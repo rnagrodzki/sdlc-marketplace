@@ -1,4 +1,4 @@
-# sdlc-utilities
+# sdlc-marketplace
 
 A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that automates SDLC tasks: generates structured PR descriptions from commits and diffs, and runs project-customizable multi-dimension code reviews matched to your changed files.
 
@@ -16,7 +16,7 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that auto
 ### Step 1 — Add the marketplace
 
 ```text
-/plugin marketplace add rnagrodzki/sdlc-utilities
+/plugin marketplace add rnagrodzki/sdlc-marketplace
 ```
 
 This registers the marketplace catalog. No plugins are installed yet.
@@ -24,7 +24,7 @@ This registers the marketplace catalog. No plugins are installed yet.
 ### Step 2 — Install the plugin
 
 ```text
-/plugin install sdlc@sdlc-utilities
+/plugin install sdlc@sdlc-marketplace
 ```
 
 Or browse interactively: run `/plugin`, go to the **Discover** tab, and select the plugin to install.
@@ -42,18 +42,18 @@ See [docs/getting-started.md](docs/getting-started.md) for a full first-use walk
 ### Step 1 — Refresh the marketplace catalog
 
 ```text
-/plugin marketplace update sdlc-utilities
+/plugin marketplace update sdlc-marketplace
 ```
 
 ### Step 2 — Update the plugin
 
 ```text
-/plugin update sdlc@sdlc-utilities
+/plugin update sdlc@sdlc-marketplace
 ```
 
 ### Enable auto-update
 
-Open `/plugin`, go to the **Marketplaces** tab, and toggle auto-update for `sdlc-utilities`. When enabled, Claude Code checks for new versions on startup.
+Open `/plugin`, go to the **Marketplaces** tab, and toggle auto-update for `sdlc-marketplace`. When enabled, Claude Code checks for new versions on startup.
 
 ---
 
@@ -102,13 +102,13 @@ To skip the check when a version bump is intentionally not needed, add the **`sk
 This happens when the plugin name registered in the marketplace doesn't match the identity in `plugin.json`. Clear the cache, restart, and reinstall:
 
 ```bash
-rm -rf ~/.claude/plugins/cache/sdlc-utilities
+rm -rf ~/.claude/plugins/cache/sdlc-marketplace
 ```
 
 Then restart Claude Code and run:
 
 ```text
-/plugin install sdlc@sdlc-utilities
+/plugin install sdlc@sdlc-marketplace
 ```
 
 ### Plugin not updating after marketplace refresh

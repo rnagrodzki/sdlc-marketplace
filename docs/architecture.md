@@ -12,7 +12,7 @@ This repository serves two roles:
 ## Directory Structure
 
 ```text
-sdlc-utilities/
+sdlc-marketplace/
 ├── .claude-plugin/
 │   └── marketplace.json          # Marketplace manifest (entry point)
 ├── plugins/
@@ -43,13 +43,13 @@ sdlc-utilities/
 The root `marketplace.json` tells Claude Code: "This repository contains plugins. Here
 is where to find them." It lists each plugin with a name and a relative source path.
 
-When a user runs `/plugin marketplace add rnagrodzki/sdlc-utilities` in Claude Code:
+When a user runs `/plugin marketplace add rnagrodzki/sdlc-marketplace` in Claude Code:
 
 1. Clones or references this repository
 2. Reads `.claude-plugin/marketplace.json`
 3. Discovers the listed plugins and makes them available to browse
 
-No plugins are installed yet at this point. The user must then run `/plugin install sdlc@sdlc-utilities` (or use the interactive **Discover** tab in `/plugin`) to install the plugin.
+No plugins are installed yet at this point. The user must then run `/plugin install sdlc@sdlc-marketplace` (or use the interactive **Discover** tab in `/plugin`) to install the plugin.
 
 **Important:** The `name` in each `marketplace.json` plugin entry must match the `name` in the corresponding `plugin.json`. A mismatch causes "plugin not found" errors when users try to update via the `/plugin` UI, because Claude Code looks up the installed plugin identity (from `plugin.json`) in the marketplace catalog.
 

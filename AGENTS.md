@@ -3,8 +3,8 @@
 This repository is a **Claude Code plugin marketplace** that ships the `sdlc-utilities` plugin for software development lifecycle (SDLC) automation. Installation requires two steps:
 
 ```text
-/plugin marketplace add rnagrodzki/sdlc-utilities
-/plugin install sdlc@sdlc-utilities
+/plugin marketplace add rnagrodzki/sdlc-marketplace
+/plugin install sdlc@sdlc-marketplace
 ```
 
 ---

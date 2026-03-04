@@ -5,7 +5,7 @@
 ### Step 1 — Add the marketplace
 
 ```text
-/plugin marketplace add rnagrodzki/sdlc-utilities
+/plugin marketplace add rnagrodzki/sdlc-marketplace
 ```
 
 This registers the marketplace catalog with Claude Code. No plugins are installed yet.
@@ -13,7 +13,7 @@ This registers the marketplace catalog with Claude Code. No plugins are installe
 ### Step 2 — Install the plugin
 
 ```text
-/plugin install sdlc@sdlc-utilities
+/plugin install sdlc@sdlc-marketplace
 ```
 
 Or browse interactively: run `/plugin`, go to the **Discover** tab, and select the plugin to install.
@@ -34,18 +34,18 @@ After installation, start a new Claude Code session. You should see a message fr
 ### Refresh the marketplace catalog
 
 ```text
-/plugin marketplace update sdlc-utilities
+/plugin marketplace update sdlc-marketplace
 ```
 
 ### Update the plugin
 
 ```text
-/plugin update sdlc@sdlc-utilities
+/plugin update sdlc@sdlc-marketplace
 ```
 
 ### Enable auto-update
 
-Open `/plugin`, go to the **Marketplaces** tab, and toggle auto-update for `sdlc-utilities`.
+Open `/plugin`, go to the **Marketplaces** tab, and toggle auto-update for `sdlc-marketplace`.
 
 ## First Use
 
