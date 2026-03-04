@@ -1,55 +1,55 @@
 # Getting Started
 
+## Requirements
+
+| Requirement | Version | Notes |
+| --- | --- | --- |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | — | This is a Claude Code plugin marketplace |
+| Node.js | >= 16 | For helper scripts. Uses built-in modules, no `npm install` needed |
+| git | — | Required for diff and commit analysis |
+| gh (GitHub CLI) | — | Required for `/sdlc:pr`. Falls back to showing the description if unavailable |
+
 ## Installation
 
-### Step 1 — Add the marketplace
+### Via the plugin UI (recommended)
+
+1. Open Claude Code and run `/plugin`
+2. Go to **Marketplaces** → **Add marketplace** → enter `rnagrodzki/sdlc-marketplace`
+3. Go to **Discover** → select `sdlc` → **Install**
+
+### Via CLI commands
 
 ```text
 /plugin marketplace add rnagrodzki/sdlc-marketplace
-```
-
-This registers the marketplace catalog with Claude Code. No plugins are installed yet.
-
-### Step 2 — Install the plugin
-
-```text
 /plugin install sdlc@sdlc-marketplace
 ```
 
-Or browse interactively: run `/plugin`, go to the **Discover** tab, and select the plugin to install.
+### Verifying installation
 
-### Verifying Installation
-
-After installation, start a new Claude Code session. You should see a message from the plugin:
+After installation, start a new Claude Code session. You should see:
 
 ```text
-[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions.
+[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:pr-customize to create a PR template, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions, /sdlc:version to manage releases.
 ```
 
-> **Note:** Commands and skills are namespaced with the plugin name. The `/pr` command
-> becomes `/sdlc:pr`. See [Architecture](architecture.md#name-resolution) for details.
+> **Note:** Commands and skills are namespaced with the plugin name. The `pr` command becomes `/sdlc:pr`. See [Architecture](architecture.md#name-resolution) for details.
 
-## Updating the Plugin
+## Updating
 
-### Refresh the marketplace catalog
+### Via the plugin UI
+
+Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketplace`.
+
+### Via update commands
 
 ```text
 /plugin marketplace update sdlc-marketplace
-```
-
-### Update the plugin
-
-```text
 /plugin update sdlc@sdlc-marketplace
 ```
 
-### Enable auto-update
-
-Open `/plugin`, go to the **Marketplaces** tab, and toggle auto-update for `sdlc-marketplace`.
-
 ## First Use
 
-### Code Review Setup
+### Code review setup
 
 The plugin provides a project-customizable multi-dimension code review system.
 
@@ -59,9 +59,7 @@ The plugin provides a project-customizable multi-dimension code review system.
 /sdlc:review-init
 ```
 
-Scans your tech stack and proposes tailored dimension files (security, API contracts,
-test coverage, etc.) in `.claude/review-dimensions/`. Run with `--add` to expand an
-existing set.
+Scans your tech stack and proposes tailored dimension files (security, API contracts, test coverage, etc.) in `.claude/review-dimensions/`. Run with `--add` to expand an existing set.
 
 **Step 2 — Run reviews** (on any feature branch):
 
@@ -69,10 +67,9 @@ existing set.
 /sdlc:review
 ```
 
-Matches dimensions to your changed files, dispatches parallel review subagents,
-deduplicates findings, and posts a consolidated comment to the PR.
+Matches dimensions to your changed files, dispatches parallel review subagents, deduplicates findings, and posts a consolidated comment to the PR.
 
-### Creating a Pull Request
+### Creating a pull request
 
 ```text
 /sdlc:pr
@@ -82,9 +79,11 @@ Generates a structured PR description from your commits and diffs, then opens th
 
 ## What Gets Created
 
-| File/Directory               | Purpose                                                                   |
-|------------------------------|---------------------------------------------------------------------------|
+| File / Directory | Purpose |
+| --- | --- |
 | `.claude/review-dimensions/` | Per-project code review dimension files (created by `/sdlc:review-init`) |
+| `.claude/pr-template.md` | Project PR template (created by `/sdlc:pr-customize`) |
+| `.claude/version.json` | Release configuration (created by `/sdlc:version --init`) |
 
 ## Next Steps
 
