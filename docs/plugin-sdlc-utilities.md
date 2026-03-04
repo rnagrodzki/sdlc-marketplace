@@ -77,6 +77,54 @@ Create this PR? (yes / edit / cancel)
 
 ---
 
+### Custom PR Templates
+
+By default, `/sdlc:pr` uses an 8-section template (Summary, JIRA Ticket, Business Context,
+Business Benefits, Technical Design, Technical Impact, Changes Overview, Testing). You can
+replace this with a project-specific template by creating `.claude/pr-template.md`.
+
+#### Template format
+
+A PR template is a plain markdown file with `## Section` headings. The text under each
+heading is a fill instruction for the LLM — it describes what should go in that section.
+
+Example `.claude/pr-template.md`:
+
+````markdown
+## Summary
+[1-3 sentence plain-language overview of the change]
+
+## What Changed
+[Describe what was changed, grouped by logical concern. No file paths.]
+
+## Why
+[Business or technical reason for this change]
+
+## Testing
+[How was this verified? Manual steps, automated tests, edge cases.]
+````
+
+When `/sdlc:pr` is run in a project with this file, it uses your sections instead of the default 8.
+
+#### Creating a template
+
+Run `/sdlc:pr-customize` to create or edit your project template interactively. The command:
+
+1. Scans your project for conventions (GitHub PR templates, recent PR patterns, JIRA usage)
+2. Proposes a tailored starter template with evidence-backed sections
+3. Guides you through customization — keep, remove, rename, or add sections
+4. Writes `.claude/pr-template.md` and validates it
+
+#### Validating a template
+
+```bash
+node <plugin-scripts-path>/validate-pr-template.js --project-root .
+```
+
+Checks: file exists, non-empty, at least one section, no duplicate headings, every section has body text.
+
+---
+
 ---
 
 ## `/sdlc:review` — Multi-Dimension Code Review
