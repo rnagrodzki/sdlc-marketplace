@@ -46,6 +46,6 @@ The skill will help you review and update it.
 
 ### Step 3: Delegate to Skill
 
-Invoke the `customizing-pr-template` skill. The skill handles everything from here:
+Invoke the `sdlc-customizing-pr-template` skill. The skill handles everything from here:
 project signal scanning, template proposal, interactive customization, file creation,
 and validation.

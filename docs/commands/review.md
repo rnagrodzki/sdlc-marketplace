@@ -59,7 +59,7 @@ The command posts a single PR comment:
 ```markdown
 ## Code Review — 3 dimension(s), 7 finding(s)
 
-> Automated review by `sdlc:reviewing-changes` · 2026-02-25
+> Automated review by `sdlc:sdlc-reviewing-changes` · 2026-02-25
 
 ### Summary
 

@@ -1,6 +1,6 @@
-# reviewing-changes — Reference
+# sdlc-reviewing-changes — Reference
 
-Supporting reference for the `sdlc:reviewing-changes` skill.
+Supporting reference for the `sdlc:sdlc-reviewing-changes` skill.
 Contains: dimension file format spec, subagent prompt template, consolidated comment template.
 
 See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension files.
@@ -187,7 +187,7 @@ After all subagents complete and findings are deduplicated, post this as a singl
 ```markdown
 ## Code Review — {N} dimension(s), {M} finding(s)
 
-> Automated review by `sdlc:reviewing-changes` · {date}
+> Automated review by `sdlc:sdlc-reviewing-changes` · {date}
 
 ### Summary
 

@@ -4,7 +4,7 @@
  *
  * Pre-processing script for the /sdlc:version command.
  * Collects version source, git tags, commits since last tag, and remote state
- * into a single JSON blob consumed by the versioning-releases skill.
+ * into a single JSON blob consumed by the sdlc-versioning-releases skill.
  *
  * Usage:
  *   node version-prepare.js [major|minor|patch] [--init] [--pre <label>]

@@ -75,10 +75,10 @@ with the plugin's `name` (from `plugin.json`), using the format `<plugin-name>:<
 
 **Skills** — referenced as `<plugin-name>:<skill-name>`:
 
-| Directory                          | `plugin.json` `name` | Resolved name                       |
-|------------------------------------|----------------------|-------------------------------------|
-| `skills/creating-pull-requests/`   | `sdlc`               | `sdlc:creating-pull-requests`       |
-| `skills/reviewing-changes/`        | `sdlc`               | `sdlc:reviewing-changes`            |
+| Directory                                   | `plugin.json` `name` | Resolved name                            |
+|---------------------------------------------|----------------------|------------------------------------------|
+| `skills/sdlc-creating-pull-requests/`       | `sdlc`               | `sdlc:sdlc-creating-pull-requests`       |
+| `skills/sdlc-reviewing-changes/`            | `sdlc`               | `sdlc:sdlc-reviewing-changes`            |
 
 The `name` field in `plugin.json` is the namespace prefix — **not** the directory name. Keep it
 stable — renaming it changes every command and skill name for all installed users.

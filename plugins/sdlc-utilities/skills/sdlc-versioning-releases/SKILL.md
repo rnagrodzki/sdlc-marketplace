@@ -1,5 +1,5 @@
 ---
-name: versioning-releases
+name: sdlc-versioning-releases
 description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow. Consumes pre-computed context from version-prepare.js and handles the complete release process. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate."
 user-invokable: false
 ---
@@ -256,7 +256,7 @@ Display result:
 After completing a release or encountering unexpected behavior, append to `.claude/learnings/log.md`:
 
 ```
-## YYYY-MM-DD — versioning-releases: <brief summary>
+## YYYY-MM-DD — sdlc-versioning-releases: <brief summary>
 <what happened, what was learned>
 ```
 

@@ -6,7 +6,7 @@ argument-hint: "[--base <branch>] [--dimensions <name,...>] [--dry-run]"
 
 # /review Command
 
-Invoke the `reviewing-changes` skill, passing all `$ARGUMENTS`.
+Invoke the `sdlc-reviewing-changes` skill, passing all `$ARGUMENTS`.
 
 All validation (git state, base branch detection, uncommitted changes warning,
 dimension discovery) is handled by the `review-prepare.js` script inside the skill.
