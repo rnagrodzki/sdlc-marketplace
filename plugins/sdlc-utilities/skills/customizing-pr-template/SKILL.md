@@ -191,10 +191,11 @@ After the user accepts:
 After writing, locate and run the validation script:
 
 ```bash
-node <script-path>/validate-pr-template.js --project-root .
+SCRIPT=$(find ~/.claude/plugins -name "validate-pr-template.js" -path "*/scripts/*" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "validate-pr-template.js" -path "*/scripts/*" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate validate-pr-template.js. Is the sdlc plugin installed?" >&2; exit 2; }
+node "$SCRIPT" --project-root .
 ```
-
-Locate the script with Glob: `**/scripts/validate-pr-template.js`
 
 - If validation **passes**: show the summary table from the script output.
 - If validation **fails**: show the error and offer to fix it automatically.

@@ -10,8 +10,9 @@ Project-aware dimension creator: scan tech stack, propose tailored dimensions wi
 let the user select, write files, and validate with the validation script.
 
 Supporting references (dimension format spec, 5 example dimensions) are in
-`reviewing-changes/REFERENCE.md` and `reviewing-changes/EXAMPLES.md`. Locate them with Glob:
-`**/reviewing-changes/REFERENCE.md`.
+`reviewing-changes/REFERENCE.md` and `reviewing-changes/EXAMPLES.md`. Locate them using Glob
+with `path: ~/.claude` and pattern `**/reviewing-changes/REFERENCE.md`. If not found, retry
+Glob with the default path (cwd). Use the same approach for EXAMPLES.md.
 
 ---
 
@@ -83,8 +84,12 @@ Check `.claude/review-dimensions/` for already-installed dimension files.
 
 In `--add` (expansion) mode:
 
-- Locate the validation script with Glob: `**/scripts/validate-dimensions.js`
-- Run: `node <plugin-scripts-path>/validate-dimensions.js --project-root . --json`
+- Locate the validation script:
+  ```bash
+  SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/scripts/*" 2>/dev/null | head -1)
+  [ -z "$SCRIPT" ] && SCRIPT=$(find . -name "validate-dimensions.js" -path "*/scripts/*" 2>/dev/null | head -1)
+  ```
+- Run: `node "$SCRIPT" --project-root . --json`
 - Extract the list of currently installed dimension names from the output
 - Note their trigger patterns so new proposals avoid identical globs
 
@@ -196,10 +201,12 @@ For each selected dimension:
 
 ### Step 7 — Validate Installation
 
-Run the validation script:
+Run the validation script (use `SCRIPT` resolved in Step 2, or re-resolve if Step 2 was skipped):
 
 ```bash
-node <plugin-scripts-path>/validate-dimensions.js --project-root . --markdown
+SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/scripts/*" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "validate-dimensions.js" -path "*/scripts/*" 2>/dev/null | head -1)
+node "$SCRIPT" --project-root . --markdown
 ```
 
 Present the markdown output table.

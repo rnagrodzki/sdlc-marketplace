@@ -23,18 +23,17 @@ creates a new one.
 
 ### Step 1: Run the Pre-processing Script
 
-Locate the script:
-
-```text
-**/scripts/pr-prepare.js
-```
-
-Build the command from the arguments passed to this command:
+Locate and run the script:
 
 ```bash
+# Resolve script: check installed plugin location first, then fall back to project tree
+SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "pr-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate pr-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+
 # Write to temp file — large diffs (100KB+) break shell pipes
 PR_CONTEXT_FILE=$(mktemp /tmp/pr-context-XXXXXX.json)
-node <script-path>/pr-prepare.js $ARGUMENTS > "$PR_CONTEXT_FILE"
+node "$SCRIPT" $ARGUMENTS > "$PR_CONTEXT_FILE"
 EXIT_CODE=$?
 ```
 

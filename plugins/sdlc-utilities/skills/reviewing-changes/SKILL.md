@@ -14,18 +14,17 @@ findings, and posts the consolidated PR comment.
 
 ## Step 1 — Run Preparation Script
 
-Locate the script:
-
-```
-**/scripts/review-prepare.js
-```
-
-Build the command from the arguments passed to this skill:
+Locate and run the script:
 
 ```bash
+# Resolve script: check installed plugin location first, then fall back to project tree
+SCRIPT=$(find ~/.claude/plugins -name "review-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "review-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate review-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+
 # Write to temp file — large manifests (100KB+) break shell pipes
 MANIFEST_FILE=$(mktemp /tmp/review-manifest-XXXXXX.json)
-node <script-path>/review-prepare.js \
+node "$SCRIPT" \
   --project-root . \
   [--base <branch>]        # include if --base was provided
   [--dimensions <names>]   # include if --dimensions was provided
@@ -82,24 +81,19 @@ Stop here.
 
 ## Step 3 — Spawn Orchestrator Agent
 
-Locate the orchestrator agent definition:
+Locate the orchestrator agent definition using Glob with `path: ~/.claude` and pattern
+`**/agents/review-orchestrator.md`. If not found, retry Glob with the default path (cwd).
 
-```
-**/agents/review-orchestrator.md
-```
-
-Locate the reference templates:
-
-```
-**/reviewing-changes/REFERENCE.md
-```
+Locate the reference templates using Glob with `path: ~/.claude` and pattern
+`**/reviewing-changes/REFERENCE.md`. If not found, retry Glob with the default path (cwd).
+Store the resolved absolute path as `REFERENCE_MD_PATH`.
 
 Spawn a single Agent (subagent_type: general-purpose) with the orchestrator agent's
 instructions and this context embedded in the prompt:
 
 ```
 MANIFEST_JSON: {the full JSON manifest from Step 1}
-REFERENCE_MD_PATH: **/reviewing-changes/REFERENCE.md
+REFERENCE_MD_PATH: {resolved absolute path to REFERENCE.md from above}
 ```
 
 Wait for the orchestrator to complete and return results.
