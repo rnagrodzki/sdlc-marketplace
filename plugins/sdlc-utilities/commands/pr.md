@@ -26,9 +26,9 @@ creates a new one.
 Locate and run the script:
 
 ```bash
-# Resolve script: check installed plugin location first, then fall back to project tree
-SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "pr-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
+# Resolve script: check project tree first (local changes take precedence), then fall back to installed plugin
+SCRIPT=$(find . -name "pr-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate pr-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 # Write to temp file — large diffs (100KB+) break shell pipes

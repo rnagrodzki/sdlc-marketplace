@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions.'"
+            "command": "echo '[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions, /sdlc:version to manage releases.'"
           }
         ]
       }

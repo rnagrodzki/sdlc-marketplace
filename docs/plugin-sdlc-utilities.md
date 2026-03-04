@@ -243,6 +243,56 @@ Validation: 4/4 dimensions pass all checks.
 
 ---
 
+## `/sdlc:version` — Semantic Versioning & Release Management
+
+Detects the project version source, bumps the version, creates an annotated git tag,
+optionally generates a CHANGELOG entry, and pushes the release.
+
+**First-time setup** (run once per project):
+
+```text
+/sdlc:version --init
+```
+
+### Version Usage
+
+```text
+/sdlc:version patch                    # 1.2.3 → 1.2.4
+/sdlc:version minor                    # 1.2.3 → 1.3.0
+/sdlc:version minor --pre beta         # 1.2.3 → 1.3.0-beta.1 (pre-release)
+/sdlc:version patch --changelog        # bump + generate CHANGELOG entry
+/sdlc:version minor --no-push          # bump and tag locally, skip push
+```
+
+### Version Flags
+
+```text
+/sdlc:version --init                   # run setup wizard, write .claude/version.json
+/sdlc:version major --pre rc           # 1.2.3 → 2.0.0-rc.1
+/sdlc:version --pre beta               # increment existing pre-release counter
+```
+
+### Config File
+
+Stores per-project settings in `.claude/version.json` after `--init`:
+
+```json
+{
+  "mode": "file",
+  "versionFile": "package.json",
+  "fileType": "package.json",
+  "tagPrefix": "v",
+  "changelog": false,
+  "changelogFile": "CHANGELOG.md"
+}
+```
+
+Set `"mode": "tag"` for projects without a version file (git tag is the version source).
+
+> **[Full reference →](version-command.md)** All flags, config schema, supported version files, pre-release workflow, CHANGELOG format
+
+---
+
 ## Review Dimensions Format
 
 Each project defines review dimensions as `.md` files in `.claude/review-dimensions/`.

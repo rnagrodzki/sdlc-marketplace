@@ -41,6 +41,15 @@ Entries flow from incidents, debugging sessions, and evolution cycles.
 - **Action**: (1) Update `pr.md` command to prescribe temp-file write pattern. (2) Add GOTCHA section to `creating-pull-requests` SKILL.md. (3) Apply same fix to `review.md` / `reviewing-changes` SKILL.md. (4) Consider adding `--output-file` flag to both scripts.
 - **Status**: ACTIVE
 
+### [GOTCHA] Installed plugin script version skew silently suppresses custom PR template
+
+- **Date**: 2026-03-04
+- **Session**: post-mortem
+- **Discovery**: `pr.md` resolved `pr-prepare.js` from the installed plugin first (`~/.claude/plugins`). Installed v0.3.1 predates custom template support; the project's current script has it. The installed version always won, so `PR_CONTEXT_JSON.customTemplate` was `null`, and the skill silently used the default 8-section template (including JIRA Ticket) instead of the project's 7-section `.claude/pr-template.md`. Root cause: lookup order preferred installed over local; no fallback in the skill to cross-check disk.
+- **Impact**: HIGH — project template preferences silently ignored; wrong sections injected into every PR generated against this project.
+- **Action**: (1) Reversed lookup order in `pr.md`: local project script first, installed second. (2) Added Quality Gate Gotcha to `creating-pull-requests` skill: if `customTemplate` is null, check disk for `.claude/pr-template.md` and read it directly if present, warn about potential version skew.
+- **Status**: ACTIVE
+
 ### [GOTCHA] Hardcoded branch names in AGENTS.md become stale immediately
 
 - **Date**: 2026-02-24
