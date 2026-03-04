@@ -245,6 +245,62 @@ function getDiffContent(base, projectRoot) {
 }
 
 // ---------------------------------------------------------------------------
+// Version-specific helpers (used by version-prepare.js only)
+// ---------------------------------------------------------------------------
+
+/**
+ * List all semver-like tags, sorted by descending version (latest first).
+ * Includes tags with or without a 'v' prefix (e.g., 'v1.2.3' or '1.2.3').
+ * @param {string} projectRoot
+ * @returns {string[]}
+ */
+function getTagList(projectRoot) {
+  const out = exec('git tag --list --sort=-v:refname', { cwd: projectRoot });
+  if (!out) return [];
+  return out.split('\n').filter(tag => /^v?\d+\.\d+\.\d+/.test(tag));
+}
+
+/**
+ * Return structured commit objects since a given ref (tag, commit, etc.) up to HEAD.
+ * If sinceRef is empty or null, returns ALL commits in the repository.
+ * Uses the same separator-based parsing as getCommitsStructured.
+ * @param {string|null} sinceRef - tag name, commit SHA, or null for all commits
+ * @param {string} projectRoot
+ * @returns {Array<{ hash: string, subject: string, body: string, coAuthors: string[] }>}
+ */
+function getCommitsSinceRef(sinceRef, projectRoot) {
+  const SEP   = '---COMMIT---';
+  const range = sinceRef ? `${sinceRef}..HEAD` : 'HEAD';
+  const raw   = exec(
+    `git log --format="${SEP}%n%H%n%s%n%b%n%(trailers:key=Co-authored-by)" ${range}`,
+    { cwd: projectRoot }
+  );
+  if (!raw) return [];
+
+  const commits = [];
+  const blocks  = raw.split(SEP).filter(b => b.trim());
+
+  for (const block of blocks) {
+    const lines = block.trim().split('\n');
+    if (lines.length < 2) continue;
+
+    const hash    = lines[0].trim().slice(0, 8);
+    const subject = lines[1].trim();
+    const rest    = lines.slice(2);
+
+    const coAuthors = rest.filter(l => /^Co-authored-by:/i.test(l.trim())).map(l => l.trim());
+    const bodyLines = rest.filter(l => !/^Co-authored-by:/i.test(l.trim()));
+    const body      = bodyLines.join('\n').trim();
+
+    if (hash && subject) {
+      commits.push({ hash, subject, body, coAuthors });
+    }
+  }
+
+  return commits;
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -264,4 +320,7 @@ module.exports = {
   getCommitsStructured,
   getDiffStat,
   getDiffContent,
+  // Version-specific
+  getTagList,
+  getCommitsSinceRef,
 };
