@@ -1,0 +1,51 @@
+# Learnings Log
+
+This is the append-only learnings log for the `ai-setup-automation` marketplace repository.
+Entries flow from incidents, debugging sessions, and evolution cycles.
+
+---
+
+### [DOC_GAP] Documentation not updated after structural feature PRs
+
+- **Date**: 2026-02-24
+- **Session**: post-mortem
+- **Discovery**: After PRs #2, #3, #4 added the `sdlc-utilities` plugin, namespace prefixes, `scripts/`, and CI enforcement, 25 specific documentation issues accumulated across 7 files. Root cause: the PR workflow (`creating-pull-requests` skill) has no quality gate checking whether structural docs (README, AGENTS.md, docs/) were updated to match code changes. `aisa-evolve-target` was never triggered post-merge despite being designed for exactly this.
+- **Impact**: HIGH — misleading docs for contributors; wrong naming conventions documented; entire `scripts/` directory undocumented; outdated PR template description in README vs actual 8-section skill.
+- **Action**: (1) Add "Documentation Sync" quality gate to `creating-pull-requests` skill. (2) Add Best Practice note in that skill recommending `/aisa-evolve-target` after structural changes. (3) Fix all 25 doc issues in 7 files. (4) Establish `.claude/learnings/` in this repo for future capture.
+- **Status**: ACTIVE
+
+### [PATTERN_FAILED] Prescriptive docs written without reading actual code
+
+- **Date**: 2026-02-24
+- **Session**: post-mortem
+- **Discovery**: `docs/adding-skills.md` recommends a gerund naming convention for skill directories (e.g., `writing-unit-tests`). 8 of 9 actual skills in the repo use a non-gerund prefix pattern (`aisa-init`, `aisa-evolve`, `aisa-evolve-*`). The doc was authored as prescriptive ideal without cross-referencing existing code — a violation of Behavioral Rule 2 ("code is ground truth").
+- **Impact**: MEDIUM — contributors following the docs would create skills with inconsistent naming.
+- **Action**: Fix `docs/adding-skills.md` to describe the actual naming pattern used. Document both the `<plugin-prefix>-<noun>` pattern (aisa skills) and the gerund pattern (sdlc skills) as context-specific conventions.
+- **Status**: ACTIVE
+
+### [DOC_GAP] scripts/ directory entirely absent from all documentation
+
+- **Date**: 2026-02-24
+- **Session**: post-mortem
+- **Discovery**: `plugins/ai-setup-automation/scripts/` contains `verify-setup.js`, `cache-snapshot.js`, and a `lib/` directory with 6 modules. Not one documentation file mentions this directory. Contributors have no guidance on how to add scripts to a plugin or when to use them vs skills.
+- **Impact**: HIGH — scripts are invoked by health and cache skills; undocumented maintenance risk.
+- **Action**: Add `scripts/` to all structural documentation (AGENTS.md, README.md, docs/architecture.md). Consider adding `docs/adding-scripts.md` if scripts are expected to grow.
+- **Status**: ACTIVE
+
+### [GOTCHA] Large script JSON output (>65KB) breaks shell pipes — use temp file pattern
+
+- **Date**: 2026-03-03
+- **Session**: post-mortem
+- **Discovery**: `pr-prepare.js` embeds full `diffContent` in its JSON output, inflating it to ~150KB for a 16-file PR. When an agent runs `node pr-prepare.js | node -e "..."` to parse the output, the pipe silently truncates at ~65KB, producing "Unterminated string in JSON at position 65342". The `pr.md` command says "capture stdout as `PR_CONTEXT_JSON`" with no guidance for large outputs, so the natural interpretation (shell pipe) fails. Workaround: write to a temp file first (`node pr-prepare.js > /tmp/pr-context-$$.json`), then read from it. Same risk applies to `review-prepare.js`.
+- **Impact**: HIGH — `/sdlc:pr` fails silently on repos with large diffs; requires 3+ extra recovery steps.
+- **Action**: (1) Update `pr.md` command to prescribe temp-file write pattern. (2) Add GOTCHA section to `creating-pull-requests` SKILL.md. (3) Apply same fix to `review.md` / `reviewing-changes` SKILL.md. (4) Consider adding `--output-file` flag to both scripts.
+- **Status**: ACTIVE
+
+### [GOTCHA] Hardcoded branch names in AGENTS.md become stale immediately
+
+- **Date**: 2026-02-24
+- **Session**: post-mortem
+- **Discovery**: AGENTS.md contained `Current branch: fix/docs` and `Target merge branch: main` as hardcoded text. After merging to main, these lines became factually wrong. Branch metadata in static docs is always stale — it reflects the state at time of writing, not at time of reading.
+- **Impact**: LOW — confusing to contributors and AI agents reading the file.
+- **Action**: Remove hardcoded branch metadata from AGENTS.md. If branch context is needed, use git commands instead of hardcoding in docs.
+- **Status**: ACTIVE

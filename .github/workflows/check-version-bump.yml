@@ -1,0 +1,35 @@
+name: Check Plugin Version Bumps
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for skip label
+        id: skip-check
+        run: |
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'skip-version-check') }}" == "true" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip notice
+        if: steps.skip-check.outputs.skip == 'true'
+        run: echo "::notice::Version check skipped via 'skip-version-check' label"
+
+      - name: Checkout
+        if: steps.skip-check.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version bumps
+        if: steps.skip-check.outputs.skip != 'true'
+        run: node .github/scripts/check-version-bump.js
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}

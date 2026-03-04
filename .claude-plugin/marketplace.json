@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ai-setup-automation",
+  "description": "Marketplace for AI project setup automation skills, commands, and hooks. Install this to get tools that help you create and maintain AI-ready project configurations.",
+  "owner": {
+    "name": "rnagrodzki"
+  },
+  "plugins": [
+    {
+      "name": "aisa",
+      "source": "./plugins/ai-setup-automation"
+    },
+    {
+      "name": "sdlc",
+      "source": "./plugins/sdlc-utilities"
+    }
+  ]
+}

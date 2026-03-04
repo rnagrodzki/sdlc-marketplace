@@ -1,0 +1,267 @@
+/**
+ * git.js
+ * Shared git and GitHub utilities for sdlc-utilities scripts.
+ * Zero external dependencies — Node.js built-ins only.
+ *
+ * Exports (shared — used by review-prepare.js and pr-prepare.js):
+ *   exec, checkGitState, detectBaseBranch, getChangedFiles,
+ *   getCommitLog, getCommitCount, fetchPrMetadata
+ *
+ * Exports (PR-specific — used by pr-prepare.js only):
+ *   getRemoteState, pushToRemote, getCommitsStructured,
+ *   getDiffStat, getDiffContent
+ */
+
+'use strict';
+
+const { execSync, spawnSync } = require('node:child_process');
+
+// ---------------------------------------------------------------------------
+// Core exec helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Run a shell command and return trimmed stdout, or null on failure.
+ * @param {string} cmd
+ * @param {object} [opts]  Passed to execSync (cwd, shell, etc.)
+ * @param {boolean} [opts.throwOnError]  If true, rethrows on failure instead of returning null.
+ * @returns {string|null}
+ */
+function exec(cmd, opts = {}) {
+  const { throwOnError, ...execOpts } = opts;
+  try {
+    return execSync(cmd, { encoding: 'utf8', ...execOpts }).trim();
+  } catch (err) {
+    if (throwOnError) throw err;
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers (used by both review-prepare.js and pr-prepare.js)
+// ---------------------------------------------------------------------------
+
+/**
+ * Verify the working directory is inside a git repo and return basic state.
+ * @param {string} projectRoot
+ * @returns {{ currentBranch: string, uncommittedChanges: boolean, dirtyFiles: string[] }}
+ * @throws {Error} if not inside a git repo
+ */
+function checkGitState(projectRoot) {
+  const inside = exec('git rev-parse --is-inside-work-tree', { cwd: projectRoot });
+  if (inside !== 'true') throw new Error('Not inside a git repository');
+
+  const currentBranch = exec('git branch --show-current', { cwd: projectRoot }) || 'HEAD';
+  const statusLines   = exec('git status --porcelain', { cwd: projectRoot }) || '';
+  const dirtyFiles    = statusLines.split('\n').filter(Boolean).map(l => l.slice(3));
+
+  return { currentBranch, uncommittedChanges: dirtyFiles.length > 0, dirtyFiles };
+}
+
+/**
+ * Auto-detect the default base branch.
+ * Tries: origin/HEAD symbolic ref → 'main' → 'master'.
+ * @param {string} projectRoot
+ * @returns {string}
+ * @throws {Error} if no base branch can be detected
+ */
+function detectBaseBranch(projectRoot) {
+  const fromRemote = exec(
+    "git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@'",
+    { cwd: projectRoot, shell: true }
+  );
+  if (fromRemote) return fromRemote;
+
+  for (const candidate of ['main', 'master']) {
+    const exists = exec(`git rev-parse --verify ${candidate} 2>/dev/null`, { cwd: projectRoot, shell: true });
+    if (exists) return candidate;
+  }
+
+  throw new Error('Cannot auto-detect base branch. Use --base <branch>.');
+}
+
+/**
+ * List files changed between base and HEAD.
+ * @param {string} base
+ * @param {string} projectRoot
+ * @returns {string[]}
+ */
+function getChangedFiles(base, projectRoot) {
+  const out = exec(`git diff --name-only ${base}..HEAD`, { cwd: projectRoot });
+  return out ? out.split('\n').filter(Boolean) : [];
+}
+
+/**
+ * One-line commit log between base and HEAD.
+ * @param {string} base
+ * @param {string} projectRoot
+ * @returns {string}
+ */
+function getCommitLog(base, projectRoot) {
+  return exec(`git log --oneline ${base}..HEAD`, { cwd: projectRoot }) || '';
+}
+
+/**
+ * Number of commits between base and HEAD.
+ * @param {string} base
+ * @param {string} projectRoot
+ * @returns {number}
+ */
+function getCommitCount(base, projectRoot) {
+  const count = exec(`git rev-list --count ${base}..HEAD`, { cwd: projectRoot });
+  return count ? parseInt(count, 10) : 0;
+}
+
+/**
+ * Fetch basic PR metadata for the current branch via `gh`.
+ * Returns { exists: false } if no PR exists or gh is unavailable.
+ * @returns {{ exists: boolean, number?: number, title?: string, url?: string, state?: string, owner?: string, repo?: string }}
+ */
+function fetchPrMetadata() {
+  const prJson = exec('gh pr view --json number,title,url,state');
+  if (!prJson) return { exists: false };
+  const repoJson = exec('gh repo view --json owner,name');
+  if (!repoJson) return { exists: false };
+  try {
+    const pr   = JSON.parse(prJson);
+    const repo = JSON.parse(repoJson);
+    return { exists: true, number: pr.number, title: pr.title, url: pr.url, state: pr.state, owner: repo.owner.login, repo: repo.name };
+  } catch (_) {
+    return { exists: false };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PR-specific helpers (used by pr-prepare.js only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Check the remote tracking state of the current branch.
+ * @param {string} projectRoot
+ * @returns {{ hasUpstream: boolean, remoteBranch: string|null, isAhead: boolean }}
+ */
+function getRemoteState(projectRoot) {
+  const upstream = exec(
+    'git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null',
+    { cwd: projectRoot }
+  );
+  if (!upstream) return { hasUpstream: false, remoteBranch: null, isAhead: false };
+
+  const aheadBehind = exec(`git status -sb`, { cwd: projectRoot }) || '';
+  const isAhead = /ahead/.test(aheadBehind);
+  return { hasUpstream: true, remoteBranch: upstream, isAhead };
+}
+
+/**
+ * Push the current branch to origin.
+ * If no upstream exists, uses `git push -u origin <branch>`.
+ * Otherwise uses `git push`.
+ * @param {string} projectRoot
+ * @param {boolean} hasUpstream
+ * @returns {'pushed-new' | 'pushed' | 'error'}
+ */
+function pushToRemote(projectRoot, hasUpstream) {
+  if (!hasUpstream) {
+    const branch = exec('git branch --show-current', { cwd: projectRoot });
+    if (!branch) return 'error';
+    const result = spawnSync('git', ['push', '-u', 'origin', branch], { cwd: projectRoot, encoding: 'utf8' });
+    return result.status === 0 ? 'pushed-new' : 'error';
+  }
+  const result = spawnSync('git', ['push'], { cwd: projectRoot, encoding: 'utf8' });
+  return result.status === 0 ? 'pushed' : 'error';
+}
+
+/**
+ * Return structured commit objects between base and HEAD.
+ * Parses Co-authored-by trailers.
+ * @param {string} base
+ * @param {string} projectRoot
+ * @returns {Array<{ hash: string, subject: string, body: string, coAuthors: string[] }>}
+ */
+function getCommitsStructured(base, projectRoot) {
+  // Use a unique separator to split commits reliably
+  const SEP = '---COMMIT---';
+  const raw = exec(
+    `git log --format="${SEP}%n%H%n%s%n%b%n%(trailers:key=Co-authored-by)" ${base}..HEAD`,
+    { cwd: projectRoot }
+  );
+  if (!raw) return [];
+
+  const commits = [];
+  const blocks = raw.split(SEP).filter(b => b.trim());
+
+  for (const block of blocks) {
+    const lines = block.trim().split('\n');
+    if (lines.length < 2) continue;
+
+    const hash    = lines[0].trim().slice(0, 8);
+    const subject = lines[1].trim();
+    const rest    = lines.slice(2);
+
+    // Co-authored-by trailers are at the end; body is everything in between
+    const coAuthors = rest.filter(l => /^Co-authored-by:/i.test(l.trim())).map(l => l.trim());
+    const bodyLines = rest.filter(l => !/^Co-authored-by:/i.test(l.trim()));
+    const body = bodyLines.join('\n').trim();
+
+    if (hash && subject) {
+      commits.push({ hash, subject, body, coAuthors });
+    }
+  }
+
+  return commits;
+}
+
+/**
+ * Return diff statistics between base and HEAD.
+ * @param {string} base
+ * @param {string} projectRoot
+ * @returns {{ filesChanged: number, insertions: number, deletions: number, summary: string }}
+ */
+function getDiffStat(base, projectRoot) {
+  const stat = exec(`git diff --stat ${base}..HEAD`, { cwd: projectRoot }) || '';
+  const summary = stat.split('\n').filter(Boolean).pop() || '';
+
+  // Parse "N files changed, N insertions(+), N deletions(-)"
+  const filesMatch = summary.match(/(\d+) files? changed/);
+  const insMatch   = summary.match(/(\d+) insertions?\(\+\)/);
+  const delMatch   = summary.match(/(\d+) deletions?\(-\)/);
+
+  return {
+    filesChanged: filesMatch ? parseInt(filesMatch[1], 10) : 0,
+    insertions:   insMatch   ? parseInt(insMatch[1],   10) : 0,
+    deletions:    delMatch   ? parseInt(delMatch[1],   10) : 0,
+    summary,
+  };
+}
+
+/**
+ * Return the full unified diff between base and HEAD.
+ * @param {string} base
+ * @param {string} projectRoot
+ * @returns {string}
+ */
+function getDiffContent(base, projectRoot) {
+  return exec(`git diff ${base}..HEAD`, { cwd: projectRoot }) || '';
+}
+
+// ---------------------------------------------------------------------------
+// Exports
+// ---------------------------------------------------------------------------
+
+module.exports = {
+  // Core
+  exec,
+  // Shared
+  checkGitState,
+  detectBaseBranch,
+  getChangedFiles,
+  getCommitLog,
+  getCommitCount,
+  fetchPrMetadata,
+  // PR-specific
+  getRemoteState,
+  pushToRemote,
+  getCommitsStructured,
+  getDiffStat,
+  getDiffContent,
+};

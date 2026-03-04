@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[ai-setup-automation] Plugin loaded. Use /aisa:setup to initialize AI configuration for your project.'"
+          }
+        ]
+      }
+    ]
+  }
+}
