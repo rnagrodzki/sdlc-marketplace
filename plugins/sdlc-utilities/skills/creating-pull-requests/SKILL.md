@@ -218,7 +218,6 @@ Title: <title>
 4. **No file paths in Changes Overview** — reviewers think in concepts, not paths
 5. **Flag risks** — call out migrations, permission changes, or config changes
 6. **Preserve author intent** — if commit messages express design rationale, carry it into the description
-7. **Trigger doc evolution after structural PRs** — if a PR adds new plugins, directories, commands, or scripts, recommend running `/aisa-evolve-target` after merge to keep skills and docs in sync with the new structure
 
 ## DO NOT
 

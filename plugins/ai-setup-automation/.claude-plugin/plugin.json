@@ -1,8 +1,0 @@
-{
-  "name": "aisa",
-  "description": "Skills, commands, and hooks for creating and maintaining AI-ready project configurations. Provides scaffolding for CLAUDE.md, .claude/ directory structure, skills, commands, and hooks.",
-  "version": "0.4.3",
-  "author": {
-    "name": "rnagrodzki"
-  }
-}
