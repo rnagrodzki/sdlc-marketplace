@@ -62,6 +62,6 @@ For the warning `"You have uncommitted changes"`, ask the user to confirm they w
 
 ### Step 2: Delegate to Skill
 
-Invoke the `versioning-releases` skill, passing `VERSION_CONTEXT_JSON` as the
+Invoke the `sdlc-versioning-releases` skill, passing `VERSION_CONTEXT_JSON` as the
 pre-computed context. The skill handles everything from here: init setup or release
 execution, version bump, changelog generation, user confirmation, and git operations.

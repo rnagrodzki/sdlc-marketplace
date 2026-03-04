@@ -55,6 +55,6 @@ Ask them to confirm if they want to proceed (particularly for uncommitted change
 
 ### Step 2: Delegate to Skill
 
-Invoke the `creating-pull-requests` skill, passing `PR_CONTEXT_JSON` as the
+Invoke the `sdlc-creating-pull-requests` skill, passing `PR_CONTEXT_JSON` as the
 pre-computed context. The skill handles everything from here: description
 generation, self-critique, user review, and PR creation or update.

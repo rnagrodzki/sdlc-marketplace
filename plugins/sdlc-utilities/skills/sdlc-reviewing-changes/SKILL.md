@@ -1,5 +1,5 @@
 ---
-name: reviewing-changes
+name: sdlc-reviewing-changes
 description: "Use this skill when reviewing code changes across project-defined dimensions (security, performance, docs, concurrency, etc.). Runs review-prepare.js to pre-compute all git data, then delegates to the review-orchestrator agent. Triggers on: review changes, code review, review PR, multi-dimension review, run review."
 user-invokable: false
 ---
@@ -85,7 +85,7 @@ Locate the orchestrator agent definition using Glob with `path: ~/.claude` and p
 `**/agents/review-orchestrator.md`. If not found, retry Glob with the default path (cwd).
 
 Locate the reference templates using Glob with `path: ~/.claude` and pattern
-`**/reviewing-changes/REFERENCE.md`. If not found, retry Glob with the default path (cwd).
+`**/sdlc-reviewing-changes/REFERENCE.md`. If not found, retry Glob with the default path (cwd).
 Store the resolved absolute path as `REFERENCE_MD_PATH`.
 
 Spawn a single Agent (subagent_type: general-purpose) with the orchestrator agent's
@@ -132,4 +132,4 @@ this project's directory layout.
 - `agents/review-orchestrator.md` — full orchestration logic
 - `REFERENCE.md` — dimension format spec, subagent prompt template, comment template
 - `EXAMPLES.md` — 5 ready-to-use example dimension files
-- `sdlc:initializing-review-dimensions` — creates tailored dimensions for a project
+- `sdlc:sdlc-initializing-review-dimensions` — creates tailored dimensions for a project

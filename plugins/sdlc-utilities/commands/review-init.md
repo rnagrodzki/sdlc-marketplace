@@ -39,7 +39,7 @@ This command must be run from inside a git repository.
 
 ### Step 2: Delegate to Skill
 
-Invoke the `initializing-review-dimensions` skill, passing:
+Invoke the `sdlc-initializing-review-dimensions` skill, passing:
 
 - `--add` flag if set
 

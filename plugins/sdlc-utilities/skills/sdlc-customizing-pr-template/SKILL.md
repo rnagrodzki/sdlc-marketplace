@@ -1,5 +1,5 @@
 ---
-name: customizing-pr-template
+name: sdlc-customizing-pr-template
 description: "Use this skill when guiding the user through creating or editing a custom PR template for this project. Scans project signals (GitHub PR template, recent PRs, manifests) to propose a tailored starter, then guides the user through interactive customization. Triggers on: /sdlc:pr-customize, create PR template, edit PR template, customize PR description format."
 user-invokable: false
 ---
@@ -226,5 +226,5 @@ Log to `.claude/learnings/log.md` when:
 
 ## See Also
 
-- `creating-pull-requests/SKILL.md` — uses the template written by this skill
+- `sdlc-creating-pull-requests/SKILL.md` — uses the template written by this skill
 - `scripts/validate-pr-template.js` — validates the template format

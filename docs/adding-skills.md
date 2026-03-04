@@ -17,7 +17,7 @@ Choose a directory name that makes the skill's purpose immediately obvious. Two 
 are used in this repo — pick the one that fits the plugin's naming style:
 
 - **Prefix pattern** (used by `aisa` skills): `<plugin-prefix>-<noun>`, e.g., `aisa-init`, `aisa-evolve-health`
-- **Gerund pattern** (used by `sdlc` skills): `<verb>-ing-<noun>`, e.g., `creating-pull-requests`
+- **Prefix pattern** (used by `sdlc` skills): `sdlc-<verb>-ing-<noun>`, e.g., `sdlc-creating-pull-requests`
 
 Use lowercase and hyphens only. Avoid vague names (`setup`, `utils`) — names should be specific.
 

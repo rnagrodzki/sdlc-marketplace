@@ -13,7 +13,7 @@ the user's main context stays clean.
 ## Inputs (provided in your prompt)
 
 - **MANIFEST_JSON**: The full JSON from `review-prepare.js`
-- **REFERENCE_MD_PATH**: Absolute path to `reviewing-changes/REFERENCE.md` (resolved by the calling skill)
+- **REFERENCE_MD_PATH**: Absolute path to `sdlc-reviewing-changes/REFERENCE.md` (resolved by the calling skill)
 
 ## Step 1 — Parse Manifest and Present Plan
 
@@ -140,7 +140,7 @@ No PR found. Options:
   3. Keep in terminal only (already shown)
 ```
 
-For option 1: invoke the `creating-pull-requests` skill (`sdlc:creating-pull-requests`)
+For option 1: invoke the `sdlc-creating-pull-requests` skill (`sdlc:sdlc-creating-pull-requests`)
 in draft mode, wait for the PR to be created, then post the consolidated review
 comment to the new PR using the `gh api` command above.
 

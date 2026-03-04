@@ -1,59 +1,36 @@
 # sdlc-marketplace
 
-A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that automates SDLC tasks: generates structured PR descriptions from commits and diffs, and runs project-customizable multi-dimension code reviews matched to your changed files.
-
-## Technical Requirements
-
-| Requirement | Version | Notes |
-| --- | --- | --- |
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | — | This is a Claude Code plugin marketplace |
-| Node.js | >= 16 | For helper scripts. Uses built-in modules, no `npm install` needed |
-| git | — | Required for diff and commit analysis |
-| gh (GitHub CLI) | — | Required for `/sdlc:pr`. Falls back to showing the description if unavailable |
+A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that automates SDLC tasks: generates structured PR descriptions from commits and diffs, and runs project-customizable multi-dimension code reviews.
 
 ## Installation
 
-### Step 1 — Add the marketplace
+### Via the plugin UI (recommended)
+
+1. Open Claude Code and run `/plugin`
+2. Go to **Marketplaces** → **Add marketplace** → enter `rnagrodzki/sdlc-marketplace`
+3. Go to **Discover** → select `sdlc` → **Install**
+
+### Via CLI commands
 
 ```text
 /plugin marketplace add rnagrodzki/sdlc-marketplace
-```
-
-This registers the marketplace catalog. No plugins are installed yet.
-
-### Step 2 — Install the plugin
-
-```text
 /plugin install sdlc@sdlc-marketplace
-```
-
-Or browse interactively: run `/plugin`, go to the **Discover** tab, and select the plugin to install.
-
-Verify by starting a new Claude Code session — the plugin announces itself:
-
-```text
-[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:pr-customize to create a PR template, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions, /sdlc:version to manage releases.
 ```
 
 See [docs/getting-started.md](docs/getting-started.md) for a full first-use walkthrough.
 
 ## Updating
 
-### Step 1 — Refresh the marketplace catalog
+### Via the plugin UI
+
+Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketplace`. When enabled, Claude Code checks for new versions on startup.
+
+### Via update commands
 
 ```text
 /plugin marketplace update sdlc-marketplace
-```
-
-### Step 2 — Update the plugin
-
-```text
 /plugin update sdlc@sdlc-marketplace
 ```
-
-### Enable auto-update
-
-Open `/plugin`, go to the **Marketplaces** tab, and toggle auto-update for `sdlc-marketplace`. When enabled, Claude Code checks for new versions on startup.
 
 ---
 
@@ -61,18 +38,11 @@ Open `/plugin`, go to the **Marketplaces** tab, and toggle auto-update for `sdlc
 
 | Command | Description |
 | --- | --- |
-| `/sdlc:pr` | Create a PR with an auto-generated structured description |
-| `/sdlc:pr-customize` | Create or edit a project-specific PR template interactively |
-| `/sdlc:review` | Run multi-dimension code review on the current branch |
-| `/sdlc:review-init` | Scan the project and create tailored review dimension files |
-| `/sdlc:version` | Bump version, create git tag, optionally generate CHANGELOG, and push |
-
-`/sdlc:pr` supports `--draft`, `--update`, and `--base <branch>` flags.
-`/sdlc:pr` uses `.claude/pr-template.md` when present (run `/sdlc:pr-customize` to create one).
-`/sdlc:review` supports `--base`, `--dimensions`, and `--dry-run` flags.
-`/sdlc:version` supports `--init`, `--pre <label>`, `--no-push`, and `--changelog` flags.
-
-> **[Full reference →](docs/plugin-sdlc-utilities.md)** Usage examples, flag reference, example PR output, code review workflow, dimension format
+| [`/sdlc:pr`](docs/commands/pr.md) | Create a PR with an auto-generated structured description |
+| [`/sdlc:pr-customize`](docs/commands/pr-customize.md) | Create or edit a project-specific PR template interactively |
+| [`/sdlc:review`](docs/commands/review.md) | Run multi-dimension code review on the current branch |
+| [`/sdlc:review-init`](docs/commands/review-init.md) | Scan the project and create tailored review dimension files |
+| [`/sdlc:version`](docs/commands/version.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
 
 ---
 
@@ -82,29 +52,15 @@ Open `/plugin`, go to the **Marketplaces** tab, and toggle auto-update for `sdlc
 | --- | --- |
 | [Getting Started](docs/getting-started.md) | Installation, first use, what gets created |
 | [Architecture](docs/architecture.md) | Repository structure, plugin system, name resolution |
-| [Plugin: sdlc-utilities](docs/plugin-sdlc-utilities.md) | PR command usage, flags, example output, skill template |
-| [Version Command](docs/version-command.md) | Version bump, tagging, CHANGELOG, pre-release, config schema |
 | [Adding Skills](docs/adding-skills.md) | Create custom skills for your project |
 | [Adding Commands](docs/adding-commands.md) | Create custom slash commands |
 | [Adding Hooks](docs/adding-hooks.md) | Set up automated actions on session events |
-
-## CI Checks
-
-### Version Bump Check
-
-A GitHub Actions workflow runs on every pull request targeting `main` and verifies that modified plugins have their `version` field bumped in `plugin.json`. The check:
-
-- Detects which plugins have changed files in the PR
-- Compares the `plugin.json` version against the base branch
-- Fails if a plugin's files changed but its version was not incremented
-
-To skip the check when a version bump is intentionally not needed, add the **`skip-version-check`** label to the pull request. The workflow will pass with a notice.
 
 ## Troubleshooting
 
 ### "Plugin not found" when updating via `/plugin` UI
 
-This happens when the plugin name registered in the marketplace doesn't match the identity in `plugin.json`. Clear the cache, restart, and reinstall:
+Clear the cache, restart, and reinstall:
 
 ```bash
 rm -rf ~/.claude/plugins/cache/sdlc-marketplace
@@ -118,11 +74,11 @@ Then restart Claude Code and run:
 
 ### Plugin not updating after marketplace refresh
 
-The `version` field in `plugin.json` must be bumped for Claude Code to detect a new version. If the version hasn't changed, Claude Code uses the cached copy. See the [CI Checks](#ci-checks) section — every PR that modifies plugin files must bump the version.
+The `version` field in `plugin.json` must be bumped for Claude Code to detect a new version. If the version hasn't changed, Claude Code uses the cached copy.
 
 ### Auto-update not working
 
-Open `/plugin`, go to the **Marketplaces** tab, and verify auto-update is toggled on for `sdlc-utilities`. Auto-update is off by default for third-party marketplaces.
+Open `/plugin`, go to the **Marketplaces** tab, and verify auto-update is toggled on for `sdlc-marketplace`. Auto-update is off by default for third-party marketplaces.
 
 ### Timeout during marketplace add or plugin install
 

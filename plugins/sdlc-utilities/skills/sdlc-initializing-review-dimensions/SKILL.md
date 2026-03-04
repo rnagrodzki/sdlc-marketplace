@@ -1,5 +1,5 @@
 ---
-name: initializing-review-dimensions
+name: sdlc-initializing-review-dimensions
 description: "Use this skill to initialize or expand review dimensions for a project. Scans the project's tech stack, dependencies, file patterns, and architecture to propose relevant review dimensions tailored to the specific project. Triggers on: initialize review dimensions, add review dimension, setup code review, create dimension files, expand review config, review-init."
 user-invokable: false
 ---
@@ -10,8 +10,8 @@ Project-aware dimension creator: scan tech stack, propose tailored dimensions wi
 let the user select, write files, and validate with the validation script.
 
 Supporting references (dimension format spec, 5 example dimensions) are in
-`reviewing-changes/REFERENCE.md` and `reviewing-changes/EXAMPLES.md`. Locate them using Glob
-with `path: ~/.claude` and pattern `**/reviewing-changes/REFERENCE.md`. If not found, retry
+`sdlc-reviewing-changes/REFERENCE.md` and `sdlc-reviewing-changes/EXAMPLES.md`. Locate them using Glob
+with `path: ~/.claude` and pattern `**/sdlc-reviewing-changes/REFERENCE.md`. If not found, retry
 Glob with the default path (cwd). Use the same approach for EXAMPLES.md.
 
 ---
@@ -193,7 +193,7 @@ For each selected dimension:
    ```
 
 2. Write the full dimension file (frontmatter + tailored body). Use the corresponding
-   example from `reviewing-changes/EXAMPLES.md` as the starting template, then
+   example from `sdlc-reviewing-changes/EXAMPLES.md` as the starting template, then
    customize with the project-specific evidence.
 3. Confirm each file written with its path.
 
@@ -237,6 +237,6 @@ Log to `.claude/learnings/log.md` when:
 
 ## See Also
 
-- `reviewing-changes/REFERENCE.md` — dimension file format spec and examples
-- `reviewing-changes/EXAMPLES.md` — 5 copy-paste-ready dimension files to adapt
-- `sdlc:reviewing-changes` — runs the dimensions created by this skill
+- `sdlc-reviewing-changes/REFERENCE.md` — dimension file format spec and examples
+- `sdlc-reviewing-changes/EXAMPLES.md` — 5 copy-paste-ready dimension files to adapt
+- `sdlc:sdlc-reviewing-changes` — runs the dimensions created by this skill
