@@ -19,7 +19,7 @@ the user's main context stays clean.
 
 Parse MANIFEST_JSON. Display the review plan:
 
-```
+```text
 Review Plan
   Base branch:   {base_branch}
   Changed files: {git.changed_files.length}
@@ -54,7 +54,7 @@ For each dimension with `status: "ACTIVE"` or `status: "TRUNCATED"`:
    - `{filtered diff}` → the content read from `dimension.diff_file`
    - Add commit context section before the Output Format section:
 
-     ```
+     ```text
      ## Commit Context
 
      Use these to understand the author's intent:
@@ -102,18 +102,38 @@ Format the comment using the template from REFERENCE.md section 3.
 - `APPROVED WITH NOTES` — any `high` finding, OR ≥ 5 `medium` findings
 - `APPROVED` — all other cases
 
-**Post the comment:**
+**Present for confirmation:**
 
-If `manifest.pr.exists`:
+If `manifest.pr.exists`, display the full formatted comment and ask for explicit user
+approval before posting. **Do not execute `gh api` without explicit user approval.**
 
-```bash
-gh api repos/{manifest.pr.owner}/{manifest.pr.repo}/issues/{manifest.pr.number}/comments \
-  -f body="{comment}"
+```text
+Review comment ready to post to PR #{manifest.pr.number}:
+─────────────────────────────────────────────
+{consolidated comment}
+─────────────────────────────────────────────
+
+Post this review comment to PR #{manifest.pr.number}? (yes / save / cancel)
+  yes    — post the comment to the PR
+  save   — save review to .claude/reviews/<branch>-<date>.md instead
+  cancel — keep in terminal only (already shown above)
 ```
+
+Wait for the user's response:
+
+- `yes` → post via `gh api`:
+
+  ```bash
+  gh api repos/{manifest.pr.owner}/{manifest.pr.repo}/issues/{manifest.pr.number}/comments \
+    -f body="{comment}"
+  ```
+
+- `save` → write the review to `.claude/reviews/<branch>-<date>.md`
+- `cancel` → skip posting; review is already visible in the terminal
 
 If no PR: present the full review in the terminal, then offer:
 
-```
+```text
 No PR found. Options:
   1. Create a draft PR to attach this review as a comment
   2. Save review to .claude/reviews/<branch>-<date>.md
@@ -128,7 +148,7 @@ comment to the new PR using the `gh api` command above.
 
 Output this summary for the main context to display:
 
-```
+```text
 Review complete
   Dimensions run:  {active} ({skipped} skipped — no matching files)
   Total findings:  {total}
@@ -147,3 +167,7 @@ Before returning:
 - All findings reference a specific `file:line`
 - Verdict computed from actual severity counts (not hardcoded)
 - Temp diff directory (`manifest.diff_dir`) has been removed
+
+## DO NOT
+
+- Post the review comment to a PR via `gh api` without explicit user approval
