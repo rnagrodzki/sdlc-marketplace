@@ -11,7 +11,7 @@ This repository serves two roles:
 
 ## Directory Structure
 
-```
+```text
 sdlc-utilities/
 ├── .claude-plugin/
 │   └── marketplace.json          # Marketplace manifest (entry point)
@@ -56,6 +56,7 @@ No plugins are installed yet at this point. The user must then run `/plugin inst
 ### Plugin Layer
 
 Each plugin has its own `.claude-plugin/plugin.json` that declares:
+
 - **name** and **description** — Identification
 - **version** — Semantic version for tracking updates
 - **author** — Who maintains this plugin
@@ -123,6 +124,8 @@ Hooks are defined in `plugins/<plugin>/hooks/hooks.json`. Available hook points:
 | `SessionStart`| When a Claude Code session begins                                     |
 | `PreToolUse`  | Before a tool is invoked (use `matcher` to filter by tool name)       |
 | `PostToolUse` | After a tool completes                                                |
+
+See [adding-hooks.md](adding-hooks.md) for the complete list of hook events.
 
 ## Adding a New Plugin
 

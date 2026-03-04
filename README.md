@@ -32,7 +32,7 @@ Or browse interactively: run `/plugin`, go to the **Discover** tab, and select t
 Verify by starting a new Claude Code session — the plugin announces itself:
 
 ```text
-[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create or update a pull request with an auto-generated description.
+[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions.
 ```
 
 See [docs/getting-started.md](docs/getting-started.md) for a full first-use walkthrough.

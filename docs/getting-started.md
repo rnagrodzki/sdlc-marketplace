@@ -23,7 +23,7 @@ Or browse interactively: run `/plugin`, go to the **Discover** tab, and select t
 After installation, start a new Claude Code session. You should see a message from the plugin:
 
 ```text
-[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create or update a pull request with an auto-generated description.
+[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions.
 ```
 
 > **Note:** Commands and skills are namespaced with the plugin name. The `/pr` command
@@ -82,8 +82,8 @@ Generates a structured PR description from your commits and diffs, then opens th
 
 ## What Gets Created
 
-| File/Directory               | Purpose                                                                    |
-|------------------------------|----------------------------------------------------------------------------|
+| File/Directory               | Purpose                                                                   |
+|------------------------------|---------------------------------------------------------------------------|
 | `.claude/review-dimensions/` | Per-project code review dimension files (created by `/sdlc:review-init`) |
 
 ## Next Steps
