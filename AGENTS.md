@@ -43,14 +43,6 @@ Automates common SDLC tasks.
 | `/sdlc:review [--base <branch>] [--dimensions <name,...>] [--dry-run]` | Run multi-dimension code review on the current branch |
 | `/sdlc:review-init [--add]` | Initialize or expand project review dimensions by scanning the tech stack |
 
-### Skills
-
-| Skill | Purpose |
-| --- | --- |
-| `sdlc:creating-pull-requests` | Analyse commits and diffs; generate structured 8-section PR descriptions (Summary / JIRA Ticket / Business Context / Business Benefits / Technical Design / Technical Impact / Changes Overview / Testing) |
-| `sdlc:reviewing-changes` | Load project dimensions from `.claude/review-dimensions/`, match to changed files, dispatch parallel review subagents, deduplicate findings, post consolidated PR comment |
-| `sdlc:initializing-review-dimensions` | Scan project tech stack and propose tailored review dimension files with project-specific evidence; create and validate selected files |
-
 ---
 
 ## Architecture Principles

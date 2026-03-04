@@ -1,6 +1,7 @@
 ---
 name: reviewing-changes
 description: "Use this skill when reviewing code changes across project-defined dimensions (security, performance, docs, concurrency, etc.). Runs review-prepare.js to pre-compute all git data, then delegates to the review-orchestrator agent. Triggers on: review changes, code review, review PR, multi-dimension review, run review."
+user-invokable: false
 ---
 
 # Reviewing Changes

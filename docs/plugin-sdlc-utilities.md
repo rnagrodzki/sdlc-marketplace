@@ -77,27 +77,6 @@ Create this PR? (yes / edit / cancel)
 
 ---
 
-## `sdlc:creating-pull-requests` Skill
-
-Reusable knowledge skill that analyzes commits and diffs to generate PR descriptions in the Conventional PR format. Loaded by the `/sdlc:pr` command and available to any other command or skill that needs to produce PR content.
-
-### Template (8 sections, always all present)
-
-```text
-## Summary          — 1-3 sentence plain-language overview, no jargon
-## JIRA Ticket      — auto-detected from branch/commits, or "Not detected"
-## Business Context — why this change is needed from a business perspective
-## Business Benefits— value delivered: user impact, efficiency, risk reduction
-## Technical Design — architecture, key decisions, trade-offs
-## Technical Impact — affected systems, breaking changes, migration needs
-## Changes Overview — what changed, grouped by concern (no file paths)
-## Testing          — how it was verified: automated tests, manual steps
-```
-
-### Trigger Phrases
-
-**When triggered**: "create PR", "open pull request", "update PR", "write PR description"
-
 ---
 
 ## `/sdlc:review` — Multi-Dimension Code Review
@@ -213,22 +192,6 @@ Validation: 4/4 dimensions pass all checks.
 ```
 
 ---
-
-## `sdlc:reviewing-changes` Skill
-
-Loaded by `/sdlc:review`. Implements the full 11-step PCIDCI workflow: dimension discovery
-and validation, file matching, parallel subagent dispatch, deduplication, and PR comment posting.
-
-**Trigger phrases**: "review changes", "code review", "review PR", "multi-dimension review", "run review"
-
----
-
-## `sdlc:initializing-review-dimensions` Skill
-
-Loaded by `/sdlc:review-init`. Scans the tech stack, generates project-specific evidence for
-each proposal, refines with a critique/improve pass, creates files, and validates them.
-
-**Trigger phrases**: "initialize review dimensions", "add review dimension", "setup code review", "create dimension files", "expand review config"
 
 ---
 

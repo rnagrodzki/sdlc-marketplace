@@ -85,6 +85,7 @@ See `./checklist.md` for the full verification checklist.
 | `name` field | Lowercase, hyphens only, max 64 chars. Use prefix or gerund pattern (see above). |
 | `description` field | Maximum 1024 characters |
 | `SKILL.md` content | Maximum 500 lines |
+| `user-invokable` field | Set to `false` to hide the skill from the `/` menu. Use for skills that have a corresponding slash command as their entry point — the command handles argument parsing and preparation before delegating to the skill. Claude can still invoke the skill automatically; only user-initiated invocation via `/` is suppressed. |
 
 ## Writing Effective Descriptions
 

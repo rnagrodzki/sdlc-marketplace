@@ -1,6 +1,7 @@
 ---
 name: creating-pull-requests
 description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, or when asked to describe changes for a pull request."
+user-invokable: false
 ---
 
 # Creating Pull Requests
