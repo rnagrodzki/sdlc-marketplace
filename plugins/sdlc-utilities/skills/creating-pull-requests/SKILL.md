@@ -25,7 +25,7 @@ PR description readable by both technical and non-technical stakeholders.
 > section. Apply the same fill rules: real content, "N/A", or "Not detected" — never
 > fabricate. All sections defined in the custom template must appear in the output.
 
-Every PR uses this 8-section flat structure. **All sections are always present.**
+When no custom template is present, every PR uses this 8-section flat structure. **All sections in the active template are always present.**
 
 ```markdown
 ## Summary
@@ -65,7 +65,7 @@ If no tests added, explain why.]
 
 **Section fill rules:**
 
-- ALL 8 sections MUST always be present — never omit one
+- ALL sections in the active template MUST always be present — never omit one (8 sections for the default; the custom template's sections when a custom template is active)
 - Fill with real content when derivable from commits, diff, or user answers
 - Use **"N/A"** when a section genuinely doesn't apply (state why briefly)
 - Use **"Not detected"** when detection was attempted but yielded nothing
@@ -107,7 +107,7 @@ Key fields available (including `customTemplate` added for project-level PR temp
 > as the template structure. Use each section's body text as the fill instruction.
 > Skip the default per-section instructions below and draft all custom sections instead.
 
-Using data from `PR_CONTEXT_JSON`, draft all 8 sections of the PR template.
+Using data from `PR_CONTEXT_JSON`, draft all sections of the active PR template (custom sections if `customTemplate` is present, or the default 8 sections below).
 
 For each section, apply the fill rules:
 
@@ -238,10 +238,10 @@ Title: <title>
 
 ## DO NOT
 
-- Omit any of the 8 sections — always include all of them
+- Omit any section from the active template (default 8 or custom) — always include all defined sections
 - Write generic descriptions ("various improvements", "code cleanup")
 - Fabricate a JIRA ticket, business reason, or technical claim
-- Include file paths in the Changes Overview section
+- Include file paths in the Changes Overview section (this rule applies only if the active template includes a "Changes Overview" section)
 - Execute `gh pr create` or `gh pr edit` without explicit user approval
 - Skip the plan-critique-improve-do-critique-improve cycle before presenting to the user
 - Run git or gh bash commands to gather data — all context comes from `PR_CONTEXT_JSON`
