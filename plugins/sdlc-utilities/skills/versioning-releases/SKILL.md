@@ -180,6 +180,12 @@ Before executing, verify:
 - The new tag does not conflict with existing tags (`conflictsWithNext[bumpType]` is false)
 - There are no uncommitted changes that would corrupt the release commit (run `git status --porcelain` and warn if non-empty)
 - Remote state is known — warn if no upstream is configured, but do not block the release
+- Git identity is configured: run `git config user.name` and `git config user.email`. If either is empty, stop and instruct the user to set them:
+  ```
+  git config user.name "Your Name"
+  git config user.email "you@example.com"
+  ```
+  (The annotated tag created in Step 8 requires a committer identity.)
 
 ### Step 7 (IMPROVE): Fix Any Pre-condition Issues
 
