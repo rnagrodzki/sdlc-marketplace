@@ -23,6 +23,9 @@
 
 'use strict';
 
+const fs   = require('fs');
+const path = require('path');
+
 const {
   exec,
   checkGitState,
@@ -218,6 +221,12 @@ function main() {
   // Step 10: Extract JIRA ticket
   const jiraTicket = detectJiraTicket(currentBranch, commits);
 
+  // Step 11: Read custom PR template
+  const templatePath = path.join(projectRoot, '.claude', 'pr-template.md');
+  const customTemplate = fs.existsSync(templatePath)
+    ? fs.readFileSync(templatePath, 'utf8')
+    : null;
+
   // Build output
   const result = {
     mode,
@@ -228,6 +237,7 @@ function main() {
       ? { number: prMeta.number, title: prMeta.title, url: prMeta.url, state: prMeta.state }
       : null,
     jiraTicket,
+    customTemplate,
     commits,
     diffStat,
     diffContent,
