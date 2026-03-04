@@ -24,14 +24,6 @@
 /plugin install sdlc@sdlc-marketplace
 ```
 
-### Verifying installation
-
-After installation, start a new Claude Code session. You should see:
-
-```text
-[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:pr-customize to create a PR template, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions, /sdlc:version to manage releases.
-```
-
 > **Note:** Commands and skills are namespaced with the plugin name. The `pr` command becomes `/sdlc:pr`. See [Architecture](architecture.md#name-resolution) for details.
 
 ## Updating

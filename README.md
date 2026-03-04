@@ -17,12 +17,6 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that auto
 /plugin install sdlc@sdlc-marketplace
 ```
 
-Verify by starting a new Claude Code session — the plugin announces itself:
-
-```text
-[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:pr-customize to create a PR template, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions, /sdlc:version to manage releases.
-```
-
 See [docs/getting-started.md](docs/getting-started.md) for a full first-use walkthrough.
 
 ## Updating
