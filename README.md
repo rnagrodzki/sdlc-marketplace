@@ -32,7 +32,7 @@ Or browse interactively: run `/plugin`, go to the **Discover** tab, and select t
 Verify by starting a new Claude Code session — the plugin announces itself:
 
 ```text
-[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions.
+[sdlc-utilities] Plugin loaded. Use /sdlc:pr to create a pull request, /sdlc:pr-customize to create a PR template, /sdlc:review to run a code review, /sdlc:review-init to set up review dimensions.
 ```
 
 See [docs/getting-started.md](docs/getting-started.md) for a full first-use walkthrough.
@@ -62,10 +62,12 @@ Open `/plugin`, go to the **Marketplaces** tab, and toggle auto-update for `sdlc
 | Command | Description |
 | --- | --- |
 | `/sdlc:pr` | Create a PR with an auto-generated structured description |
+| `/sdlc:pr-customize` | Create or edit a project-specific PR template interactively |
 | `/sdlc:review` | Run multi-dimension code review on the current branch |
 | `/sdlc:review-init` | Scan the project and create tailored review dimension files |
 
 `/sdlc:pr` supports `--draft`, `--update`, and `--base <branch>` flags.
+`/sdlc:pr` uses `.claude/pr-template.md` when present (run `/sdlc:pr-customize` to create one).
 `/sdlc:review` supports `--base`, `--dimensions`, and `--dry-run` flags.
 
 > **[Full reference →](docs/plugin-sdlc-utilities.md)** Usage examples, flag reference, example PR output, code review workflow, dimension format
