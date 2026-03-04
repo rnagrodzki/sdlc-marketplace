@@ -13,7 +13,7 @@ the user's main context stays clean.
 ## Inputs (provided in your prompt)
 
 - **MANIFEST_JSON**: The full JSON from `review-prepare.js`
-- **REFERENCE_MD_PATH**: Glob path to locate `**/reviewing-changes/REFERENCE.md`
+- **REFERENCE_MD_PATH**: Absolute path to `reviewing-changes/REFERENCE.md` (resolved by the calling skill)
 
 ## Step 1 — Parse Manifest and Present Plan
 
@@ -42,7 +42,7 @@ included in this review.
 
 ## Step 2 — Dispatch Dimension Subagents
 
-Read REFERENCE.md (locate via Glob at REFERENCE_MD_PATH). Use section 2 "Subagent Prompt Template".
+Read REFERENCE.md at REFERENCE_MD_PATH. Use section 2 "Subagent Prompt Template".
 
 For each dimension with `status: "ACTIVE"` or `status: "TRUNCATED"`:
 
