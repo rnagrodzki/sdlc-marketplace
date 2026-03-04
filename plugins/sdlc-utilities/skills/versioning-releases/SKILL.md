@@ -70,14 +70,27 @@ Wait for explicit user response before proceeding.
 ### Step 4 (WRITE): Write Config on Confirmation
 
 On `yes` or `changelog`, write `.claude/version.json` using the Write tool with
-the content from `suggestedConfig` (adjusted if `changelog` was chosen). Display:
+the content from `suggestedConfig` (adjusted if `changelog` was chosen).
+
+Then scaffold the retag workflow into the project:
+
+1. Copy `plugins/sdlc-utilities/scripts/retag-release.js` → `.github/scripts/retag-release.js` (create `.github/scripts/` if it doesn't exist)
+2. Copy `plugins/sdlc-utilities/templates/retag-release.yml` → `.github/workflows/retag-release.yml` (create `.github/workflows/` if it doesn't exist)
+
+If either target file already exists, skip copying it (do not overwrite).
+
+Display:
 
 ```
 ✓ .claude/version.json written.
+✓ .github/workflows/retag-release.yml added (auto-fixes tags after squash merge to main).
+✓ .github/scripts/retag-release.js added.
 Run /sdlc:version patch to create your first release.
 ```
 
-On `tag-only`, update `suggestedConfig.mode` to `"tag"` before writing.
+If a file was skipped because it already existed, show `(already exists — skipped)` instead of `added`.
+
+On `tag-only`, update `suggestedConfig.mode` to `"tag"` before writing. Apply the same workflow scaffolding.
 
 On `cancel`, stop immediately without writing any files.
 
@@ -225,6 +238,7 @@ Display result:
 
 ## Gotchas
 
+- **Squash merge orphans tags**: When using GitHub's "squash and merge" strategy, the annotated tag created on the feature branch points to the pre-merge commit, which becomes unreachable from main after merge. The `retag-release.yml` workflow (scaffolded during init) automatically moves the tag to the squash commit on main whenever a push lands on main. Without this workflow, tags are orphaned and `git describe` / `git log --decorate` on main will not show them.
 - `bumpOptions.preRelease` is pre-computed in the JSON only when `--pre` was passed at script time. If the user requests a different pre-label during `edit`, re-run the script — the `preRelease` field reflects the label passed at script invocation, not a label added mid-session.
 - For TOML/YAML version files, use the Edit tool with targeted string replacement (old version string → new version string), not full file rewrites, to avoid corrupting file structure.
 - `git push && git push --tags` are two separate pushes. `git push --tags` alone does NOT push the release commit — both commands are required.
