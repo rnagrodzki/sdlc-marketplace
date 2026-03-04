@@ -1,11 +1,10 @@
-# AI Setup Automation — Claude Code Plugin Marketplace
+# SDLC Utilities — Claude Code Plugin Marketplace
 
-This repository is a **Claude Code plugin marketplace** that ships two plugins for AI-driven project configuration and software development lifecycle (SDLC) automation. Installation requires two steps:
+This repository is a **Claude Code plugin marketplace** that ships the `sdlc-utilities` plugin for software development lifecycle (SDLC) automation. Installation requires two steps:
 
 ```text
-/plugin marketplace add rnagrodzki/ai-setup-automation
-/plugin install aisa@ai-setup-automation
-/plugin install sdlc@ai-setup-automation
+/plugin marketplace add rnagrodzki/sdlc-utilities
+/plugin install sdlc@sdlc-utilities
 ```
 
 ---
@@ -15,8 +14,7 @@ This repository is a **Claude Code plugin marketplace** that ships two plugins f
 ```text
 .claude-plugin/marketplace.json   # Marketplace manifest (entry point)
 plugins/
-  ai-setup-automation/            # Plugin: AI project config scaffolding & evolution
-  sdlc-utilities/                 # Plugin: SDLC automation (PRs, etc.)
+  sdlc-utilities/                 # Plugin: SDLC automation (PRs, code review)
 docs/                             # Architecture, getting-started, skill/command/hook guides
 README.md
 ```
@@ -33,40 +31,11 @@ scripts/                     # Node.js helper scripts (optional; invoked via Bas
 
 ---
 
-## Plugin 1 — `ai-setup-automation`
-
-Creates and continuously evolves AI-ready project configurations (`CLAUDE.md`, `.claude/` directory).
-
-### Plugin 1 Commands
-
-| Command | Purpose |
-| --- | --- |
-| `/aisa:setup` | Detect tech stack and scaffold full `CLAUDE.md` + `.claude/` configuration |
-| `/aisa:audit` | Audit existing AI configuration and suggest improvements |
-| `/aisa:postmortem` | Guided incident analysis; encodes lessons into skills |
-| `/aisa:validate` | Validate all skills and agents against architectural principles |
-
-### Plugin 1 Skills
-
-| Skill | When to invoke |
-| --- | --- |
-| `aisa:aisa-init` | New project or full rebuild — 6-phase discovery → generate pipeline |
-| `aisa:aisa-evolve` | Full evolution cycle (every 2–4 weeks) — 7-phase drift → execute pipeline |
-| `aisa:aisa-evolve-health` | Weekly read-only drift scan and status report |
-| `aisa:aisa-evolve-harvest` | Promote accumulated learnings into skills/docs |
-| `aisa:aisa-evolve-target` | Scoped update after a feature, refactor, or integration |
-| `aisa:aisa-evolve-validate` | Validate all skills against architectural principles |
-| `aisa:aisa-evolve-cache` | Manage `.claude/cache/` snapshot hashes (60–80 % token reduction) |
-| `aisa:aisa-evolve-postmortem` | Create learning entries and skill gaps from an incident |
-| `aisa:aisa-evolve-principles` | Shared principles / tool registry — dependency only, never invoked directly |
-
----
-
-## Plugin 2 — `sdlc-utilities`
+## Plugin — `sdlc-utilities`
 
 Automates common SDLC tasks.
 
-### Plugin 2 Commands
+### Commands
 
 | Command | Purpose |
 | --- | --- |
@@ -74,7 +43,7 @@ Automates common SDLC tasks.
 | `/sdlc:review [--base <branch>] [--dimensions <name,...>] [--dry-run]` | Run multi-dimension code review on the current branch |
 | `/sdlc:review-init [--add]` | Initialize or expand project review dimensions by scanning the tech stack |
 
-### Plugin 2 Skills
+### Skills
 
 | Skill | Purpose |
 | --- | --- |
@@ -88,10 +57,8 @@ Automates common SDLC tasks.
 
 1. **Spec-driven development** — design before implementation
 2. **Plan → Critique → Improve → Do → Critique → Improve** — mandatory dual critique gates in every pipeline (critique the plan, then critique the output)
-3. **Cache-first incremental scanning** — snapshot hashing in `.claude/cache/`
-4. **Parallel execution** — always run independent steps concurrently
-5. **Self-learning directives** — learnings flow into `.claude/learnings/log.md` and are harvested into skills
-6. **Specificity over generics** — every skill targets a concrete task
+3. **Parallel execution** — always run independent steps concurrently
+4. **Specificity over generics** — every skill targets a concrete task
 
 ---
 
