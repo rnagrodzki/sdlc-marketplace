@@ -1,0 +1,8 @@
+{
+  "mode": "file",
+  "versionFile": "plugins/sdlc-utilities/.claude-plugin/plugin.json",
+  "fileType": "plugin.json",
+  "tagPrefix": "v",
+  "changelog": false,
+  "changelogFile": "CHANGELOG.md"
+}
