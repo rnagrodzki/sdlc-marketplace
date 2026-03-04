@@ -83,7 +83,7 @@ Check `.claude/review-dimensions/` for already-installed dimension files.
 
 In `--add` (expansion) mode:
 
-- Locate the validation script with Glob: `**/sdlc-utilities/scripts/validate-dimensions.js`
+- Locate the validation script with Glob: `**/scripts/validate-dimensions.js`
 - Run: `node <plugin-scripts-path>/validate-dimensions.js --project-root . --json`
 - Extract the list of currently installed dimension names from the output
 - Note their trigger patterns so new proposals avoid identical globs

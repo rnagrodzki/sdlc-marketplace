@@ -17,7 +17,7 @@ findings, and posts the consolidated PR comment.
 Locate the script:
 
 ```
-**/sdlc-utilities/scripts/review-prepare.js
+**/scripts/review-prepare.js
 ```
 
 Build the command from the arguments passed to this skill:
@@ -85,7 +85,7 @@ Stop here.
 Locate the orchestrator agent definition:
 
 ```
-**/sdlc-utilities/agents/review-orchestrator.md
+**/agents/review-orchestrator.md
 ```
 
 Locate the reference templates:
