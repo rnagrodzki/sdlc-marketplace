@@ -224,7 +224,7 @@ requires-full-diff: false      # OPTIONAL. Default: false. Full diff for matched
 Run the bundled validation script to check all dimension files:
 
 ```bash
-node $(find ~/.claude -name validate-dimensions.js -path '*/sdlc-utilities/*') \
+node $(find ~/.claude -name validate-dimensions.js) \
   --project-root . --markdown
 ```
 

@@ -26,7 +26,7 @@ creates a new one.
 Locate the script:
 
 ```text
-**/sdlc-utilities/scripts/pr-prepare.js
+**/scripts/pr-prepare.js
 ```
 
 Build the command from the arguments passed to this command:
