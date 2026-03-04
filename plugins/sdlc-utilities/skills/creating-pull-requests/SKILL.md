@@ -19,6 +19,12 @@ PR description readable by both technical and non-technical stakeholders.
 
 ## PR Template
 
+> **Custom template**: If `PR_CONTEXT_JSON.customTemplate` is not null, use it as the
+> template instead of the default 8-section structure below. Parse every `## Heading`
+> line as a section name; the text under each heading is the fill instruction for that
+> section. Apply the same fill rules: real content, "N/A", or "Not detected" — never
+> fabricate. All sections defined in the custom template must appear in the output.
+
 Every PR uses this 8-section flat structure. **All sections are always present.**
 
 ```markdown
@@ -78,7 +84,7 @@ temp file, read and parsed it, and passed the parsed object to this skill as
 `PR_CONTEXT_JSON`. It is an in-memory JavaScript/JSON object — no file path, no
 bash commands needed to retrieve it. Read it now.
 
-Key fields available:
+Key fields available (including `customTemplate` added for project-level PR template support):
 
 | Field | Description |
 | ----- | ----------- |
@@ -93,8 +99,13 @@ Key fields available:
 | `diffContent` | Full unified diff text |
 | `remoteState` | `{ pushed, remoteBranch, action }` |
 | `warnings` | Non-fatal notes already surfaced to the user by the command |
+| `customTemplate` | Full content of `.claude/pr-template.md` or `null` if not present |
 
 ### Step 2 (PLAN): Draft PR Description
+
+> **If `PR_CONTEXT_JSON.customTemplate` is not null**: parse its `## Section` headings
+> as the template structure. Use each section's body text as the fill instruction.
+> Skip the default per-section instructions below and draft all custom sections instead.
 
 Using data from `PR_CONTEXT_JSON`, draft all 8 sections of the PR template.
 
@@ -117,7 +128,7 @@ Before presenting to the user, review the draft against every quality gate:
 
 | Gate | Check | Pass Criteria |
 | ---- | ----- | ------------- |
-| All sections present | All 8 sections exist with content | Real content, "N/A", or "Not detected" — never empty |
+| All sections present | If custom template: all `##` sections from `customTemplate` have content. If default: all 8 hardcoded sections exist | Real content, "N/A", or "Not detected" — never empty |
 | Specificity | Summary names a concrete change | No vague summaries like "various improvements" |
 | Business honesty | Business Context/Benefits are concrete or "N/A" | No "because it was needed" or invented reasons |
 | No file paths | Changes Overview uses concepts only | Zero file paths in this section |
@@ -126,6 +137,11 @@ Before presenting to the user, review the draft against every quality gate:
 | JIRA accuracy | JIRA value matches evidence or is "Not detected" | No guessed ticket numbers |
 | Audience check | Readable by non-technical stakeholders | No unexplained jargon in Summary/Business sections |
 | Documentation sync | If diff adds new commands, changes structure, renames concepts, or adds new directories/scripts: check that at least one `docs:` commit exists on this branch OR ask the user to confirm docs are updated | PR does not silently ship structural changes without a corresponding docs update |
+
+> **Note**: When a custom template is active, the "No file paths in Changes Overview"
+> gate applies only if the custom template includes a section named "Changes Overview".
+> All other universal gates (title length, no fabrication, JIRA accuracy, audience
+> check, documentation sync) apply regardless of template.
 
 Note every failing gate.
 
