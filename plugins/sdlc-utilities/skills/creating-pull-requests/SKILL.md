@@ -255,6 +255,15 @@ Title: <title>
   re-run the script manually, always use `node pr-prepare.js > /tmp/pr-context-$$.json` and
   read from the file rather than piping output to a parser.
 
+- **Installed plugin version skew silently suppresses custom template**: `pr-prepare.js` is
+  resolved from the installed plugin, which may be older than the project's local copy. An
+  older installed version may lack `customTemplate` support entirely, returning the field as
+  absent or `null` even when `.claude/pr-template.md` exists on disk. **Always cross-check**:
+  if `PR_CONTEXT_JSON.customTemplate` is null or absent, verify whether `.claude/pr-template.md`
+  exists before defaulting to the 8-section template. If the file exists, read it directly and
+  use it as the template, then warn the user that the installed plugin may be out of date and
+  suggest re-installing (`/plugin install sdlc@sdlc-marketplace`).
+
 ## Learning Capture
 
 When creating pull requests, capture discoveries by appending to `.claude/learnings/log.md`.
