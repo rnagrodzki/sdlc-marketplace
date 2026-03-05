@@ -81,13 +81,22 @@ function detectBaseBranch(projectRoot) {
 }
 
 /**
- * List files changed between base and HEAD.
- * @param {string} base
+ * List files changed depending on scope.
+ * @param {string|null} base  Base branch (required for 'all', 'committed', and 'worktree' scopes)
  * @param {string} projectRoot
+ * @param {'all'|'committed'|'staged'|'working'|'worktree'} [scope='all']
  * @returns {string[]}
  */
-function getChangedFiles(base, projectRoot) {
-  const out = exec(`git diff --name-only ${base}..HEAD`, { cwd: projectRoot });
+function getChangedFiles(base, projectRoot, scope = 'all') {
+  let cmd;
+  switch (scope) {
+    case 'committed': cmd = `git diff --name-only ${base}..HEAD`; break;
+    case 'staged':    cmd = 'git diff --cached --name-only';      break;
+    case 'working':   cmd = 'git diff HEAD --name-only';          break;
+    case 'worktree':  cmd = `git diff --name-only ${base}`;       break;
+    default:          cmd = `git diff --cached --name-only ${base}`; break; // 'all'
+  }
+  const out = exec(cmd, { cwd: projectRoot });
   return out ? out.split('\n').filter(Boolean) : [];
 }
 

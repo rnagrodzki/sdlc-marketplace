@@ -41,6 +41,43 @@ const {
 } = require('./lib/git');
 
 // ---------------------------------------------------------------------------
+// Review config (.claude/review.json)
+// ---------------------------------------------------------------------------
+
+const VALID_SCOPES = ['all', 'committed', 'staged', 'working', 'worktree'];
+
+function readReviewConfig(projectRoot) {
+  const configPath = path.join(projectRoot, '.claude', 'review.json');
+  if (!fs.existsSync(configPath)) return null;
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    if (config?.defaults?.scope && !VALID_SCOPES.includes(config.defaults.scope)) {
+      process.stderr.write(
+        `Warning: invalid scope "${config.defaults.scope}" in ${configPath}. ` +
+        `Valid: ${VALID_SCOPES.join(', ')}. Using default "all".\n`
+      );
+      config.defaults.scope = 'all';
+    }
+    return config;
+  } catch (err) {
+    process.stderr.write(`Warning: invalid review config at ${configPath}: ${err.message}\n`);
+    return null;
+  }
+}
+
+function writeReviewConfig(projectRoot, updates) {
+  const claudeDir  = path.join(projectRoot, '.claude');
+  const configPath = path.join(claudeDir, 'review.json');
+  if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true });
+  let existing = {};
+  if (fs.existsSync(configPath)) {
+    try { existing = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch (_) {}
+  }
+  const merged = { ...existing, ...updates, defaults: { ...(existing.defaults || {}), ...(updates.defaults || {}) } };
+  fs.writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf8');
+}
+
+// ---------------------------------------------------------------------------
 // CLI argument parsing
 // ---------------------------------------------------------------------------
 
@@ -49,15 +86,22 @@ function parseArgs(argv) {
   let projectRoot = process.cwd();
   let baseBranch = null;
   let dimensionFilter = null;
+  let scope = null;
+  let setDefault = false;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '--project-root' && args[i + 1]) projectRoot = path.resolve(args[++i]);
     else if (a === '--base' && args[i + 1]) baseBranch = args[++i];
     else if (a === '--dimensions' && args[i + 1]) dimensionFilter = args[++i].split(',').map(s => s.trim());
+    else if (a === '--committed')   scope = 'committed';
+    else if (a === '--staged')      scope = 'staged';
+    else if (a === '--working')     scope = 'working';
+    else if (a === '--worktree')    scope = 'worktree';
+    else if (a === '--set-default') setDefault = true;
   }
 
-  return { projectRoot, baseBranch, dimensionFilter };
+  return { projectRoot, baseBranch, dimensionFilter, scope, setDefault };
 }
 
 // ---------------------------------------------------------------------------
@@ -183,8 +227,16 @@ function getCommitFileMap(base, projectRoot) {
  * Fetch the full diff and split into per-file chunks.
  * Returns Map<filePath, rawDiffChunk>
  */
-function fetchAndSplitDiff(base, projectRoot) {
-  const raw = exec(`git diff ${base}..HEAD`, { cwd: projectRoot });
+function fetchAndSplitDiff(base, projectRoot, scope = 'all') {
+  let cmd;
+  switch (scope) {
+    case 'committed': cmd = `git diff ${base}..HEAD`; break;
+    case 'staged':    cmd = 'git diff --cached';      break;
+    case 'working':   cmd = 'git diff HEAD';          break;
+    case 'worktree':  cmd = `git diff ${base}`;       break;
+    default:          cmd = `git diff --cached ${base}`; break; // 'all'
+  }
+  const raw = exec(cmd, { cwd: projectRoot });
   if (!raw) return new Map();
 
   const fileDiffs = new Map();
@@ -331,7 +383,25 @@ function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const { projectRoot, baseBranch, dimensionFilter } = parseArgs(process.argv);
+  const { projectRoot, baseBranch, dimensionFilter, scope: cliScope, setDefault } = parseArgs(process.argv);
+
+  // Resolve scope: CLI flag > .claude/review.json > hardcoded default
+  const reviewConfig = readReviewConfig(projectRoot);
+  const scope = cliScope || reviewConfig?.defaults?.scope || 'all';
+
+  // Persist default if --set-default was passed
+  if (setDefault) {
+    writeReviewConfig(projectRoot, { defaults: { scope } });
+    process.stderr.write(`Saved default scope "${scope}" to .claude/review.json\n`);
+  }
+
+  // Validate mutual exclusivity
+  const isLocalScope = scope === 'staged' || scope === 'working';
+  if (isLocalScope && baseBranch) {
+    process.stderr.write(`Error: --${scope} and --base are mutually exclusive.\n`);
+    process.exit(2);
+  }
+  if (isLocalScope && scope !== scope) { /* unreachable, kept for clarity */ }
 
   let gitState;
   try {
@@ -341,8 +411,9 @@ function main() {
     process.exit(2);
   }
 
+  // Base branch needed for 'all', 'committed', and 'worktree' scopes
   let base = baseBranch;
-  if (!base) {
+  if (!isLocalScope && !base) {
     try {
       base = detectBaseBranch(projectRoot);
     } catch (err) {
@@ -351,9 +422,16 @@ function main() {
     }
   }
 
-  const changedFiles = getChangedFiles(base, projectRoot);
+  const changedFiles = getChangedFiles(base, projectRoot, scope);
   if (changedFiles.length === 0) {
-    process.stderr.write(`No changed files found between this branch and "${base}".\n`);
+    const scopeLabel = {
+      all:       `committed + staged changes vs "${base}"`,
+      committed: `committed changes vs "${base}"`,
+      staged:    'staged changes',
+      working:   'working tree changes vs HEAD',
+      worktree:  `working tree vs "${base}" (committed + staged + unstaged)`,
+    }[scope] || scope;
+    process.stderr.write(`No changed files found in ${scopeLabel}.\n`);
     process.exit(1);
   }
 
@@ -363,37 +441,40 @@ function main() {
     process.exit(1);
   }
 
-  // Commit context
-  const commitFileMap = getCommitFileMap(base, projectRoot);
-  for (const dim of dims) {
-    dim.file_context = dim.matched_files.map(file => ({
-      file,
-      commits: commitFileMap.get(file) || [],
-    }));
+  // Commit context only available for branch-based scopes
+  if (!isLocalScope) {
+    const commitFileMap = getCommitFileMap(base, projectRoot);
+    for (const dim of dims) {
+      dim.file_context = dim.matched_files.map(file => ({
+        file,
+        commits: commitFileMap.get(file) || [],
+      }));
+    }
   }
 
   // Diffs
-  const fileDiffs    = fetchAndSplitDiff(base, projectRoot);
-  const activeDims   = dims.filter(d => d.status === 'ACTIVE' || d.status === 'TRUNCATED');
-  const tmpDir       = writeDimensionDiffs(activeDims, fileDiffs, projectRoot);
+  const fileDiffs  = fetchAndSplitDiff(base, projectRoot, scope);
+  const activeDims = dims.filter(d => d.status === 'ACTIVE' || d.status === 'TRUNCATED');
+  const tmpDir     = writeDimensionDiffs(activeDims, fileDiffs, projectRoot);
 
   // Plan critique and refinement
   const critique = critiquePlan(dims, changedFiles);
   const queued   = refinePlan(dims);
 
-  // PR metadata
-  const pr = fetchPrMetadata();
+  // PR metadata only relevant for branch-based scopes
+  const pr = !isLocalScope ? fetchPrMetadata() : { exists: false };
 
   const manifest = {
-    version:    1,
-    timestamp:  new Date().toISOString(),
-    base_branch: base,
+    version:        1,
+    timestamp:      new Date().toISOString(),
+    scope,
+    base_branch:    base || null,
     current_branch: gitState.currentBranch,
     uncommitted_changes: gitState.uncommittedChanges,
-    dirty_files: gitState.dirtyFiles,
+    dirty_files:    gitState.dirtyFiles,
     git: {
-      commit_count:  getCommitCount(base, projectRoot),
-      commit_log:    getCommitLog(base, projectRoot),
+      commit_count:  !isLocalScope ? getCommitCount(base, projectRoot) : 0,
+      commit_log:    !isLocalScope ? getCommitLog(base, projectRoot)   : '',
       changed_files: changedFiles,
     },
     pr,
@@ -406,11 +487,11 @@ function main() {
       queued_dimensions:     queued,
     },
     summary: {
-      total_dimensions:    dims.length,
-      active_dimensions:   dims.filter(d => d.status === 'ACTIVE' || d.status === 'TRUNCATED').length,
-      skipped_dimensions:  dims.filter(d => d.status === 'SKIPPED').length,
-      queued_dimensions:   queued.length,
-      total_changed_files: changedFiles.length,
+      total_dimensions:     dims.length,
+      active_dimensions:    dims.filter(d => d.status === 'ACTIVE' || d.status === 'TRUNCATED').length,
+      skipped_dimensions:   dims.filter(d => d.status === 'SKIPPED').length,
+      queued_dimensions:    queued.length,
+      total_changed_files:  changedFiles.length,
       uncovered_file_count: critique.uncoveredFiles.length,
     },
     diff_dir: tmpDir,

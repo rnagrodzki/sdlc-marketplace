@@ -2,7 +2,7 @@
 
 ## Overview
 
-Loads project review dimensions from `.claude/review-dimensions/`, matches them to changed files via glob patterns, dispatches parallel review subagents for each matching dimension, deduplicates findings, and posts a consolidated comment to the PR. Requires at least one dimension file — run `/sdlc:review-init` first if none exist.
+Loads project review dimensions from `.claude/review-dimensions/`, matches them to changed files via glob patterns, dispatches parallel review subagents for each matching dimension, deduplicates findings, and posts a consolidated comment to the PR. By default reviews committed branch changes plus staged changes. Requires at least one dimension file — run `/sdlc:review-init` first if none exist.
 
 ---
 
@@ -19,17 +19,42 @@ Loads project review dimensions from `.claude/review-dimensions/`, matches them 
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--base <branch>` | Compare against this branch instead of auto-detected base | auto-detected |
+| `--committed` | Review only committed branch changes (excludes staged) | — |
+| `--staged` | Review only staged changes vs HEAD | — |
+| `--working` | Review all uncommitted changes vs HEAD (staged + unstaged) | — |
+| `--worktree` | Review full working tree vs base: committed + staged + unstaged | — |
+| `--set-default` | Save the resolved scope to `.claude/review.json` as the project default | — |
 | `--dimensions <name,...>` | Run only the named dimensions (comma-separated) | all matching |
 | `--dry-run` | Show the review plan without dispatching subagents | — |
+
+> **Scope flags:** `--committed`, `--staged`, `--working`, and `--worktree` are mutually exclusive. `--staged` and `--working` cannot be combined with `--base`.
 
 ---
 
 ## Examples
 
-### Run a full review
+### Run a full review (committed + staged changes)
 
 ```text
 /sdlc:review
+```
+
+### Review staged changes before committing
+
+```text
+/sdlc:review --staged
+```
+
+### Review all local changes (staged + unstaged)
+
+```text
+/sdlc:review --working
+```
+
+### Review only committed changes (exclude staged)
+
+```text
+/sdlc:review --committed
 ```
 
 ### Review against a non-default base branch
@@ -44,11 +69,49 @@ Loads project review dimensions from `.claude/review-dimensions/`, matches them 
 /sdlc:review --dimensions security-review,api-review
 ```
 
+### Review full working tree including unstaged changes
+
+```text
+/sdlc:review --worktree
+```
+
+### Save a scope as the project default, then run
+
+```text
+/sdlc:review --set-default --worktree
+```
+
+Saves `worktree` to `.claude/review.json` and runs the review. Subsequent `/sdlc:review` calls will use `worktree` automatically.
+
 ### Preview what would be reviewed without running
 
 ```text
 /sdlc:review --dry-run
 ```
+
+---
+
+## Configuration
+
+The default scope can be persisted in `.claude/review.json`:
+
+```json
+{
+  "defaults": {
+    "scope": "worktree"
+  }
+}
+```
+
+**Scope resolution order:** CLI flag → `.claude/review.json` → `all` (hardcoded default)
+
+Use `--set-default` to create or update this file without editing it manually:
+
+```text
+/sdlc:review --set-default --staged
+```
+
+Valid scope values: `all`, `committed`, `staged`, `working`, `worktree`.
 
 ---
 

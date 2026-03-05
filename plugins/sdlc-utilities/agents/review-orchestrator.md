@@ -21,7 +21,8 @@ Parse MANIFEST_JSON. Display the review plan:
 
 ```text
 Review Plan
-  Base branch:   {base_branch}
+  Scope:         {scope label — see below}
+  {if scope is 'all' or 'committed'}: Base branch: {base_branch}
   Changed files: {git.changed_files.length}
   Dimensions:    {summary.active_dimensions} active, {summary.skipped_dimensions} skipped
 
@@ -31,14 +32,27 @@ Review Plan
 | performance      | 0     | medium   | SKIPPED  |
 ```
 
+Scope labels:
+
+- `all`       → `All changes (committed + staged)`
+- `committed` → `Committed branch changes only`
+- `staged`    → `Staged changes only`
+- `working`   → `Working tree changes (staged + unstaged)`
+- `worktree`  → `Full working tree vs base (committed + staged + unstaged)`
+
 Surface warnings from `plan_critique`:
 
 - **Uncovered files** (`uncovered_files.length > 0`): list them
 - **Over-broad** (`over_broad_dimensions`): flag by name
 - **Queued** (`queued_dimensions`): note they were capped out
 
-If `uncommitted_changes` is true: warn the user that uncommitted changes are not
-included in this review.
+If `scope` is `all` and `uncommitted_changes` is true: note that unstaged files are not
+included in this review (only staged + committed changes are).
+
+If `scope` is `committed` and `uncommitted_changes` is true: warn the user that
+uncommitted changes are not included in this review.
+
+If `scope` is `worktree`: do NOT warn — the scope includes everything (committed + staged + unstaged).
 
 ## Step 2 — Dispatch Dimension Subagents
 
@@ -131,7 +145,9 @@ Wait for the user's response:
 - `save` → write the review to `.claude/reviews/<branch>-<date>.md`
 - `cancel` → skip posting; review is already visible in the terminal
 
-If no PR: present the full review in the terminal, then offer:
+If no PR: present the full review in the terminal, then offer options based on scope:
+
+For `all`, `committed`, or `worktree` scope (branch-based changes):
 
 ```text
 No PR found. Options:
@@ -143,6 +159,14 @@ No PR found. Options:
 For option 1: invoke the `sdlc-creating-pull-requests` skill (`sdlc:sdlc-creating-pull-requests`)
 in draft mode, wait for the PR to be created, then post the consolidated review
 comment to the new PR using the `gh api` command above.
+
+For `staged` or `working` scope (local changes not yet committed):
+
+```text
+Reviewing local changes — no PR to post to. Options:
+  1. Save review to .claude/reviews/<branch>-<date>.md
+  2. Keep in terminal only (already shown)
+```
 
 ## Step 6 — Return Summary
 

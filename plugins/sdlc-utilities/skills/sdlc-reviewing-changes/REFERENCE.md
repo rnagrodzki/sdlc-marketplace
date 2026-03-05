@@ -15,6 +15,7 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
 {
   "version": 1,
   "timestamp": "ISO-8601",
+  "scope": "all",
   "base_branch": "main",
   "current_branch": "feat/xyz",
   "uncommitted_changes": false,
@@ -72,6 +73,18 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
 ```
 
 `status` values: `ACTIVE`, `SKIPPED`, `TRUNCATED`, `QUEUED`
+
+`scope` values:
+
+- `all` (default) — committed branch changes + staged changes (`git diff --cached {base}`)
+- `committed` — committed branch changes only (`git diff {base}..HEAD`)
+- `staged` — staged changes vs HEAD only (`git diff --cached`)
+- `working` — all uncommitted changes vs HEAD, staged + unstaged (`git diff HEAD`)
+- `worktree` — full working tree vs base: committed + staged + unstaged (`git diff {base}`)
+
+When `scope` is `staged` or `working`: `base_branch` is `null`, `git.commit_count` is `0`, `git.commit_log` is `""`, and `file_context[].commits` arrays are empty. `pr` is `{ exists: false }`.
+
+When `scope` is `worktree`: `base_branch` is set, `git.commit_count` and `git.commit_log` reflect commits since base, and `file_context[].commits` arrays are populated. The diff additionally includes unstaged working tree changes. `pr` is populated if a PR exists. Note: untracked files (never `git add`-ed) are not included.
 
 ---
 
@@ -142,11 +155,15 @@ You are a code reviewer focused exclusively on: {dimension.description}
 
 ## Commit Context
 
+{if any entry in file_context has commits.length > 0}
 Use these to understand the author's intent:
 
 {for each entry in file_context where entry.commits.length > 0}
 - `{entry.file}` — {entry.commits.map(c => `${c.hash}: ${c.subject}`).join('; ')}
 {end for}
+{else}
+No commit context available (reviewing {scope} changes — no commits to reference).
+{end if}
 
 ## Diff to Review
 {content of dimension.diff_file — pre-computed by review-prepare.js}

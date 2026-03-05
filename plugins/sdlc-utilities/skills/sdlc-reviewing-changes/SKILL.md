@@ -23,7 +23,8 @@ Key fields available:
 
 | Field | Description |
 | ----- | ----------- |
-| `base_branch` | The base branch used for the diff |
+| `scope` | Review scope: `all` (default), `committed`, `staged`, `working`, or `worktree` |
+| `base_branch` | The base branch used for the diff (`null` for `staged`/`working`) |
 | `git.changed_files` | Array of changed file paths |
 | `uncommitted_changes` | `true` if there are dirty working tree files |
 | `dirty_files` | Array of uncommitted file paths |
@@ -37,15 +38,27 @@ files written by the script. Clean both up in Step 3.
 
 **Uncommitted changes warning:**
 
-If `manifest.uncommitted_changes` is `true`, warn the user:
+Apply based on `manifest.scope`:
 
-```
-Warning: you have uncommitted changes ({dirty_files.length} files). They are NOT
-included in this review diff. Commit or stash them first if you want them reviewed.
-Continue? (yes/no)
-```
+- **`all`** (default): The review includes committed + staged changes. If `manifest.uncommitted_changes` is `true`, warn that **unstaged** files are not included:
+  ```
+  Note: you have unstaged or untracked files not included in this review.
+  Only staged and committed changes are reviewed in the default scope.
+  Use --working to include unstaged changes. Continue? (yes/no)
+  ```
+  Wait for confirmation before proceeding.
 
-Wait for confirmation before proceeding.
+- **`committed`**: If `manifest.uncommitted_changes` is `true`, warn the user:
+  ```
+  Warning: you have uncommitted changes ({dirty_files.length} files). They are NOT
+  included in this review. Use the default scope (no flags) or --working to include them.
+  Continue? (yes/no)
+  ```
+  Wait for confirmation before proceeding.
+
+- **`staged`** or **`working`**: Do NOT warn — reviewing uncommitted changes is the purpose.
+
+- **`worktree`**: Do NOT warn — the scope explicitly includes committed + staged + unstaged changes vs the base branch, so nothing is excluded.
 
 ---
 
