@@ -1,7 +1,7 @@
 ---
 description: Initialize or expand project review dimensions by scanning the tech stack and proposing tailored dimension files for use with /sdlc:review
 allowed-tools: [Read, Glob, Grep, Write, Bash, Skill]
-argument-hint: "[--add]"
+argument-hint: "[--add] [--no-copilot]"
 ---
 
 # /review-init Command
@@ -14,6 +14,7 @@ loaded by `/sdlc:review` to run project-specific multi-dimension code reviews.
 
 - `/sdlc:review-init` — Full scan: propose all relevant dimensions for this project
 - `/sdlc:review-init --add` — Expansion mode: propose only dimensions not already installed
+- `/sdlc:review-init --no-copilot` — Skip the GitHub Copilot instructions prompt
 
 ## Workflow
 
@@ -22,6 +23,7 @@ loaded by `/sdlc:review` to run project-specific multi-dimension code reviews.
 Check `$ARGUMENTS` for flags:
 
 - `--add` present → expansion mode (only propose dimensions not already installed)
+- `--no-copilot` present → skip the Copilot instructions prompt in the skill
 
 ### Step 1: Validate Git State
 
@@ -42,6 +44,7 @@ This command must be run from inside a git repository.
 Invoke the `sdlc-initializing-review-dimensions` skill, passing:
 
 - `--add` flag if set
+- `--no-copilot` flag if set
 
 The skill handles everything from here: tech stack scanning, tailored dimension proposals
 with evidence, user selection, file creation, and validation.

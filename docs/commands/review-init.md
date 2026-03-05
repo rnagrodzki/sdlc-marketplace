@@ -16,9 +16,10 @@ Scans the project's tech stack, dependencies, and file structure, then proposes 
 
 ## Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--add` | Expansion mode — propose only dimensions not already installed | — |
+| Flag           | Description                                                          | Default |
+|----------------|----------------------------------------------------------------------|---------|
+| `--add`        | Expansion mode — propose only dimensions not already installed       | —       |
+| `--no-copilot` | Skip the GitHub Copilot instructions prompt after dimension creation | —       |
 
 ---
 
@@ -60,6 +61,17 @@ Install which? (numbers comma-separated, or "all"): all
 ✓ Created .claude/review-dimensions/test-coverage-review.md
 
 Validation: 4/4 dimensions pass all checks.
+
+Would you also like to generate GitHub Copilot review instructions?
+These mirror your review dimensions so Copilot's automatic PR code review follows the same standards.
+Files will be created in .github/instructions/ (one per dimension, ~1-2 KB each).
+(yes/no): yes
+
+Generated Copilot instruction files:
+  .github/instructions/code-quality-review.instructions.md  (1,180 chars)
+  .github/instructions/security-review.instructions.md      (1,420 chars)
+  .github/instructions/api-review.instructions.md           (1,350 chars)
+  .github/instructions/test-coverage-review.instructions.md (1,100 chars)
 ```
 
 ### Add dimensions to an existing setup
@@ -80,9 +92,10 @@ Proposes only dimensions not yet present in `.claude/review-dimensions/`.
 
 ## What It Creates or Modifies
 
-| File / Artifact | Description |
-|-----------------|-------------|
-| `.claude/review-dimensions/*.md` | One file per dimension, used by `/sdlc:review` |
+| File / Artifact                          | Description                                                                  |
+|------------------------------------------|------------------------------------------------------------------------------|
+| `.claude/review-dimensions/*.md`         | One file per dimension, used by `/sdlc:review`                               |
+| `.github/instructions/*.instructions.md` | GitHub Copilot path-specific review instructions (opt-in, one per dimension) |
 
 ---
 
@@ -144,6 +157,65 @@ max-files: 50
 | SQL / command injection vector | critical |
 | Missing authorization check | high |
 ```
+
+---
+
+## GitHub Copilot Instructions
+
+After creating dimension files, `review-init` offers to generate matching GitHub Copilot
+instruction files in `.github/instructions/`. These instruct Copilot's automatic PR code
+review to follow the same standards as your Claude Code dimensions.
+
+Each dimension maps to one path-specific instruction file:
+
+| Dimension field  | Copilot field                       | Notes                                        |
+|------------------|-------------------------------------|----------------------------------------------|
+| `triggers`       | `applyTo` (comma-separated string)  | Activates instruction for matched file paths |
+| `description`    | Opening paragraph                   | Used as-is                                   |
+| `severity`       | Header note                         | "Default severity: {value}"                  |
+| Body checklist   | Checklist section                   | Converts checkbox items to plain list        |
+| `skip-when`      | Advisory note                       | Copilot has no native exclusion support      |
+
+### Copilot instruction file format
+
+```markdown
+---
+applyTo: "**/middleware/**,**/auth/**"
+---
+# security-review — Review Instructions
+
+Reviews changes for authentication, authorization, injection vulnerabilities, and secrets exposure.
+
+Default severity: high
+
+## Checklist
+
+- No hardcoded credentials, API keys, or secrets
+- All user-supplied input is validated before use
+- Authentication checks are present on protected routes
+- No SQL injection vectors (use parameterized queries)
+- No command injection (avoid exec/shell with user input)
+
+## Severity Guide
+
+| Finding                              | Severity |
+|--------------------------------------|----------|
+| Hardcoded secret / credential        | critical |
+| Missing authentication on route      | critical |
+| SQL / command injection vector       | critical |
+| Missing authorization check          | high     |
+```
+
+### Copilot limits
+
+- **4,000-character limit**: Copilot code review reads only the first 4,000 characters of
+  each instruction file. `review-init` estimates the size before writing and condenses any
+  file that would exceed this limit.
+- **No exclusion support**: `skip-when` patterns from the dimension are noted in a `## Note`
+  section but are not enforced by Copilot.
+- **Base branch**: Copilot uses instructions from the PR's base branch, not the feature branch.
+
+Use `--no-copilot` to skip this prompt if you manage Copilot instructions separately.
 
 ---
 

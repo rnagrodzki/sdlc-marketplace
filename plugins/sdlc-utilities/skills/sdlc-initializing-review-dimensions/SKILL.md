@@ -1,7 +1,7 @@
 ---
 name: sdlc-initializing-review-dimensions
 description: "Use this skill to initialize or expand review dimensions for a project. Scans the project's tech stack, dependencies, file patterns, and architecture to propose relevant review dimensions tailored to the specific project. Triggers on: initialize review dimensions, add review dimension, setup code review, create dimension files, expand review config, review-init."
-user-invokable: false
+user-invocable: false
 ---
 
 # Initializing Review Dimensions
@@ -19,6 +19,7 @@ Glob with the default path (cwd). Use the same approach for EXAMPLES.md.
 ## Arguments
 
 - `--add` — expansion mode: propose only dimensions not already installed
+- `--no-copilot` — skip the GitHub Copilot instructions prompt after dimension creation
 
 ---
 
@@ -215,6 +216,141 @@ If any file has errors, show the error detail and offer to fix them automaticall
 
 ---
 
+### Step 8 (COPILOT) — Propose GitHub Copilot Review Instructions
+
+**Skip this step if:**
+- Step 7 validation reported any errors (broken dimensions produce bad instructions)
+- `--no-copilot` flag was passed
+
+**Opt-in prompt:**
+
+```text
+Would you also like to generate GitHub Copilot review instructions?
+These mirror your review dimensions so Copilot's automatic PR code review follows the same standards.
+Files will be created in .github/instructions/ (one per dimension, ~1-2 KB each).
+(yes/no):
+```
+
+If the user answers no, skip to the next section.
+
+---
+
+**Check existing state:**
+
+Use Glob to check `.github/instructions/*.instructions.md`. If any files exist with the same
+names as the selected dimensions, list them and confirm overwrite before proceeding.
+
+In `--add` mode: only generate Copilot instructions for the newly added dimensions, not
+existing ones.
+
+---
+
+**PLAN sub-step — map dimensions to Copilot instruction files:**
+
+For each validated dimension, compute the proposed `.github/instructions/<name>.instructions.md`
+file. Show the plan:
+
+```text
+Proposed Copilot instruction files:
+
+1. .github/instructions/security-review.instructions.md
+   applyTo: "**/middleware/**,**/auth/**,**/*auth*"
+   ~1,420 chars (limit: 4,000) ✓
+
+2. .github/instructions/code-quality-review.instructions.md
+   applyTo: "**/*.ts,**/*.tsx"
+   ~1,180 chars (limit: 4,000) ✓
+
+Generate all? (yes/no/select numbers):
+```
+
+---
+
+**CRITIQUE sub-step — self-review proposals:**
+
+Before generating, check:
+
+- **Overly broad `applyTo`**: any pattern that is `**/*` or `**` alone? Flag for tightening.
+- **4,000-char overflow**: estimate char count of the rendered instruction body. Flag any that exceed the limit with the exact count.
+- **Duplicate `applyTo` patterns** across files: note that Copilot applies all matching instructions (acceptable, but worth flagging to the user).
+
+---
+
+**IMPROVE sub-step — refine before writing:**
+
+Based on critique:
+
+- Condense instructions that exceed 4,000 chars: remove verbose explanatory prose, keep
+  the checklist and severity guide table. If still over limit, truncate the checklist to the
+  most important items and add a note `<!-- truncated to fit 4,000-char Copilot limit -->`.
+- Tighten any broad `applyTo` patterns to match the project's actual directory structure.
+
+---
+
+**DO sub-step — write files:**
+
+For each selected instruction:
+
+1. Create `.github/instructions/` if it does not exist:
+   ```bash
+   mkdir -p .github/instructions
+   ```
+
+2. Write `.github/instructions/<name>.instructions.md` using this template:
+
+   ```markdown
+   ---
+   applyTo: "{triggers array joined by comma}"
+   ---
+   # {name} — Review Instructions
+
+   {description}
+
+   Default severity: {severity}
+
+   ## Checklist
+
+   {body checklist items — convert "- [ ] " prefix to "- " (plain list, no checkboxes)}
+
+   ## Severity Guide
+
+   {severity guide table from body, if present}
+   {if skip-when patterns exist:}
+
+   ## Note
+
+   In Claude Code reviews, files matching these patterns are excluded: {skip-when patterns}.
+   Copilot path-specific instructions do not support exclusion patterns — use judgment
+   when findings apply to these files.
+   ```
+
+   **Mapping rules:**
+
+   | Dimension field | Copilot field | Transformation |
+   |---|---|---|
+   | `triggers` (array) | `applyTo` (string) | Join with `,` — e.g. `"**/auth/**,**/middleware/**"` |
+   | `description` | Opening paragraph | Used as-is |
+   | `severity` | Header note | "Default severity: {value}" |
+   | Body checklist | Checklist section | Strip `- [ ]` → `- ` |
+   | `skip-when` | Note section | Advisory text |
+   | `max-files`, `requires-full-diff` | — | Omit (not applicable to Copilot) |
+
+3. Confirm each file with its path and character count.
+
+**Final summary:**
+
+```text
+Generated Copilot instruction files:
+  .github/instructions/security-review.instructions.md      (1,420 chars)
+  .github/instructions/code-quality-review.instructions.md  (1,180 chars)
+
+These files are read by GitHub Copilot when reviewing pull requests that touch
+the matched file paths. Enable Copilot code review in your repository settings
+to activate automatic PR reviews.
+```
+
+---
+
 ## Quality Gates
 
 Before marking complete, verify:
@@ -234,6 +370,9 @@ Log to `.claude/learnings/log.md` when:
 - User rejected a proposed dimension — note which dimension and the likely reason (triggers too broad? not relevant to their stack?)
 - User requested a dimension that was not proposed — note what evidence was missed in the scan
 - A created dimension failed validation — note which check failed and the root cause
+- User opted in to Copilot instructions — note how many dimensions were converted and any that needed condensing
+- User declined Copilot instructions — note for awareness (they may want to know about `--no-copilot` for future runs)
+- A Copilot instruction exceeded the 4,000-char limit — note which dimension and how it was condensed
 
 ## See Also
 
