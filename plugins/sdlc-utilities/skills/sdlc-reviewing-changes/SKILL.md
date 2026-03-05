@@ -1,7 +1,7 @@
 ---
 name: sdlc-reviewing-changes
 description: "Use this skill when reviewing code changes across project-defined dimensions (security, performance, docs, concurrency, etc.). Runs review-prepare.js to pre-compute all git data, then delegates to the review-orchestrator agent. Triggers on: review changes, code review, review PR, multi-dimension review, run review."
-user-invokable: false
+user-invocable: false
 ---
 
 # Reviewing Changes
@@ -12,32 +12,28 @@ findings, and posts the consolidated PR comment.
 
 ---
 
-## Step 1 — Run Preparation Script
+## Step 1 — Consume Pre-computed Context
 
-Locate and run the script:
+The `/review` command has already run `review-prepare.js`, written the JSON output
+to a temp file, read and parsed it, and passed the parsed object to this skill as
+`MANIFEST_JSON`. It is an in-memory JavaScript/JSON object — no file path, no bash
+commands needed to retrieve it. Read it now.
 
-```bash
-# Resolve script: check installed plugin location first, then fall back to project tree
-SCRIPT=$(find ~/.claude/plugins -name "review-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "review-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate review-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+Key fields available:
 
-# Write to temp file — large manifests (100KB+) break shell pipes
-MANIFEST_FILE=$(mktemp /tmp/review-manifest-XXXXXX.json)
-node "$SCRIPT" \
-  --project-root . \
-  [--base <branch>]        # include if --base was provided
-  [--dimensions <names>]   # include if --dimensions was provided
-  --json > "$MANIFEST_FILE"
-EXIT_CODE=$?
-```
+| Field | Description |
+| ----- | ----------- |
+| `base_branch` | The base branch used for the diff |
+| `git.changed_files` | Array of changed file paths |
+| `uncommitted_changes` | `true` if there are dirty working tree files |
+| `dirty_files` | Array of uncommitted file paths |
+| `summary.active_dimensions` | Number of dimensions with matching files |
+| `summary.skipped_dimensions` | Number of dimensions with no matching files |
+| `diff_dir` | Temp directory path containing per-dimension `.diff` files |
+| `plan_critique` | `{ uncovered_files, over_broad_dimensions }` |
 
-Read and parse `MANIFEST_FILE` as `MANIFEST_JSON`. The manifest also contains `diff_dir` — a temp directory with per-dimension `.diff` files written by the script. Clean both up in Step 4.
-
-**On non-zero `EXIT_CODE`:**
-
-- Exit code 1: show the stderr message to the user and stop.
-- Exit code 2: show `Script error — see output above` and stop.
+The manifest also contains `diff_dir` — a temp directory with per-dimension `.diff`
+files written by the script. Clean both up in Step 3.
 
 **Uncommitted changes warning:**
 
