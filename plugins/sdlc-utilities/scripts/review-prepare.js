@@ -41,6 +41,43 @@ const {
 } = require('./lib/git');
 
 // ---------------------------------------------------------------------------
+// Review config (.claude/review.json)
+// ---------------------------------------------------------------------------
+
+const VALID_SCOPES = ['all', 'committed', 'staged', 'working', 'worktree'];
+
+function readReviewConfig(projectRoot) {
+  const configPath = path.join(projectRoot, '.claude', 'review.json');
+  if (!fs.existsSync(configPath)) return null;
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    if (config?.defaults?.scope && !VALID_SCOPES.includes(config.defaults.scope)) {
+      process.stderr.write(
+        `Warning: invalid scope "${config.defaults.scope}" in ${configPath}. ` +
+        `Valid: ${VALID_SCOPES.join(', ')}. Using default "all".\n`
+      );
+      config.defaults.scope = 'all';
+    }
+    return config;
+  } catch (err) {
+    process.stderr.write(`Warning: invalid review config at ${configPath}: ${err.message}\n`);
+    return null;
+  }
+}
+
+function writeReviewConfig(projectRoot, updates) {
+  const claudeDir  = path.join(projectRoot, '.claude');
+  const configPath = path.join(claudeDir, 'review.json');
+  if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true });
+  let existing = {};
+  if (fs.existsSync(configPath)) {
+    try { existing = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch (_) {}
+  }
+  const merged = { ...existing, ...updates, defaults: { ...(existing.defaults || {}), ...(updates.defaults || {}) } };
+  fs.writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf8');
+}
+
+// ---------------------------------------------------------------------------
 // CLI argument parsing
 // ---------------------------------------------------------------------------
 
@@ -49,19 +86,22 @@ function parseArgs(argv) {
   let projectRoot = process.cwd();
   let baseBranch = null;
   let dimensionFilter = null;
-  let scope = 'all';
+  let scope = null;
+  let setDefault = false;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '--project-root' && args[i + 1]) projectRoot = path.resolve(args[++i]);
     else if (a === '--base' && args[i + 1]) baseBranch = args[++i];
     else if (a === '--dimensions' && args[i + 1]) dimensionFilter = args[++i].split(',').map(s => s.trim());
-    else if (a === '--committed') scope = 'committed';
-    else if (a === '--staged')    scope = 'staged';
-    else if (a === '--working')   scope = 'working';
+    else if (a === '--committed')   scope = 'committed';
+    else if (a === '--staged')      scope = 'staged';
+    else if (a === '--working')     scope = 'working';
+    else if (a === '--worktree')    scope = 'worktree';
+    else if (a === '--set-default') setDefault = true;
   }
 
-  return { projectRoot, baseBranch, dimensionFilter, scope };
+  return { projectRoot, baseBranch, dimensionFilter, scope, setDefault };
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +233,7 @@ function fetchAndSplitDiff(base, projectRoot, scope = 'all') {
     case 'committed': cmd = `git diff ${base}..HEAD`; break;
     case 'staged':    cmd = 'git diff --cached';      break;
     case 'working':   cmd = 'git diff HEAD';          break;
+    case 'worktree':  cmd = `git diff ${base}`;       break;
     default:          cmd = `git diff --cached ${base}`; break; // 'all'
   }
   const raw = exec(cmd, { cwd: projectRoot });
@@ -342,7 +383,17 @@ function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const { projectRoot, baseBranch, dimensionFilter, scope } = parseArgs(process.argv);
+  const { projectRoot, baseBranch, dimensionFilter, scope: cliScope, setDefault } = parseArgs(process.argv);
+
+  // Resolve scope: CLI flag > .claude/review.json > hardcoded default
+  const reviewConfig = readReviewConfig(projectRoot);
+  const scope = cliScope || reviewConfig?.defaults?.scope || 'all';
+
+  // Persist default if --set-default was passed
+  if (setDefault) {
+    writeReviewConfig(projectRoot, { defaults: { scope } });
+    process.stderr.write(`Saved default scope "${scope}" to .claude/review.json\n`);
+  }
 
   // Validate mutual exclusivity
   const isLocalScope = scope === 'staged' || scope === 'working';
@@ -360,7 +411,7 @@ function main() {
     process.exit(2);
   }
 
-  // Base branch only needed for 'all' and 'committed' scopes
+  // Base branch needed for 'all', 'committed', and 'worktree' scopes
   let base = baseBranch;
   if (!isLocalScope && !base) {
     try {
@@ -378,6 +429,7 @@ function main() {
       committed: `committed changes vs "${base}"`,
       staged:    'staged changes',
       working:   'working tree changes vs HEAD',
+      worktree:  `working tree vs "${base}" (committed + staged + unstaged)`,
     }[scope] || scope;
     process.stderr.write(`No changed files found in ${scopeLabel}.\n`);
     process.exit(1);

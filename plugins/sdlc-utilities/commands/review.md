@@ -1,7 +1,7 @@
 ---
 description: Run multi-dimension code review on the current branch using project-defined review dimensions
 allowed-tools: [Glob, Bash, Skill, Agent]
-argument-hint: "[--base <branch>] [--committed] [--staged] [--working] [--dimensions <name,...>] [--dry-run]"
+argument-hint: "[--base <branch>] [--committed] [--staged] [--working] [--worktree] [--set-default] [--dimensions <name,...>] [--dry-run]"
 ---
 
 # /review Command
@@ -15,6 +15,8 @@ project-defined review dimensions.
 - `/sdlc:review --committed` — Review only committed branch changes (excludes staged)
 - `/sdlc:review --staged` — Review only staged changes vs HEAD
 - `/sdlc:review --working` — Review all uncommitted changes vs HEAD (staged + unstaged)
+- `/sdlc:review --worktree` — Review full working tree vs base (committed + staged + unstaged)
+- `/sdlc:review --set-default --worktree` — Save `worktree` as default scope, then run the review
 - `/sdlc:review --base develop` — Diff against a specific base branch
 - `/sdlc:review --dimensions security,performance` — Restrict to named dimensions only
 - `/sdlc:review --dry-run` — Show the review plan without dispatching subagents

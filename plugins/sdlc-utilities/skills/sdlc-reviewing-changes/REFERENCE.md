@@ -80,8 +80,11 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
 - `committed` — committed branch changes only (`git diff {base}..HEAD`)
 - `staged` — staged changes vs HEAD only (`git diff --cached`)
 - `working` — all uncommitted changes vs HEAD, staged + unstaged (`git diff HEAD`)
+- `worktree` — full working tree vs base: committed + staged + unstaged (`git diff {base}`)
 
 When `scope` is `staged` or `working`: `base_branch` is `null`, `git.commit_count` is `0`, `git.commit_log` is `""`, and `file_context[].commits` arrays are empty. `pr` is `{ exists: false }`.
+
+When `scope` is `worktree`: `base_branch` is set, `git.commit_count` and `git.commit_log` reflect commits since base, and `file_context[].commits` arrays are populated. The diff additionally includes unstaged working tree changes. `pr` is populated if a PR exists. Note: untracked files (never `git add`-ed) are not included.
 
 ---
 

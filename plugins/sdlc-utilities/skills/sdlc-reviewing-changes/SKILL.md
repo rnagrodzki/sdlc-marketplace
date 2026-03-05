@@ -23,7 +23,7 @@ Key fields available:
 
 | Field | Description |
 | ----- | ----------- |
-| `scope` | Review scope: `all` (default), `committed`, `staged`, or `working` |
+| `scope` | Review scope: `all` (default), `committed`, `staged`, `working`, or `worktree` |
 | `base_branch` | The base branch used for the diff (`null` for `staged`/`working`) |
 | `git.changed_files` | Array of changed file paths |
 | `uncommitted_changes` | `true` if there are dirty working tree files |
@@ -57,6 +57,8 @@ Apply based on `manifest.scope`:
   Wait for confirmation before proceeding.
 
 - **`staged`** or **`working`**: Do NOT warn — reviewing uncommitted changes is the purpose.
+
+- **`worktree`**: Do NOT warn — the scope explicitly includes committed + staged + unstaged changes vs the base branch, so nothing is excluded.
 
 ---
 

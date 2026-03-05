@@ -22,10 +22,12 @@ Loads project review dimensions from `.claude/review-dimensions/`, matches them 
 | `--committed` | Review only committed branch changes (excludes staged) | — |
 | `--staged` | Review only staged changes vs HEAD | — |
 | `--working` | Review all uncommitted changes vs HEAD (staged + unstaged) | — |
+| `--worktree` | Review full working tree vs base: committed + staged + unstaged | — |
+| `--set-default` | Save the resolved scope to `.claude/review.json` as the project default | — |
 | `--dimensions <name,...>` | Run only the named dimensions (comma-separated) | all matching |
 | `--dry-run` | Show the review plan without dispatching subagents | — |
 
-> **Scope flags:** `--committed`, `--staged`, and `--working` are mutually exclusive. `--staged` and `--working` cannot be combined with `--base`.
+> **Scope flags:** `--committed`, `--staged`, `--working`, and `--worktree` are mutually exclusive. `--staged` and `--working` cannot be combined with `--base`.
 
 ---
 
@@ -67,11 +69,49 @@ Loads project review dimensions from `.claude/review-dimensions/`, matches them 
 /sdlc:review --dimensions security-review,api-review
 ```
 
+### Review full working tree including unstaged changes
+
+```text
+/sdlc:review --worktree
+```
+
+### Save a scope as the project default, then run
+
+```text
+/sdlc:review --set-default --worktree
+```
+
+Saves `worktree` to `.claude/review.json` and runs the review. Subsequent `/sdlc:review` calls will use `worktree` automatically.
+
 ### Preview what would be reviewed without running
 
 ```text
 /sdlc:review --dry-run
 ```
+
+---
+
+## Configuration
+
+The default scope can be persisted in `.claude/review.json`:
+
+```json
+{
+  "defaults": {
+    "scope": "worktree"
+  }
+}
+```
+
+**Scope resolution order:** CLI flag → `.claude/review.json` → `all` (hardcoded default)
+
+Use `--set-default` to create or update this file without editing it manually:
+
+```text
+/sdlc:review --set-default --staged
+```
+
+Valid scope values: `all`, `committed`, `staged`, `working`, `worktree`.
 
 ---
 

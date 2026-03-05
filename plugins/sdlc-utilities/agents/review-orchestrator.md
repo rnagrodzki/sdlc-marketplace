@@ -38,6 +38,7 @@ Scope labels:
 - `committed` → `Committed branch changes only`
 - `staged`    → `Staged changes only`
 - `working`   → `Working tree changes (staged + unstaged)`
+- `worktree`  → `Full working tree vs base (committed + staged + unstaged)`
 
 Surface warnings from `plan_critique`:
 
@@ -50,6 +51,8 @@ included in this review (only staged + committed changes are).
 
 If `scope` is `committed` and `uncommitted_changes` is true: warn the user that
 uncommitted changes are not included in this review.
+
+If `scope` is `worktree`: do NOT warn — the scope includes everything (committed + staged + unstaged).
 
 ## Step 2 — Dispatch Dimension Subagents
 
@@ -144,7 +147,7 @@ Wait for the user's response:
 
 If no PR: present the full review in the terminal, then offer options based on scope:
 
-For `all` or `committed` scope (branch-based changes):
+For `all`, `committed`, or `worktree` scope (branch-based changes):
 
 ```text
 No PR found. Options:
