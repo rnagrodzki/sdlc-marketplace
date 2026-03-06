@@ -43,6 +43,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | [`/sdlc:review`](docs/commands/review.md) | Run multi-dimension code review on the current branch |
 | [`/sdlc:review-init`](docs/commands/review-init.md) | Scan the project and create tailored review dimension files |
 | [`/sdlc:version`](docs/commands/version.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
+| [`/sdlc:plugin-check`](docs/commands/plugin-check.md) | Validate the plugin discovery chain (manifests, commands, skills, hooks) |
 
 ---
 
@@ -52,6 +53,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | --- | --- |
 | [Getting Started](docs/getting-started.md) | Installation, first use, what gets created |
 | [Architecture](docs/architecture.md) | Repository structure, plugin system, name resolution |
+| [Plugin Installation](docs/plugin-installation.md) | How plugins are installed, discovered, and resolved at runtime |
 | [Adding Skills](docs/adding-skills.md) | Create custom skills for your project |
 | [Adding Commands](docs/adding-commands.md) | Create custom slash commands |
 | [Adding Hooks](docs/adding-hooks.md) | Set up automated actions on session events |

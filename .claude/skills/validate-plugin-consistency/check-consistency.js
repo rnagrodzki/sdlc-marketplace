@@ -198,6 +198,7 @@ function skillForCommand(commandName) {
     version: 'sdlc-versioning-releases',
     'review-init': 'sdlc-initializing-review-dimensions',
     'pr-customize': 'sdlc-customizing-pr-template',
+    'plugin-check': 'sdlc-validating-plugin-discovery',
   };
   return map[commandName] || null;
 }
