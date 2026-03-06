@@ -106,33 +106,41 @@ After installation, Claude Code can discover and load the plugin on next session
 
 ## On-Disk Layout
 
-After installation, the plugin's files live under `~/.claude/plugins/`. Scripts are
-found at runtime using:
+After installation, the plugin's files live under `~/.claude/plugins/cache/`. Scripts
+are found at runtime using:
 
 ```bash
-find ~/.claude/plugins -name "<script>.js" -path "*/scripts/*"
+find ~/.claude/plugins -name "<script>.js"
 ```
 
-The plugin's internal structure mirrors what's in the repository:
+The full path includes marketplace, plugin name, and version:
 
 ```text
-~/.claude/plugins/
-└── <plugin>/
-    ├── .claude-plugin/
-    │   └── plugin.json        # Plugin identity and version
-    ├── commands/
-    │   └── pr.md              # Defines /sdlc:pr
-    ├── skills/
-    │   └── sdlc-creating-pull-requests/
-    │       └── SKILL.md       # Skill instructions + supporting files
-    ├── scripts/
-    │   ├── pr-prepare.js      # Helper scripts (found at runtime via find)
-    │   └── lib/
-    ├── hooks/
-    │   └── hooks.json
-    └── agents/
-        └── review-orchestrator.md
+~/.claude/plugins/cache/
+└── <marketplace>/               # e.g. sdlc-marketplace
+    └── <plugin>/                # e.g. sdlc
+        └── <version>/           # e.g. 0.7.0
+            ├── .claude-plugin/
+            │   └── plugin.json        # Plugin identity and version
+            ├── commands/
+            │   └── pr.md              # Defines /sdlc:pr
+            ├── skills/
+            │   └── sdlc-creating-pull-requests/
+            │       └── SKILL.md       # Skill instructions + supporting files
+            ├── scripts/
+            │   ├── pr-prepare.js      # Helper scripts (found at runtime via find)
+            │   └── lib/
+            ├── hooks/
+            │   └── hooks.json
+            └── agents/
+                └── review-orchestrator.md
 ```
+
+Example actual path: `~/.claude/plugins/cache/sdlc-marketplace/sdlc/0.7.0/scripts/pr-prepare.js`
+
+Because scripts are nested 4 levels deep under `~/.claude/plugins/`, a recursive
+`find` (without `-path` filters) is required — path-based filtering is fragile and
+unnecessary since script names are unique within the plugin.
 
 ---
 
@@ -223,26 +231,27 @@ Then restart Claude Code and reinstall:
 
 ## Script Resolution at Runtime
 
-Helper scripts (`.js` files in `scripts/`) are not imported directly — they are located
-at runtime using the `find` command inside command files. The two-step pattern:
+Commands are thin wrappers that delegate immediately to skills. Skills own script
+resolution — they locate and run helper scripts themselves using this two-step pattern:
 
 ```bash
-# Step 1: Check installed plugin location first (correct version for the user)
-SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
+# Step 1: Search installed plugin (recursive find — scripts are 4 levels deep under cache/)
+SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" 2>/dev/null | head -1)
 
 # Step 2: Fall back to the repository tree (for development / testing)
-[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "pr-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/pr-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/pr-prepare.js"
 
 # Step 3: Hard error if not found
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate pr-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 ```
 
-**Why plugins-first?** The installed version at `~/.claude/plugins/` is the version the
-user explicitly installed. Searching there first ensures users always run the version
-that matches the rest of the installed plugin, not a different version from a local clone.
+**Why `find` without `-path`?** Scripts are nested 4 levels deep (`cache/<marketplace>/<plugin>/<version>/scripts/`). The `-path "*/scripts/*"` filter that was previously used is fragile — LLMs paraphrase it and silently drop the glob wildcards. Since script names are unique within the plugin, `-name` alone is sufficient.
 
-**Why the CWD fallback?** Allows contributors working in the `sdlc-marketplace`
-repository to run commands directly without installing the plugin globally.
+**Why the direct-path CWD fallback?** Allows contributors working in the `sdlc-marketplace`
+repository to run commands directly without installing the plugin globally. The fallback
+uses a literal `[ -f "..." ]` check with no globbing — impossible to corrupt.
+
+**Why skills, not commands?** Commands are natural language instructions that LLMs interpret and may paraphrase. Moving all bash logic into skills — and adding a `VERBATIM` directive before each bash block — reduces the risk of LLM paraphrasing breaking script resolution.
 
 ---
 

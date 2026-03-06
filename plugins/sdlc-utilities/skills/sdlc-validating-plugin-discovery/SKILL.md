@@ -10,10 +10,34 @@ Validates that the plugin's full discovery and cross-reference chain is intact �
 marketplace manifest through plugin manifests to every command, skill, script, hook,
 and agent — so the plugin works correctly after installation.
 
+## Step 0 — Resolve and Run validate-discovery.js
+
+> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "validate-discovery.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/validate-discovery.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/validate-discovery.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate validate-discovery.js. Is the sdlc plugin installed?" >&2; exit 2; }
+
+REPORT_FILE=$(mktemp /tmp/discovery-report-XXXXXX.json)
+node "$SCRIPT" --project-root . $ARGUMENTS --json > "$REPORT_FILE"
+EXIT_CODE=$?
+```
+
+Read and parse `REPORT_FILE` as `REPORT_JSON`. Clean up after work is complete:
+
+```bash
+rm -f "$REPORT_FILE"
+```
+
+**On `EXIT_CODE`:**
+
+- Exit code 1: Issues were found — `REPORT_JSON` is valid and contains `checks` with `status: "fail"` entries. **Continue to Step 1** (display and fix them).
+- Exit code 2: Script error — show `Script error — see output above` and stop.
+
 ## Inputs
 
-The `/sdlc:plugin-check` command has already run `validate-discovery.js` and read the
-JSON output into `REPORT_JSON`. Key fields:
+`REPORT_JSON` key fields:
 
 ```
 REPORT_JSON.overall          — "pass" or "fail"
@@ -192,11 +216,9 @@ tools: Read, Glob, Grep, Bash, Agent
 
 ## Step 4 — Re-validate
 
-After fixing all issues, re-run the check:
+After fixing all issues, re-run the check using the same `$SCRIPT` resolved in Step 0:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "validate-discovery.js" -path "*/scripts/*" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "validate-discovery.js" -path "*/scripts/*" 2>/dev/null | head -1)
 node "$SCRIPT" --project-root . --markdown
 ```
 

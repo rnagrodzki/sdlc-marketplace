@@ -87,8 +87,8 @@ In `--add` (expansion) mode:
 
 - Locate the validation script:
   ```bash
-  SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/scripts/*" 2>/dev/null | head -1)
-  [ -z "$SCRIPT" ] && SCRIPT=$(find . -name "validate-dimensions.js" -path "*/scripts/*" 2>/dev/null | head -1)
+  SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" 2>/dev/null | head -1)
+  [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/validate-dimensions.js"
   ```
 - Run: `node "$SCRIPT" --project-root . --json`
 - Extract the list of currently installed dimension names from the output
@@ -205,8 +205,8 @@ For each selected dimension:
 Run the validation script (use `SCRIPT` resolved in Step 2, or re-resolve if Step 2 was skipped):
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/scripts/*" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "validate-dimensions.js" -path "*/scripts/*" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/validate-dimensions.js"
 node "$SCRIPT" --project-root . --markdown
 ```
 

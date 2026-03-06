@@ -191,8 +191,8 @@ After the user accepts:
 After writing, locate and run the validation script:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "validate-pr-template.js" -path "*/scripts/*" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "validate-pr-template.js" -path "*/scripts/*" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "validate-pr-template.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/validate-pr-template.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/validate-pr-template.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate validate-pr-template.js. Is the sdlc plugin installed?" >&2; exit 2; }
 node "$SCRIPT" --project-root .
 ```

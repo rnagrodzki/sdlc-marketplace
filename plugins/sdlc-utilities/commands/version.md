@@ -1,6 +1,6 @@
 ---
 description: Bump the project version, create a git tag, optionally generate a CHANGELOG entry, and push the release
-allowed-tools: [Read, Edit, Write, Glob, Grep, Bash, Skill]
+allowed-tools: [Read, Edit, Write, Bash, Skill]
 argument-hint: "[major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog]"
 ---
 
@@ -28,40 +28,6 @@ Subsequent runs read `.claude/version.json` and skip auto-detection.
 
 ## Workflow
 
-### Step 1: Run the Pre-processing Script
-
-Locate and run the script:
-
-```bash
-# Resolve script: check installed plugin location first, then fall back to project tree
-SCRIPT=$(find ~/.claude/plugins -name "version-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "version-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate version-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
-
-# Write to temp file to handle large output safely
-VERSION_CONTEXT_FILE=$(mktemp /tmp/version-context-XXXXXX.json)
-node "$SCRIPT" $ARGUMENTS > "$VERSION_CONTEXT_FILE"
-EXIT_CODE=$?
-```
-
-Read and parse `VERSION_CONTEXT_FILE` as `VERSION_CONTEXT_JSON`. Clean up the temp file after the release completes or is cancelled:
-
-```bash
-rm -f "$VERSION_CONTEXT_FILE"
-```
-
-**On non-zero `EXIT_CODE`:**
-
-- Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
-- Exit code 2: Show `Script error — see output above` and stop.
-
-**If `VERSION_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
-
-**If `VERSION_CONTEXT_JSON.warnings` is non-empty**, show the warnings to the user before continuing.
-For the warning `"You have uncommitted changes"`, ask the user to confirm they want to proceed.
-
-### Step 2: Delegate to Skill
-
-Invoke the `sdlc-versioning-releases` skill, passing `VERSION_CONTEXT_JSON` as the
-pre-computed context. The skill handles everything from here: init setup or release
-execution, version bump, changelog generation, user confirmation, and git operations.
+Invoke the `sdlc-versioning-releases` skill, passing `$ARGUMENTS` as the CLI flags.
+The skill handles everything: script resolution, version detection, init setup or
+release execution, version bump, changelog generation, user confirmation, and git operations.

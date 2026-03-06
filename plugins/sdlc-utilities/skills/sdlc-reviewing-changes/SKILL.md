@@ -12,12 +12,34 @@ findings, and posts the consolidated PR comment.
 
 ---
 
+## Step 0 — Resolve and Run review-prepare.js
+
+> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "review-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/review-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/review-prepare.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate review-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+
+MANIFEST_FILE=$(mktemp /tmp/review-manifest-XXXXXX.json)
+node "$SCRIPT" $ARGUMENTS --json > "$MANIFEST_FILE"
+EXIT_CODE=$?
+```
+
+Read and parse `MANIFEST_FILE` as `MANIFEST_JSON`. Clean up after the review completes or is cancelled:
+
+```bash
+rm -f "$MANIFEST_FILE"
+```
+
+**On non-zero `EXIT_CODE`:**
+
+- Exit code 1: show the stderr message to the user and stop.
+- Exit code 2: show `Script error — see output above` and stop.
+
 ## Step 1 — Consume Pre-computed Context
 
-The `/review` command has already run `review-prepare.js`, written the JSON output
-to a temp file, read and parsed it, and passed the parsed object to this skill as
-`MANIFEST_JSON`. It is an in-memory JavaScript/JSON object — no file path, no bash
-commands needed to retrieve it. Read it now.
+Read `MANIFEST_JSON` now.
 
 Key fields available:
 

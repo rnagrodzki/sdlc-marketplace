@@ -104,11 +104,19 @@ function parseSimpleYaml(yamlStr) {
 // Excludes placeholder patterns like "<script>.js" (containing < or >).
 const RE_FIND_SCRIPT = /find\s[^`\n]*?-name\s+["']([^"'<>]+\.js)["']/g;
 
+// Extract script filenames from direct-path fallback pattern:
+// plugins/sdlc-utilities/scripts/<script>.js
+const RE_DIRECT_SCRIPT = /plugins\/sdlc-utilities\/scripts\/([^\s"'<>]+\.js)/g;
+
 function extractScriptRefs(content) {
   const names = new Set();
   let m;
-  const re = new RegExp(RE_FIND_SCRIPT.source, 'g');
-  while ((m = re.exec(content)) !== null) {
+  const reFindScript = new RegExp(RE_FIND_SCRIPT.source, 'g');
+  while ((m = reFindScript.exec(content)) !== null) {
+    names.add(m[1]);
+  }
+  const reDirectScript = new RegExp(RE_DIRECT_SCRIPT.source, 'g');
+  while ((m = reDirectScript.exec(content)) !== null) {
     names.add(m[1]);
   }
   return [...names];

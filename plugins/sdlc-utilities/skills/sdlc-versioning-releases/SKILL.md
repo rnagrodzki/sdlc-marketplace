@@ -21,7 +21,39 @@ optional CHANGELOG entry, release commit, and push to origin.
 
 ## Workflow
 
-The workflow has two branches determined by `VERSION_CONTEXT_JSON.flow`.
+### Step 0: Resolve and Run version-prepare.js
+
+> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "version-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/version-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/version-prepare.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate version-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+
+VERSION_CONTEXT_FILE=$(mktemp /tmp/version-context-XXXXXX.json)
+node "$SCRIPT" $ARGUMENTS > "$VERSION_CONTEXT_FILE"
+EXIT_CODE=$?
+```
+
+Read and parse `VERSION_CONTEXT_FILE` as `VERSION_CONTEXT_JSON`. Clean up after the release completes or is cancelled:
+
+```bash
+rm -f "$VERSION_CONTEXT_FILE"
+```
+
+**On non-zero `EXIT_CODE`:**
+
+- Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
+- Exit code 2: Show `Script error — see output above` and stop.
+
+**If `VERSION_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
+
+**If `VERSION_CONTEXT_JSON.warnings` is non-empty**, show the warnings to the user before continuing.
+For the warning `"You have uncommitted changes"`, ask the user to confirm they want to proceed.
+
+---
+
+The workflow then has two branches determined by `VERSION_CONTEXT_JSON.flow`.
 
 ---
 

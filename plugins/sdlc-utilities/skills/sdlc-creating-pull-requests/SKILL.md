@@ -77,12 +77,39 @@ If no tests added, explain why.]
 
 ## Workflow
 
-### Step 1: Consume the Pre-computed Context
+### Step 0: Resolve and Run pr-prepare.js
 
-The `/pr` command has already run `pr-prepare.js`, written the JSON output to a
-temp file, read and parsed it, and passed the parsed object to this skill as
-`PR_CONTEXT_JSON`. It is an in-memory JavaScript/JSON object — no file path, no
-bash commands needed to retrieve it. Read it now.
+> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/pr-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/pr-prepare.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate pr-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+
+PR_CONTEXT_FILE=$(mktemp /tmp/pr-context-XXXXXX.json)
+node "$SCRIPT" $ARGUMENTS > "$PR_CONTEXT_FILE"
+EXIT_CODE=$?
+```
+
+Read and parse `PR_CONTEXT_FILE` as `PR_CONTEXT_JSON`. Clean up after PR is created or cancelled:
+
+```bash
+rm -f "$PR_CONTEXT_FILE"
+```
+
+**On non-zero `EXIT_CODE`:**
+
+- Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
+- Exit code 2: Show `Script error — see output above` and stop.
+
+**If `PR_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
+
+**If `PR_CONTEXT_JSON.warnings` is non-empty**, show the warnings to the user before continuing.
+Ask them to confirm if they want to proceed (particularly for uncommitted changes).
+
+### Step 1: Consume the Context
+
+Read `PR_CONTEXT_JSON` now.
 
 Key fields available (including `customTemplate` added for project-level PR template support):
 
