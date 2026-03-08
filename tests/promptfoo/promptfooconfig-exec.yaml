@@ -1,5 +1,8 @@
 description: "Script execution tests for sdlc-marketplace (runs real scripts against fixture directories, no LLM)"
 
+evaluateOptions:
+  concurrency: 8
+
 # Each test case uses the script-runner.js provider directly.
 # The prompt is unused for script tests but required by the promptfoo config schema.
 providers:
