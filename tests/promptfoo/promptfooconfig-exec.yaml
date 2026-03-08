@@ -16,3 +16,4 @@ tests:
   - file://datasets/sdlc-plugin-discovery-exec.yaml
   - file://datasets/sdlc-dimensions-exec.yaml
   - file://datasets/sdlc-pr-template-exec.yaml
+  - file://datasets/sdlc-script-resolution-exec.yaml

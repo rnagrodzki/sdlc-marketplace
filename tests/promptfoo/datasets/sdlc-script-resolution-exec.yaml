@@ -1,0 +1,85 @@
+# Script execution tests for the skill bash resolution pattern.
+# These tests validate the 3-step find + fallback + error pattern that all skills use
+# to locate helper scripts in both installed-plugin and development environments.
+#
+# Each fixture contains fake-home/ (HOME override) and fake-repo/ (CWD override).
+# The test-script-resolution.js script runs the verbatim bash pattern from skills
+# and outputs JSON: {"resolved":"<path>","source":"installed"|"local"|"error"}
+#
+# Fixture appropriateness:
+#   resolution-installed-only -- CORRECT: script only under ~/.claude/plugins
+#   resolution-dev-only       -- CORRECT: script only under plugins/sdlc-utilities/scripts/
+#   resolution-both           -- CORRECT: both paths present; installed must win
+#   resolution-neither        -- CORRECT: neither path exists; must produce error
+
+- description: "script-resolution: installed plugin path is found"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
+    script_args: "--script-name pr-prepare.js --project-root {{project_root}}"
+    project_root: "file://fixtures-fs/resolution-installed-only"
+  assert:
+    # Source must be "installed"
+    - type: icontains
+      value: '"source":"installed"'
+    # Resolved path must be under .claude/plugins
+    - type: icontains
+      value: ".claude/plugins"
+    # Must NOT fall back to local
+    - type: not-icontains
+      value: '"source":"local"'
+    # Must NOT be error
+    - type: not-icontains
+      value: '"source":"error"'
+
+- description: "script-resolution: dev fallback path is found when plugin not installed"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
+    script_args: "--script-name pr-prepare.js --project-root {{project_root}}"
+    project_root: "file://fixtures-fs/resolution-dev-only"
+  assert:
+    # Source must be "local"
+    - type: icontains
+      value: '"source":"local"'
+    # Resolved path must reference the local scripts directory
+    - type: icontains
+      value: "plugins/sdlc-utilities/scripts"
+    # Must NOT be installed
+    - type: not-icontains
+      value: '"source":"installed"'
+    # Must NOT be error
+    - type: not-icontains
+      value: '"source":"error"'
+
+- description: "script-resolution: installed path wins when both paths exist"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
+    script_args: "--script-name pr-prepare.js --project-root {{project_root}}"
+    project_root: "file://fixtures-fs/resolution-both"
+  assert:
+    # Source must be "installed" (find runs before local fallback)
+    - type: icontains
+      value: '"source":"installed"'
+    # Resolved path must be under .claude/plugins, not local
+    - type: icontains
+      value: ".claude/plugins"
+    # Must NOT fall back to local
+    - type: not-icontains
+      value: '"source":"local"'
+
+- description: "script-resolution: error when script not found in either location"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
+    script_args: "--script-name pr-prepare.js --project-root {{project_root}}"
+    project_root: "file://fixtures-fs/resolution-neither"
+  assert:
+    # Source must be "error"
+    - type: icontains
+      value: '"source":"error"'
+    # Resolved must be null
+    - type: icontains
+      value: '"resolved":null'
+    # Must NOT produce a resolved path
+    - type: not-icontains
+      value: ".claude/plugins"
+    - type: not-icontains
+      value: "plugins/sdlc-utilities/scripts"
