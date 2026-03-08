@@ -9,6 +9,11 @@ user-invocable: false
 Project-aware dimension creator: scan tech stack, propose tailored dimensions with evidence,
 let the user select, write files, and validate with the validation script.
 
+> **CRITICAL — Inline output only.** Always produce dimension proposals, evidence citations,
+> and trigger patterns directly in your current response. Never write "the simulated output is
+> complete above", "see my previous response", or any similar deferral. If no files can be
+> written (simulation context), still emit the full proposed dimension YAML/Markdown inline.
+
 Supporting references (dimension format spec, 5 example dimensions) are in
 `sdlc-reviewing-changes/REFERENCE.md` and `sdlc-reviewing-changes/EXAMPLES.md`. Locate them using Glob
 with `path: ~/.claude` and pattern `**/sdlc-reviewing-changes/REFERENCE.md`. If not found, retry
