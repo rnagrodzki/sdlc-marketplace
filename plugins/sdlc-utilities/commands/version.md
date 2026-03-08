@@ -1,7 +1,7 @@
 ---
 description: Bump the project version, create a git tag, optionally generate a CHANGELOG entry, and push the release
 allowed-tools: [Read, Edit, Write, Bash, Skill]
-argument-hint: "[major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog]"
+argument-hint: "[major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix]"
 ---
 
 # /version Command
@@ -25,6 +25,7 @@ Subsequent runs read `.claude/version.json` and skip auto-detection.
 - `/sdlc:version --pre rc` — Increment existing pre-release (1.0.0-rc.1 → 1.0.0-rc.2)
 - `/sdlc:version patch --changelog` — Bump and generate CHANGELOG entry
 - `/sdlc:version minor --no-push` — Bump and tag locally, skip push
+- `/sdlc:version patch --hotfix` — Bump patch and mark as a hotfix release (for DORA tracking)
 
 ## Workflow
 

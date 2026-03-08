@@ -11,3 +11,4 @@
 | [`/sdlc:review`](commands/review.md) | Run multi-dimension code review on the current branch |
 | [`/sdlc:review-init`](commands/review-init.md) | Scan the project and create tailored review dimension files |
 | [`/sdlc:version`](commands/version.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
+| [`/sdlc:plugin-check`](commands/plugin-check.md) | Validate the plugin discovery chain — manifests, commands, skills, scripts, hooks, and agents |

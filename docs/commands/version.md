@@ -23,6 +23,7 @@ Manages the full semantic release workflow: detects the version source, bumps th
 | `--pre <label>` | Create a pre-release version (e.g. `beta`, `rc`). Auto-increments the counter on repeated runs. | — |
 | `--no-push` | Commit and tag locally, skip `git push`. | — |
 | `--changelog` | Generate or update `CHANGELOG.md` for this release. | off |
+| `--hotfix` | Mark this release as a hotfix for DORA metrics tracking. Annotates the commit message with `[hotfix]` and the tag message body with `Type: hotfix`. | off |
 
 ---
 
@@ -67,6 +68,32 @@ Does this look right? (yes / tag-only / changelog / cancel)
 
 ```text
 /sdlc:version patch --no-push
+```
+
+### Hotfix release (DORA metrics tracking)
+
+```text
+/sdlc:version patch --hotfix
+```
+
+```text
+Release Plan
+────────────────────────────────────────────
+Version:    1.4.2 → 1.4.3
+Tag:        v1.4.3 (annotated)
+File:       package.json
+Push:       yes (to origin/main)
+Changelog:  no
+Hotfix:     yes
+────────────────────────────────────────────
+
+Proceed? (yes / edit / cancel)
+> yes
+
+✓ Release v1.4.3 complete (hotfix).
+  Commit: d4e5f6a — chore(release): v1.4.3 [hotfix]
+  Tag:    v1.4.3  (annotated with Type: hotfix)
+  Pushed: yes → origin/main
 ```
 
 ### Pre-release workflow
@@ -134,6 +161,37 @@ Conventional commit mapping:
 
 ---
 
+## DORA Metrics
+
+The `--hotfix` flag enables DORA (DevOps Research and Assessment) metrics tracking by embedding hotfix metadata directly in git history.
+
+**What gets annotated:**
+
+- **Commit message**: `chore(release): v1.4.3 [hotfix]` — queryable via `git log`
+- **Tag message body**: contains `Type: hotfix` — queryable via `git tag`
+
+**Querying hotfix releases:**
+
+```bash
+# List all commits that are hotfixes
+git log --oneline --grep='\[hotfix\]'
+
+# Read the full annotation of a specific tag
+git tag -l --format='%(refname:short)%09%(contents)' 'v1.4.3'
+
+# List all tags and their metadata (filter by Type: hotfix in post-processing)
+git tag -l --format='%(refname:short)%09%(contents:subject)%09%(contents:body)'
+```
+
+**DORA metrics this supports:**
+
+| DORA Metric | How `--hotfix` helps |
+|-------------|----------------------|
+| Change Failure Rate | Count `[hotfix]` commits as failures relative to total deploys |
+| Time to Restore Service | Diff timestamp between incident and hotfix tag |
+
+---
+
 ## Prerequisites
 
 - **git** — required for tagging and commit operations.
@@ -148,7 +206,7 @@ Conventional commit mapping:
 |-----------------|-------------|
 | `.claude/version.json` | Per-project config (created by `--init`) |
 | `package.json` / version file | Version field bumped in-place |
-| git tag | Annotated tag (e.g. `v1.3.0`) pushed to origin |
+| git tag | Annotated tag (e.g. `v1.3.0`) pushed to origin. With `--hotfix`, tag body includes `Type: hotfix`. |
 | `CHANGELOG.md` | New entry prepended (only with `--changelog`) |
 
 ---

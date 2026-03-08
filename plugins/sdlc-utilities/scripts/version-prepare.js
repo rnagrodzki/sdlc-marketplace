@@ -8,7 +8,7 @@
  *
  * Usage:
  *   node version-prepare.js [major|minor|patch] [--init] [--pre <label>]
- *                           [--no-push] [--changelog] [--file <path>]
+ *                           [--no-push] [--changelog] [--hotfix] [--file <path>]
  *
  * Flags:
  *   major|minor|patch   Requested bump type (positional, optional)
@@ -16,6 +16,7 @@
  *   --pre <label>       Pre-release label (e.g., beta, rc)
  *   --no-push           Skip push to remote
  *   --changelog         Enable changelog generation for this run
+ *   --hotfix            Mark this release as a hotfix (DORA metrics)
  *   --file <path>       Override version file path (used with --init)
  *
  * Exit codes:
@@ -51,6 +52,7 @@ const {
  *   preLabel: string|null,
  *   noPush: boolean,
  *   changelog: boolean,
+ *   hotfix: boolean,
  *   fileOverride: string|null,
  *   warnings: string[],
  * }}
@@ -63,6 +65,7 @@ function parseArgs(argv) {
   let preLabel       = null;
   let noPush         = false;
   let changelog      = false;
+  let hotfix         = false;
   let fileOverride   = null;
   const warnings     = [];
 
@@ -81,6 +84,8 @@ function parseArgs(argv) {
       noPush = true;
     } else if (a === '--changelog') {
       changelog = true;
+    } else if (a === '--hotfix') {
+      hotfix = true;
     } else if (a === '--file' && args[i + 1]) {
       fileOverride = args[++i];
     } else if (a.startsWith('-')) {
@@ -88,7 +93,7 @@ function parseArgs(argv) {
     }
   }
 
-  return { init, requestedBump, preLabel, noPush, changelog, fileOverride, warnings };
+  return { init, requestedBump, preLabel, noPush, changelog, hotfix, fileOverride, warnings };
 }
 
 // ---------------------------------------------------------------------------
@@ -454,6 +459,7 @@ async function main() {
       noPush:    args.noPush,
       changelog: args.changelog,
       preLabel:  args.preLabel,
+      hotfix:    args.hotfix,
     },
     tags:               tagsOutput,
     commits,

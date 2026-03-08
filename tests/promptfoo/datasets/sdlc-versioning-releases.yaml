@@ -56,6 +56,64 @@
         to confirm (accept/modify/cancel) before writing the config file. It does NOT write any
         files in this simulation — it describes what would happen with confirmation.
 
+- description: "sdlc-versioning-releases: hotfix release annotates commit and tag"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"
+    project_context: "file://fixtures/project-hotfix-release.md"
+    user_request: >
+      Run /sdlc:version patch --hotfix. The version-prepare.js output is provided
+      in the project context. Show the release plan.
+  assert:
+    # Must show version bump
+    - type: regex
+      value: '(1\.4\.2|1\.4\.3)'
+    # Must indicate hotfix in the release plan
+    - type: icontains
+      value: "hotfix"
+    # Must show the tag annotation will include hotfix metadata
+    - type: regex
+      value: '(Type:\s*hotfix|\[hotfix\])'
+    # Must NOT proceed without user confirmation
+    - type: not-icontains
+      value: "git tag created"
+    # Behavioral: reads hotfix flag, presents plan with hotfix annotation, awaits confirmation
+    - type: llm-rubric
+      value: >
+        The response reads the version-prepare.js output showing currentVersion=1.4.2 with
+        flags.hotfix=true and requestedBump=patch. It presents a release plan showing the bump
+        from 1.4.2 to 1.4.3 with tag v1.4.3. The plan clearly indicates this is a hotfix release
+        (e.g. a "Hotfix: yes" line or equivalent). The commit message format shown includes [hotfix]
+        (e.g., chore(release): v1.4.3 [hotfix]) and/or the tag message includes Type: hotfix.
+        It asks the user to confirm (yes / edit / cancel) before proceeding. It does NOT execute
+        any git commands without explicit user approval.
+
+- description: "sdlc-versioning-releases: regular release does not include hotfix annotation"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"
+    project_context: "file://fixtures/project-with-version-config.md"
+    user_request: >
+      Run /sdlc:version major. The version-prepare.js output is provided in the project context.
+      Show the release plan. This is NOT a hotfix — do not use the --hotfix flag.
+  assert:
+    # Must show version bump
+    - type: regex
+      value: '(2\.1\.0|3\.0\.0)'
+    # Must NOT include hotfix annotation in the plan
+    - type: not-regex
+      value: 'Type:\s*hotfix'
+    # The commit message format must not include [hotfix]
+    - type: not-icontains
+      value: "[hotfix]"
+    # Behavioral: regular release plan with no hotfix metadata anywhere
+    - type: llm-rubric
+      value: >
+        The response presents a release plan for a regular (non-hotfix) major version bump from
+        2.1.0 to 3.0.0. The commit message format shown is the standard "chore(release): v3.0.0"
+        without any [hotfix] suffix. The tag message is the standard "Release v3.0.0" without
+        "Type: hotfix" metadata. The plan does not show a Hotfix line or mention hotfix as a
+        release attribute anywhere. It warns about the breaking change detected and asks the user
+        to confirm before proceeding.
+
 - description: "sdlc-versioning-releases: release blocked when version config missing"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"

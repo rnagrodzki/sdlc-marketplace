@@ -122,6 +122,29 @@ Run /sdlc:version patch to create your first release.
 
 If a file was skipped because it already existed, show `(already exists — skipped)` instead of `added`.
 
+**Retag script version check** — after scaffolding (whether files were added or skipped), check if the installed files are up to date:
+
+1. Read the installed `.github/scripts/retag-release.js` (if it exists) and look for `const RETAG_SCRIPT_VERSION = (\d+);`. If absent, treat as version 1.
+2. Read the installed `.github/workflows/retag-release.yml` (if it exists) and look for `# retag-release-version: (\d+)`. If absent, treat as version 1.
+3. Read the plugin's current copies of those files (from the same paths used for scaffolding) and extract their version numbers the same way.
+4. If either installed file's version is less than the plugin's current version, show an update prompt:
+
+```
+⚠  Outdated retag files detected:
+   .github/scripts/retag-release.js   (installed: v1, current: v2)
+   .github/workflows/retag-release.yml (installed: v1, current: v2)
+
+Changes in v2:
+- Retag now preserves original tag message metadata (required for --hotfix DORA annotations)
+
+Update these files? (yes / no)
+```
+
+On `yes`, overwrite the outdated files with the plugin's current copies. On `no`, warn:
+```
+⚠  Skipped update. Note: hotfix tag metadata (Type: hotfix) will not survive retagging until you update these files.
+```
+
 On `tag-only`, update `suggestedConfig.mode` to `"tag"` before writing. Apply the same workflow scaffolding.
 
 On `cancel`, stop immediately without writing any files.
@@ -145,7 +168,8 @@ Read `VERSION_CONTEXT_JSON`. Key fields to extract:
 | `bumpOptions` | `{ major, minor, patch, preRelease }` — pre-computed next versions |
 | `tags.latest` | Most recent tag |
 | `commits` | Array of commits since last tag |
-| `flags` | `{ preLabel, noPush, changelog }` — parsed CLI flags |
+| `flags` | `{ preLabel, noPush, changelog, hotfix }` — parsed CLI flags |
+| `flags.hotfix` | Whether this release is a hotfix (for DORA metrics tracking) |
 | `conflictsWithNext` | `{ major, minor, patch }` — whether each tag already exists |
 
 ### Step 2 (PLAN): Determine Bump Type and Draft CHANGELOG
@@ -192,6 +216,7 @@ Tag:        v1.3.0 (annotated)
 File:       package.json
 Push:       yes (to origin/main)
 Changelog:  no
+Hotfix:     yes             ← only shown when flags.hotfix === true
 ────────────────────────────────────────────
 
 Proceed? (yes / edit / cancel)
@@ -230,8 +255,15 @@ Resolve any issues found in Step 6 before proceeding. If a blocking issue cannot
 1. **Update version file** (only if `config.mode === "file"`): Use the Edit tool to replace the old version string with the new version in the version file. For TOML/YAML files, use targeted string replacement rather than a full file rewrite.
 2. **Update CHANGELOG** (only if changelog is enabled): Use the Edit or Write tool to prepend the new entry after the `## [Unreleased]` section if present, or after the file header if not. Create `CHANGELOG.md` if it does not exist.
 3. **Stage changed files**: `git add <versionFile> CHANGELOG.md` — include only files that were actually changed.
-4. **Commit**: `git commit -m "chore(release): ${newTag}"`
-5. **Tag**: `git tag -a ${newTag} -m "Release ${newTag}"`
+4. **Commit**:
+   - If `flags.hotfix === true`: `git commit -m "chore(release): ${newTag} [hotfix]"`
+   - Otherwise: `git commit -m "chore(release): ${newTag}"`
+5. **Tag**:
+   - If `flags.hotfix === true`:
+     ```bash
+     git tag -a ${newTag} -m "$(printf 'Release %s\n\nType: hotfix' ${newTag})"
+     ```
+   - Otherwise: `git tag -a ${newTag} -m "Release ${newTag}"`
 6. **Push** (unless `flags.noPush === true`): `git push && git push --tags`
 
 Display result:
@@ -240,6 +272,15 @@ Display result:
 ✓ Release v1.3.0 complete.
   Commit: abc1234 — chore(release): v1.3.0
   Tag:    v1.3.0
+  Pushed: yes → origin/main
+```
+
+If `flags.hotfix === true`, show instead:
+
+```
+✓ Release v1.3.0 complete (hotfix).
+  Commit: abc1234 — chore(release): v1.3.0 [hotfix]
+  Tag:    v1.3.0  (annotated with Type: hotfix)
   Pushed: yes → origin/main
 ```
 
