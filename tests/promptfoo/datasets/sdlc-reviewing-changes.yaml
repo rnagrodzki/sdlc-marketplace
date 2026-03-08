@@ -1,7 +1,8 @@
 # Fixture appropriateness:
-#   project-with-dimensions  -- CORRECT: primary use case; 3 dimensions active with file matching
-#   project-no-dimensions    -- CORRECT: edge case; no dimensions installed → error + suggestion
-#   feature-branch-*         -- INVALID: PR context, not review context
+#   project-with-dimensions            -- CORRECT: primary use case; 3 dimensions active with file matching
+#   project-with-uncovered-suggestions -- CORRECT: uncovered file suggestions surfaced in review plan
+#   project-no-dimensions              -- CORRECT: edge case; no dimensions installed → error + suggestion
+#   feature-branch-*                   -- INVALID: PR context, not review context
 
 - description: "sdlc-reviewing-changes: multi-dimension review with active dimensions"
   vars:
@@ -55,6 +56,34 @@
         It explicitly does NOT dispatch the review-orchestrator agent or any subagents. It does
         NOT produce any actual code review findings or comments. It describes what would happen
         if the --dry-run flag were omitted.
+
+- description: "sdlc-reviewing-changes: surfaces dimension suggestions for uncovered files"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-reviewing-changes/SKILL.md"
+    project_context: "file://fixtures/project-with-uncovered-suggestions.md"
+    user_request: >
+      Run /sdlc:review on this project. The review-prepare.js manifest is in the project context.
+      Show the review plan including any suggestions for uncovered files.
+  assert:
+    # Must mention the suggested dimension names
+    - type: regex
+      value: "(ci-cd-pipeline-review|configuration-management-review)"
+    # Must reference the uncovered file paths or types
+    - type: regex
+      value: "(workflows|ci\.yml|config|\.env)"
+    # Must point to review-init --add
+    - type: regex
+      value: "(review-init|--add)"
+    # Behavioral: surfaces suggestions, directs user to review-init
+    - type: llm-rubric
+      value: >
+        The response reads the manifest showing 5 uncovered files with 2 dimension suggestions:
+        ci-cd-pipeline-review (for .github/workflows/ci.yml and deploy.yml) and
+        configuration-management-review (for src/config/db.ts, src/config/auth.ts, .env.example).
+        It displays these suggestions in the review plan — either in a "Suggested new dimensions"
+        block or as plan critique warnings — and references the specific file paths or types.
+        It recommends running /sdlc:review-init --add to create those dimensions. It does NOT
+        create the dimension files itself during the review run.
 
 - description: "sdlc-reviewing-changes: no dimensions installed reports error and suggests review-init"
   vars:

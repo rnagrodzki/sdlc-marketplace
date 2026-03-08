@@ -1,7 +1,8 @@
 # Fixture appropriateness:
-#   project-with-tech-stack  -- CORRECT: React/TypeScript frontend; multiple signals for dimension proposals
-#   project-no-dimensions    -- CORRECT: Python/FastAPI project; different signals → different proposals
-#   healthy-plugin-structure -- INVALID: plugin manifest context, not a project to scan
+#   project-with-tech-stack    -- CORRECT: React/TypeScript frontend; multiple signals for dimension proposals
+#   project-no-dimensions      -- CORRECT: Python/FastAPI project; different signals → different proposals
+#   project-with-cicd-monorepo -- CORRECT: TypeScript monorepo + CI/CD; tests extended dimension catalog
+#   healthy-plugin-structure   -- INVALID: plugin manifest context, not a project to scan
 
 - description: "sdlc-initializing-review-dimensions: scans tech stack and proposes tailored dimensions"
   vars:
@@ -30,6 +31,39 @@
         api, data-integrity, or infrastructure dimensions since there is no evidence for these
         in the fixture. Trigger patterns reference the actual project directories (src/components/,
         src/pages/, __tests__/).
+
+- description: "sdlc-initializing-review-dimensions: monorepo with CI/CD gets extended dimension proposals"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-initializing-review-dimensions/SKILL.md"
+    project_context: "file://fixtures/project-with-cicd-monorepo.md"
+    user_request: "Run /sdlc:review-init to scan this project and propose review dimensions."
+  assert:
+    # Must always include baseline
+    - type: icontains
+      value: "code-quality-review"
+    # Must propose monorepo governance dimension
+    - type: icontains
+      value: "monorepo-governance-review"
+    # Must propose CI/CD pipeline dimension
+    - type: icontains
+      value: "ci-cd-pipeline-review"
+    # Must cite monorepo-specific evidence
+    - type: regex
+      value: "(pnpm-workspace|packages/|workspace|lerna|turbo|monorepo)"
+    # Must cite CI/CD-specific evidence
+    - type: regex
+      value: "(\.github/workflows|\.circleci|ci\.yml|release\.yml)"
+    # Behavioral: detects monorepo + CI/CD signals, proposes correct extended dimensions
+    - type: llm-rubric
+      value: >
+        The response scans the TypeScript monorepo project and proposes dimensions appropriate
+        for a monorepo with CI/CD pipelines: code-quality-review (baseline, always included),
+        monorepo-governance-review (evidence: pnpm-workspace.yaml, packages/ and apps/ dirs,
+        workspaces config in package.json), and ci-cd-pipeline-review (evidence:
+        .github/workflows/ci.yml, .github/workflows/release.yml, .circleci/config.yml).
+        Each proposal cites specific evidence from the fixture. The response does NOT propose
+        security, api-review, or data-integrity dimensions since there is no auth/ORM/route
+        evidence in the fixture. It presents the proposals to the user before creating files.
 
 - description: "sdlc-initializing-review-dimensions: Python/FastAPI project gets appropriate proposals"
   vars:

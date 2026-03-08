@@ -63,46 +63,64 @@ triggers:
 ```json
 {
   "scope": "all",
-  "baseBranch": "main",
-  "changedFiles": [
-    "src/routes/search.ts",
-    "src/routes/users.ts",
-    "src/middleware/auth.ts",
-    "src/models/user.ts",
-    "src/services/search.ts",
-    "src/__tests__/search.test.ts",
-    "src/__tests__/users.test.ts",
-    "package.json"
-  ],
+  "base_branch": "main",
+  "git": {
+    "changed_files": [
+      "src/routes/search.ts",
+      "src/routes/users.ts",
+      "src/middleware/auth.ts",
+      "src/models/user.ts",
+      "src/services/search.ts",
+      "src/__tests__/search.test.ts",
+      "src/__tests__/users.test.ts",
+      "package.json"
+    ]
+  },
   "dimensions": [
     {
       "name": "security-review",
       "status": "ACTIVE",
       "severity": "high",
-      "matchedFiles": ["src/routes/search.ts", "src/routes/users.ts", "src/middleware/auth.ts"],
-      "fileCount": 3
+      "matched_files": ["src/routes/search.ts", "src/routes/users.ts", "src/middleware/auth.ts"],
+      "file_count": 3
     },
     {
       "name": "code-quality-review",
       "status": "ACTIVE",
       "severity": "medium",
-      "matchedFiles": ["src/routes/search.ts", "src/routes/users.ts", "src/middleware/auth.ts", "src/models/user.ts", "src/services/search.ts", "src/__tests__/search.test.ts", "src/__tests__/users.test.ts"],
-      "fileCount": 7
+      "matched_files": ["src/routes/search.ts", "src/routes/users.ts", "src/middleware/auth.ts", "src/models/user.ts", "src/services/search.ts", "src/__tests__/search.test.ts", "src/__tests__/users.test.ts"],
+      "file_count": 7
     },
     {
       "name": "api-review",
       "status": "ACTIVE",
       "severity": "high",
-      "matchedFiles": ["src/routes/search.ts", "src/routes/users.ts"],
-      "fileCount": 2
+      "matched_files": ["src/routes/search.ts", "src/routes/users.ts"],
+      "file_count": 2
     }
   ],
-  "skippedDimensions": [],
-  "critique": {
-    "uncoveredFiles": ["package.json"],
-    "overBroadDimensions": [],
-    "overlappingPairs": [["security-review", "code-quality-review"]]
+  "plan_critique": {
+    "uncovered_files": ["package.json"],
+    "uncovered_suggestions": [
+      {
+        "dimension": "dependency-management-review",
+        "files": ["package.json"],
+        "reason": "1 dependency lockfile file not covered by any dimension"
+      }
+    ],
+    "still_uncovered": [],
+    "over_broad_dimensions": [],
+    "overlapping_pairs": [["security-review", "code-quality-review"]],
+    "dimension_cap_applied": false,
+    "queued_dimensions": []
   },
-  "errors": []
+  "summary": {
+    "total_dimensions": 3,
+    "active_dimensions": 3,
+    "skipped_dimensions": 0,
+    "total_changed_files": 8,
+    "uncovered_file_count": 1,
+    "suggested_dimensions": 1
+  }
 }
 ```
