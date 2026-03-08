@@ -1,0 +1,82 @@
+# Fixture appropriateness:
+#   feature-branch-with-commits -- CORRECT: primary scenario; no JIRA, multiple commits, needs push
+#   feature-branch-jira         -- CORRECT: validates JIRA detection from branch name
+#   feature-branch-on-main      -- CORRECT: validates main branch rejection guard
+#   project-with-dimensions     -- INVALID: not a PR context
+#   project-no-dimensions       -- INVALID: not a PR context
+
+- description: "sdlc-creating-pull-requests: standard PR creation with all 8 sections"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-creating-pull-requests/SKILL.md"
+    project_context: "file://fixtures/feature-branch-with-commits.md"
+    user_request: >
+      Run /sdlc:pr for this feature branch. The pr-prepare.js output is provided in the project
+      context above. Generate the PR title and all required sections of the description.
+  assert:
+    # Must produce section headings (at least Summary)
+    - type: icontains
+      value: "## Summary"
+    # JIRA section must show "Not detected" since no ticket in fixture
+    - type: icontains
+      value: "Not detected"
+    # Changes Overview must NOT contain file paths (quality gate)
+    - type: not-regex
+      value: "src/routes/search\\.ts"
+    # Must produce a title (conventional commit style)
+    - type: regex
+      value: "(feat|fix|chore|refactor|docs)(\(.+\))?:"
+    # Behavioral: all 8 sections present with appropriate content
+    - type: llm-rubric
+      value: >
+        The response produces a complete PR description with multiple sections including at minimum
+        Summary, JIRA Ticket, Changes Overview, and Testing. The PR title is under 72 characters
+        and follows conventional commit format (feat/fix/chore prefix). The JIRA Ticket section
+        shows "Not detected" or equivalent since no JIRA reference appears in the commits or branch
+        name. The Changes Overview section describes functional areas changed (not individual file
+        paths). Business sections (Business Context, Business Benefits) are either filled with
+        evidence-based content or marked N/A with reasoning — they are not left blank.
+
+- description: "sdlc-creating-pull-requests: JIRA ticket auto-detected from branch name"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-creating-pull-requests/SKILL.md"
+    project_context: "file://fixtures/feature-branch-jira.md"
+    user_request: >
+      Run /sdlc:pr for this branch. The pr-prepare.js output is in the project context.
+      Generate the full PR title and description.
+  assert:
+    # Must detect and show PROJ-456
+    - type: icontains
+      value: "PROJ-456"
+    # Must NOT say "Not detected" for JIRA since it was found
+    - type: not-icontains
+      value: "Not detected"
+    # Behavioral: JIRA detected from branch name, no fabrication
+    - type: llm-rubric
+      value: >
+        The response detects PROJ-456 from the branch name "PROJ-456/fix-auth-timeout" and
+        populates the JIRA Ticket section with this reference. The response does NOT fabricate
+        a different ticket number or say "Not detected". The PR title and description focus on
+        the authentication timeout fix described in the commits.
+
+- description: "sdlc-creating-pull-requests: main branch rejected with clear error"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-creating-pull-requests/SKILL.md"
+    project_context: "file://fixtures/feature-branch-on-main.md"
+    user_request: "Run /sdlc:pr to create a pull request."
+  assert:
+    # Must mention the reason for rejection (main/master/protected/error)
+    - type: regex
+      value: "(main|master|protected|cannot|error|refuse|switch|feature branch)"
+    # Must NOT produce a PR description (no ## Summary heading)
+    - type: not-icontains
+      value: "## Summary"
+    # Must NOT produce a PR title in conventional commit format (no feat/fix/chore:)
+    - type: not-regex
+      value: "^feat(\(.+\))?:"
+    # Behavioral: clearly refuses and instructs to switch branches
+    - type: llm-rubric
+      value: >
+        The response reads the error from pr-prepare.js output and clearly refuses to create a PR
+        because the current branch is "main" (a protected branch). It instructs the user to switch
+        to a feature branch first. It does NOT generate any PR title or description sections.
+        The refusal message is clear and actionable.

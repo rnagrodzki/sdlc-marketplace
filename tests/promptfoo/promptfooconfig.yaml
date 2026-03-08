@@ -1,0 +1,20 @@
+description: "Behavioral regression tests for sdlc-marketplace skills"
+
+providers:
+  - id: file://providers/claude-cli.js
+
+prompts:
+  - file://prompts/skill-runner.txt
+
+defaultTest:
+  options:
+    transformVars: "file://scripts/extract-skill-content.js"
+    provider: "file://providers/claude-cli.js"
+
+tests:
+  - file://datasets/sdlc-creating-pull-requests.yaml
+  - file://datasets/sdlc-reviewing-changes.yaml
+  - file://datasets/sdlc-versioning-releases.yaml
+  - file://datasets/sdlc-validating-plugin-discovery.yaml
+  - file://datasets/sdlc-initializing-review-dimensions.yaml
+  - file://datasets/sdlc-customizing-pr-template.yaml

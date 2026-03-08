@@ -1,0 +1,5 @@
+{
+  "name": "sdlc",
+  "description": "SDLC automation utilities for pull requests, code review, versioning, and plugin discovery.",
+  "version": "1.0.0"
+}

@@ -35,6 +35,12 @@ scripts/                     # Node.js helper scripts (optional; invoked via Bas
 
 ---
 
+## Constraints
+
+- **Never run `promptfoo eval` automatically.** The LLM must never execute `promptfoo eval` (for all test cases or any subset) on its own. Evaluation runs must always be initiated manually by the user.
+
+---
+
 ## Working in This Repository
 
 - **Adding a skill:** Follow `docs/adding-skills.md`. Place the skill under `plugins/<plugin>/skills/<skill-name>/SKILL.md`.
