@@ -111,9 +111,9 @@
     # Must mention the reason for rejection (main/master/protected/error)
     - type: regex
       value: "(main|master|protected|cannot|error|refuse|switch|feature branch)"
-    # Must NOT produce a PR description (no ## Summary heading)
+    # Must NOT produce a PR description (## Changes Overview only appears in actual PR descriptions)
     - type: not-icontains
-      value: "## Summary"
+      value: "## Changes Overview"
     # Must NOT produce a PR title in conventional commit format (no feat/fix/chore:)
     - type: not-regex
       value: '^feat(\(.+\))?:'
