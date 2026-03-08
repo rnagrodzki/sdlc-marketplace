@@ -52,7 +52,7 @@
       value: "(pnpm-workspace|packages/|workspace|lerna|turbo|monorepo)"
     # Must cite CI/CD-specific evidence
     - type: regex
-      value: "(\.github/workflows|\.circleci|ci\.yml|release\.yml)"
+      value: '(\.github/workflows|\.circleci|ci\.yml|release\.yml)'
     # Behavioral: detects monorepo + CI/CD signals, proposes correct extended dimensions
     - type: llm-rubric
       value: >

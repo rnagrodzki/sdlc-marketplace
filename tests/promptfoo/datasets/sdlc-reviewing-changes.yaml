@@ -70,7 +70,7 @@
       value: "(ci-cd-pipeline-review|configuration-management-review)"
     # Must reference the uncovered file paths or types
     - type: regex
-      value: "(workflows|ci\.yml|config|\.env)"
+      value: '(workflows|ci\.yml|config|\.env)'
     # Must point to review-init --add
     - type: regex
       value: "(review-init|--add)"
