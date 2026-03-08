@@ -24,7 +24,7 @@
       value: "src/routes/search\\.ts"
     # Must produce a title (conventional commit style)
     - type: regex
-      value: "(feat|fix|chore|refactor|docs)(\(.+\))?:"
+      value: '(feat|fix|chore|refactor|docs)(\(.+\))?:'
     # Behavioral: all 8 sections present with appropriate content
     - type: llm-rubric
       value: >
@@ -72,7 +72,7 @@
       value: "## Summary"
     # Must NOT produce a PR title in conventional commit format (no feat/fix/chore:)
     - type: not-regex
-      value: "^feat(\(.+\))?:"
+      value: '^feat(\(.+\))?:'
     # Behavioral: clearly refuses and instructs to switch branches
     - type: llm-rubric
       value: >
