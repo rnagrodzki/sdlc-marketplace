@@ -46,6 +46,29 @@ Surface warnings from `plan_critique`:
 - **Over-broad** (`over_broad_dimensions`): flag by name
 - **Queued** (`queued_dimensions`): note they were capped out
 
+If `plan_critique.uncovered_suggestions` is non-empty, display a suggestions block after the warnings:
+
+```text
+Suggested new dimensions for uncovered files:
+
+  {dimension-name} — {reason}
+    Files: {files joined by ", " (max 5, then "… and N more")}
+
+  ...
+
+Run `/sdlc:review-init --add` to create these dimensions.
+```
+
+If `plan_critique.still_uncovered` is non-empty (files that could not be mapped to any known dimension type), display:
+
+```text
+{N} file(s) not mappable to any known dimension type:
+  {list, max 10 files; if more, append "… and N more"}
+Consider creating a custom dimension or broadening existing trigger patterns.
+```
+
+These are informational only. The orchestrator does NOT create dimensions during a review.
+
 If `scope` is `all` and `uncommitted_changes` is true: note that unstaged files are not
 included in this review (only staged + committed changes are).
 

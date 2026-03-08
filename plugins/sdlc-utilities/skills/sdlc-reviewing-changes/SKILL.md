@@ -53,7 +53,11 @@ Key fields available:
 | `summary.active_dimensions` | Number of dimensions with matching files |
 | `summary.skipped_dimensions` | Number of dimensions with no matching files |
 | `diff_dir` | Temp directory path containing per-dimension `.diff` files |
-| `plan_critique` | `{ uncovered_files, over_broad_dimensions }` |
+| `plan_critique.uncovered_files` | Files not matched by any dimension |
+| `plan_critique.uncovered_suggestions` | Array of `{ dimension, files, reason }` — suggested new dimensions for uncovered files |
+| `plan_critique.still_uncovered` | Files that could not be mapped to any known dimension type |
+| `plan_critique.over_broad_dimensions` | Dimensions matching >80% of changed files |
+| `summary.suggested_dimensions` | Count of suggested new dimensions |
 
 The manifest also contains `diff_dir` — a temp directory with per-dimension `.diff`
 files written by the script. Clean both up in Step 3.
@@ -102,8 +106,9 @@ Review Plan (dry run — no subagents dispatched)
 ...
 
 Plan critique:
-  - Uncovered files: {manifest.plan_critique.uncovered_files.join(', ') or "none"}
-  - Over-broad:      {manifest.plan_critique.over_broad_dimensions.join(', ') or "none"}
+  - Uncovered files:       {manifest.plan_critique.uncovered_files.join(', ') or "none"}
+  - Over-broad:            {manifest.plan_critique.over_broad_dimensions.join(', ') or "none"}
+  - Suggested dimensions:  {manifest.plan_critique.uncovered_suggestions.map(s => s.dimension).join(', ') or "none"}
 ```
 
 Stop here.

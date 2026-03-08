@@ -271,3 +271,281 @@ Review whether new code changes are accompanied by appropriate tests.
 | Missing edge case test | low |
 | Test name does not describe scenario | info |
 ```
+
+---
+
+## ci-cd-pipeline-review.md
+
+```markdown
+---
+name: ci-cd-pipeline-review
+description: "Reviews CI/CD pipeline definitions for secret handling, job ordering, caching correctness, and reproducibility"
+triggers:
+  - ".github/workflows/**"
+  - ".circleci/**"
+  - "**/Jenkinsfile"
+  - "**/.travis.yml"
+  - "**/Makefile"
+severity: medium
+max-files: 20
+---
+
+# CI/CD Pipeline Review
+
+Review pipeline definitions for correctness, security, and efficiency.
+
+## Checklist
+
+- [ ] No secrets or tokens hardcoded in workflow files — use repository/org secrets
+- [ ] `GITHUB_TOKEN` permissions are scoped to the minimum required (`contents: read`, etc.)
+- [ ] Jobs run in the correct order — dependencies declared with `needs:` where required
+- [ ] Cache keys are content-addressed (e.g., hash of lockfile) to avoid stale caches
+- [ ] Cache restore uses fallback keys to avoid full cache misses on first run
+- [ ] Pinned action versions use full SHA commit hashes, not mutable tags (`@v3`)
+- [ ] Test and lint jobs fail fast — `fail-fast: true` or equivalent
+- [ ] Artifact upload/download steps reference consistent names between jobs
+- [ ] Environment-specific secrets are scoped to the correct environment (`environment:`)
+- [ ] Workflow triggers are appropriately scoped — not running on every push to all branches
+- [ ] No `continue-on-error: true` masking real failures in critical steps
+- [ ] Matrix strategies do not include unnecessary combinations
+
+## Severity Guide
+
+| Finding | Severity |
+|---------|----------|
+| Hardcoded secret or token in workflow | critical |
+| Overly permissive `GITHUB_TOKEN` permissions | high |
+| Unpinned action version (mutable tag, not SHA) | high |
+| Job dependency ordering error | high |
+| Cache key not content-addressed (stale cache risk) | medium |
+| `continue-on-error` masking real failures | medium |
+| Workflow triggers too broad | low |
+| Redundant matrix combinations | info |
+```
+
+---
+
+## database-migrations-review.md
+
+```markdown
+---
+name: database-migrations-review
+description: "Reviews database migration files for ordering, reversibility, data integrity, and safe deployment patterns"
+triggers:
+  - "**/migrations/**"
+  - "**/*.sql"
+  - "**/alembic/**"
+  - "**/flyway/**"
+  - "**/db/migrate/**"
+severity: high
+max-files: 30
+---
+
+# Database Migrations Review
+
+Review migration files for correctness, safety, and reversibility.
+
+## Checklist
+
+- [ ] Migrations are numbered/timestamped and will apply in the correct order
+- [ ] Each migration has a corresponding rollback / down migration
+- [ ] No destructive operations (`DROP COLUMN`, `DROP TABLE`, `TRUNCATE`) without a data backup plan
+- [ ] Column additions use `DEFAULT` values or are nullable to avoid locking issues on large tables
+- [ ] Indexes are created `CONCURRENTLY` (PostgreSQL) or equivalent to avoid table locks
+- [ ] No raw data transformations that could fail mid-migration and leave data inconsistent
+- [ ] Foreign key constraints are added after data is in a consistent state
+- [ ] Migration does not mix schema changes with data backfills in the same transaction
+- [ ] Backfill migrations are idempotent (safe to re-run)
+- [ ] No hardcoded environment-specific values (connection strings, schema names)
+- [ ] Migration file name follows project conventions (timestamp prefix, descriptive name)
+
+## Severity Guide
+
+| Finding | Severity |
+|---------|----------|
+| Destructive operation without safety net | critical |
+| Non-idempotent data migration | critical |
+| Table lock on large table (blocking index creation) | high |
+| Missing rollback / down migration | high |
+| Non-nullable column added without default | high |
+| Mixed schema + data changes in one transaction | medium |
+| Hardcoded environment-specific value | medium |
+| Missing timestamp prefix / naming convention | low |
+```
+
+---
+
+## dependency-management-review.md
+
+```markdown
+---
+name: dependency-management-review
+description: "Reviews dependency changes for lockfile consistency, version pinning, deprecated packages, and license compliance"
+triggers:
+  - "**/package.json"
+  - "**/package-lock.json"
+  - "**/yarn.lock"
+  - "**/pnpm-lock.yaml"
+  - "**/requirements.txt"
+  - "**/pyproject.toml"
+  - "**/poetry.lock"
+  - "**/Gemfile"
+  - "**/Gemfile.lock"
+  - "**/go.mod"
+  - "**/go.sum"
+  - "**/Cargo.toml"
+  - "**/Cargo.lock"
+skip-when:
+  - "**/node_modules/**"
+  - "**/vendor/**"
+severity: medium
+---
+
+# Dependency Management Review
+
+Review dependency changes for consistency, security, and compliance.
+
+## Checklist
+
+- [ ] Lockfile is updated consistently with manifest changes (no divergence)
+- [ ] New dependencies are pinned to an exact or narrow version range
+- [ ] No packages added that are deprecated, unmaintained, or have known CVEs
+- [ ] Major version bumps are intentional and migration notes reviewed
+- [ ] Dev dependencies are not in the production dependency list
+- [ ] No duplicate packages solving the same problem added
+- [ ] License of new dependencies is compatible with the project's license
+- [ ] Transitive dependency changes from lockfile updates are reviewed for unexpected major bumps
+- [ ] No `*` or `latest` version specifiers in manifests
+- [ ] For monorepos: shared dependency versions are consistent across workspace packages
+
+## Severity Guide
+
+| Finding | Severity |
+|---------|----------|
+| Package with known critical CVE added | critical |
+| Lockfile diverges from manifest | high |
+| Deprecated/unmaintained package with no alternative noted | high |
+| Incompatible license added | high |
+| Unintended major version bump in lockfile | medium |
+| Dev dependency in production list | medium |
+| `*` or `latest` version specifier | medium |
+| Duplicate dependency solving same problem | low |
+```
+
+---
+
+## error-handling-review.md
+
+```markdown
+---
+name: error-handling-review
+description: "Reviews error handling patterns for consistency, error context preservation, retry logic, and user-facing error messages"
+triggers:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.py"
+  - "**/*.go"
+  - "**/*.java"
+  - "**/*.rb"
+skip-when:
+  - "**/*.test.*"
+  - "**/*.spec.*"
+  - "**/node_modules/**"
+  - "**/vendor/**"
+  - "**/dist/**"
+severity: medium
+---
+
+# Error Handling Review
+
+Review error handling for consistency, context preservation, and safe failure modes.
+
+## Checklist
+
+- [ ] Errors are not silently swallowed — catch blocks either handle or re-throw
+- [ ] Error context is preserved when wrapping errors (original cause attached)
+- [ ] User-facing error messages are actionable — they explain what happened and what to do
+- [ ] Internal error details (stack traces, raw DB errors) are not exposed to end users
+- [ ] Async operations handle errors explicitly — no unhandled promise rejections
+- [ ] Retry logic uses exponential backoff and has a maximum retry limit
+- [ ] Circuit breaker or fallback strategy exists for external service calls
+- [ ] Error types are specific enough to distinguish recoverable from non-recoverable errors
+- [ ] HTTP error responses use semantically correct status codes
+- [ ] Cleanup / resource release happens in finally blocks or equivalent, not only in the happy path
+- [ ] Errors that should alert on-call are logged at the appropriate level (error/fatal vs warn)
+
+## Severity Guide
+
+| Finding | Severity |
+|---------|----------|
+| Silent catch block (error swallowed, no log) | high |
+| Internal error details exposed to end user | high |
+| Unhandled promise rejection / uncaught async error | high |
+| Error context lost when re-throwing | medium |
+| Retry without backoff or max limit | medium |
+| Resource leak in error path | medium |
+| Generic catch-all with no error type distinction | low |
+| Non-actionable user-facing error message | low |
+```
+
+---
+
+## accessibility-review.md
+
+```markdown
+---
+name: accessibility-review
+description: "Reviews UI components for ARIA correctness, keyboard navigation, semantic HTML, and color contrast"
+triggers:
+  - "**/*.tsx"
+  - "**/*.jsx"
+  - "**/*.vue"
+  - "**/*.svelte"
+  - "**/*.html"
+  - "**/*.css"
+  - "**/*.scss"
+skip-when:
+  - "**/*.test.*"
+  - "**/*.spec.*"
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/build/**"
+severity: medium
+max-files: 40
+---
+
+# Accessibility Review
+
+Review UI changes for accessibility compliance (WCAG 2.1 AA).
+
+## Checklist
+
+- [ ] Interactive elements (`<button>`, `<a>`, custom components) have accessible names (text content or `aria-label`)
+- [ ] Images have meaningful `alt` text; decorative images use `alt=""`
+- [ ] Form inputs are associated with labels via `<label for>` or `aria-labelledby`
+- [ ] Error messages are associated with their input via `aria-describedby`
+- [ ] Focus is managed correctly after dynamic content changes (modals, toasts, route transitions)
+- [ ] Keyboard navigation works without a mouse — all interactive elements reachable via Tab
+- [ ] Focus indicators are visible — not removed with `outline: none` without a replacement style
+- [ ] Color is not the only means of conveying information
+- [ ] Text contrast meets WCAG AA ratio (4.5:1 for normal text, 3:1 for large text)
+- [ ] ARIA roles, states, and properties are used correctly — not redundant or conflicting
+- [ ] Touch targets are at least 44×44px on mobile
+- [ ] Dynamic content updates (live regions) use `aria-live` appropriately
+
+## Severity Guide
+
+| Finding | Severity |
+|---------|----------|
+| Interactive element with no accessible name | high |
+| Form input with no label | high |
+| Focus trapped or lost after modal/dialog | high |
+| Keyboard navigation broken for interactive element | high |
+| Contrast ratio below WCAG AA | medium |
+| Missing `alt` on informative image | medium |
+| ARIA role/state used incorrectly | medium |
+| Focus indicator removed without replacement | medium |
+| Touch target below 44×44px | low |
+| Decorative image missing `alt=""` | low |
+```

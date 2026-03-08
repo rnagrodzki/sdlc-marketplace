@@ -55,6 +55,14 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
   ],
   "plan_critique": {
     "uncovered_files": ["README.md"],
+    "uncovered_suggestions": [
+      {
+        "dimension": "documentation-quality-review",
+        "files": ["README.md"],
+        "reason": "1 documentation file not covered by any dimension"
+      }
+    ],
+    "still_uncovered": [],
     "over_broad_dimensions": [],
     "overlapping_pairs": [],
     "dimension_cap_applied": false,
@@ -66,7 +74,8 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
     "skipped_dimensions": 2,
     "queued_dimensions": 0,
     "total_changed_files": 12,
-    "uncovered_file_count": 1
+    "uncovered_file_count": 1,
+    "suggested_dimensions": 1
   },
   "diff_dir": "/tmp/sdlc-review-XXXXX"
 }

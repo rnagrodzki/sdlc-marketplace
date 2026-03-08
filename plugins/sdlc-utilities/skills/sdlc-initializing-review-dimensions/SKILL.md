@@ -68,12 +68,47 @@ codebases — read only manifests, config files, and directory listings.
 **/*.test.*          → test files
 **/*.spec.*          → test files
 docs/                → documentation directory
+
+**/i18n/**           → internationalization
+**/locales/**        → internationalization
+**/translations/**   → internationalization
+**/.env*             → configuration management
+**/config/**         → configuration management
+**/feature-flags/**  → configuration management
+**/*.graphql         → API contract (GraphQL)
+**/*.proto           → API contract (gRPC/protobuf)
+**/openapi.*         → API contract (OpenAPI)
+**/swagger.*         → API contract (Swagger)
+**/*.schema.*        → config/type schemas
+**/a11y/**           → accessibility
+**/cypress/**        → E2E testing
+**/playwright/**     → E2E testing
+**/packages/*/       → monorepo workspace
+**/apps/*/           → monorepo workspace
+**/libs/*/           → monorepo shared libs
+**/plugins/*/        → plugin architecture
+**/extensions/*/     → plugin architecture
+**/*.d.ts            → TypeScript type definitions
+**/tsconfig*.json    → TypeScript project config
+**/Jenkinsfile       → CI/CD
+**/.circleci/**      → CI/CD
+**/android/**        → mobile app
+**/ios/**            → mobile app
+**/model*/**         → ML/AI
+**/dags/**           → data pipeline (Airflow)
+**/pipeline*/**      → data pipeline
+**/store/**          → state management
+**/state/**          → state management
+**/bin/**            → CLI entry points
 ```
 
 **Config files (read if they exist):**
 
 - `.github/workflows/*.yml` → CI/CD
 - `.eslintrc*`, `pylintrc`, `golangci.yml` → linting
+- `tsconfig.json` → check `strict` mode (type-safety dimension evidence)
+- `lerna.json`, `pnpm-workspace.yaml`, `nx.json` → monorepo evidence
+- `*.graphql`, `openapi.yaml`, `openapi.json` → API contract evidence
 
 From the scan, extract:
 
@@ -99,6 +134,16 @@ In `--add` (expansion) mode:
 - Extract the list of currently installed dimension names from the output
 - Note their trigger patterns so new proposals avoid identical globs
 
+Additionally, in `--add` mode, check if there are uncovered file suggestions from a recent review run. Locate and run `review-prepare.js` to get the current branch's uncovered file analysis:
+
+```bash
+PREP=$(find ~/.claude/plugins -name "review-prepare.js" 2>/dev/null | head -1)
+[ -z "$PREP" ] && [ -f "plugins/sdlc-utilities/scripts/review-prepare.js" ] && PREP="plugins/sdlc-utilities/scripts/review-prepare.js"
+[ -n "$PREP" ] && node "$PREP" --project-root . --json 2>/dev/null
+```
+
+If this succeeds, parse `plan_critique.uncovered_suggestions` from the output. These are files not covered by any installed dimension — use them as additional evidence in Step 3 (cite: "Recent review found N uncovered files matching this pattern"). If the command fails (no changed files, not in a git repo, etc.), silently skip — it is bonus evidence, not required.
+
 If NOT in expansion mode: skip this step.
 
 ---
@@ -106,6 +151,8 @@ If NOT in expansion mode: skip this step.
 ### Step 3 (PLAN) — Propose Dimension Catalog
 
 Based on evidence from Step 1, select dimensions to propose using this table:
+
+**Core dimensions (technical):**
 
 | Evidence found | Dimension | Severity |
 | --- | --- | --- |
@@ -120,12 +167,46 @@ Based on evidence from Step 1, select dimensions to propose using this table:
 | UI components, CSS/SCSS, template files | `ui-review` | medium |
 | Any project (always include) | `code-quality-review` | medium |
 
+**Extended dimensions (non-technical and cross-cutting):**
+
+| Evidence found | Dimension | Severity |
+| --- | --- | --- |
+| Mixed casing styles across files, ESLint naming rules configured | `naming-conventions-review` | low |
+| JSDoc/docstring config, CHANGELOG.md, README quality signals | `documentation-quality-review` | low |
+| `.github/workflows/`, `.circleci/`, `Jenkinsfile`, CI config | `ci-cd-pipeline-review` | medium |
+| OpenAPI/Swagger/GraphQL schemas (`*.graphql`, `openapi.*`), `*.proto` files | `api-contract-review` | high |
+| Lock files (`package-lock.json`, `yarn.lock`, `poetry.lock`), `.npmrc`, license-checking deps | `dependency-management-review` | medium |
+| `.env*` files, `config/` directory, feature flag libs (LaunchDarkly, Unleash, ConfigCat) | `configuration-management-review` | medium |
+| Error boundary files, custom error classes, retry/circuit-breaker patterns | `error-handling-review` | medium |
+| UI components + a11y testing deps (`jest-axe`, `@axe-core/*`, `@testing-library/jest-axe`) | `accessibility-review` | medium |
+| `i18n/`, `locales/`, `translations/` dirs, i18n lib deps (`i18next`, `react-intl`, `vue-i18n`) | `internationalization-review` | low |
+| `migrations/` dir, Prisma/Alembic/Flyway/Liquibase files, `*.sql` migration scripts | `database-migrations-review` | high |
+| Structured logging libs (`winston`, `pino`, `structlog`), OpenTelemetry deps | `logging-observability-review` | medium |
+| `tsconfig.json` with `strict: true`, `.d.ts` files present | `type-safety-review` | medium |
+| Redux/Zustand/Vuex/MobX/Pinia deps, `store/` or `state/` dirs | `state-management-review` | medium |
+| `bin/` dir, `commander`/`yargs`/`meow`/`clap`/`cobra` deps | `cli-ux-review` | medium |
+
+**Project-type dimensions (conditional on project structure):**
+
+| Evidence found | Dimension | Severity |
+| --- | --- | --- |
+| `packages/`/`apps/` dirs + workspace config (`lerna.json`, `pnpm-workspace.yaml`, `nx.json`, or `workspaces` in package.json) | `monorepo-governance-review` | medium |
+| `plugins/` or `extensions/` dirs + manifest files (`plugin.json`, `manifest.json`) or hook registration patterns | `plugin-architecture-review` | medium |
+| Package exports, `index.ts`/`index.js` barrel files, semver in package.json, `CHANGELOG.md` | `sdk-library-design-review` | high |
+| `android/`/`ios/` dirs, React Native/Flutter/Capacitor deps | `mobile-app-review` | medium |
+| DAG definitions, ETL scripts, `pipeline/` dirs, Spark/Airflow/Dagster deps | `data-pipeline-review` | high |
+| Model files, `training/` dirs, ML libs (torch, tensorflow, sklearn) in requirements | `ml-ai-review` | medium |
+| Docker Compose with multiple services, `services/` dir, API gateway config, contract test files | `microservices-review` | medium |
+
 **Rules:**
 
 - Only propose a dimension if there is concrete evidence — do NOT propose `api-review`
-  for a CLI tool with no routes
+  for a CLI tool with no routes, or `mobile-app-review` for a pure web project
 - Always include `code-quality-review` as the baseline
 - In `--add` mode: exclude dimensions already installed
+- In `--add` mode: if `review-prepare.js` produced `uncovered_suggestions`, treat each as additional evidence — cite the specific files found
+- Distinguish `api-review` (route/controller code quality) from `api-contract-review` (schema file changes); both may be appropriate for projects with explicit schema files
+- Distinguish `documentation-review` (docs presence/structure) from `documentation-quality-review` (docs content accuracy and completeness); flag if both are proposed for the same project
 
 For each proposed dimension, prepare:
 
@@ -151,7 +232,9 @@ Before presenting, self-review the full proposal set:
 - **Evidence quality**: is each proposal backed by concrete scan findings? Remove any without evidence.
 - **Instructions tailored**: does each body reference the project's specific framework by name? If not, add project context.
 - **Expansion gaps** (in `--add` mode): are there project patterns not covered by existing OR proposed dimensions?
+- **Uncovered suggestion coverage** (in `--add` mode): if Step 2 produced `uncovered_suggestions`, do the proposed dimensions now cover all of those file patterns? List any that remain unaddressed and note whether they need a custom dimension.
 - **Trigger validity**: do patterns conform to glob syntax (no `***`, balanced brackets)?
+- **Dimension distinction**: if both `api-review` and `api-contract-review` are proposed, confirm both are justified (route code + schema files both present). Same for `documentation-review` vs `documentation-quality-review`.
 
 ---
 

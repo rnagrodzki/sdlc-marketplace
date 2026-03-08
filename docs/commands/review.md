@@ -153,6 +153,35 @@ User-supplied `command` parameter is passed directly to `child_process.exec()` w
 
 ---
 
+## Dimension Suggestions
+
+When the review finds changed files not covered by any active dimension, it analyzes their patterns and suggests new dimensions in the review plan output:
+
+```text
+Suggested new dimensions for uncovered files:
+
+  ci-cd-pipeline-review — 2 CI/CD workflow files not covered
+    Files: .github/workflows/ci.yml, .github/workflows/deploy.yml
+
+  configuration-management-review — 3 configuration files not covered
+    Files: src/config/db.ts, src/config/auth.ts, .env.example
+
+Run `/sdlc:review-init --add` to create these dimensions.
+```
+
+Files that cannot be mapped to any known dimension type are listed separately:
+
+```text
+2 file(s) not mappable to any known dimension type:
+  src/custom-runtime.xyz
+  build-tool.conf
+Consider creating a custom dimension or broadening existing trigger patterns.
+```
+
+These suggestions are informational during a review run. To act on them, run `/sdlc:review-init --add`.
+
+---
+
 ## Prerequisites
 
 - **`.claude/review-dimensions/`** — at least one dimension file must exist. Run `/sdlc:review-init` to create them.

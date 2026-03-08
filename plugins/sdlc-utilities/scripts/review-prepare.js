@@ -302,12 +302,78 @@ function critiquePlan(dimensions, changedFiles) {
     }
   }
 
+  const { uncoveredSuggestions, stillUncovered } = analyzeUncoveredFiles(uncoveredFiles);
+
   return {
     uncoveredFiles,
+    uncoveredSuggestions,
+    stillUncovered,
     overBroad,
     overlappingPairs,
     dimensionCapApplied: active.length > 8,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Uncovered file analysis
+// ---------------------------------------------------------------------------
+
+/**
+ * Static catalog mapping file path patterns to dimension suggestions.
+ * Each entry has a test function and a dimension name + human-readable label.
+ * Order matters: first match wins per file. More specific patterns first.
+ */
+const UNCOVERED_PATTERN_CATALOG = [
+  { test: f => /\.github\/workflows\//.test(f) || (/\.(ya?ml)$/.test(f) && /ci|deploy|pipeline/i.test(f)), dimension: 'ci-cd-pipeline-review', label: 'CI/CD workflow' },
+  { test: f => /Jenkinsfile|\.circleci\//i.test(f), dimension: 'ci-cd-pipeline-review', label: 'CI/CD pipeline' },
+  { test: f => /migrations?\//i.test(f) || /\.sql$/.test(f), dimension: 'database-migrations-review', label: 'database migration' },
+  { test: f => /i18n|locales?|translations?\//i.test(f), dimension: 'internationalization-review', label: 'internationalization' },
+  { test: f => /\.graphql$/.test(f) || /openapi|swagger/i.test(f) || /\.proto$/.test(f), dimension: 'api-contract-review', label: 'API contract/schema' },
+  { test: f => /\.md$/.test(f) || /docs?\//i.test(f), dimension: 'documentation-quality-review', label: 'documentation' },
+  { test: f => /\.d\.ts$/.test(f) || /(?:^|\/)types?\//i.test(f), dimension: 'type-safety-review', label: 'type definition' },
+  { test: f => /store|state|redux|zustand|pinia/i.test(f), dimension: 'state-management-review', label: 'state management' },
+  { test: f => /Dockerfile|docker-compose|\.dockerfile$/i.test(f) || /terraform|\.tf$|k8s|kubernetes/i.test(f), dimension: 'infrastructure-review', label: 'infrastructure' },
+  { test: f => /\.lock$/.test(f) || /package-lock|yarn\.lock|Gemfile\.lock|poetry\.lock/.test(f), dimension: 'dependency-management-review', label: 'dependency lockfile' },
+  { test: f => /android\/|ios\/|\.swift$|\.kt$|\.dart$/.test(f), dimension: 'mobile-app-review', label: 'mobile platform' },
+  { test: f => /\.env(?:\.|$)/.test(f) || /(?:^|\/)config\//i.test(f), dimension: 'configuration-management-review', label: 'configuration' },
+];
+
+/**
+ * Analyze uncovered files and group them by suggested dimension.
+ * @param {string[]} uncoveredFiles - Files not matched by any active dimension
+ * @returns {{ uncoveredSuggestions: Array<{dimension, files, reason}>, stillUncovered: string[] }}
+ */
+function analyzeUncoveredFiles(uncoveredFiles) {
+  if (uncoveredFiles.length === 0) {
+    return { uncoveredSuggestions: [], stillUncovered: [] };
+  }
+
+  const byDimension = new Map(); // dimension name -> { label, files }
+  const stillUncovered = [];
+
+  for (const file of uncoveredFiles) {
+    const entry = UNCOVERED_PATTERN_CATALOG.find(e => e.test(file));
+    if (entry) {
+      if (!byDimension.has(entry.dimension)) {
+        byDimension.set(entry.dimension, { label: entry.label, files: [] });
+      }
+      byDimension.get(entry.dimension).files.push(file);
+    } else {
+      stillUncovered.push(file);
+    }
+  }
+
+  const uncoveredSuggestions = [];
+  for (const [dimension, { label, files }] of byDimension) {
+    const count = files.length;
+    uncoveredSuggestions.push({
+      dimension,
+      files,
+      reason: `${count} ${label} file${count === 1 ? '' : 's'} not covered by any dimension`,
+    });
+  }
+
+  return { uncoveredSuggestions, stillUncovered };
 }
 
 /**
@@ -480,19 +546,22 @@ function main() {
     pr,
     dimensions: dims,
     plan_critique: {
-      uncovered_files:       critique.uncoveredFiles,
-      over_broad_dimensions: critique.overBroad,
-      overlapping_pairs:     critique.overlappingPairs,
-      dimension_cap_applied: critique.dimensionCapApplied,
-      queued_dimensions:     queued,
+      uncovered_files:        critique.uncoveredFiles,
+      uncovered_suggestions:  critique.uncoveredSuggestions,
+      still_uncovered:        critique.stillUncovered,
+      over_broad_dimensions:  critique.overBroad,
+      overlapping_pairs:      critique.overlappingPairs,
+      dimension_cap_applied:  critique.dimensionCapApplied,
+      queued_dimensions:      queued,
     },
     summary: {
-      total_dimensions:     dims.length,
-      active_dimensions:    dims.filter(d => d.status === 'ACTIVE' || d.status === 'TRUNCATED').length,
-      skipped_dimensions:   dims.filter(d => d.status === 'SKIPPED').length,
-      queued_dimensions:    queued.length,
-      total_changed_files:  changedFiles.length,
-      uncovered_file_count: critique.uncoveredFiles.length,
+      total_dimensions:      dims.length,
+      active_dimensions:     dims.filter(d => d.status === 'ACTIVE' || d.status === 'TRUNCATED').length,
+      skipped_dimensions:    dims.filter(d => d.status === 'SKIPPED').length,
+      queued_dimensions:     queued.length,
+      total_changed_files:   changedFiles.length,
+      uncovered_file_count:  critique.uncoveredFiles.length,
+      suggested_dimensions:  critique.uncoveredSuggestions.length,
     },
     diff_dir: tmpDir,
   };
@@ -509,4 +578,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { globToRegex, matchFiles };
+module.exports = { globToRegex, matchFiles, analyzeUncoveredFiles, UNCOVERED_PATTERN_CATALOG };

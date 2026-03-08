@@ -2,7 +2,7 @@
 
 ## Overview
 
-Scans the project's tech stack, dependencies, and file structure, then proposes and creates tailored review dimension files in `.claude/review-dimensions/`. Each dimension file defines a lens (security, API contracts, test coverage, etc.) that `/sdlc:review` uses to focus its analysis. Run once per project, then use `--add` to expand as the codebase evolves.
+Scans the project's tech stack, dependencies, and file structure, then proposes and creates tailored review dimension files in `.claude/review-dimensions/`. Each dimension file defines a lens (security, API contracts, test coverage, etc.) that `/sdlc:review` uses to focus its analysis. Covers 31 dimension types across technical code concerns, pipeline/config/docs review, project architecture patterns, and more. Run once per project, then use `--add` to expand as the codebase evolves.
 
 ---
 
@@ -80,7 +80,99 @@ Generated Copilot instruction files:
 /sdlc:review-init --add
 ```
 
-Proposes only dimensions not yet present in `.claude/review-dimensions/`.
+Proposes only dimensions not yet present in `.claude/review-dimensions/`. In `--add` mode, the command also runs `review-prepare.js` on the current branch and uses any `uncovered_suggestions` (files not covered by installed dimensions) as additional evidence for proposals — citing the specific files found.
+
+---
+
+## Expanded Dimension Catalog
+
+`review-init` can propose any of these 31 dimension types depending on project evidence:
+
+### Always included
+
+| Dimension             | Severity | Evidence    |
+|-----------------------|----------|-------------|
+| `code-quality-review` | medium   | Any project |
+
+### Security & data
+
+| Dimension                       | Severity | Evidence                                          |
+|---------------------------------|----------|---------------------------------------------------|
+| `security-review`               | high     | Auth dirs, JWT/OAuth/session deps                 |
+| `data-integrity-review`         | high     | ORM deps, migration files, SQL dirs               |
+| `database-migrations-review`    | high     | `migrations/` dir, Prisma/Alembic/Flyway files    |
+
+### API
+
+| Dimension             | Severity | Evidence                                       |
+|-----------------------|----------|------------------------------------------------|
+| `api-review`          | high     | Route/controller/handler dirs, OpenAPI files   |
+| `api-contract-review` | high     | OpenAPI/GraphQL schemas, .proto files           |
+
+### Code patterns
+
+| Dimension                    | Severity | Evidence                                              |
+|------------------------------|----------|-------------------------------------------------------|
+| `error-handling-review`      | medium   | Error boundary files, retry/circuit-breaker patterns  |
+| `naming-conventions-review`  | low      | Mixed casing styles, ESLint naming rules              |
+| `type-safety-review`         | medium   | `tsconfig.json` strict mode, `.d.ts` files            |
+| `state-management-review`    | medium   | Redux/Zustand/Vuex/Pinia deps, `store/` dirs          |
+| `concurrency-review`         | high     | Queue libs, worker dirs, async patterns               |
+
+### Testing
+
+| Dimension              | Severity | Evidence                                          |
+|------------------------|----------|---------------------------------------------------|
+| `test-coverage-review` | medium   | Test files present (`*.test.*`, `*.spec.*`)       |
+
+### Infrastructure & dependencies
+
+| Dimension                        | Severity | Evidence                                          |
+|----------------------------------|----------|---------------------------------------------------|
+| `infrastructure-review`          | medium   | Docker, k8s, Terraform, CI/CD files               |
+| `ci-cd-pipeline-review`          | medium   | `.github/workflows/`, `.circleci/`, `Jenkinsfile` |
+| `dependency-management-review`   | medium   | Lock files, `.npmrc`, license-checking deps       |
+| `configuration-management-review`| medium   | `.env*`, `config/`, feature flag libs             |
+
+### Frontend
+
+| Dimension                    | Severity | Evidence                               |
+|------------------------------|----------|----------------------------------------|
+| `ui-review`                  | medium   | UI components, CSS/SCSS, template files|
+| `accessibility-review`       | medium   | Components + a11y testing deps         |
+| `internationalization-review`| low      | `i18n/`, `locales/`, i18n lib deps     |
+
+### Observability & performance
+
+| Dimension                      | Severity | Evidence                                     |
+|--------------------------------|----------|----------------------------------------------|
+| `performance-review`           | medium   | Cache libs, service/repo layers              |
+| `logging-observability-review` | medium   | Structured logging libs, OpenTelemetry deps  |
+
+### Documentation
+
+| Dimension                      | Severity | Evidence                                          |
+|--------------------------------|----------|---------------------------------------------------|
+| `documentation-review`         | low      | `docs/` directory, multiple `.md` files           |
+| `documentation-quality-review` | low      | JSDoc/docstring config, CHANGELOG, README signals |
+
+### CLI
+
+| Dimension        | Severity | Evidence                                          |
+|------------------|----------|---------------------------------------------------|
+| `cli-ux-review`  | medium   | `bin/` dir, `commander`/`yargs`/`cobra` deps      |
+
+### Project-type
+
+| Dimension                     | Severity | Evidence                                                  |
+|-------------------------------|----------|-----------------------------------------------------------|
+| `monorepo-governance-review`  | medium   | `packages/`/`apps/` + workspace config                    |
+| `plugin-architecture-review`  | medium   | `plugins/` dir + manifest/hook patterns                   |
+| `sdk-library-design-review`   | high     | Package exports, barrel files, semver, CHANGELOG          |
+| `mobile-app-review`           | medium   | `android/`/`ios/` dirs, React Native/Flutter deps         |
+| `data-pipeline-review`        | high     | DAGs, ETL scripts, Spark/Airflow deps                     |
+| `ml-ai-review`                | medium   | Model files, ML libs (torch, tensorflow, sklearn)         |
+| `microservices-review`        | medium   | Docker Compose multi-service, API gateway, contract tests |
 
 ---
 
