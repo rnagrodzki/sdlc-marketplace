@@ -1,0 +1,18 @@
+description: "Script execution tests for sdlc-marketplace (runs real scripts against fixture directories, no LLM)"
+
+# Each test case uses the script-runner.js provider directly.
+# The prompt is unused for script tests but required by the promptfoo config schema.
+providers:
+  - id: file://providers/script-runner.js
+
+prompts:
+  - "run"
+
+defaultTest:
+  options:
+    transformVars: "file://scripts/extract-skill-content.js"
+
+tests:
+  - file://datasets/sdlc-plugin-discovery-exec.yaml
+  - file://datasets/sdlc-dimensions-exec.yaml
+  - file://datasets/sdlc-pr-template-exec.yaml

@@ -1,0 +1,84 @@
+# Fixture appropriateness:
+#   project-with-version-config  -- CORRECT: release flow with breaking change detection
+#   project-no-version-config    -- CORRECT: init flow detects package.json
+#   feature-branch-with-commits  -- INVALID: PR context, not versioning context
+
+- description: "sdlc-versioning-releases: release flow warns about breaking change"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"
+    project_context: "file://fixtures/project-with-version-config.md"
+    user_request: >
+      Run /sdlc:version patch. The version-prepare.js output is provided in the project context.
+      Show the release plan and any warnings.
+  assert:
+    # Must reference the current or next version
+    - type: regex
+      value: "(2\.1\.0|2\.1\.1|3\.0\.0|2\.2\.0)"
+    # Must warn about the breaking change
+    - type: icontains
+      value: "breaking"
+    # Must NOT proceed to tag without user confirmation (simulation: shows plan only)
+    - type: not-icontains
+      value: "git tag created"
+    # Behavioral: detects breaking change, warns, recommends major bump
+    - type: llm-rubric
+      value: >
+        The response reads the version-prepare.js output showing currentVersion=2.1.0 with a
+        breaking change (feat!: remove deprecated /api/v1 endpoints). It warns the user that a
+        major bump (to 3.0.0) is strongly recommended over the requested patch (to 2.1.1). It
+        presents a release plan showing the options (patch: 2.1.1, minor: 2.2.0, major: 3.0.0)
+        and asks the user to confirm before proceeding. It does NOT silently apply the patch bump
+        despite the breaking change.
+
+- description: "sdlc-versioning-releases: init flow detects package.json and proposes config"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"
+    project_context: "file://fixtures/project-no-version-config.md"
+    user_request: >
+      Run /sdlc:version --init. The version-prepare.js output is in the project context.
+      Show the detected setup and proposed configuration.
+  assert:
+    # Must identify the version file
+    - type: icontains
+      value: "package.json"
+    # Must show the detected current version
+    - type: regex
+      value: "0\.3\.1"
+    # Must propose writing .claude/version.json
+    - type: icontains
+      value: ".claude/version.json"
+    # Behavioral: presents detected config, asks for confirmation
+    - type: llm-rubric
+      value: >
+        The response follows the init workflow: it reads the version-prepare.js output showing
+        detectedVersionFile=package.json, currentVersion=0.3.1, and tagPrefix=v. It presents the
+        detected configuration and the suggested .claude/version.json content. It asks the user
+        to confirm (accept/modify/cancel) before writing the config file. It does NOT write any
+        files in this simulation — it describes what would happen with confirmation.
+
+- description: "sdlc-versioning-releases: release blocked when version config missing"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"
+    project_context: >
+      The user is on branch feat/add-search, trying to cut a release. Running version-prepare.js
+      produces this JSON output:
+      {"flow": "release", "errors": ["No version config found. Run /sdlc:version --init to set up
+      versioning for this project."], "warnings": [], "currentVersion": null, "config": null}
+    user_request: "Run /sdlc:version minor to cut a release."
+  assert:
+    # Must report the error
+    - type: regex
+      value: "(error|no.+config|config.+not.+found|--init)"
+    # Must NOT show a release plan since config is missing
+    - type: not-icontains
+      value: "Release Plan"
+    # Must suggest --init
+    - type: regex
+      value: "(--init|version --init|sdlc:version --init)"
+    # Behavioral: surfaces error, suggests init, does not attempt release
+    - type: llm-rubric
+      value: >
+        The response reads the error from version-prepare.js ("No version config found") and
+        clearly reports that the release cannot proceed. It recommends running /sdlc:version --init
+        first to initialize versioning configuration. It does NOT attempt to guess a version or
+        proceed with a release. The message is actionable and references the correct command.

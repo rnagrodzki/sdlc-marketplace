@@ -1,0 +1,77 @@
+# Fixture appropriateness:
+#   project-with-dimensions  -- CORRECT: primary use case; 3 dimensions active with file matching
+#   project-no-dimensions    -- CORRECT: edge case; no dimensions installed → error + suggestion
+#   feature-branch-*         -- INVALID: PR context, not review context
+
+- description: "sdlc-reviewing-changes: multi-dimension review with active dimensions"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-reviewing-changes/SKILL.md"
+    project_context: "file://fixtures/project-with-dimensions.md"
+    user_request: >
+      Run /sdlc:review on this project. The review-prepare.js manifest is provided in the
+      project context. Display the review plan showing which dimensions are active.
+  assert:
+    # Must reference dimensions concept
+    - type: icontains
+      value: "dimension"
+    # Must show active/skipped status for dimensions
+    - type: regex
+      value: "(ACTIVE|active|skipped|SKIPPED)"
+    # Must reference the specific dimensions from the manifest
+    - type: regex
+      value: "(security-review|code-quality-review|api-review)"
+    # Behavioral: consumes manifest, reports dimension status, describes orchestration
+    - type: llm-rubric
+      value: >
+        The response consumes the review manifest and reports which dimensions are active
+        (security-review, code-quality-review, api-review — all 3 should be ACTIVE based on
+        the manifest). It shows file counts per dimension. It either describes how it would
+        delegate to the review-orchestrator agent or describes the review plan in detail.
+        The response mentions the specific dimension names and does not fabricate additional
+        dimensions not present in the manifest.
+
+- description: "sdlc-reviewing-changes: dry-run shows plan without dispatching agents"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-reviewing-changes/SKILL.md"
+    project_context: "file://fixtures/project-with-dimensions.md"
+    user_request: >
+      Run /sdlc:review --dry-run on this project. The review-prepare.js manifest is in the
+      project context. Show the review plan only — do not dispatch any review agents.
+  assert:
+    # Must acknowledge dry-run mode
+    - type: regex
+      value: "(dry.run|dry run|DRY.RUN)"
+    # Must show a plan table with dimension information
+    - type: regex
+      value: "(Dimension|security-review|code-quality)"
+    # Must NOT say it is spawning or dispatching agents
+    - type: not-regex
+      value: "(spawning|dispatching|Agent tool|subagent)"
+    # Behavioral: plan-only output, no actual review findings
+    - type: llm-rubric
+      value: >
+        The response clearly states this is a dry run and shows only the review plan — a table
+        or list of dimensions with their status (ACTIVE/SKIPPED), file counts, and severity.
+        It explicitly does NOT dispatch the review-orchestrator agent or any subagents. It does
+        NOT produce any actual code review findings or comments. It describes what would happen
+        if the --dry-run flag were omitted.
+
+- description: "sdlc-reviewing-changes: no dimensions installed reports error and suggests review-init"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-reviewing-changes/SKILL.md"
+    project_context: "file://fixtures/project-no-dimensions.md"
+    user_request: "Run /sdlc:review on this project."
+  assert:
+    # Must report the missing dimensions problem
+    - type: regex
+      value: "(no.+dimension|dimension.+not.+found|no review dimension|0 dimension)"
+    # Must suggest running review-init
+    - type: regex
+      value: "(review-init|/sdlc:review-init)"
+    # Behavioral: clear error message, correct suggestion
+    - type: llm-rubric
+      value: >
+        The response reads the error from the review-prepare.js manifest (no dimensions found)
+        and clearly reports that no review dimensions are installed. It recommends running
+        /sdlc:review-init to create tailored dimensions for this Python/FastAPI project. It does
+        NOT fabricate a review without dimensions. The message is clear and actionable.

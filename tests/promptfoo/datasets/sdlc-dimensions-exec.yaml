@@ -1,0 +1,54 @@
+# Script execution tests for validate-dimensions.js.
+# These tests run validate-dimensions.js directly against real fixture directories (no LLM).
+# They validate that dimension validation produces correct output.
+#
+# Fixture appropriateness:
+#   project-with-dimensions  -- CORRECT: 2 valid dimension files should pass
+#   project-no-dimensions    -- CORRECT (edge): no .claude/review-dimensions/ → empty dimensions array
+
+- description: "sdlc-dimensions: valid dimensions pass all checks"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/validate-dimensions.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/project-with-dimensions"
+  assert:
+    # Overall must be PASS (uppercase in this script)
+    - type: icontains
+      value: '"overall": "PASS"'
+    # Zero total errors
+    - type: regex
+      value: '"total_errors":\s*0'
+    # Both dimensions must be present
+    - type: icontains
+      value: "security-review"
+    - type: icontains
+      value: "code-quality-review"
+
+- description: "sdlc-dimensions: no dimensions directory returns empty array"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/validate-dimensions.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/project-no-dimensions"
+  assert:
+    # dimensions array must be empty
+    - type: icontains
+      value: '"dimensions": []'
+    # Zero total in summary
+    - type: regex
+      value: '"total":\s*0'
+
+- description: "sdlc-dimensions: markdown output contains report header"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/validate-dimensions.js"
+    script_args: "--project-root {{project_root}} --markdown"
+    project_root: "file://fixtures-fs/project-with-dimensions"
+  assert:
+    # Must have markdown report header
+    - type: icontains
+      value: "Dimension Validation Report"
+    # Must have dimension status table
+    - type: regex
+      value: '\| Dimension \|'
+    # Must show both dimension names
+    - type: icontains
+      value: "security-review"

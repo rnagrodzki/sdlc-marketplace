@@ -1,0 +1,58 @@
+# Fixture appropriateness:
+#   project-with-tech-stack  -- CORRECT: React/TypeScript frontend; multiple signals for dimension proposals
+#   project-no-dimensions    -- CORRECT: Python/FastAPI project; different signals → different proposals
+#   healthy-plugin-structure -- INVALID: plugin manifest context, not a project to scan
+
+- description: "sdlc-initializing-review-dimensions: scans tech stack and proposes tailored dimensions"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-initializing-review-dimensions/SKILL.md"
+    project_context: "file://fixtures/project-with-tech-stack.md"
+    user_request: "Run /sdlc:review-init to scan this project and propose review dimensions."
+  assert:
+    # Must always include the baseline code-quality dimension
+    - type: icontains
+      value: "code-quality-review"
+    # Must propose at least one evidence-based additional dimension
+    - type: regex
+      value: "(test-coverage|ui-review|documentation)"
+    # Must cite specific evidence from the project
+    - type: regex
+      value: "(React|TypeScript|testing-library|components|__tests__)"
+    # Behavioral: evidence-based proposals with accurate citations
+    - type: llm-rubric
+      value: >
+        The response scans the React/TypeScript project signals and proposes dimensions with
+        specific evidence from the fixture: code-quality-review (always included as baseline),
+        test-coverage (evidence: testing-library + jest devDependencies, 63 test files in
+        __tests__/), ui-review (evidence: 47 components, 12 pages, React), and optionally
+        documentation (evidence: docs/ directory with 8 markdown files). Each proposed dimension
+        cites the specific evidence that triggered it. The response does NOT propose security,
+        api, data-integrity, or infrastructure dimensions since there is no evidence for these
+        in the fixture. Trigger patterns reference the actual project directories (src/components/,
+        src/pages/, __tests__/).
+
+- description: "sdlc-initializing-review-dimensions: Python/FastAPI project gets appropriate proposals"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-initializing-review-dimensions/SKILL.md"
+    project_context: "file://fixtures/project-no-dimensions.md"
+    user_request: "Run /sdlc:review-init for this project."
+  assert:
+    # Must always include baseline
+    - type: icontains
+      value: "code-quality-review"
+    # Must detect Python/FastAPI signals
+    - type: regex
+      value: "(FastAPI|SQLAlchemy|Python|fastapi|sqlalchemy)"
+    # Must propose dimensions appropriate to a Python backend
+    - type: regex
+      value: "(api-review|data-integrity|security)"
+    # Behavioral: detects Python backend stack, proposes fitting dimensions
+    - type: llm-rubric
+      value: >
+        The response scans the Python/FastAPI project and proposes dimensions appropriate for a
+        backend API with a database ORM: code-quality-review (baseline), api-review (evidence:
+        FastAPI routes in src/routes/), data-integrity (evidence: SQLAlchemy in requirements.txt,
+        migrations/ directory), and optionally security (evidence: authentication-adjacent API).
+        Each proposal cites specific evidence from the fixture (requirements.txt dependencies,
+        directory names). The response does NOT propose ui-review since there is no frontend
+        evidence. It presents proposals to the user and asks which ones to install.
