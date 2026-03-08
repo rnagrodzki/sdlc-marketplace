@@ -14,8 +14,10 @@
     - type: regex
       value: "(pass|PASS|16.*16|all.+pass|0 error)"
     # Must NOT suggest fixes when all pass
+    # Note: bare "fix"/"Fix" excluded — they match structural headers even in correct responses.
+    # Only flag imperative fix suggestions directed at the user.
     - type: not-regex
-      value: "(fix|Fix|remediat|Add the|Create the)"
+      value: "(remediat|Add the|Create the|You should fix|Please fix)"
     # Must mention the check count or overall status
     - type: regex
       value: "(16|all checks|passing)"

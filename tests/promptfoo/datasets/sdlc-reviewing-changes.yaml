@@ -44,9 +44,9 @@
     # Must show a plan table with dimension information
     - type: regex
       value: "(Dimension|security-review|code-quality)"
-    # Must NOT say it is spawning or dispatching agents
+    # Must NOT affirmatively dispatch agents (negated references like "without dispatching" are allowed)
     - type: not-regex
-      value: "(spawning|dispatching|Agent tool|subagent)"
+      value: "(I will now spawn|I am dispatching|Launching agent|Using the Agent tool)"
     # Behavioral: plan-only output, no actual review findings
     - type: llm-rubric
       value: >

@@ -1,9 +1,10 @@
 # Fixture appropriateness:
-#   feature-branch-with-commits -- CORRECT: primary scenario; no JIRA, multiple commits, needs push
-#   feature-branch-jira         -- CORRECT: validates JIRA detection from branch name
-#   feature-branch-on-main      -- CORRECT: validates main branch rejection guard
-#   project-with-dimensions     -- INVALID: not a PR context
-#   project-no-dimensions       -- INVALID: not a PR context
+#   feature-branch-with-commits    -- CORRECT: primary scenario; no JIRA, multiple commits, needs push
+#   feature-branch-jira            -- CORRECT: validates JIRA detection from branch name
+#   feature-branch-on-main         -- CORRECT: validates main branch rejection guard
+#   feature-branch-custom-template -- CORRECT: validates custom template replaces default 8 sections
+#   project-with-dimensions        -- INVALID: not a PR context
+#   project-no-dimensions          -- INVALID: not a PR context
 
 - description: "sdlc-creating-pull-requests: standard PR creation with all 8 sections"
   vars:
@@ -24,7 +25,7 @@
       value: "src/routes/search\\.ts"
     # Must produce a title (conventional commit style)
     - type: regex
-      value: "(feat|fix|chore|refactor|docs)(\(.+\))?:"
+      value: '(feat|fix|chore|refactor|docs)(\(.+\))?:'
     # Behavioral: all 8 sections present with appropriate content
     - type: llm-rubric
       value: >
@@ -58,6 +59,49 @@
         a different ticket number or say "Not detected". The PR title and description focus on
         the authentication timeout fix described in the commits.
 
+- description: "sdlc-creating-pull-requests: custom template replaces default 8 sections"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/sdlc-creating-pull-requests/SKILL.md"
+    project_context: "file://fixtures/feature-branch-custom-template.md"
+    user_request: >
+      Run /sdlc:pr for this feature branch. The pr-prepare.js output is provided in the project
+      context above. Generate the PR title and all required sections of the description.
+  assert:
+    # Must produce all 3 custom template sections
+    - type: icontains
+      value: "## Summary"
+    - type: icontains
+      value: "## What Changed"
+    - type: icontains
+      value: "## Testing"
+    # Must NOT produce default-only sections (proves custom template replaced the default)
+    - type: not-icontains
+      value: "## Business Context"
+    - type: not-icontains
+      value: "## Business Benefits"
+    - type: not-icontains
+      value: "## Technical Impact"
+    - type: not-icontains
+      value: "## Changes Overview"
+    # Universal gate: title still follows conventional commit format
+    - type: regex
+      value: '(feat|fix|chore|refactor|docs)(\(.+\))?:'
+    # Universal gate: no fabricated JIRA ticket (custom template has no JIRA section)
+    - type: not-regex
+      value: '[A-Z]{2,10}-\d+'
+    # Behavioral: custom template used, content from commits/diff, no fabrication
+    - type: llm-rubric
+      value: >
+        The response uses the custom template with exactly 3 sections (Summary, What Changed,
+        Testing) instead of the default 8-section structure. It does NOT include Business Context,
+        Business Benefits, Technical Design, Technical Impact, or Changes Overview sections.
+        The PR title is under 72 characters and follows conventional commit format. The Summary
+        is 1-3 plain-language sentences describing the search API addition. The What Changed
+        section describes the technical changes (search endpoint, model, validation, tests)
+        based on the commit subjects and diff data. The Testing section describes how the
+        changes were verified (references the integration and unit tests visible in the diff).
+        No content is fabricated — all claims trace back to the commits and diff provided.
+
 - description: "sdlc-creating-pull-requests: main branch rejected with clear error"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/sdlc-creating-pull-requests/SKILL.md"
@@ -67,12 +111,12 @@
     # Must mention the reason for rejection (main/master/protected/error)
     - type: regex
       value: "(main|master|protected|cannot|error|refuse|switch|feature branch)"
-    # Must NOT produce a PR description (no ## Summary heading)
+    # Must NOT produce a PR description (## Changes Overview only appears in actual PR descriptions)
     - type: not-icontains
-      value: "## Summary"
+      value: "## Changes Overview"
     # Must NOT produce a PR title in conventional commit format (no feat/fix/chore:)
     - type: not-regex
-      value: "^feat(\(.+\))?:"
+      value: '^feat(\(.+\))?:'
     # Behavioral: clearly refuses and instructs to switch branches
     - type: llm-rubric
       value: >
