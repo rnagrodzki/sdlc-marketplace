@@ -42,9 +42,10 @@
     # Must acknowledge dry-run mode
     - type: regex
       value: "(dry.run|dry run|DRY.RUN)"
-    # Must show a plan table with dimension information
+    # Must show a plan table with dimension information (matches table header "Dimension",
+    # lowercase "dimension" in narrative, or actual dimension names from the fixture)
     - type: regex
-      value: "(Dimension|security-review|code-quality)"
+      value: "(Dimension|dimension|security-review|code-quality-review)"
     # Must NOT affirmatively dispatch agents (negated references like "without dispatching" are allowed)
     - type: not-regex
       value: "(I will now spawn|I am dispatching|Launching agent|Using the Agent tool)"

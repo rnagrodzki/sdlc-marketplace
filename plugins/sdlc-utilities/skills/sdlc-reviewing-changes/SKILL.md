@@ -92,7 +92,7 @@ Apply based on `manifest.scope`:
 
 If `--dry-run` was passed:
 
-Format and display the review plan from the manifest:
+Output **exactly** this format — do not summarize or abbreviate:
 
 ```
 Review Plan (dry run — no subagents dispatched)
@@ -103,13 +103,21 @@ Review Plan (dry run — no subagents dispatched)
 
 | Dimension | Files | Severity | Status |
 |-----------|-------|----------|--------|
-...
+{one row per entry in manifest.dimensions, e.g.:}
+| security-review      |   3 | high     | ACTIVE  |
+| code-quality-review  |   7 | medium   | ACTIVE  |
+| api-review           |   2 | high     | ACTIVE  |
 
 Plan critique:
   - Uncovered files:       {manifest.plan_critique.uncovered_files.join(', ') or "none"}
   - Over-broad:            {manifest.plan_critique.over_broad_dimensions.join(', ') or "none"}
   - Suggested dimensions:  {manifest.plan_critique.uncovered_suggestions.map(s => s.dimension).join(', ') or "none"}
+
+To execute the full review, run /sdlc:review (without --dry-run).
 ```
+
+Use the actual dimension names, file counts, severity values, and statuses from
+`manifest.dimensions`. Do not paraphrase. Do not collapse the table into prose.
 
 Stop here.
 
