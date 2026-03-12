@@ -15,8 +15,8 @@ let the user select, write files, and validate with the validation script.
 > written (simulation context), still emit the full proposed dimension YAML/Markdown inline.
 
 Supporting references (dimension format spec, 5 example dimensions) are in
-`sdlc-reviewing-changes/REFERENCE.md` and `sdlc-reviewing-changes/EXAMPLES.md`. Locate them using Glob
-with `path: ~/.claude` and pattern `**/sdlc-reviewing-changes/REFERENCE.md`. If not found, retry
+`review-sdlc/REFERENCE.md` and `review-sdlc/EXAMPLES.md`. Locate them using Glob
+with `path: ~/.claude` and pattern `**/review-sdlc/REFERENCE.md`. If not found, retry
 Glob with the default path (cwd). Use the same approach for EXAMPLES.md.
 
 ---
@@ -282,7 +282,7 @@ For each selected dimension:
    ```
 
 2. Write the full dimension file (frontmatter + tailored body). Use the corresponding
-   example from `sdlc-reviewing-changes/EXAMPLES.md` as the starting template, then
+   example from `review-sdlc/EXAMPLES.md` as the starting template, then
    customize with the project-specific evidence.
 3. Confirm each file written with its path.
 
@@ -464,6 +464,6 @@ Log to `.claude/learnings/log.md` when:
 
 ## See Also
 
-- `sdlc-reviewing-changes/REFERENCE.md` — dimension file format spec and examples
-- `sdlc-reviewing-changes/EXAMPLES.md` — 5 copy-paste-ready dimension files to adapt
-- `sdlc:sdlc-reviewing-changes` — runs the dimensions created by this skill
+- `review-sdlc/REFERENCE.md` — dimension file format spec and examples
+- `review-sdlc/EXAMPLES.md` — 5 copy-paste-ready dimension files to adapt
+- `review-sdlc` — runs the dimensions created by this skill

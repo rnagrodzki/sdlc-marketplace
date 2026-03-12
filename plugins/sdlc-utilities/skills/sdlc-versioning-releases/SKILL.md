@@ -17,7 +17,7 @@ optional CHANGELOG entry, release commit, and push to origin.
 - Generating a Keep a Changelog entry for a release
 - Running a full semantic release workflow end-to-end
 - Creating or incrementing pre-release versions (alpha, beta, rc)
-- When the `/version` command delegates here after running `version-prepare.js`
+- When the `/version-sdlc` skill is invoked and delegates here after running `version-prepare.js`
 
 ## Workflow
 
@@ -117,7 +117,7 @@ Display:
 ✓ .claude/version.json written.
 ✓ .github/workflows/retag-release.yml added (auto-fixes tags after squash merge to main).
 ✓ .github/scripts/retag-release.js added.
-Run /sdlc:version patch to create your first release.
+Run /version-sdlc patch to create your first release.
 ```
 
 If a file was skipped because it already existed, show `(already exists — skipped)` instead of `added`.

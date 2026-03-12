@@ -113,7 +113,7 @@ Plan critique:
   - Over-broad:            {manifest.plan_critique.over_broad_dimensions.join(', ') or "none"}
   - Suggested dimensions:  {manifest.plan_critique.uncovered_suggestions.map(s => s.dimension).join(', ') or "none"}
 
-To execute the full review, run /sdlc:review (without --dry-run).
+To execute the full review, run /review-sdlc (without --dry-run).
 ```
 
 Use the actual dimension names, file counts, severity values, and statuses from
@@ -129,7 +129,7 @@ Locate the orchestrator agent definition using Glob with `path: ~/.claude` and p
 `**/agents/review-orchestrator.md`. If not found, retry Glob with the default path (cwd).
 
 Locate the reference templates using Glob with `path: ~/.claude` and pattern
-`**/sdlc-reviewing-changes/REFERENCE.md`. If not found, retry Glob with the default path (cwd).
+`**/review-sdlc/REFERENCE.md`. If not found, retry Glob with the default path (cwd).
 Store the resolved absolute path as `REFERENCE_MD_PATH`.
 
 Spawn a single Agent (subagent_type: general-purpose) with the orchestrator agent's
@@ -176,4 +176,4 @@ this project's directory layout.
 - `agents/review-orchestrator.md` — full orchestration logic
 - `REFERENCE.md` — dimension format spec, subagent prompt template, comment template
 - `EXAMPLES.md` — 5 ready-to-use example dimension files
-- `sdlc:sdlc-initializing-review-dimensions` — creates tailored dimensions for a project
+- `review-init-sdlc` — creates tailored dimensions for a project

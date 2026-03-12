@@ -15,7 +15,7 @@ PR description readable by both technical and non-technical stakeholders.
 - Updating an existing PR title or description
 - Writing or rewriting a PR description
 - Summarizing branch changes for review
-- When the `/pr` command delegates here after running `pr-prepare.js`
+- When the `/pr-sdlc` skill is invoked and delegates here after running `pr-prepare.js`
 
 ## PR Template
 
