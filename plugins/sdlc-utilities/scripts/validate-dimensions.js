@@ -62,7 +62,7 @@ function formatMarkdown(report) {
   if (report.dimensions.length === 0) {
     lines.push(`No dimension files found in \`${report.dimensions_dir}\`.`);
     lines.push('');
-    lines.push('Run `/sdlc:review-init` to create tailored review dimensions for this project.');
+    lines.push('Run `/review-init-sdlc` to create tailored review dimensions for this project.');
     return lines.join('\n');
   }
 

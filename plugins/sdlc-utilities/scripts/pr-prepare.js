@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * pr-prepare.js
- * Pre-computes all data needed for the sdlc-creating-pull-requests skill:
+ * Pre-computes all data needed for the pr-sdlc skill:
  * git state, remote sync, PR mode detection, commit history, diff, JIRA ticket.
  * Outputs JSON to stdout so the LLM can focus solely on description generation.
  *
