@@ -182,6 +182,20 @@ These suggestions are informational during a review run. To act on them, run `/r
 
 ---
 
+## Post-Review Self-Fix
+
+After a review completes with actionable findings (verdict **CHANGES REQUESTED** or **APPROVED WITH NOTES**), the skill prompts:
+
+```text
+Would you like to address these findings? (fix / no)
+  fix — process findings and implement fixes using review-receive-sdlc
+  no  — done
+```
+
+Choosing `fix` invokes `/review-receive-sdlc`, which picks up the findings from conversation context and walks through verification, self-critique, and implementation. The prompt is skipped when the verdict is `APPROVED` (no findings to address).
+
+---
+
 ## Prerequisites
 
 - **`.claude/review-dimensions/`** — at least one dimension file must exist. Run `/review-init-sdlc` to create them.
@@ -201,3 +215,4 @@ These suggestions are informational during a review run. To act on them, run `/r
 
 - [`/review-init-sdlc`](review-init-sdlc.md) — create review dimension files for this project
 - [`/pr-sdlc`](pr-sdlc.md) — open the PR that this skill reviews
+- [`/review-receive-sdlc`](review-receive-sdlc.md) — respond to findings produced by this review

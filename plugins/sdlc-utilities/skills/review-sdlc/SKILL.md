@@ -156,6 +156,30 @@ rm -rf {manifest.diff_dir}
 
 ---
 
+## Step 5 — Offer Self-Fix
+
+If the orchestrator's return summary contains actionable findings — verdict is
+**CHANGES REQUESTED** or **APPROVED WITH NOTES** — offer to process and fix them:
+
+```text
+Would you like to address these findings? (fix / no)
+  fix — process findings and implement fixes using review-receive-sdlc
+  no  — done
+```
+
+**Wait for explicit user response before proceeding.**
+
+**On `fix`:** The review findings are already in the conversation context.
+Invoke the `review-receive-sdlc` skill. It will read the findings from context
+and walk through verification, evaluation, self-critique, and implementation.
+
+**On `no`:** Stop. Done.
+
+**If verdict is `APPROVED`** (zero actionable findings): skip this step entirely —
+do not offer self-fix when there is nothing to fix.
+
+---
+
 ## Gotchas
 
 - **Large manifest output**: `review-prepare.js` can produce a large JSON manifest on repos with
