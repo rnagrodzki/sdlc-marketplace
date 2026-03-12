@@ -30,6 +30,20 @@ Glob with the default path (cwd). Use the same approach for EXAMPLES.md.
 
 ## Workflow
 
+### Step 0 — Pre-flight Checks
+
+**Validate git state:**
+
+```bash
+git rev-parse --is-inside-work-tree
+```
+
+If not inside a git repository, stop with:
+
+```text
+This skill must be run from inside a git repository.
+```
+
 ### Step 1 (SCAN) — Analyze Project Tech Stack
 
 Use Glob to discover and then Read in parallel to collect signals. Do NOT read entire

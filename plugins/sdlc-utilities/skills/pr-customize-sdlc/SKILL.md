@@ -19,6 +19,33 @@ None — this skill takes no arguments.
 
 ## Workflow
 
+### Step 0 — Pre-flight Checks
+
+**Validate git state:**
+
+```bash
+git rev-parse --is-inside-work-tree
+```
+
+If not inside a git repository, stop with:
+
+```text
+This skill must be run from inside a git repository.
+```
+
+**Check for existing template:**
+
+```bash
+test -f .claude/pr-template.md && echo "exists" || echo "not-found"
+```
+
+If the file exists, inform the user:
+
+```text
+A PR template already exists at .claude/pr-template.md.
+The skill will help you review and update it.
+```
+
 ### Step 1 (SCAN) — Gather Project Signals
 
 Run these checks in parallel to collect signals that will inform the template proposal.
