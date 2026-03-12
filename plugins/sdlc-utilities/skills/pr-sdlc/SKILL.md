@@ -107,6 +107,12 @@ rm -f "$PR_CONTEXT_FILE"
 **If `PR_CONTEXT_JSON.warnings` is non-empty**, show the warnings to the user before continuing.
 Ask them to confirm if they want to proceed (particularly for uncommitted changes).
 
+**If `PR_CONTEXT_JSON.ghAuth` is not null**, inform the user before continuing (no confirmation needed):
+
+```text
+GitHub account switched: now using "<account>" (was "<previousAccount>")
+```
+
 ### Step 1: Consume the Context
 
 Read `PR_CONTEXT_JSON` now.
@@ -119,6 +125,7 @@ Key fields available (including `customTemplate` added for project-level PR temp
 | `baseBranch` | The target base branch |
 | `currentBranch` | The branch being PR'd |
 | `isDraft` | Whether to create a draft PR |
+| `ghAuth` | `{ switched, account, previousAccount }` or `null` — GitHub account switch result |
 | `existingPr` | `{ number, title, url, state }` or `null` |
 | `jiraTicket` | Detected ticket reference or `null` |
 | `commits` | `[{ hash, subject, body, coAuthors }]` — all commits on this branch |
@@ -245,7 +252,8 @@ Pull request updated: <url>
 The GitHub CLI (gh) could not complete the operation. You can:
   1. Install gh: https://cli.github.com/
   2. Authenticate: gh auth login
-  3. Create or update the PR manually — here is your generated description to copy:
+  3. If multiple accounts are configured, switch to the correct one: gh auth switch
+  4. Create or update the PR manually — here is your generated description to copy:
 
 Title: <title>
 
@@ -290,6 +298,15 @@ Title: <title>
   exists before defaulting to the 8-section template. If the file exists, read it directly and
   use it as the template, then warn the user that the installed plugin may be out of date and
   suggest re-installing (`/plugin install sdlc@sdlc-marketplace`).
+
+- **Multiple GitHub accounts — auto-switch may pick the wrong account for team repos**: The
+  skill detects the correct `gh` account using two phases: first it matches the account login
+  against the remote repository owner name (fast, works for personal repos), then it tests API
+  access per account (fallback, handles org repos). If you're a collaborator on a repo owned by
+  a third party (not your org or personal account), the auto-detection may not find a match and
+  falls back to the currently active account with a warning. In that case, run
+  `gh auth switch --user <login>` manually before invoking the skill. The switch persists for
+  subsequent commands.
 
 ## Learning Capture
 

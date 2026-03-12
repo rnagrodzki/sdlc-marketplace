@@ -36,6 +36,7 @@ const {
   getCommitsStructured,
   getDiffStat,
   getDiffContent,
+  ensureGhAccount,
 } = require('./lib/git');
 
 // ---------------------------------------------------------------------------
@@ -170,6 +171,12 @@ function main() {
     }
   }
 
+  // Step 5b: Ensure the correct GitHub account is active for this repo
+  const ghAuth = ensureGhAccount(projectRoot);
+  if (ghAuth.warning) {
+    warnings.push(ghAuth.warning);
+  }
+
   // Step 6: Check remote state and push if needed
   const remoteInfo = getRemoteState(projectRoot);
   let remoteAction = 'none';
@@ -233,6 +240,9 @@ function main() {
     baseBranch,
     currentBranch,
     isDraft,
+    ghAuth: ghAuth.switched
+      ? { switched: true, account: ghAuth.account, previousAccount: ghAuth.previousAccount }
+      : null,
     existingPr: prMeta.exists
       ? { number: prMeta.number, title: prMeta.title, url: prMeta.url, state: prMeta.state }
       : null,

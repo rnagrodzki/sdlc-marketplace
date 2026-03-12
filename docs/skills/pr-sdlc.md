@@ -102,9 +102,24 @@ Run `/pr-customize-sdlc` to create or edit the template interactively.
 
 ---
 
+## GitHub Multi-Account Support
+
+When multiple `gh` CLI accounts are authenticated, the skill automatically detects the correct account for the current repository and switches to it before creating or updating the PR.
+
+Detection is two-phase:
+
+1. **Owner match** (fast): If an account login matches the repository owner name, the skill switches to that account.
+2. **API access test** (fallback): If no login matches the owner (e.g., org repos), each authenticated account is tested for API access to the repository. The first account with access is selected.
+
+If a switch occurs, the skill notifies you: `GitHub account switched: now using "work-account" (was "personal-account")`. The switch persists for subsequent `gh` commands. If no matching account is found, the skill continues with the currently active account and displays a warning.
+
+To override manually: `gh auth switch --user <login>` before running the skill.
+
+---
+
 ## Prerequisites
 
-- **`gh` CLI** — required to open or update the PR (`gh auth login`). Falls back to printing the description for manual use if unavailable.
+- **`gh` CLI** — required to open or update the PR (`gh auth login`). Falls back to printing the description for manual use if unavailable. Multiple authenticated accounts are handled automatically.
 - **Active branch with commits** — the skill diffs against the target base branch.
 
 ---

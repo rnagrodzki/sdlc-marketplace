@@ -5,7 +5,8 @@
  *
  * Exports (shared — used by review-prepare.js and pr-prepare.js):
  *   exec, checkGitState, detectBaseBranch, getChangedFiles,
- *   getCommitLog, getCommitCount, fetchPrMetadata
+ *   getCommitLog, getCommitCount, fetchPrMetadata,
+ *   parseRemoteOwner, getGhAccounts, ensureGhAccount
  *
  * Exports (PR-specific — used by pr-prepare.js only):
  *   getRemoteState, pushToRemote, getCommitsStructured,
@@ -138,6 +139,136 @@ function fetchPrMetadata() {
   } catch (_) {
     return { exists: false };
   }
+}
+
+// ---------------------------------------------------------------------------
+// GitHub account switching (shared — used by pr-prepare.js and review-prepare.js)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the git remote URL to extract host, owner, and repo name.
+ * Supports SSH format (git@host:owner/repo.git) and HTTPS (https://host/owner/repo.git).
+ * @param {string} projectRoot
+ * @returns {{ host: string, owner: string, repo: string } | null}
+ */
+function parseRemoteOwner(projectRoot) {
+  const url = exec('git remote get-url origin', { cwd: projectRoot });
+  if (!url) return null;
+
+  // SSH: git@github.com:owner/repo.git
+  const sshMatch = url.match(/^git@([^:]+):([^/]+)\/(.+?)(?:\.git)?$/);
+  if (sshMatch) {
+    return { host: sshMatch[1], owner: sshMatch[2], repo: sshMatch[3] };
+  }
+
+  // HTTPS: https://github.com/owner/repo.git
+  const httpsMatch = url.match(/^https?:\/\/([^/]+)\/([^/]+)\/(.+?)(?:\.git)?$/);
+  if (httpsMatch) {
+    return { host: httpsMatch[1], owner: httpsMatch[2], repo: httpsMatch[3] };
+  }
+
+  return null;
+}
+
+/**
+ * Return all authenticated gh accounts for a given host.
+ * @param {string} host  e.g. "github.com"
+ * @returns {{ accounts: Array<{ login: string, active: boolean }>, error: string|null }}
+ */
+function getGhAccounts(host) {
+  const raw = exec('gh auth status --json hosts');
+  if (!raw) return { accounts: [], error: null }; // gh not installed — silent skip
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (_) {
+    return { accounts: [], error: 'Could not parse gh auth status output' };
+  }
+
+  const hostEntries = parsed.hosts && parsed.hosts[host];
+  if (!Array.isArray(hostEntries) || hostEntries.length === 0) {
+    return { accounts: [], error: null };
+  }
+
+  const accounts = hostEntries
+    .filter(e => e.state === 'success')
+    .map(e => ({ login: e.login, active: Boolean(e.active) }));
+
+  return { accounts, error: null };
+}
+
+/**
+ * Ensure the active gh account is the correct one for the current repository.
+ * Uses two-phase matching:
+ *   Phase 1 (fast): Match account login against the remote owner name.
+ *   Phase 2 (fallback): Test API access per account (handles org repos).
+ *
+ * The switch persists beyond this call — it changes the global gh CLI active account.
+ *
+ * @param {string} projectRoot
+ * @returns {{ switched: boolean, account: string|null, previousAccount: string|null, warning: string|null }}
+ */
+function ensureGhAccount(projectRoot) {
+  const noOp = { switched: false, account: null, previousAccount: null, warning: null };
+
+  const remote = parseRemoteOwner(projectRoot);
+  if (!remote) return noOp; // no origin remote, nothing to do
+
+  const { host, owner, repo } = remote;
+  const { accounts, error } = getGhAccounts(host);
+
+  if (error) return { ...noOp, warning: `GitHub account detection failed: ${error}` };
+  if (accounts.length <= 1) return noOp; // single or no accounts — nothing to switch
+
+  const activeAccount = accounts.find(a => a.active);
+  if (!activeAccount) return noOp;
+
+  // Phase 1: Fast owner match (covers personal repos)
+  const ownerLower = owner.toLowerCase();
+  if (activeAccount.login.toLowerCase() === ownerLower) return noOp; // already correct
+
+  const matchingAccount = accounts.find(a => !a.active && a.login.toLowerCase() === ownerLower);
+  if (matchingAccount) {
+    const switchResult = exec(`gh auth switch --user ${matchingAccount.login}`);
+    if (switchResult !== null || exec('gh auth status --active') !== null) {
+      return {
+        switched: true,
+        account: matchingAccount.login,
+        previousAccount: activeAccount.login,
+        warning: null,
+      };
+    }
+    // switch command failed — fall through to phase 2
+  }
+
+  // Phase 2: API access test (covers org repos where login !== owner)
+  const apiPath = `repos/${owner}/${repo}`;
+
+  // Test active account first — maybe it has access despite not matching the name
+  const activeHasAccess = exec(`gh api ${apiPath} --silent 2>/dev/null`, { shell: true });
+  if (activeHasAccess !== null) return noOp; // active account works, no switch needed
+
+  // Try each other account
+  for (const candidate of accounts.filter(a => !a.active)) {
+    exec(`gh auth switch --user ${candidate.login}`);
+    const hasAccess = exec(`gh api ${apiPath} --silent 2>/dev/null`, { shell: true });
+    if (hasAccess !== null) {
+      return {
+        switched: true,
+        account: candidate.login,
+        previousAccount: activeAccount.login,
+        warning: null,
+      };
+    }
+  }
+
+  // No account worked — restore original and warn
+  exec(`gh auth switch --user ${activeAccount.login}`);
+  return {
+    ...noOp,
+    warning: `No authenticated gh account has access to ${owner}/${repo}. Run "gh auth switch" to select the correct account manually.`,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -323,6 +454,9 @@ module.exports = {
   getCommitLog,
   getCommitCount,
   fetchPrMetadata,
+  parseRemoteOwner,
+  getGhAccounts,
+  ensureGhAccount,
   // PR-specific
   getRemoteState,
   pushToRemote,

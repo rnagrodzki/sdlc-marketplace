@@ -38,6 +38,7 @@ const {
   getCommitLog,
   getCommitCount,
   fetchPrMetadata,
+  ensureGhAccount,
 } = require('./lib/git');
 
 // ---------------------------------------------------------------------------
@@ -526,6 +527,13 @@ function main() {
   // Plan critique and refinement
   const critique = critiquePlan(dims, changedFiles);
   const queued   = refinePlan(dims);
+
+  // Ensure correct GitHub account before any gh commands (branch-based scopes only)
+  if (!isLocalScope) {
+    const ghAuth = ensureGhAccount(projectRoot);
+    if (ghAuth.warning) process.stderr.write(`Warning: ${ghAuth.warning}\n`);
+    if (ghAuth.switched) process.stderr.write(`Switched GitHub account to "${ghAuth.account}" (was "${ghAuth.previousAccount}")\n`);
+  }
 
   // PR metadata only relevant for branch-based scopes
   const pr = !isLocalScope ? fetchPrMetadata() : { exists: false };
