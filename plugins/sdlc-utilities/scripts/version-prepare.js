@@ -2,9 +2,9 @@
 /**
  * version-prepare.js
  *
- * Pre-processing script for the /sdlc:version command.
+ * Pre-processing script for the /version-sdlc command.
  * Collects version source, git tags, commits since last tag, and remote state
- * into a single JSON blob consumed by the sdlc-versioning-releases skill.
+ * into a single JSON blob consumed by the version-sdlc skill.
  *
  * Usage:
  *   node version-prepare.js [major|minor|patch] [--init] [--pre <label>]
@@ -240,7 +240,7 @@ async function main() {
   }
 
   if (!config) {
-    errors.push('No version config found. Run /sdlc:version --init to set up versioning for this project.');
+    errors.push('No version config found. Run /version-sdlc --init to set up versioning for this project.');
     output({ flow: 'release', errors, warnings }, 1);
     return;
   }

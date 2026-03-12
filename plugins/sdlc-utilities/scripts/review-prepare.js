@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * review-prepare.js
- * Pre-computes all data needed for the sdlc-reviewing-changes skill:
+ * Pre-computes all data needed for the review-sdlc skill:
  * git state, changed files, dimension matching, diff splitting,
  * commit context, PR metadata. Outputs JSON manifest + per-dimension
  * .diff files to a temp directory.
@@ -503,7 +503,7 @@ function main() {
 
   const dims = loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter);
   if (dims.length === 0) {
-    process.stderr.write('No review dimensions found in .claude/review-dimensions/.\nRun /sdlc:review-init to create tailored review dimensions.\n');
+    process.stderr.write('No review dimensions found in .claude/review-dimensions/.\nRun /review-init-sdlc to create tailored review dimensions.\n');
     process.exit(1);
   }
 
