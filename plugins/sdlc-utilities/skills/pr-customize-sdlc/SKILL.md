@@ -207,8 +207,8 @@ After the user accepts:
    ```text
    Written to .claude/pr-template.md
 
-   This template will be used by /sdlc:pr for all future PRs on this project.
-   To update it, run /sdlc:pr-customize again.
+   This template will be used by /pr-sdlc for all future PRs on this project.
+   To update it, run /pr-customize-sdlc again.
    ```
 
 ---
@@ -253,5 +253,5 @@ Log to `.claude/learnings/log.md` when:
 
 ## See Also
 
-- `sdlc-creating-pull-requests/SKILL.md` — uses the template written by this skill
+- `pr-sdlc/SKILL.md` — uses the template written by this skill
 - `scripts/validate-pr-template.js` — validates the template format

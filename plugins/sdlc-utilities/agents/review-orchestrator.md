@@ -13,7 +13,7 @@ the user's main context stays clean.
 ## Inputs (provided in your prompt)
 
 - **MANIFEST_JSON**: The full JSON from `review-prepare.js`
-- **REFERENCE_MD_PATH**: Absolute path to `sdlc-reviewing-changes/REFERENCE.md` (resolved by the calling skill)
+- **REFERENCE_MD_PATH**: Absolute path to `review-sdlc/REFERENCE.md` (resolved by the calling skill)
 
 ## Step 1 — Parse Manifest and Present Plan
 
@@ -56,7 +56,7 @@ Suggested new dimensions for uncovered files:
 
   ...
 
-Run `/sdlc:review-init --add` to create these dimensions.
+Run `/review-init-sdlc --add` to create these dimensions.
 ```
 
 If `plan_critique.still_uncovered` is non-empty (files that could not be mapped to any known dimension type), display:
@@ -179,7 +179,7 @@ No PR found. Options:
   3. Keep in terminal only (already shown)
 ```
 
-For option 1: invoke the `sdlc-creating-pull-requests` skill (`sdlc:sdlc-creating-pull-requests`)
+For option 1: invoke the `pr-sdlc` skill
 in draft mode, wait for the PR to be created, then post the consolidated review
 comment to the new PR using the `gh api` command above.
 

@@ -117,7 +117,7 @@ Display:
 ✓ .claude/version.json written.
 ✓ .github/workflows/retag-release.yml added (auto-fixes tags after squash merge to main).
 ✓ .github/scripts/retag-release.js added.
-Run /sdlc:version patch to create your first release.
+Run /version-sdlc patch to create your first release.
 ```
 
 If a file was skipped because it already existed, show `(already exists — skipped)` instead of `added`.
@@ -329,7 +329,7 @@ If `flags.hotfix === true`, show instead:
 After completing a release or encountering unexpected behavior, append to `.claude/learnings/log.md`:
 
 ```
-## YYYY-MM-DD — sdlc-versioning-releases: <brief summary>
+## YYYY-MM-DD — version-sdlc: <brief summary>
 <what happened, what was learned>
 ```
 
