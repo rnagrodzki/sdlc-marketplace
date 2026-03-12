@@ -34,16 +34,16 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 
 ---
 
-## Commands
+## Skills
 
-| Command | Description |
+| Skill | Description |
 | --- | --- |
-| [`/sdlc:pr`](docs/commands/pr.md) | Create a PR with an auto-generated structured description |
-| [`/sdlc:pr-customize`](docs/commands/pr-customize.md) | Create or edit a project-specific PR template interactively |
-| [`/sdlc:review`](docs/commands/review.md) | Run multi-dimension code review on the current branch |
-| [`/sdlc:review-init`](docs/commands/review-init.md) | Scan the project and create tailored review dimension files |
-| [`/sdlc:version`](docs/commands/version.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
-| [`/sdlc:plugin-check`](docs/commands/plugin-check.md) | Validate the plugin discovery chain (manifests, commands, skills, hooks) |
+| [`/pr-sdlc`](docs/skills/pr-sdlc.md) | Create a PR with an auto-generated structured description |
+| [`/pr-customize-sdlc`](docs/skills/pr-customize-sdlc.md) | Create or edit a project-specific PR template interactively |
+| [`/review-sdlc`](docs/skills/review-sdlc.md) | Run multi-dimension code review on the current branch |
+| [`/review-init-sdlc`](docs/skills/review-init-sdlc.md) | Scan the project and create tailored review dimension files |
+| [`/version-sdlc`](docs/skills/version-sdlc.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
+| [`/plugin-check-sdlc`](docs/skills/plugin-check-sdlc.md) | Validate the plugin discovery chain (manifests, skills, hooks) |
 
 ---
 
@@ -55,7 +55,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | [Architecture](docs/architecture.md) | Repository structure, plugin system, name resolution |
 | [Plugin Installation](docs/plugin-installation.md) | How plugins are installed, discovered, and resolved at runtime |
 | [Adding Skills](docs/adding-skills.md) | Create custom skills for your project |
-| [Adding Commands](docs/adding-commands.md) | Create custom slash commands |
+| [Adding Commands](docs/adding-commands.md) | Create custom slash commands (legacy — prefer skills) |
 | [Adding Hooks](docs/adding-hooks.md) | Set up automated actions on session events |
 
 ## Troubleshooting

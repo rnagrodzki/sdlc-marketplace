@@ -2,13 +2,13 @@
 
 `sdlc-utilities` automates common SDLC tasks. See the [README](../README.md) for installation.
 
-## Commands
+## Skills
 
-| Command | Description |
+| Skill | Description |
 | --- | --- |
-| [`/sdlc:pr`](commands/pr.md) | Create a PR with an auto-generated structured description |
-| [`/sdlc:pr-customize`](commands/pr-customize.md) | Create or edit a project-specific PR template interactively |
-| [`/sdlc:review`](commands/review.md) | Run multi-dimension code review on the current branch |
-| [`/sdlc:review-init`](commands/review-init.md) | Scan the project and create tailored review dimension files |
-| [`/sdlc:version`](commands/version.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
-| [`/sdlc:plugin-check`](commands/plugin-check.md) | Validate the plugin discovery chain — manifests, commands, skills, scripts, hooks, and agents |
+| [`/pr-sdlc`](skills/pr-sdlc.md) | Create a PR with an auto-generated structured description |
+| [`/pr-customize-sdlc`](skills/pr-customize-sdlc.md) | Create or edit a project-specific PR template interactively |
+| [`/review-sdlc`](skills/review-sdlc.md) | Run multi-dimension code review on the current branch |
+| [`/review-init-sdlc`](skills/review-init-sdlc.md) | Scan the project and create tailored review dimension files |
+| [`/version-sdlc`](skills/version-sdlc.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
+| [`/plugin-check-sdlc`](skills/plugin-check-sdlc.md) | Validate the plugin discovery chain — manifests, skills, scripts, hooks, and agents |

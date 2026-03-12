@@ -1,15 +1,15 @@
-# `/sdlc:review-init` — Review Dimension Setup
+# `/review-init-sdlc` — Review Dimension Setup
 
 ## Overview
 
-Scans the project's tech stack, dependencies, and file structure, then proposes and creates tailored review dimension files in `.claude/review-dimensions/`. Each dimension file defines a lens (security, API contracts, test coverage, etc.) that `/sdlc:review` uses to focus its analysis. Covers 31 dimension types across technical code concerns, pipeline/config/docs review, project architecture patterns, and more. Run once per project, then use `--add` to expand as the codebase evolves.
+Scans the project's tech stack, dependencies, and file structure, then proposes and creates tailored review dimension files in `.claude/review-dimensions/`. Each dimension file defines a lens (security, API contracts, test coverage, etc.) that `/review-sdlc` uses to focus its analysis. Covers 31 dimension types across technical code concerns, pipeline/config/docs review, project architecture patterns, and more. Run once per project, then use `--add` to expand as the codebase evolves.
 
 ---
 
 ## Usage
 
 ```text
-/sdlc:review-init
+/review-init-sdlc
 ```
 
 ---
@@ -28,7 +28,7 @@ Scans the project's tech stack, dependencies, and file structure, then proposes 
 ### Initial setup
 
 ```text
-/sdlc:review-init
+/review-init-sdlc
 ```
 
 ```text
@@ -77,10 +77,10 @@ Generated Copilot instruction files:
 ### Add dimensions to an existing setup
 
 ```text
-/sdlc:review-init --add
+/review-init-sdlc --add
 ```
 
-Proposes only dimensions not yet present in `.claude/review-dimensions/`. In `--add` mode, the command also runs `review-prepare.js` on the current branch and uses any `uncovered_suggestions` (files not covered by installed dimensions) as additional evidence for proposals — citing the specific files found.
+Proposes only dimensions not yet present in `.claude/review-dimensions/`. In `--add` mode, the skill also runs `review-prepare.js` on the current branch and uses any `uncovered_suggestions` (files not covered by installed dimensions) as additional evidence for proposals — citing the specific files found.
 
 ---
 
@@ -178,7 +178,7 @@ Proposes only dimensions not yet present in `.claude/review-dimensions/`. In `--
 
 ## Prerequisites
 
-- **Git repository** — the command scans the project structure and git history.
+- **Git repository** — the skill scans the project structure and git history.
 
 ---
 
@@ -186,7 +186,7 @@ Proposes only dimensions not yet present in `.claude/review-dimensions/`. In `--
 
 | File / Artifact                          | Description                                                                  |
 |------------------------------------------|------------------------------------------------------------------------------|
-| `.claude/review-dimensions/*.md`         | One file per dimension, used by `/sdlc:review`                               |
+| `.claude/review-dimensions/*.md`         | One file per dimension, used by `/review-sdlc`                               |
 | `.github/instructions/*.instructions.md` | GitHub Copilot path-specific review instructions (opt-in, one per dimension) |
 
 ---
@@ -311,6 +311,6 @@ Use `--no-copilot` to skip this prompt if you manage Copilot instructions separa
 
 ---
 
-## Related Commands
+## Related Skills
 
-- [`/sdlc:review`](review.md) — run the review using dimension files created by this command
+- [`/review-sdlc`](review-sdlc.md) — run the review using dimension files created by this skill

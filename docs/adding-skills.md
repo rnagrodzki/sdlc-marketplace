@@ -17,13 +17,16 @@ Choose a directory name that makes the skill's purpose immediately obvious. Two 
 are used in this repo — pick the one that fits the plugin's naming style:
 
 - **Prefix pattern** (used by `aisa` skills): `<plugin-prefix>-<noun>`, e.g., `aisa-init`, `aisa-evolve-health`
-- **Prefix pattern** (used by `sdlc` skills): `sdlc-<verb>-ing-<noun>`, e.g., `sdlc-creating-pull-requests`
+- **Suffix pattern** (used by `sdlc` skills): `<action-verb>-sdlc`, e.g., `pr-sdlc`, `review-sdlc`, `version-sdlc`
+
+The `-sdlc` suffix convention for this plugin puts the action word first (making the `/` menu
+scannable) and appends `-sdlc` for disambiguation in a user's combined namespace of project
+skills and plugin skills.
 
 Use lowercase and hyphens only. Avoid vague names (`setup`, `utils`) — names should be specific.
 
-> **Name resolution:** When loaded from a marketplace plugin, skills are referenced as
-> `<plugin-name>:<skill-name>` (e.g., `aisa:aisa-init`). The plugin name
-> comes from the `name` field in `plugin.json`.
+> **Name resolution:** User-invocable skills are callable directly by their directory name with
+> no prefix. A skill in `skills/pr-sdlc/` is invoked as `/pr-sdlc`.
 
 ### Step 2: Create SKILL.md
 
@@ -82,10 +85,10 @@ See `./checklist.md` for the full verification checklist.
 
 | Rule | Limit |
 |---|---|
-| `name` field | Lowercase, hyphens only, max 64 chars. Use prefix or gerund pattern (see above). |
+| `name` field | Lowercase, hyphens only, max 64 chars. Use prefix or action-suffix pattern (see above). |
 | `description` field | Maximum 1024 characters |
 | `SKILL.md` content | Maximum 500 lines |
-| `user-invokable` field | Set to `false` to hide the skill from the `/` menu. Use for skills that have a corresponding slash command as their entry point — the command handles argument parsing and preparation before delegating to the skill. Claude can still invoke the skill automatically; only user-initiated invocation via `/` is suppressed. |
+| `user-invocable` field | Set to `true` to expose the skill in the `/` menu so users can invoke it directly (e.g., `/pr-sdlc`). Set to `false` (or omit) for internal skills invoked only by Claude automatically or by other skills. The skills-primary model favors `user-invocable: true` — skills own argument parsing and preparation directly. |
 
 ## Writing Effective Descriptions
 

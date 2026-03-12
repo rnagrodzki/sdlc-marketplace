@@ -1,15 +1,15 @@
-# `/sdlc:pr-customize` — PR Template Setup
+# `/pr-customize-sdlc` — PR Template Setup
 
 ## Overview
 
-Guides you through creating or editing a project-specific PR description template. Scans your project for conventions (existing GitHub PR templates, recent PR patterns, JIRA usage), proposes a tailored starter, then lets you customize it interactively. The result is saved to `.claude/pr-template.md` and used automatically by `/sdlc:pr`.
+Guides you through creating or editing a project-specific PR description template. Scans your project for conventions (existing GitHub PR templates, recent PR patterns, JIRA usage), proposes a tailored starter, then lets you customize it interactively. The result is saved to `.claude/pr-template.md` and used automatically by `/pr-sdlc`.
 
 ---
 
 ## Usage
 
 ```text
-/sdlc:pr-customize
+/pr-customize-sdlc
 ```
 
 No flags.
@@ -21,7 +21,7 @@ No flags.
 ### Create a template for the first time
 
 ```text
-/sdlc:pr-customize
+/pr-customize-sdlc
 ```
 
 ```text
@@ -47,18 +47,18 @@ Does this look right? (yes / edit sections / start fresh)
 > yes
 
 ✓ Written: .claude/pr-template.md
-  /sdlc:pr will use this template for all future PRs on this project.
+  /pr-sdlc will use this template for all future PRs on this project.
 ```
 
 ### Edit an existing template
 
-Running `/sdlc:pr-customize` again when `.claude/pr-template.md` exists opens the existing template for editing rather than starting over.
+Running `/pr-customize-sdlc` again when `.claude/pr-template.md` exists opens the existing template for editing rather than starting over.
 
 ---
 
 ## Prerequisites
 
-- **Git repository** — the command scans commits and project files.
+- **Git repository** — the skill scans commits and project files.
 - No additional tools required.
 
 ---
@@ -67,7 +67,7 @@ Running `/sdlc:pr-customize` again when `.claude/pr-template.md` exists opens th
 
 | File / Artifact | Description |
 |-----------------|-------------|
-| `.claude/pr-template.md` | Project PR template used by `/sdlc:pr` |
+| `.claude/pr-template.md` | Project PR template used by `/pr-sdlc` |
 
 ---
 
@@ -91,6 +91,6 @@ A PR template is a plain markdown file with `## Section` headings. Text under ea
 
 ---
 
-## Related Commands
+## Related Skills
 
-- [`/sdlc:pr`](pr.md) — uses `.claude/pr-template.md` when present
+- [`/pr-sdlc`](pr-sdlc.md) — uses `.claude/pr-template.md` when present

@@ -1,4 +1,4 @@
-# `/sdlc:version` — Semantic Versioning & Release Management
+# `/version-sdlc` — Semantic Versioning & Release Management
 
 ## Overview
 
@@ -9,7 +9,7 @@ Manages the full semantic release workflow: detects the version source, bumps th
 ## Usage
 
 ```text
-/sdlc:version [major|minor|patch] [flags]
+/version-sdlc [major|minor|patch] [flags]
 ```
 
 ---
@@ -32,7 +32,7 @@ Manages the full semantic release workflow: detects the version source, bumps th
 ### First-time setup (run once per project)
 
 ```text
-/sdlc:version --init
+/version-sdlc --init
 ```
 
 ```text
@@ -52,28 +52,28 @@ Does this look right? (yes / tag-only / changelog / cancel)
 ### Bump the version
 
 ```text
-/sdlc:version patch          # 1.2.3 → 1.2.4
-/sdlc:version minor          # 1.2.3 → 1.3.0
-/sdlc:version major          # 1.2.3 → 2.0.0
-/sdlc:version                # auto-detect bump type from conventional commits
+/version-sdlc patch          # 1.2.3 → 1.2.4
+/version-sdlc minor          # 1.2.3 → 1.3.0
+/version-sdlc major          # 1.2.3 → 2.0.0
+/version-sdlc                # auto-detect bump type from conventional commits
 ```
 
 ### Release with a CHANGELOG entry
 
 ```text
-/sdlc:version minor --changelog
+/version-sdlc minor --changelog
 ```
 
 ### Tag locally without pushing
 
 ```text
-/sdlc:version patch --no-push
+/version-sdlc patch --no-push
 ```
 
 ### Hotfix release (DORA metrics tracking)
 
 ```text
-/sdlc:version patch --hotfix
+/version-sdlc patch --hotfix
 ```
 
 ```text
@@ -99,16 +99,16 @@ Proceed? (yes / edit / cancel)
 ### Pre-release workflow
 
 ```text
-/sdlc:version minor --pre beta    # 1.2.3 → 1.3.0-beta.1
-/sdlc:version --pre beta          # 1.3.0-beta.1 → 1.3.0-beta.2
-/sdlc:version --pre rc            # 1.3.0-beta.2 → 1.3.0-rc.1  (label change resets counter)
-/sdlc:version minor               # 1.3.0-rc.1 → 1.3.0         (graduate to release)
+/version-sdlc minor --pre beta    # 1.2.3 → 1.3.0-beta.1
+/version-sdlc --pre beta          # 1.3.0-beta.1 → 1.3.0-beta.2
+/version-sdlc --pre rc            # 1.3.0-beta.2 → 1.3.0-rc.1  (label change resets counter)
+/version-sdlc minor               # 1.3.0-rc.1 → 1.3.0         (graduate to release)
 ```
 
 ### Example release session
 
 ```text
-/sdlc:version minor
+/version-sdlc minor
 ```
 
 ```text
@@ -268,6 +268,6 @@ Auto-detected in this priority order:
 
 ---
 
-## Related Commands
+## Related Skills
 
-- [`/sdlc:pr`](pr.md) — open the PR before or after tagging a release
+- [`/pr-sdlc`](pr-sdlc.md) — open the PR before or after tagging a release

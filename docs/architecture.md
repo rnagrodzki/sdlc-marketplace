@@ -20,12 +20,10 @@ sdlc-marketplace/
 │       ├── .claude-plugin/
 │       │   └── plugin.json       # Plugin manifest (name: "sdlc")
 │       ├── agents/               # Agent definitions (orchestrators spawned by skills)
-│       ├── skills/               # Skill definitions
+│       ├── skills/               # Skill definitions (user-invocable skills appear in the / menu)
 │       │   └── <skill-name>/
 │       │       ├── SKILL.md      # Skill entry point (YAML frontmatter + instructions)
 │       │       └── *.md          # Optional supporting files
-│       ├── commands/             # Slash command definitions
-│       │   └── <command>.md      # Command file (YAML frontmatter + instructions)
 │       ├── hooks/
 │       │   └── hooks.json        # Hook configuration
 │       └── scripts/
@@ -63,25 +61,24 @@ Each plugin has its own `.claude-plugin/plugin.json` that declares:
 
 ### Name Resolution
 
-When a plugin is loaded from a marketplace, Claude Code prefixes all commands and skills
-with the plugin's `name` (from `plugin.json`), using the format `<plugin-name>:<item-name>`.
+When a plugin is loaded from a marketplace, Claude Code installs skills so that
+user-invocable skills are callable directly by their directory name — with **no prefix**.
 
-**Commands** — invoked as `/<plugin-name>:<command-name>`:
+**Skills** — a skill named `pr-sdlc` in `skills/pr-sdlc/` is invoked as `/pr-sdlc`:
 
-| File                | `plugin.json` `name` | Resolved command    |
-|---------------------|----------------------|---------------------|
-| `commands/pr.md`    | `sdlc`               | `/sdlc:pr`          |
-| `commands/review.md`| `sdlc`               | `/sdlc:review`      |
+| Directory             | Invocation        |
+|-----------------------|-------------------|
+| `skills/pr-sdlc/`     | `/pr-sdlc`        |
+| `skills/review-sdlc/` | `/review-sdlc`    |
+| `skills/version-sdlc/`| `/version-sdlc`   |
 
-**Skills** — referenced as `<plugin-name>:<skill-name>`:
+The `-sdlc` suffix on each skill name provides disambiguation: action word first,
+`-sdlc` suffix ensures the skill is identifiable in a user's combined skill namespace
+(project skills + plugin skills). Use the pattern `<action>-sdlc` for all skills in
+this plugin.
 
-| Directory                                   | `plugin.json` `name` | Resolved name                            |
-|---------------------------------------------|----------------------|------------------------------------------|
-| `skills/sdlc-creating-pull-requests/`       | `sdlc`               | `sdlc:sdlc-creating-pull-requests`       |
-| `skills/sdlc-reviewing-changes/`            | `sdlc`               | `sdlc:sdlc-reviewing-changes`            |
-
-The `name` field in `plugin.json` is the namespace prefix — **not** the directory name. Keep it
-stable — renaming it changes every command and skill name for all installed users.
+The `name` field in `plugin.json` is a plugin identifier used for marketplace/update
+operations — **not** the prefix for skill invocations. Keep it stable.
 
 ### Skills
 
@@ -92,19 +89,25 @@ contain a `SKILL.md` file with YAML frontmatter:
 ---
 name: skill-name
 description: "When Claude should invoke this skill (max 1024 characters)"
+user-invocable: true
 ---
 ```
 
 The `description` field is critical — Claude uses it to decide when to activate the
 skill. Write it as a trigger condition, not a summary.
 
+Set `user-invocable: true` to make the skill appear in the `/` menu so users can invoke
+it directly (e.g., `/pr-sdlc`). Set it to `false` for internal skills that should only
+be invoked by Claude automatically or by other skills — not by users directly.
+
 Supporting files (`.md` templates, checklists, scripts) live alongside `SKILL.md` in
 the same directory. Reference them with relative paths like `./supporting-file.md`.
 
-### Commands
+### Commands (legacy)
 
 Commands are `.md` files under `plugins/<plugin>/commands/`. The filename (without `.md`)
-becomes the slash command name. Each file has YAML frontmatter:
+becomes the slash command name, prefixed with the plugin name. Each file has YAML
+frontmatter:
 
 ```yaml
 ---
@@ -113,7 +116,9 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 ---
 ```
 
-For example, `commands/pr.md` creates the `/pr` command (resolved to `/sdlc:pr`).
+**The skills-primary model is preferred.** New functionality should be added as skills
+with `user-invocable: true` rather than as commands. Commands remain supported for
+backwards compatibility but are no longer the recommended entry point.
 
 ### Hooks
 
@@ -141,4 +146,4 @@ To add another plugin to this marketplace:
    }
    ```
 
-3. Follow the same structure: `skills/`, `commands/`, `hooks/` (and optionally `scripts/`)
+3. Follow the same structure: `skills/`, `hooks/` (and optionally `scripts/`, `commands/`)
