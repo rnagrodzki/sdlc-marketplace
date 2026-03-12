@@ -1,4 +1,4 @@
-# `/sdlc:pr` — Pull Request Creation
+# `/pr-sdlc` — Pull Request Creation
 
 ## Overview
 
@@ -9,7 +9,7 @@ Analyzes all commits and the diff on the current branch, generates a structured 
 ## Usage
 
 ```text
-/sdlc:pr
+/pr-sdlc
 ```
 
 ---
@@ -29,7 +29,7 @@ Analyzes all commits and the diff on the current branch, generates a structured 
 ### Create a PR
 
 ```text
-/sdlc:pr
+/pr-sdlc
 ```
 
 Generates and displays a structured description, then prompts:
@@ -67,20 +67,20 @@ Create this PR? (yes / edit / cancel)
 ### Create a draft PR targeting a specific branch
 
 ```text
-/sdlc:pr --draft --base release/2
+/pr-sdlc --draft --base release/2
 ```
 
 ### Update an existing PR description
 
 ```text
-/sdlc:pr --update
+/pr-sdlc --update
 ```
 
 ---
 
 ## Custom PR Templates
 
-By default, `/sdlc:pr` uses an 8-section template (Summary, JIRA Ticket, Business Context, Business Benefits, Technical Design, Technical Impact, Changes Overview, Testing). Replace it with a project-specific template by creating `.claude/pr-template.md`.
+By default, `/pr-sdlc` uses an 8-section template (Summary, JIRA Ticket, Business Context, Business Benefits, Technical Design, Technical Impact, Changes Overview, Testing). Replace it with a project-specific template by creating `.claude/pr-template.md`.
 
 A template is a plain markdown file with `## Section` headings. The text under each heading is a fill instruction for the LLM:
 
@@ -98,14 +98,14 @@ A template is a plain markdown file with `## Section` headings. The text under e
 [How was this verified? Manual steps, automated tests, edge cases.]
 ```
 
-Run `/sdlc:pr-customize` to create or edit the template interactively.
+Run `/pr-customize-sdlc` to create or edit the template interactively.
 
 ---
 
 ## Prerequisites
 
 - **`gh` CLI** — required to open or update the PR (`gh auth login`). Falls back to printing the description for manual use if unavailable.
-- **Active branch with commits** — the command diffs against the target base branch.
+- **Active branch with commits** — the skill diffs against the target base branch.
 
 ---
 
@@ -117,7 +117,7 @@ Run `/sdlc:pr-customize` to create or edit the template interactively.
 
 ---
 
-## Related Commands
+## Related Skills
 
-- [`/sdlc:pr-customize`](pr-customize.md) — create or edit a project-specific PR template
-- [`/sdlc:review`](review.md) — run code review on the branch before opening the PR
+- [`/pr-customize-sdlc`](pr-customize-sdlc.md) — create or edit a project-specific PR template
+- [`/review-sdlc`](review-sdlc.md) — run code review on the branch before opening the PR

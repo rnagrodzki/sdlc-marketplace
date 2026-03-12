@@ -18,8 +18,7 @@ Each plugin lives under `plugins/<name>/` and follows the structure:
 
 ```text
 .claude-plugin/plugin.json   # Plugin manifest
-commands/                    # Slash commands (*.md)
-skills/                      # Skills (one subdirectory each)
+skills/                      # Skills (one subdirectory each; user-invocable skills appear in the / menu)
 hooks/hooks.json             # Session-start and other hooks
 scripts/                     # Node.js helper scripts (optional; invoked via Bash)
 ```
@@ -44,24 +43,24 @@ scripts/                     # Node.js helper scripts (optional; invoked via Bas
 ## Working in This Repository
 
 - **Adding a skill:** Follow `docs/adding-skills.md`. Place the skill under `plugins/<plugin>/skills/<skill-name>/SKILL.md`.
-- **Adding a command:** Follow `docs/adding-commands.md`. Place it under `plugins/<plugin>/commands/<command>.md`.
+- **Adding a command (legacy):** Follow `docs/adding-commands.md`. New functionality should be added as skills with `user-invocable: true` instead.
 - **Adding a hook:** Follow `docs/adding-hooks.md`. Edit `plugins/<plugin>/hooks/hooks.json`.
 - **Plugin manifest fields:** See `docs/architecture.md` for required fields in `plugin.json`.
 
 ---
 
-## Documenting Commands
+## Documenting Skills
 
-Every command must have a dedicated reference doc in `docs/commands/<command-name>.md`. Use `docs/command-template.md` as the starting point.
+Every skill must have a dedicated reference doc in `docs/skills/<skill-name>.md`. Use `docs/skill-doc-template.md` as the starting point.
 
-Each command doc must include:
+Each skill doc must include:
 
-- **Overview** — what the command does in 2–3 sentences
+- **Overview** — what the skill does in 2–3 sentences
 - **Usage** — basic invocation
 - **Flags** — table with flag, description, and default
 - **Examples** — concrete invocations with expected output
 - **Prerequisites** — required tools and config files
 - **What It Creates or Modifies** — files and artifacts produced
-- **Related Commands** — cross-links to companion commands
+- **Related Skills** — cross-links to companion skills
 
-The command name in `docs/commands/` must match the command filename in `plugins/<plugin>/commands/`. Link the doc from the commands table in `README.md`.
+The skill name in `docs/skills/` must match the skill directory name in `plugins/<plugin>/skills/`. Link the doc from the skills table in `README.md`.

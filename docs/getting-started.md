@@ -7,7 +7,7 @@
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | — | This is a Claude Code plugin marketplace |
 | Node.js | >= 16 | For helper scripts. Uses built-in modules, no `npm install` needed |
 | git | — | Required for diff and commit analysis |
-| gh (GitHub CLI) | — | Required for `/sdlc:pr`. Falls back to showing the description if unavailable |
+| gh (GitHub CLI) | — | Required for `/pr-sdlc`. Falls back to showing the description if unavailable |
 
 ## Installation
 
@@ -24,7 +24,7 @@
 /plugin install sdlc@sdlc-marketplace
 ```
 
-> **Note:** Commands and skills are namespaced with the plugin name. The `pr` command becomes `/sdlc:pr`. See [Architecture](architecture.md#name-resolution) for details.
+> **Note:** Skills are invoked directly by name with no prefix. The `pr-sdlc` skill is invoked as `/pr-sdlc`. See [Architecture](architecture.md#name-resolution) for details.
 
 ## Updating
 
@@ -48,7 +48,7 @@ The plugin provides a project-customizable multi-dimension code review system.
 **Step 1 — Create review dimensions** (one-time per project):
 
 ```text
-/sdlc:review-init
+/review-init-sdlc
 ```
 
 Scans your tech stack and proposes tailored dimension files (security, API contracts, test coverage, etc.) in `.claude/review-dimensions/`. Run with `--add` to expand an existing set.
@@ -56,7 +56,7 @@ Scans your tech stack and proposes tailored dimension files (security, API contr
 **Step 2 — Run reviews** (on any feature branch):
 
 ```text
-/sdlc:review
+/review-sdlc
 ```
 
 Matches dimensions to your changed files, dispatches parallel review subagents, deduplicates findings, and posts a consolidated comment to the PR.
@@ -64,7 +64,7 @@ Matches dimensions to your changed files, dispatches parallel review subagents, 
 ### Creating a pull request
 
 ```text
-/sdlc:pr
+/pr-sdlc
 ```
 
 Generates a structured PR description from your commits and diffs, then opens the PR via `gh`.
@@ -73,13 +73,13 @@ Generates a structured PR description from your commits and diffs, then opens th
 
 | File / Directory | Purpose |
 | --- | --- |
-| `.claude/review-dimensions/` | Per-project code review dimension files (created by `/sdlc:review-init`) |
-| `.claude/pr-template.md` | Project PR template (created by `/sdlc:pr-customize`) |
-| `.claude/version.json` | Release configuration (created by `/sdlc:version --init`) |
+| `.claude/review-dimensions/` | Per-project code review dimension files (created by `/review-init-sdlc`) |
+| `.claude/pr-template.md` | Project PR template (created by `/pr-customize-sdlc`) |
+| `.claude/version.json` | Release configuration (created by `/version-sdlc --init`) |
 
 ## Next Steps
 
 - Read [Architecture](architecture.md) to understand how the plugin works
 - Read [Adding Skills](adding-skills.md) to create project-specific skills
-- Read [Adding Commands](adding-commands.md) to create custom slash commands
+- Read [Adding Commands](adding-commands.md) to create custom slash commands (legacy — prefer skills)
 - Read [Adding Hooks](adding-hooks.md) to set up automated actions

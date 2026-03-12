@@ -1,10 +1,10 @@
-# `/sdlc:plugin-check` — Plugin Discovery Validation
+# `/plugin-check-sdlc` — Plugin Discovery Validation
 
 ## Overview
 
 Validates the full plugin discovery and cross-reference chain so that the plugin
 works correctly after installation from GitHub. Checks 16 structural properties
-across marketplace manifests, plugin manifests, commands, skills, scripts, hooks,
+across marketplace manifests, plugin manifests, skills, scripts, hooks,
 and agents — catching broken references before users encounter runtime failures.
 
 ---
@@ -12,7 +12,7 @@ and agents — catching broken references before users encounter runtime failure
 ## Usage
 
 ```text
-/sdlc:plugin-check
+/plugin-check-sdlc
 ```
 
 Run from the root of the `sdlc-marketplace` repository.
@@ -32,7 +32,7 @@ Run from the root of the `sdlc-marketplace` repository.
 ### All checks pass
 
 ```text
-/sdlc:plugin-check
+/plugin-check-sdlc
 ```
 
 Expected output:
@@ -46,7 +46,7 @@ pass: 16/16
 ### Issues found
 
 ```text
-/sdlc:plugin-check
+/plugin-check-sdlc
 ```
 
 Example output when a name mismatch exists:
@@ -102,12 +102,12 @@ The skill then guides you through fixing the mismatch and re-runs validation.
 This command is read-only. It does not create or modify any files.
 
 If issues are found, the skill guides you through targeted edits to the files that
-failed their checks. Re-run `/sdlc:plugin-check` after fixing to confirm.
+failed their checks. Re-run `/plugin-check-sdlc` after fixing to confirm.
 
 ---
 
-## Related Commands
+## Related Skills
 
-- [`/sdlc:version`](version.md) — bumps the version validated by PD7
-- [`/sdlc:review-init`](review-init.md) — creates review dimensions referenced at runtime
+- [`/version-sdlc`](version-sdlc.md) — bumps the version validated by PD7
+- [`/review-init-sdlc`](review-init-sdlc.md) — creates review dimensions referenced at runtime
 - [`validate-plugin-consistency`](.claude/skills/validate-plugin-consistency/SKILL.md) — complementary check for internal code conventions (script resolution order, temp file usage)

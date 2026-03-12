@@ -7,7 +7,7 @@ on disk, how they are discovered at session start, and how scripts are resolved 
 
 ## Overview
 
-The full lifecycle from GitHub repository to working slash commands:
+The full lifecycle from GitHub repository to working skills:
 
 ```
 GitHub: rnagrodzki/sdlc-marketplace
@@ -21,13 +21,13 @@ Copies plugin files to ~/.claude/plugins/
     │
     ▼  Session start
 Claude Code scans ~/.claude/plugins/ for plugin.json files
-Registers /<plugin-name>:<command> slash commands
+Registers user-invocable skills in the / menu (e.g. /pr-sdlc)
 Loads skill descriptions for auto-invocation matching
 Attaches hooks from hooks.json
     │
-    ▼  Runtime (e.g. /sdlc:pr)
-Command script uses find to locate helper scripts:
-  find ~/.claude/plugins -name "pr-prepare.js" -path "*/scripts/*"
+    ▼  Runtime (e.g. /pr-sdlc)
+Skill uses find to locate helper scripts:
+  find ~/.claude/plugins -name "pr-prepare.js"
 ```
 
 ---
@@ -62,7 +62,7 @@ The `plugins` array lists every plugin in this marketplace. Each entry has:
 
 | Field | Description |
 |-------|-------------|
-| `name` | Plugin identifier used in slash commands (`sdlc` → `/sdlc:pr`) |
+| `name` | Plugin identifier used for marketplace/update operations |
 | `source` | Relative path from the repo root to the plugin directory |
 
 The marketplace is cached at:
@@ -119,14 +119,14 @@ The full path includes marketplace, plugin name, and version:
 ~/.claude/plugins/cache/
 └── <marketplace>/               # e.g. sdlc-marketplace
     └── <plugin>/                # e.g. sdlc
-        └── <version>/           # e.g. 0.7.0
+        └── <version>/           # e.g. 0.8.1
             ├── .claude-plugin/
             │   └── plugin.json        # Plugin identity and version
-            ├── commands/
-            │   └── pr.md              # Defines /sdlc:pr
             ├── skills/
-            │   └── sdlc-creating-pull-requests/
-            │       └── SKILL.md       # Skill instructions + supporting files
+            │   ├── pr-sdlc/
+            │   │   └── SKILL.md       # Invoked as /pr-sdlc
+            │   └── review-sdlc/
+            │       └── SKILL.md       # Invoked as /review-sdlc
             ├── scripts/
             │   ├── pr-prepare.js      # Helper scripts (found at runtime via find)
             │   └── lib/
@@ -136,7 +136,7 @@ The full path includes marketplace, plugin name, and version:
                 └── review-orchestrator.md
 ```
 
-Example actual path: `~/.claude/plugins/cache/sdlc-marketplace/sdlc/0.7.0/scripts/pr-prepare.js`
+Example actual path: `~/.claude/plugins/cache/sdlc-marketplace/sdlc/0.8.1/scripts/pr-prepare.js`
 
 Because scripts are nested 4 levels deep under `~/.claude/plugins/`, a recursive
 `find` (without `-path` filters) is required — path-based filtering is fragile and
@@ -150,8 +150,8 @@ When Claude Code starts a session, it scans `~/.claude/plugins/` for installed p
 For each directory containing `.claude-plugin/plugin.json`, it:
 
 1. **Reads `plugin.json`** to get the plugin `name`, `description`, and `version`
-2. **Registers commands** — every `.md` file in `commands/` becomes a slash command,
-   prefixed with the plugin name: `commands/pr.md` → `/sdlc:pr`
+2. **Registers user-invocable skills** — every `SKILL.md` with `user-invocable: true`
+   is added to the `/` menu by its directory name: `skills/pr-sdlc/` → `/pr-sdlc`
 3. **Loads skill descriptions** — every `SKILL.md` frontmatter `description` is registered
    for automatic invocation matching (Claude invokes skills when the description matches)
 4. **Attaches hooks** — the `hooks/hooks.json` configuration is read and hook handlers
@@ -163,17 +163,17 @@ For each directory containing `.claude-plugin/plugin.json`, it:
 
 ## Name Resolution
 
-Slash commands and skills are namespaced by the plugin name from `plugin.json`:
+User-invocable skills are registered by their directory name with no prefix:
 
-| Plugin file | `plugin.json` `name` | Resolved name |
-|-------------|----------------------|---------------|
-| `commands/pr.md` | `sdlc` | `/sdlc:pr` |
-| `commands/review.md` | `sdlc` | `/sdlc:review` |
-| `skills/sdlc-creating-pull-requests/` | `sdlc` | `sdlc:sdlc-creating-pull-requests` |
+| Plugin directory         | Invocation        |
+|--------------------------|-------------------|
+| `skills/pr-sdlc/`        | `/pr-sdlc`        |
+| `skills/review-sdlc/`    | `/review-sdlc`    |
+| `skills/version-sdlc/`   | `/version-sdlc`   |
 
-The plugin `name` in `plugin.json` is the namespace prefix, not the directory name.
-**Renaming this field changes every command and skill name for all installed users** —
-treat it as a stable identifier.
+The plugin `name` in `plugin.json` is used for marketplace and update operations, not
+for skill invocation names. **Renaming skill directories changes the invocation names
+for all installed users** — treat directory names as stable identifiers.
 
 ### Name consistency requirement
 
@@ -231,8 +231,8 @@ Then restart Claude Code and reinstall:
 
 ## Script Resolution at Runtime
 
-Commands are thin wrappers that delegate immediately to skills. Skills own script
-resolution — they locate and run helper scripts themselves using this two-step pattern:
+Skills own script resolution — they locate and run helper scripts themselves using this
+two-step pattern:
 
 ```bash
 # Step 1: Search installed plugin (recursive find — scripts are 4 levels deep under cache/)
@@ -251,7 +251,7 @@ SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" 2>/dev/null | head -1)
 repository to run commands directly without installing the plugin globally. The fallback
 uses a literal `[ -f "..." ]` check with no globbing — impossible to corrupt.
 
-**Why skills, not commands?** Commands are natural language instructions that LLMs interpret and may paraphrase. Moving all bash logic into skills — and adding a `VERBATIM` directive before each bash block — reduces the risk of LLM paraphrasing breaking script resolution.
+**Why skills?** Skills are the primary entry point in the skills-primary model. Skills add a `VERBATIM` directive before each bash block, reducing the risk of LLM paraphrasing breaking script resolution. Skills also own argument parsing and preparation directly.
 
 ---
 
@@ -288,5 +288,5 @@ See the [README troubleshooting section](../README.md#troubleshooting) for solut
 - [Architecture](architecture.md) — repository structure, plugin manifest fields, name resolution
 - [Getting Started](getting-started.md) — first-use walkthrough and what gets created
 - [Adding Skills](adding-skills.md) — how to create new skills
-- [Adding Commands](adding-commands.md) — how to create slash commands
+- [Adding Commands](adding-commands.md) — how to create slash commands (legacy)
 - [Adding Hooks](adding-hooks.md) — how to configure session hooks

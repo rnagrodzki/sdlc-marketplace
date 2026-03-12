@@ -1,5 +1,10 @@
 # Adding Commands
 
+> **Legacy approach.** Commands are supported for backwards compatibility but the
+> skills-primary model is preferred. For new functionality, create a skill with
+> `user-invocable: true` instead — skills appear in the `/` menu directly and own
+> their own argument parsing and preparation. See [Adding Skills](adding-skills.md).
+
 ## Overview
 
 Commands define slash commands (e.g., `/setup`) that users invoke directly in

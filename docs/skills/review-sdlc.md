@@ -1,15 +1,15 @@
-# `/sdlc:review` — Multi-Dimension Code Review
+# `/review-sdlc` — Multi-Dimension Code Review
 
 ## Overview
 
-Loads project review dimensions from `.claude/review-dimensions/`, matches them to changed files via glob patterns, dispatches parallel review subagents for each matching dimension, deduplicates findings, and posts a consolidated comment to the PR. By default reviews committed branch changes plus staged changes. Requires at least one dimension file — run `/sdlc:review-init` first if none exist.
+Loads project review dimensions from `.claude/review-dimensions/`, matches them to changed files via glob patterns, dispatches parallel review subagents for each matching dimension, deduplicates findings, and posts a consolidated comment to the PR. By default reviews committed branch changes plus staged changes. Requires at least one dimension file — run `/review-init-sdlc` first if none exist.
 
 ---
 
 ## Usage
 
 ```text
-/sdlc:review
+/review-sdlc
 ```
 
 ---
@@ -36,57 +36,57 @@ Loads project review dimensions from `.claude/review-dimensions/`, matches them 
 ### Run a full review (committed + staged changes)
 
 ```text
-/sdlc:review
+/review-sdlc
 ```
 
 ### Review staged changes before committing
 
 ```text
-/sdlc:review --staged
+/review-sdlc --staged
 ```
 
 ### Review all local changes (staged + unstaged)
 
 ```text
-/sdlc:review --working
+/review-sdlc --working
 ```
 
 ### Review only committed changes (exclude staged)
 
 ```text
-/sdlc:review --committed
+/review-sdlc --committed
 ```
 
 ### Review against a non-default base branch
 
 ```text
-/sdlc:review --base develop
+/review-sdlc --base develop
 ```
 
 ### Run specific dimensions only
 
 ```text
-/sdlc:review --dimensions security-review,api-review
+/review-sdlc --dimensions security-review,api-review
 ```
 
 ### Review full working tree including unstaged changes
 
 ```text
-/sdlc:review --worktree
+/review-sdlc --worktree
 ```
 
 ### Save a scope as the project default, then run
 
 ```text
-/sdlc:review --set-default --worktree
+/review-sdlc --set-default --worktree
 ```
 
-Saves `worktree` to `.claude/review.json` and runs the review. Subsequent `/sdlc:review` calls will use `worktree` automatically.
+Saves `worktree` to `.claude/review.json` and runs the review. Subsequent `/review-sdlc` calls will use `worktree` automatically.
 
 ### Preview what would be reviewed without running
 
 ```text
-/sdlc:review --dry-run
+/review-sdlc --dry-run
 ```
 
 ---
@@ -108,7 +108,7 @@ The default scope can be persisted in `.claude/review.json`:
 Use `--set-default` to create or update this file without editing it manually:
 
 ```text
-/sdlc:review --set-default --staged
+/review-sdlc --set-default --staged
 ```
 
 Valid scope values: `all`, `committed`, `staged`, `working`, `worktree`.
@@ -166,7 +166,7 @@ Suggested new dimensions for uncovered files:
   configuration-management-review — 3 configuration files not covered
     Files: src/config/db.ts, src/config/auth.ts, .env.example
 
-Run `/sdlc:review-init --add` to create these dimensions.
+Run `/review-init-sdlc --add` to create these dimensions.
 ```
 
 Files that cannot be mapped to any known dimension type are listed separately:
@@ -178,13 +178,13 @@ Files that cannot be mapped to any known dimension type are listed separately:
 Consider creating a custom dimension or broadening existing trigger patterns.
 ```
 
-These suggestions are informational during a review run. To act on them, run `/sdlc:review-init --add`.
+These suggestions are informational during a review run. To act on them, run `/review-init-sdlc --add`.
 
 ---
 
 ## Prerequisites
 
-- **`.claude/review-dimensions/`** — at least one dimension file must exist. Run `/sdlc:review-init` to create them.
+- **`.claude/review-dimensions/`** — at least one dimension file must exist. Run `/review-init-sdlc` to create them.
 - **`gh` CLI** — recommended for posting the PR comment. Falls back to terminal output if unavailable.
 
 ---
@@ -197,7 +197,7 @@ These suggestions are informational during a review run. To act on them, run `/s
 
 ---
 
-## Related Commands
+## Related Skills
 
-- [`/sdlc:review-init`](review-init.md) — create review dimension files for this project
-- [`/sdlc:pr`](pr.md) — open the PR that this command reviews
+- [`/review-init-sdlc`](review-init-sdlc.md) — create review dimension files for this project
+- [`/pr-sdlc`](pr-sdlc.md) — open the PR that this skill reviews
