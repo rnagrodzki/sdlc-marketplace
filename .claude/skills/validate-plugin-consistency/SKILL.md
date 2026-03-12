@@ -1,6 +1,6 @@
 ---
 name: validate-plugin-consistency
-description: "Use after modifying any file under plugins/sdlc-utilities/ (commands/*.md, skills/*/SKILL.md, scripts/*.js). Runs the consistency validation script to catch structural issues before they reach users: wrong script resolution order, skills running scripts they shouldn't, missing frontmatter fields, missing docs, missing temp-file safety."
+description: "Use after modifying any file under plugins/sdlc-utilities/ (skills/*/SKILL.md, scripts/*.js). Runs the consistency validation script to catch structural issues before they reach users: wrong script resolution order, skills missing prepare-script execution, missing mktemp or exit-code handling, missing frontmatter fields, missing user-invocable flags."
 user-invocable: true
 ---
 
@@ -13,7 +13,6 @@ issues that would cause failures in users' repositories.
 
 Invoke this skill when you have modified any of:
 
-- `plugins/sdlc-utilities/commands/*.md`
 - `plugins/sdlc-utilities/skills/*/SKILL.md`
 - `plugins/sdlc-utilities/scripts/*.js`
 
@@ -39,42 +38,23 @@ The `find` pattern searches CWD (`.`) before `~/.claude/plugins`. Reverse the or
 
 ```bash
 # Correct (plugins-first)
-SCRIPT=$(find ~/.claude/plugins -name "<script>.js" -path "*/scripts/*" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "<script>.js" -path "*/scripts/*" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "<script>.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/<script>.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/<script>.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate <script>.js. Is the sdlc plugin installed?" >&2; exit 2; }
 ```
 
-### `command-runs-script` (error)
+### `skill-runs-script` (error)
 
-A command has a matching `*-prepare.js` but doesn't run it — it delegates that
-responsibility to the skill. Move the find+mktemp+node block into the command and
-have the skill consume pre-computed JSON instead. Follow the pattern in `pr.md`:
+A skill is paired with a prepare script but does not contain the find+node resolution
+pattern. Skills must run their own prepare scripts. Add the find+mktemp+node block to
+the skill following the pattern in `review-sdlc/SKILL.md`:
 
-1. Command: find script → mktemp → `node "$SCRIPT" $ARGUMENTS --json > "$FILE"` → read → delegate to skill with parsed JSON
-2. Skill: receive pre-computed context in Step 1, no bash execution
+1. Skill: find script → mktemp → `node "$SCRIPT" $ARGUMENTS --json > "$FILE"` → read and parse JSON
 
-### `skill-receives-context` (error)
+### `skill-uses-mktemp` (error)
 
-A skill is executing a prepare script that its paired command should run instead.
-Remove the find+node block from the skill and add a "Consume Pre-computed Context"
-step explaining the command has already run the script.
-
-### `argument-passthrough` (warning)
-
-A command runs a prepare script but doesn't use `$ARGUMENTS`. Change the node
-invocation to: `node "$SCRIPT" $ARGUMENTS --json > "$MANIFEST_FILE"`
-
-### `frontmatter-field-names` (error)
-
-A skill uses the deprecated `user-invokable` field. Replace with `user-invocable`.
-
-### `command-docs-exist` (warning)
-
-Create `docs/commands/<name>.md` using `docs/command-template.md` as the starting point.
-
-### `temp-file-pattern` (error)
-
-A command pipes node output directly instead of using a temp file. Replace with:
+A skill runs a prepare script but pipes output directly instead of using a temp file.
+Replace with:
 
 ```bash
 MANIFEST_FILE=$(mktemp /tmp/<name>-XXXXXX.json)
@@ -82,16 +62,39 @@ node "$SCRIPT" $ARGUMENTS --json > "$MANIFEST_FILE"
 EXIT_CODE=$?
 ```
 
-### `exit-code-handling` (error)
+### `skill-checks-exit-code` (error)
 
-A command runs a script but doesn't capture `EXIT_CODE`. Add after the node call:
+A skill runs a script but doesn't capture `EXIT_CODE`. Add after the node call:
 
 ```bash
 EXIT_CODE=$?
-# ...then check:
 # Exit code 1: show the stderr message to the user and stop.
-# Exit code 2: show `Script error — see output above` and stop.
+# Exit code 2: show "Script error — see output above" and stop.
 ```
+
+### `skill-passes-arguments` (warning)
+
+A skill runs a prepare script but doesn't use `$ARGUMENTS`. Change the node
+invocation to: `node "$SCRIPT" $ARGUMENTS --json > "$MANIFEST_FILE"`
+
+### `frontmatter-field-names` (error)
+
+A skill uses the deprecated `user-invokable` field. Replace with `user-invocable`.
+
+### `user-invocable-flag` (error)
+
+A user-facing skill is missing `user-invocable: true` in its frontmatter. Add it:
+
+```yaml
+---
+name: <skill-name>
+description: "..."
+user-invocable: true
+---
+```
+
+The 6 user-facing skills that must have this flag are: `pr-sdlc`, `pr-customize-sdlc`,
+`review-sdlc`, `review-init-sdlc`, `version-sdlc`, `plugin-check-sdlc`.
 
 ## Step 3 — Re-run Validation
 
@@ -103,26 +106,24 @@ node .claude/skills/validate-plugin-consistency/check-consistency.js
 
 Confirm exit 0 before marking work complete.
 
-## Reference: The Correct Command Pattern
+## Reference: The Correct Skill Pattern (for paired skills)
 
-Every command that has a matching `*-prepare.js` script must follow this exact pattern:
+Every skill that has a matching `*-prepare.js` script must follow this exact pattern:
 
 ```bash
-# Step 1: Resolve the script
-SCRIPT=$(find ~/.claude/plugins -name "<name>-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find . -name "<name>-prepare.js" -path "*/scripts/*" 2>/dev/null | head -1)
+# Step 0: Resolve and run the prepare script
+SCRIPT=$(find ~/.claude/plugins -name "<name>-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/<name>-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/<name>-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate <name>-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-# Step 2: Run to temp file (large output breaks pipes)
 CONTEXT_FILE=$(mktemp /tmp/<name>-context-XXXXXX.json)
 node "$SCRIPT" $ARGUMENTS --json > "$CONTEXT_FILE"
 EXIT_CODE=$?
 # Cleanup: rm -f "$CONTEXT_FILE" after use
 
-# Step 3: Handle errors
-# Exit code 1: show stderr, stop
-# Exit code 2: show "Script error — see output above", stop
+# On non-zero EXIT_CODE:
+# Exit code 1: show stderr message to the user and stop.
+# Exit code 2: show "Script error — see output above" and stop.
 
-# Step 4: Delegate to skill with parsed JSON
-# Invoke sdlc-<doing>-<noun> skill, passing CONTEXT_JSON
+# Step 1: Read and parse CONTEXT_FILE as CONTEXT_JSON, then proceed with skill logic.
 ```
