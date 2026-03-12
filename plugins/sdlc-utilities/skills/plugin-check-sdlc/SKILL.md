@@ -1,7 +1,7 @@
 ---
-name: sdlc-validating-plugin-discovery
-description: "Use this skill when validating the plugin discovery chain after the /sdlc:plugin-check command has run the validation script. Consumes pre-computed REPORT_JSON and displays results, guiding fixes for any broken cross-references, missing manifests, or undiscoverable commands, skills, scripts, hooks, or agents. Triggers on: validate plugin, check plugin discovery, plugin health check, plugin structure, marketplace manifest."
-user-invocable: false
+name: plugin-check-sdlc
+description: "Use this skill when validating the plugin discovery chain. Runs validate-discovery.js, displays results, and guides fixes for any broken cross-references, missing manifests, or undiscoverable skills, scripts, hooks, or agents. Arguments: [--markdown]. Triggers on: validate plugin, check plugin discovery, plugin health check, plugin structure, marketplace manifest."
+user-invocable: true
 ---
 
 # Validating Plugin Discovery

@@ -1,7 +1,7 @@
 ---
-name: sdlc-versioning-releases
-description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow. Consumes pre-computed context from version-prepare.js and handles the complete release process. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate."
-user-invocable: false
+name: version-sdlc
+description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow. Consumes pre-computed context from version-prepare.js and handles the complete release process. Arguments: [major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix]. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate."
+user-invocable: true
 ---
 
 # Versioning Releases Skill
