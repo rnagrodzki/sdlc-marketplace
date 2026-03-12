@@ -30,7 +30,7 @@ httpx==0.25.2
 
 `.claude/review-dimensions/` directory does **not exist**.
 
-No review dimensions have been installed for this project. Running `/sdlc:review-init`
+No review dimensions have been installed for this project. Running `/review-init-sdlc`
 would scan the project and propose dimensions based on the detected stack (FastAPI, SQLAlchemy,
 Alembic migrations, pytest).
 
@@ -48,7 +48,7 @@ Alembic migrations, pytest).
   ],
   "dimensions": [],
   "errors": [
-    "No review dimensions found. Run /sdlc:review-init to create tailored dimensions for this project."
+    "No review dimensions found. Run /review-init-sdlc to create tailored dimensions for this project."
   ]
 }
 ```

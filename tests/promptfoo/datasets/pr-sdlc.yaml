@@ -6,12 +6,12 @@
 #   project-with-dimensions        -- INVALID: not a PR context
 #   project-no-dimensions          -- INVALID: not a PR context
 
-- description: "sdlc-creating-pull-requests: standard PR creation with all 8 sections"
+- description: "pr-sdlc: standard PR creation with all 8 sections"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-creating-pull-requests/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
     project_context: "file://fixtures/feature-branch-with-commits.md"
     user_request: >
-      Run /sdlc:pr for this feature branch. The pr-prepare.js output is provided in the project
+      Run /pr-sdlc for this feature branch. The pr-prepare.js output is provided in the project
       context above. Generate the PR title and all required sections of the description.
   assert:
     # Must produce section headings (at least Summary)
@@ -37,12 +37,12 @@
         paths). Business sections (Business Context, Business Benefits) are either filled with
         evidence-based content or marked N/A with reasoning — they are not left blank.
 
-- description: "sdlc-creating-pull-requests: JIRA ticket auto-detected from branch name"
+- description: "pr-sdlc: JIRA ticket auto-detected from branch name"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-creating-pull-requests/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
     project_context: "file://fixtures/feature-branch-jira.md"
     user_request: >
-      Run /sdlc:pr for this branch. The pr-prepare.js output is in the project context.
+      Run /pr-sdlc for this branch. The pr-prepare.js output is in the project context.
       Generate the full PR title and description.
   assert:
     # Must detect and show PROJ-456
@@ -59,12 +59,12 @@
         a different ticket number or say "Not detected". The PR title and description focus on
         the authentication timeout fix described in the commits.
 
-- description: "sdlc-creating-pull-requests: custom template replaces default 8 sections"
+- description: "pr-sdlc: custom template replaces default 8 sections"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-creating-pull-requests/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
     project_context: "file://fixtures/feature-branch-custom-template.md"
     user_request: >
-      Run /sdlc:pr for this feature branch. The pr-prepare.js output is provided in the project
+      Run /pr-sdlc for this feature branch. The pr-prepare.js output is provided in the project
       context above. Generate the PR title and all required sections of the description.
   assert:
     # Must produce all 3 custom template sections
@@ -102,11 +102,11 @@
         changes were verified (references the integration and unit tests visible in the diff).
         No content is fabricated — all claims trace back to the commits and diff provided.
 
-- description: "sdlc-creating-pull-requests: main branch rejected with clear error"
+- description: "pr-sdlc: main branch rejected with clear error"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-creating-pull-requests/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
     project_context: "file://fixtures/feature-branch-on-main.md"
-    user_request: "Run /sdlc:pr to create a pull request."
+    user_request: "Run /pr-sdlc to create a pull request."
   assert:
     # Must mention the reason for rejection (main/master/protected/error)
     - type: regex
