@@ -4,11 +4,11 @@
 #   project-with-cicd-monorepo -- CORRECT: TypeScript monorepo + CI/CD; tests extended dimension catalog
 #   healthy-plugin-structure   -- INVALID: plugin manifest context, not a project to scan
 
-- description: "sdlc-initializing-review-dimensions: scans tech stack and proposes tailored dimensions"
+- description: "review-init-sdlc: scans tech stack and proposes tailored dimensions"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-initializing-review-dimensions/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-tech-stack.md"
-    user_request: "Run /sdlc:review-init to scan this project and propose review dimensions."
+    user_request: "Run /review-init-sdlc to scan this project and propose review dimensions."
   assert:
     # Must always include the baseline code-quality dimension
     - type: icontains
@@ -32,11 +32,11 @@
         in the fixture. Trigger patterns reference the actual project directories (src/components/,
         src/pages/, __tests__/).
 
-- description: "sdlc-initializing-review-dimensions: monorepo with CI/CD gets extended dimension proposals"
+- description: "review-init-sdlc: monorepo with CI/CD gets extended dimension proposals"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-initializing-review-dimensions/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-cicd-monorepo.md"
-    user_request: "Run /sdlc:review-init to scan this project and propose review dimensions."
+    user_request: "Run /review-init-sdlc to scan this project and propose review dimensions."
   assert:
     # Must always include baseline
     - type: icontains
@@ -65,11 +65,11 @@
         security, api-review, or data-integrity dimensions since there is no auth/ORM/route
         evidence in the fixture. It presents the proposals to the user before creating files.
 
-- description: "sdlc-initializing-review-dimensions: Python/FastAPI project gets appropriate proposals"
+- description: "review-init-sdlc: Python/FastAPI project gets appropriate proposals"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-initializing-review-dimensions/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
     project_context: "file://fixtures/project-no-dimensions.md"
-    user_request: "Run /sdlc:review-init for this project."
+    user_request: "Run /review-init-sdlc for this project."
   assert:
     # Must always include baseline
     - type: icontains

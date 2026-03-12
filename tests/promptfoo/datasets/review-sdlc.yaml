@@ -4,12 +4,12 @@
 #   project-no-dimensions              -- CORRECT: edge case; no dimensions installed → error + suggestion
 #   feature-branch-*                   -- INVALID: PR context, not review context
 
-- description: "sdlc-reviewing-changes: multi-dimension review with active dimensions"
+- description: "review-sdlc: multi-dimension review with active dimensions"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-reviewing-changes/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-dimensions.md"
     user_request: >
-      Run /sdlc:review on this project. The review-prepare.js manifest is provided in the
+      Run /review-sdlc on this project. The review-prepare.js manifest is provided in the
       project context. Display the review plan showing which dimensions are active.
   assert:
     # Must reference dimensions concept
@@ -31,12 +31,12 @@
         The response mentions the specific dimension names and does not fabricate additional
         dimensions not present in the manifest.
 
-- description: "sdlc-reviewing-changes: dry-run shows plan without dispatching agents"
+- description: "review-sdlc: dry-run shows plan without dispatching agents"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-reviewing-changes/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-dimensions.md"
     user_request: >
-      Run /sdlc:review --dry-run on this project. The review-prepare.js manifest is in the
+      Run /review-sdlc --dry-run on this project. The review-prepare.js manifest is in the
       project context. Show the review plan only — do not dispatch any review agents.
   assert:
     # Must acknowledge dry-run mode
@@ -58,12 +58,12 @@
         NOT produce any actual code review findings or comments. It describes what would happen
         if the --dry-run flag were omitted.
 
-- description: "sdlc-reviewing-changes: surfaces dimension suggestions for uncovered files"
+- description: "review-sdlc: surfaces dimension suggestions for uncovered files"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-reviewing-changes/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-uncovered-suggestions.md"
     user_request: >
-      Run /sdlc:review on this project. The review-prepare.js manifest is in the project context.
+      Run /review-sdlc on this project. The review-prepare.js manifest is in the project context.
       Show the review plan including any suggestions for uncovered files.
   assert:
     # Must mention the suggested dimension names
@@ -72,10 +72,10 @@
     # Must reference the uncovered file paths or types
     - type: regex
       value: '(workflows|ci\.yml|config|\.env)'
-    # Must point to review-init --add
+    # Must point to review-init-sdlc --add
     - type: regex
-      value: "(review-init|--add)"
-    # Behavioral: surfaces suggestions, directs user to review-init
+      value: "(review-init-sdlc|--add)"
+    # Behavioral: surfaces suggestions, directs user to review-init-sdlc
     - type: llm-rubric
       value: >
         The response reads the manifest showing 5 uncovered files with 2 dimension suggestions:
@@ -83,25 +83,25 @@
         configuration-management-review (for src/config/db.ts, src/config/auth.ts, .env.example).
         It displays these suggestions in the review plan — either in a "Suggested new dimensions"
         block or as plan critique warnings — and references the specific file paths or types.
-        It recommends running /sdlc:review-init --add to create those dimensions. It does NOT
+        It recommends running /review-init-sdlc --add to create those dimensions. It does NOT
         create the dimension files itself during the review run.
 
-- description: "sdlc-reviewing-changes: no dimensions installed reports error and suggests review-init"
+- description: "review-sdlc: no dimensions installed reports error and suggests review-init-sdlc"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-reviewing-changes/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
     project_context: "file://fixtures/project-no-dimensions.md"
-    user_request: "Run /sdlc:review on this project."
+    user_request: "Run /review-sdlc on this project."
   assert:
     # Must report the missing dimensions problem
     - type: regex
       value: "(no.+dimension|dimension.+not.+found|no review dimension|0 dimension)"
-    # Must suggest running review-init
+    # Must suggest running review-init-sdlc
     - type: regex
-      value: "(review-init|/sdlc:review-init)"
+      value: "(review-init-sdlc|/review-init-sdlc)"
     # Behavioral: clear error message, correct suggestion
     - type: llm-rubric
       value: >
         The response reads the error from the review-prepare.js manifest (no dimensions found)
         and clearly reports that no review dimensions are installed. It recommends running
-        /sdlc:review-init to create tailored dimensions for this Python/FastAPI project. It does
+        /review-init-sdlc to create tailored dimensions for this Python/FastAPI project. It does
         NOT fabricate a review without dimensions. The message is clear and actionable.

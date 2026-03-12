@@ -15,9 +15,9 @@ defaultTest:
     provider: "file://providers/claude-cli.js"
 
 tests:
-  - file://datasets/sdlc-creating-pull-requests.yaml
-  - file://datasets/sdlc-reviewing-changes.yaml
-  - file://datasets/sdlc-versioning-releases.yaml
-  - file://datasets/sdlc-validating-plugin-discovery.yaml
-  - file://datasets/sdlc-initializing-review-dimensions.yaml
-  - file://datasets/sdlc-customizing-pr-template.yaml
+  - file://datasets/pr-sdlc.yaml
+  - file://datasets/review-sdlc.yaml
+  - file://datasets/version-sdlc.yaml
+  - file://datasets/plugin-check-sdlc.yaml
+  - file://datasets/review-init-sdlc.yaml
+  - file://datasets/pr-customize-sdlc.yaml

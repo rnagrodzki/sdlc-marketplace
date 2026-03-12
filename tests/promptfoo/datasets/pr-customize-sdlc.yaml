@@ -3,11 +3,11 @@
 #   project-with-pr-template  -- CORRECT: validates editing existing template
 #   project-with-dimensions   -- INVALID: review context, not PR template context
 
-- description: "sdlc-customizing-pr-template: proposes new template from scanned project signals"
+- description: "pr-customize-sdlc: proposes new template from scanned project signals"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-customizing-pr-template/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/pr-customize-sdlc/SKILL.md"
     project_context: "file://fixtures/project-no-pr-template.md"
-    user_request: "Run /sdlc:pr-customize to create a PR template for this project."
+    user_request: "Run /pr-customize-sdlc to create a PR template for this project."
   assert:
     # Must propose section headings
     - type: regex
@@ -28,11 +28,11 @@
         of at least 20 characters. It presents the proposal and asks the user to accept, edit,
         or customize specific sections.
 
-- description: "sdlc-customizing-pr-template: edits existing template preserving custom sections"
+- description: "pr-customize-sdlc: edits existing template preserving custom sections"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-customizing-pr-template/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/pr-customize-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-pr-template.md"
-    user_request: "Run /sdlc:pr-customize to update the existing PR template."
+    user_request: "Run /pr-customize-sdlc to update the existing PR template."
   assert:
     # Must reference the existing custom sections
     - type: regex

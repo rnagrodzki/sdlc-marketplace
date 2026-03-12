@@ -23,7 +23,7 @@ tasks:
       - promptfoo eval --config promptfooconfig-exec.yaml --env-file .env
 
   test:skill:
-    desc: "Run tests for specific skills (args: skill name, e.g. task test:skill -- sdlc-creating-pull-requests)"
+    desc: "Run tests for specific skills (args: skill name, e.g. task test:skill -- pr-sdlc)"
     silent: true
     dir: tests/promptfoo
     cmds:

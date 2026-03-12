@@ -3,12 +3,12 @@
 #   project-no-version-config    -- CORRECT: init flow detects package.json
 #   feature-branch-with-commits  -- INVALID: PR context, not versioning context
 
-- description: "sdlc-versioning-releases: release flow warns about breaking change"
+- description: "version-sdlc: release flow warns about breaking change"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-version-config.md"
     user_request: >
-      Run /sdlc:version patch. The version-prepare.js output is provided in the project context.
+      Run /version-sdlc patch. The version-prepare.js output is provided in the project context.
       Show the release plan and any warnings.
   assert:
     # Must reference the current or next version
@@ -30,12 +30,12 @@
         and asks the user to confirm before proceeding. It does NOT silently apply the patch bump
         despite the breaking change.
 
-- description: "sdlc-versioning-releases: init flow detects package.json and proposes config"
+- description: "version-sdlc: init flow detects package.json and proposes config"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
     project_context: "file://fixtures/project-no-version-config.md"
     user_request: >
-      Run /sdlc:version --init. The version-prepare.js output is in the project context.
+      Run /version-sdlc --init. The version-prepare.js output is in the project context.
       Show the detected setup and proposed configuration.
   assert:
     # Must identify the version file
@@ -56,12 +56,12 @@
         to confirm (accept/modify/cancel) before writing the config file. It does NOT write any
         files in this simulation — it describes what would happen with confirmation.
 
-- description: "sdlc-versioning-releases: hotfix release annotates commit and tag"
+- description: "version-sdlc: hotfix release annotates commit and tag"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
     project_context: "file://fixtures/project-hotfix-release.md"
     user_request: >
-      Run /sdlc:version patch --hotfix. The version-prepare.js output is provided
+      Run /version-sdlc patch --hotfix. The version-prepare.js output is provided
       in the project context. Show the release plan.
   assert:
     # Must show version bump
@@ -87,12 +87,12 @@
         It asks the user to confirm (yes / edit / cancel) before proceeding. It does NOT execute
         any git commands without explicit user approval.
 
-- description: "sdlc-versioning-releases: regular release does not include hotfix annotation"
+- description: "version-sdlc: regular release does not include hotfix annotation"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-version-config.md"
     user_request: >
-      Run /sdlc:version major. The version-prepare.js output is provided in the project context.
+      Run /version-sdlc major. The version-prepare.js output is provided in the project context.
       Show the release plan. This is NOT a hotfix — do not use the --hotfix flag.
   assert:
     # Must show version bump
@@ -114,15 +114,15 @@
         release attribute anywhere. It warns about the breaking change detected and asks the user
         to confirm before proceeding.
 
-- description: "sdlc-versioning-releases: release blocked when version config missing"
+- description: "version-sdlc: release blocked when version config missing"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-versioning-releases/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
     project_context: >
       The user is on branch feat/add-search, trying to cut a release. Running version-prepare.js
       produces this JSON output:
-      {"flow": "release", "errors": ["No version config found. Run /sdlc:version --init to set up
+      {"flow": "release", "errors": ["No version config found. Run /version-sdlc --init to set up
       versioning for this project."], "warnings": [], "currentVersion": null, "config": null}
-    user_request: "Run /sdlc:version minor to cut a release."
+    user_request: "Run /version-sdlc minor to cut a release."
   assert:
     # Must report the error
     - type: regex
@@ -132,11 +132,11 @@
       value: "Release Plan"
     # Must suggest --init
     - type: regex
-      value: "(--init|version --init|sdlc:version --init)"
+      value: "(--init|version-sdlc --init|/version-sdlc --init)"
     # Behavioral: surfaces error, suggests init, does not attempt release
     - type: llm-rubric
       value: >
         The response reads the error from version-prepare.js ("No version config found") and
-        clearly reports that the release cannot proceed. It recommends running /sdlc:version --init
+        clearly reports that the release cannot proceed. It recommends running /version-sdlc --init
         first to initialize versioning configuration. It does NOT attempt to guess a version or
         proceed with a release. The message is actionable and references the correct command.

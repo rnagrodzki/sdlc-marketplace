@@ -29,6 +29,6 @@
 
 ## Context
 
-The user attempted to run `/sdlc:pr` while on the `main` branch. The script detected this
+The user attempted to run `/pr-sdlc` while on the `main` branch. The script detected this
 protected branch and returned an error. No diff or commit data is available because
 the operation was blocked before any git queries were made.

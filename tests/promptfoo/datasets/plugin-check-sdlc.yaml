@@ -2,12 +2,12 @@
 #   healthy-plugin-structure -- CORRECT: all 16 checks pass
 #   broken-plugin-structure  -- CORRECT: 3 errors + 1 warning, specific PD IDs fail
 
-- description: "sdlc-validating-plugin-discovery: all 16 checks pass on healthy structure"
+- description: "plugin-check-sdlc: all 16 checks pass on healthy structure"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-validating-plugin-discovery/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/plugin-check-sdlc/SKILL.md"
     project_context: "file://fixtures/healthy-plugin-structure.md"
     user_request: >
-      Run /sdlc:plugin-check. The validate-discovery.js report is provided in the project context
+      Run /plugin-check-sdlc. The validate-discovery.js report is provided in the project context
       showing all checks passing. Display the results.
   assert:
     # Must report passing status
@@ -29,12 +29,12 @@
         actions beyond confirming the plugin is correctly wired. It does not fabricate any failing
         checks not present in the fixture.
 
-- description: "sdlc-validating-plugin-discovery: failed checks shown with fix guidance"
+- description: "plugin-check-sdlc: failed checks shown with fix guidance"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/sdlc-validating-plugin-discovery/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/plugin-check-sdlc/SKILL.md"
     project_context: "file://fixtures/broken-plugin-structure.md"
     user_request: >
-      Run /sdlc:plugin-check. The validate-discovery.js report from the project context shows
+      Run /plugin-check-sdlc. The validate-discovery.js report from the project context shows
       4 failing checks. Display the failures and provide fix guidance.
   assert:
     # Must report specific failing check IDs

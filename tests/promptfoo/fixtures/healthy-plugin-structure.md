@@ -13,17 +13,10 @@ plugins/
   sdlc-utilities/
     .claude-plugin/
       plugin.json         ← name: "sdlc", description, version: "0.7.1"
-    commands/
-      pr.md               ← frontmatter: description present
-      review.md           ← frontmatter: description present
-      version.md          ← frontmatter: description present
-      plugin-check.md     ← frontmatter: description present
-      review-init.md      ← frontmatter: description present
-      pr-customize.md     ← frontmatter: description present
     skills/
-      sdlc-creating-pull-requests/
+      pr-sdlc/
         SKILL.md          ← frontmatter: name + description present
-      sdlc-reviewing-changes/
+      review-sdlc/
         SKILL.md          ← frontmatter: name + description present
         REFERENCE.md      ← exists (referenced in SKILL.md)
         EXAMPLES.md       ← exists (referenced in SKILL.md)

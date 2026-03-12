@@ -17,7 +17,7 @@ From repo root:
 task test          # LLM behavioral tests (all 6 skills)
 task test:exec     # Script execution tests (no LLM, fast)
 task test:all      # Both behavioral and exec tests
-task test:skill -- sdlc-creating-pull-requests  # Single skill
+task test:skill -- pr-sdlc  # Single skill
 task test:view     # Open web UI to inspect results
 ```
 
