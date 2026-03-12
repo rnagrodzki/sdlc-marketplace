@@ -45,6 +45,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | [`/review-receive-sdlc`](docs/skills/review-receive-sdlc.md) | Process code review feedback with verification, self-critique, and implementation |
 | [`/version-sdlc`](docs/skills/version-sdlc.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
 | [`/plugin-check-sdlc`](docs/skills/plugin-check-sdlc.md) | Validate the plugin discovery chain (manifests, skills, hooks) |
+| [`/executing-plans-smartly`](docs/skills/executing-plans-smartly.md) | Execute an implementation plan with adaptive task classification, wave-based parallel dispatch, and automatic error recovery |
 
 ---
 
