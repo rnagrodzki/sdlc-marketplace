@@ -14,7 +14,7 @@ severity: high
 
 # Runtime Contract Review
 
-Review the command→script→skill execution pipeline for correctness and resilience. Every command in this project follows the pattern: resolve script → run to temp file → read JSON → delegate to skill. A documented version skew bug in `sdlc-creating-pull-requests` (installed `pr-prepare.js` silently omitting `customTemplate`) illustrates how contract violations surface only at runtime. This dimension checks that all parties in the pipeline — command, script, and skill — agree on the interface.
+Review the command→script→skill execution pipeline for correctness and resilience. Every command in this project follows the pattern: resolve script → run to temp file → read JSON → delegate to skill. A documented version skew bug in `pr-sdlc` (installed `pr-prepare.js` silently omitting `customTemplate`) illustrates how contract violations surface only at runtime. This dimension checks that all parties in the pipeline — command, script, and skill — agree on the interface.
 
 ## Checklist
 

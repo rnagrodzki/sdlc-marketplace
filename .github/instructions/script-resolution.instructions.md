@@ -15,7 +15,7 @@ Default severity: high
 - Every resolution block ends with a failure guard: `[ -z "$SCRIPT" ] && { echo "ERROR: ..."; exit 2; }` — no silent continuation with an empty `$SCRIPT`
 - The error message in the failure guard names the specific script and explains how to fix it (e.g., "Is the sdlc plugin installed?")
 - Glob-based reference file lookups (REFERENCE.md, EXAMPLES.md, agent definitions) use `path: ~/.claude` first and explicitly document a cwd fallback if not found
-- Glob patterns for reference file lookups are specific enough to match exactly one file — e.g., `**/sdlc-reviewing-changes/REFERENCE.md` not `**/REFERENCE.md`
+- Glob patterns for reference file lookups are specific enough to match exactly one file — e.g., `**/review-sdlc/REFERENCE.md` not `**/REFERENCE.md`
 - No resolution pattern uses hardcoded absolute paths other than the conventional `~/.claude/plugins` prefix
 - When a skill re-resolves the same script in a later step, both resolution blocks use identical find patterns — no divergent logic for the same script
 - `head -1` is used after `find` — verify the script name is specific enough that exactly one match is expected
