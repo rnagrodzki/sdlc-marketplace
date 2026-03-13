@@ -102,7 +102,7 @@ rm -f "$PR_CONTEXT_FILE"
 - Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
 - Exit code 2: Show `Script error — see output above` and stop.
 
-**Error-to-Jira proposal** (optional — requires jira-sdlc):
+**Error-to-GitHub issue proposal**:
 
 For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
 under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
@@ -273,7 +273,7 @@ Title: <title>
 <description>
 ```
 
-**Error-to-Jira proposal** (optional — requires jira-sdlc):
+**Error-to-GitHub issue proposal**:
 
 For non-auth `gh` failures (e.g., server error, unexpected exit), locate the procedure:
 Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`, then retry with cwd.

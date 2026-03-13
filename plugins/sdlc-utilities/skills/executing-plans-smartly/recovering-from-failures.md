@@ -104,9 +104,9 @@ Other waves affected:
 
 Wait for the user's response before proceeding with any affected waves.
 
-**Error-to-Jira proposal** (optional — requires jira-sdlc):
+**Error-to-GitHub issue proposal**:
 
-After escalating, also offer to track the failure as a Jira issue. Locate the procedure:
+After escalating, also offer to track the failure as a GitHub issue. Locate the procedure:
 Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`, then retry with cwd.
 If found, follow the procedure with:
 

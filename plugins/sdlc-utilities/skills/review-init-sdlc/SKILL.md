@@ -316,7 +316,7 @@ EXIT_CODE=$?
 - If exit code **1**: Show the validation errors; offer to fix them automatically.
 - If exit code **2**: Show `Script error — see output above` and stop.
 
-**Error-to-Jira proposal** (optional — requires jira-sdlc):
+**Error-to-GitHub issue proposal**:
 
 For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
 under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:

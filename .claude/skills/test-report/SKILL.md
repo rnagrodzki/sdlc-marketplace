@@ -33,7 +33,7 @@ EXIT_CODE=$?
 - If exit code **2**: Report the script crash, stop.
 - If exit code **0**: Read `DATA_FILE` into `REPORT_DATA_JSON`.
 
-**Error-to-Jira proposal** (optional — requires jira-sdlc):
+**Error-to-GitHub issue proposal**:
 
 For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
 under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:

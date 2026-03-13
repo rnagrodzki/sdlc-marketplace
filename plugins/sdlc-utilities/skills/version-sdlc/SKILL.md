@@ -46,7 +46,7 @@ rm -f "$VERSION_CONTEXT_FILE"
 - Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
 - Exit code 2: Show `Script error — see output above` and stop.
 
-**Error-to-Jira proposal** (optional — requires jira-sdlc):
+**Error-to-GitHub issue proposal**:
 
 For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
 under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
@@ -281,7 +281,7 @@ Resolve any issues found in Step 6 before proceeding. If a blocking issue cannot
 
 **If any git command fails** (commit, tag, or push) with a non-auth error, show the error.
 
-**Error-to-Jira proposal** (optional — requires jira-sdlc):
+**Error-to-GitHub issue proposal**:
 
 Locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`,
 then retry with cwd. If found, follow the procedure with:

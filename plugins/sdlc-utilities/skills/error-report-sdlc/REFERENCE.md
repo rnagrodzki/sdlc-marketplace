@@ -1,4 +1,4 @@
-# Error-to-Jira Proposal — Procedure Reference
+# Error-to-GitHub Issue Proposal — Procedure Reference
 
 Used by `error-report-sdlc`. Follow every section in order.
 
@@ -6,7 +6,7 @@ Used by `error-report-sdlc`. Follow every section in order.
 
 ## Section 1: Error Classification
 
-Only proceed with a Jira proposal for **issue-worthy** errors. Skip silently for all others.
+Only proceed with a GitHub issue proposal for **issue-worthy** errors. Skip silently for all others.
 
 **Issue-worthy** (proceed with proposal):
 
@@ -14,7 +14,7 @@ Only proceed with a Jira proposal for **issue-worthy** errors. Skip silently for
 |---|---|
 | Prepare script crash | Exit code 2 from any `*-prepare.js` script |
 | CLI tool failure | `gh pr create` / `gh pr edit` fails with non-auth error; `git tag` or `git push` fails |
-| Persistent API error | HTTP 400 on the same Jira operation 2+ times in a row |
+| Persistent API error | HTTP 400/5xx on the same external API operation 2+ times in a row |
 | Persistent conflict | HTTP 409 that persists after one retry |
 | Escalated task failure | Task in `executing-plans-smartly` fails after 2 retries |
 | Build failure blocking execution | Build fails and blocks wave progression |
@@ -38,31 +38,23 @@ Only proceed with a Jira proposal for **issue-worthy** errors. Skip silently for
 
 Run these checks before offering the proposal. If any required check fails, **skip the proposal silently** and return to the calling skill's normal error handling.
 
-**Check 1 — jira-prepare.js available:**
+**Check 1 — gh CLI available and authenticated:**
 
 ```bash
-JIRA_SCRIPT=$(find ~/.claude/plugins -name "jira-prepare.js" 2>/dev/null | head -1)
-[ -z "$JIRA_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/jira-prepare.js" ] && JIRA_SCRIPT="plugins/sdlc-utilities/scripts/jira-prepare.js"
+gh auth status
 ```
 
-If `JIRA_SCRIPT` is empty after both attempts → skip proposal. The jira-sdlc capability is not installed.
+If the command fails (exit non-zero) → skip proposal. The user's GitHub CLI is not configured or not authenticated.
 
-**Check 2 — Project key resolvable:**
-
-Attempt resolution in this order:
-1. Git branch pattern: extract `[A-Z]{2,10}` from branch name if it matches `[A-Z]{2,10}-\d+`
-2. `.claude/jira-config.json` field `defaultProject`
-3. If neither yields a key → skip proposal
-
-Store the resolved key as `JIRA_PROJECT_KEY`.
-
-**Check 3 — Cache status (informational only, do not block):**
+**Check 2 — GitHub remote resolvable:**
 
 ```bash
-node "$JIRA_SCRIPT" --project "$JIRA_PROJECT_KEY" --check
+REPO_URL=$(git remote get-url origin 2>/dev/null)
 ```
 
-Note the result. If cache is missing or stale, the proposal can still proceed — jira-sdlc will handle initialization on create.
+If `REPO_URL` is empty or the command fails → skip proposal.
+
+Store `TARGET_REPO=rnagrodzki/sdlc-marketplace` — this is the fixed repository for all tooling error reports.
 
 ---
 
@@ -71,7 +63,7 @@ Note the result. If cache is missing or stale, the proposal can still proceed �
 Present this prompt to the user:
 
 ```
-This error may be worth tracking as a Jira issue. Create one? (yes / no)
+This error may be worth tracking as a GitHub issue. Create one? (yes / no)
   yes — I'll draft the issue with the full error context for your review
   no  — skip, continue with normal error handling
 ```
@@ -121,10 +113,9 @@ Build the title: `[{skill-name}] {one-line error summary}` (max 72 chars).
 Present the assembled issue to the user:
 
 ```
-Proposed Jira Issue:
+Proposed GitHub Issue:
 ───────────────────────────────────────────
 Title:    {assembled title}
-Type:     Bug
 Priority: {High | Medium}
 Labels:   tooling-error, {skill-name}
 
@@ -145,49 +136,38 @@ If the user says `edit`: apply the requested changes, re-present. Loop until `ye
 
 ---
 
-## Section 6: Create the Jira Issue
+## Section 6: Create the GitHub Issue
 
-**6a. Load cache:**
+**6a. Create the issue:**
 
 ```bash
-CACHE_JSON=$(node "$JIRA_SCRIPT" --project "$JIRA_PROJECT_KEY" --load)
+gh issue create \
+  --repo "rnagrodzki/sdlc-marketplace" \
+  --title "<assembled title>" \
+  --body "<filled template content>" \
+  --label "tooling-error" \
+  --label "<skill-name>"
 ```
 
-If `--load` fails (exit non-zero), skip creation silently and report: `Could not load Jira cache — issue not created. Run /jira-sdlc to initialize it.` Then return to normal error handling.
+If a label does not exist on the repository, `gh` will error. In that case, attempt to create the missing label first:
 
-**6b. Resolve issue type:**
-
-Read `cache.issueTypes`. Find the entry whose key or value matches "Bug" (case-insensitive). Use the exact type name string (e.g., `"Bug"`) — not the ID.
-
-If no Bug type found: use the first available issue type and note it in the output.
-
-**6c. Call `mcp__atlassian__createJiraIssue`:**
-
-```
-{
-  cloudId: cache.cloudId,
-  projectKey: JIRA_PROJECT_KEY,
-  issueTypeName: "<resolved bug type name>",
-  summary: "<assembled title>",
-  description: "<filled template content>",
-  contentFormat: "markdown",
-  priority: { name: "<High|Medium>" },
-  labels: ["tooling-error", "<skill-name>"]
-}
+```bash
+gh label create "tooling-error" --repo "rnagrodzki/sdlc-marketplace" --color "d93f0b" 2>/dev/null || true
+gh label create "<skill-name>" --repo "rnagrodzki/sdlc-marketplace" --color "0075ca" 2>/dev/null || true
 ```
 
-Use the MCP prefix that is active in this session (default: `mcp__atlassian__`; may be `mcp__claude_ai_Atlassian__`).
+Then retry `gh issue create`. If it still fails, proceed to 6c.
 
-**6d. On success:** Report the created issue key and URL:
-
-```
-Jira issue created: {KEY}-{number} — {url}
-```
-
-**6e. On failure:** Report the error without retrying:
+**6b. On success:** Report the created issue number and URL:
 
 ```
-Could not create Jira issue: {error}
+GitHub issue created: #<number> — <url>
+```
+
+**6c. On failure:** Report the error without retrying:
+
+```
+Could not create GitHub issue: <error>
 ```
 
 Then return to the calling skill's normal error handling.
@@ -204,7 +184,6 @@ After Section 6 (whether the issue was created, skipped, or failed), **always re
 
 - Propose for user input errors, auth/permission failures, or user cancellations
 - Create an issue without both consent gates passing (Sections 3 and 5)
-- Initialize a new jira-sdlc cache — only use existing cache; skip if absent
-- Retry a failed MCP call
+- Retry a failed gh issue create call
 - Leave `{placeholder}` text in the issue description
 - Block the calling skill's normal error flow

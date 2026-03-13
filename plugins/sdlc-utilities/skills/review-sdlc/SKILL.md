@@ -37,7 +37,7 @@ rm -f "$MANIFEST_FILE"
 - Exit code 1: show the stderr message to the user and stop.
 - Exit code 2: show `Script error — see output above` and stop.
 
-**Error-to-Jira proposal** (optional — requires jira-sdlc):
+**Error-to-GitHub issue proposal**:
 
 For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
 under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
@@ -157,7 +157,7 @@ Wait for the orchestrator to complete and return results.
 
 **If the agent dispatch fails or returns an error** (not a review verdict — an actual agent error):
 
-**Error-to-Jira proposal** (optional — requires jira-sdlc):
+**Error-to-GitHub issue proposal**:
 
 Locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`,
 then retry with cwd. If found, follow the procedure with:
