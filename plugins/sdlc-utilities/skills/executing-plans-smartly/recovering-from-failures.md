@@ -104,6 +104,20 @@ Other waves affected:
 
 Wait for the user's response before proceeding with any affected waves.
 
+**Error-to-Jira proposal** (optional — requires jira-sdlc):
+
+After escalating, also offer to track the failure as a Jira issue. Locate the procedure:
+Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`, then retry with cwd.
+If found, follow the procedure with:
+
+- **Skill**: executing-plans-smartly
+- **Step**: Step 6 — RECOVER (Escalation)
+- **Operation**: Task execution (task name and wave from escalation output above)
+- **Error**: Persistent failure after 2 retries (details from escalation output above)
+- **Suggested investigation**: Review the task description for ambiguity; check whether the task's allowed file list is complete; inspect agent error output for root cause
+
+If not found, skip — the capability is not installed.
+
 ## Rollback Strategy
 
 When a wave produces fundamentally broken output that cannot be recovered through targeted fixes:

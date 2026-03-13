@@ -37,6 +37,19 @@ rm -f "$MANIFEST_FILE"
 - Exit code 1: show the stderr message to the user and stop.
 - Exit code 2: show `Script error — see output above` and stop.
 
+**Error-to-Jira proposal** (optional — requires jira-sdlc):
+
+For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
+under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
+
+- **Skill**: review-sdlc
+- **Step**: Step 0 — review-prepare.js execution
+- **Operation**: Running review-prepare.js to pre-compute review manifest
+- **Error**: Exit code 2 — script crash (full error on stderr)
+- **Suggested investigation**: Check Node.js version; inspect stderr for stack trace; verify review-prepare.js is accessible via the plugin path
+
+If not found, skip — the capability is not installed.
+
 ## Step 1 — Consume Pre-computed Context
 
 Read `MANIFEST_JSON` now.
@@ -142,6 +155,21 @@ REFERENCE_MD_PATH: {resolved absolute path to REFERENCE.md from above}
 
 Wait for the orchestrator to complete and return results.
 
+**If the agent dispatch fails or returns an error** (not a review verdict — an actual agent error):
+
+**Error-to-Jira proposal** (optional — requires jira-sdlc):
+
+Locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`,
+then retry with cwd. If found, follow the procedure with:
+
+- **Skill**: review-sdlc
+- **Step**: Step 3 — Spawn Orchestrator Agent
+- **Operation**: Dispatching review-orchestrator agent
+- **Error**: Agent dispatch failure or error return (details from above)
+- **Suggested investigation**: Check that the review-orchestrator.md agent file is resolvable; verify bypassPermissions mode is active
+
+If not found, skip — the capability is not installed.
+
 ---
 
 ## Step 4 — Report and Cleanup
@@ -177,6 +205,25 @@ and walk through verification, evaluation, self-critique, and implementation.
 
 **If verdict is `APPROVED`** (zero actionable findings): skip this step entirely —
 do not offer self-fix when there is nothing to fix.
+
+---
+
+## Error Recovery
+
+> **Flow**: detect → diagnose → auto-recover (retry once if transient) → invoke `error-report-sdlc` for persistent actionable failures.
+
+| Error | Recovery | Invoke error-report-sdlc? |
+|-------|----------|---------------------------|
+| `review-prepare.js` exit 1 (no dimensions or no changes) | Show stderr; suggest `review-init-sdlc` if no dimensions exist | No — user setup or empty scope |
+| `review-prepare.js` exit 2 (crash) | Show stderr, stop | Yes |
+| Orchestrator agent fails to return | Re-dispatch the orchestrator once with the same manifest | Yes if second attempt also fails |
+
+When invoking `error-report-sdlc`, provide:
+- **Skill**: review-sdlc
+- **Step**: Step 0 (script crash) or Step 3 (orchestrator failure)
+- **Operation**: `review-prepare.js` execution or orchestrator agent dispatch
+- **Error**: exit code 2 + stderr, or agent error output
+- **Suggested investigation**: Check installed plugin version; verify `.claude/review-dimensions/` contains valid dimension files
 
 ---
 

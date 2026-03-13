@@ -19,7 +19,7 @@ Manages Jira issues via the Atlassian MCP with a project metadata cache that eli
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--project <KEY>` | Jira project key to use (e.g., `PROJ`). Auto-detected from git branch or `.claude/jira-config.json` | Auto |
-| `--force-refresh` | Rebuild the project cache from scratch even if it's still fresh | — |
+| `--force-refresh` | Rebuild the project cache from scratch (cache is permanent by default; use when project metadata has changed) | — |
 | `--init-templates` | Copy the skill's default issue type templates to `.claude/jira-templates/` for customization | — |
 
 ---
@@ -148,7 +148,7 @@ Run `/jira-sdlc --init-templates` to export the skill defaults to `.claude/jira-
 
 ## How the Cache Works
 
-The cache is stored at `.claude/jira-cache/<PROJECT_KEY>.json` and is valid for 24 hours. It is refreshed automatically when stale, or immediately when `--force-refresh` is passed.
+The cache is stored at `.claude/jira-cache/<PROJECT_KEY>.json` and is permanent by default — it does not expire on a timer. It is refreshed when `--force-refresh` is passed or when an operation fails due to stale cached data (e.g., invalid transition IDs or changed field schemas), triggering an automatic rebuild and retry.
 
 The cache contains:
 

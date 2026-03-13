@@ -26,9 +26,10 @@ Eliminate all redundant discovery calls after initialization.
 
 On first use, this skill initializes a cache at `.claude/jira-cache/<PROJECT_KEY>.json`
 containing the site's `cloudId`, issue type definitions, field schemas, workflow graphs,
-link types, and user mappings. The cache is valid for 24 hours. After initialization,
-every subsequent operation reads exclusively from the cache — no discovery endpoints are
-called again until the cache expires or `--force-refresh` is passed.
+link types, and user mappings. The cache is permanent by default — it does not expire
+on a timer. After initialization, every subsequent operation reads exclusively from the
+cache. The cache is rebuilt only when `--force-refresh` is passed or when operations
+fail due to stale data (invalid transition IDs, changed field schemas).
 
 Each issue type has a description template (shipped in the skill's `templates/` directory
 and customizable per project at `.claude/jira-templates/<Type>.md`). Templates are filled
@@ -86,9 +87,9 @@ Read the check output:
 
 - If `exists: false` → cache not initialized. Proceed to **Step 1**.
 - If `missing` array contains required sections (`cloudId`, `project`, `issueTypes`, `fieldSchemas`) → cache incomplete. Proceed to **Step 1**.
-- If `fresh: false` → cache stale. Proceed to **Step 1**.
-- If `--force-refresh` passed → ignore freshness. Proceed to **Step 1**.
-- If cache exists, fresh, and complete → load cache via `--load`, skip to **Step 2**.
+- If `--force-refresh` passed → rebuild regardless of age. Proceed to **Step 1**.
+- If `fresh: false` AND `maxAgeHours > 0` → TTL-based expiry exceeded. Proceed to **Step 1**.
+- Otherwise (cache exists, complete, and either permanent or within TTL) → load cache via `--load`, skip to **Step 2**.
 
 Load cache:
 
@@ -111,9 +112,9 @@ with any Jira operation.
 
 ## Step 1 — Deterministic Cache Initialization
 
-> Run this phase only when the cache is missing, stale, incomplete, or `--force-refresh`
-> is set. After it completes, the skill never calls discovery endpoints again until the
-> next refresh.
+> Run this phase only when the cache is missing, incomplete, `--force-refresh` is set,
+> a TTL-based expiry was exceeded, or an operation error triggered an auto-refresh.
+> After it completes, the skill never calls discovery endpoints again until the next refresh.
 
 Announce: "Initializing Jira cache for project `[PROJECT_KEY]`…"
 
@@ -219,7 +220,7 @@ Assemble the full cache object:
 {
   "version": 1,
   "lastUpdated": "<current ISO timestamp>",
-  "maxAgeHours": 24,
+  "maxAgeHours": 0,
   "cloudId": "...",
   "siteUrl": "...",
   "currentUser": { "accountId": "...", "displayName": "...", "email": "..." },
@@ -469,7 +470,8 @@ After operations that reveal new information, update the cache incrementally:
 |---------|---------------------|
 | New user resolved via lookupJiraAccountId | `echo '{"<name>":"<id>"}' \| node "$SCRIPT" --project "$KEY" --save-field userMappings` |
 | Transition from a status not in workflow cache | `echo '<workflows_json>' \| node "$SCRIPT" --project "$KEY" --save-field workflows` |
-| Cache returned stale transition ID (404/400) | Run `--force-refresh` to rebuild |
+| Cache returned stale transition ID (404/400) | **Auto-refresh**: run `--force-refresh`, reload cache, retry operation once |
+| Operation fails with field key or value not in cache | **Auto-refresh**: run `--force-refresh`, reload cache, retry operation once |
 
 ---
 
@@ -477,16 +479,23 @@ After operations that reveal new information, update the cache incrementally:
 
 | Error | Diagnosis | Recovery |
 |-------|-----------|----------|
-| 400 on create | Missing required field or wrong field shape | Check `fieldSchemas` for the issue type; cross-reference REFERENCE.md Section 2 |
-| 400 on transition | Missing required transition field (e.g., resolution) | Check `workflows[type].transitions[status][n].requiredFields`; include required fields |
-| 400 on edit | Wrong field shape or incorrect custom field key | Verify field key spelling (`customfield_XXXXX`); check type in REFERENCE.md Section 2 |
+| 400 on create | Missing required field or wrong field shape | Check `fieldSchemas` for the issue type; cross-reference REFERENCE.md Section 2. If field key or allowed values don't match the API error, **auto-refresh**: run `--force-refresh`, reload cache, retry once |
+| 400 on transition | Missing required transition field (e.g., resolution) | Check `workflows[type].transitions[status][n].requiredFields`; include required fields. If transition ID is not recognized, **auto-refresh**: run `--force-refresh`, reload cache, retry once |
+| 400 on edit | Wrong field shape or incorrect custom field key | Verify field key spelling; check type in REFERENCE.md Section 2. If field no longer exists, **auto-refresh**: run `--force-refresh`, reload cache, retry once |
 | 401 | Auth token expired | Reconnect Atlassian MCP; cannot recover programmatically |
 | 403 | Insufficient permission | Report to user — cannot fix |
 | 404 issue | Issue key wrong or issue deleted | Ask user to verify the issue key |
 | 404 project | Wrong project key or no access | Re-run `--check`; verify cloudId matches the correct site |
 | 409 | Concurrent edit conflict | Retry the operation once |
-| Stale transition | Transition ID no longer valid | Call `getTransitionsForJiraIssue` fresh; run `--force-refresh` if recurring |
-| Repeated 400 (2+ attempts) | Cache may have incorrect schema data | Run `--force-refresh` and retry |
+| Stale transition | Transition ID no longer valid | **Auto-refresh**: run `--force-refresh`, reload cache, retry with new IDs |
+| Repeated 400 (2+ attempts) | Cache may have incorrect schema data | **Auto-refresh**: run `--force-refresh`, reload cache, retry once. If still failing after refresh, invoke `error-report-sdlc` |
+
+When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
+- **Skill**: jira-sdlc
+- **Step**: Step 3 — Execute Operation (operation name)
+- **Operation**: MCP call that failed (e.g., `createJiraIssue`, `transitionJiraIssue`)
+- **Error**: HTTP status + error message from the MCP response
+- **Suggested investigation**: Check if Jira project schema changed; verify cloudId is still valid; confirm the MCP prefix matches the active session
 
 ---
 

@@ -102,6 +102,19 @@ rm -f "$PR_CONTEXT_FILE"
 - Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
 - Exit code 2: Show `Script error — see output above` and stop.
 
+**Error-to-Jira proposal** (optional — requires jira-sdlc):
+
+For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
+under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
+
+- **Skill**: pr-sdlc
+- **Step**: Step 0 — pr-prepare.js execution
+- **Operation**: Running pr-prepare.js to pre-compute PR context
+- **Error**: Exit code 2 — script crash (full error on stderr)
+- **Suggested investigation**: Check Node.js version; inspect stderr for stack trace; verify pr-prepare.js is accessible via the plugin path
+
+If not found, skip — the capability is not installed.
+
 **If `PR_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
 **If `PR_CONTEXT_JSON.warnings` is non-empty**, show the warnings to the user before continuing.
@@ -260,6 +273,20 @@ Title: <title>
 <description>
 ```
 
+**Error-to-Jira proposal** (optional — requires jira-sdlc):
+
+For non-auth `gh` failures (e.g., server error, unexpected exit), locate the procedure:
+Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`, then retry with cwd.
+If found, follow the procedure with:
+
+- **Skill**: pr-sdlc
+- **Step**: Step 6 — Create or Update PR
+- **Operation**: Running `gh pr create` or `gh pr edit`
+- **Error**: gh CLI failure (full error message from above)
+- **Suggested investigation**: Check `gh status`, verify repo permissions, check if branch is pushed to remote
+
+If not found, skip — the capability is not installed.
+
 ---
 
 ## Best Practices
@@ -280,6 +307,27 @@ Title: <title>
 - Execute `gh pr create` or `gh pr edit` without explicit user approval
 - Skip the plan-critique-improve-do-critique-improve cycle before presenting to the user
 - Run git or gh bash commands to gather data — all context comes from `PR_CONTEXT_JSON`
+
+## Error Recovery
+
+> **Flow**: detect → diagnose → auto-recover (retry once if transient) → invoke `error-report-sdlc` for persistent actionable failures.
+
+| Error | Recovery | Invoke error-report-sdlc? |
+|-------|----------|---------------------------|
+| `pr-prepare.js` exit 1 (`errors[]` present) | Show each error, stop | No — user input error |
+| `pr-prepare.js` exit 2 (crash) | Show stderr, stop | Yes |
+| `gh pr create` / `gh pr edit` fails with 5xx or unexpected error | Show error; offer manual fallback (copy title + description) | Yes |
+| `gh` unavailable | Show install instructions | No — user setup |
+| `gh` auth failure | Show `gh auth login` instructions | No — auth, not a bug |
+
+When invoking `error-report-sdlc`, provide:
+- **Skill**: pr-sdlc
+- **Step**: Step 0 (script crash) or Step 6 (gh CLI failure)
+- **Operation**: `pr-prepare.js` execution or `gh pr create` / `gh pr edit`
+- **Error**: exit code 2 + stderr, or gh error output
+- **Suggested investigation**: Check installed plugin version; verify git remote is configured and branch is pushed
+
+---
 
 ## Gotchas
 

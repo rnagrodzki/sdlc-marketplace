@@ -81,6 +81,57 @@ See `./templates.md` for language-specific templates.
 See `./checklist.md` for the full verification checklist.
 ```
 
+## Error Recovery (Required)
+
+Every skill that runs a script or calls an external tool **must** include an `## Error Recovery` section. This section ensures that failures are surfaced cleanly and routed to `error-report-sdlc` when appropriate.
+
+**Standard flow:**
+```
+DETECT → DIAGNOSE → RECOVER-OR-ESCALATE
+```
+- **Detect**: Check exit code, parse `errors[]`, validate output structure
+- **Diagnose**: Match error against known patterns. Classify as: transient (retry once), stale-data (refresh + retry once), or permanent (escalate)
+- **Recover-or-Escalate**: Transient → retry once. Permanent → report to user and stop.
+
+**Standard Error Recovery section template:**
+
+```markdown
+## Error Recovery
+
+> **Flow**: detect → diagnose → auto-recover (retry once if transient) → invoke `error-report-sdlc` for persistent actionable failures.
+
+| Error | Recovery | Invoke error-report-sdlc? |
+|-------|----------|---------------------------|
+| `<script>.js` exit 1 | Show `errors[]`, stop | No — user input error |
+| `<script>.js` exit 2 (crash) | Show stderr, stop | Yes |
+| `<tool>` 5xx or unexpected error | Retry once; show error if persistent | Yes if second attempt fails |
+| `<tool>` unavailable / auth failure | Show setup instructions | No — user setup |
+
+When invoking `error-report-sdlc`, provide:
+- **Skill**: <skill-name>
+- **Step**: <step number and name>
+- **Operation**: <what was being attempted>
+- **Error**: <exit code + stderr or HTTP status + message>
+- **Suggested investigation**: <skill-specific hints>
+```
+
+**When to invoke `error-report-sdlc`:**
+- Script crash (exit code 2) — unexpected, actionable
+- External tool 5xx or unrecoverable failure — unexpected, actionable
+- Do NOT invoke for: user input errors (exit 1), auth failures, tool not installed, expected empty states
+
+**Locating the procedure at runtime:**
+
+```bash
+# Use this pattern in every error-report-sdlc invocation block:
+# Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`,
+# then retry with cwd. If found, follow the procedure. If not found, skip.
+```
+
+See `plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md` for a complete example.
+
+---
+
 ## Rules and Constraints
 
 | Rule | Limit |

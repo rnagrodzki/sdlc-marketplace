@@ -232,6 +232,26 @@ State the correction factually and move on.
 
 ---
 
+## Error Recovery
+
+> **Flow**: detect → diagnose → auto-recover (retry once if transient) → invoke `error-report-sdlc` for persistent actionable failures.
+
+| Error | Recovery | Invoke error-report-sdlc? |
+|-------|----------|---------------------------|
+| `gh pr view` or `gh api` fails to fetch PR comments | Check `gh auth status`; show error; ask user to supply feedback directly | No — auth or permissions issue |
+| Comment references file/line that no longer exists | Note the discrepancy; verify against current HEAD diff | No — expected with rebased PRs |
+| Cannot verify reviewer's claim (no runtime data/external context) | State limitation explicitly; ask user for direction | No — expected limitation |
+| `gh api` 5xx or unexpected server error when posting reply | Retry once; if still failing, show the drafted response for manual posting | Yes if second attempt also fails |
+
+When invoking `error-report-sdlc`, provide:
+- **Skill**: review-receive-sdlc
+- **Step**: Step 7 — RESPOND (posting GitHub thread replies)
+- **Operation**: `gh api` call to post comment reply
+- **Error**: HTTP status + error message from above
+- **Suggested investigation**: Check `gh auth status`; verify PR number is correct and accessible; confirm repo permissions
+
+---
+
 ## Gotchas
 
 - **Contradictory comments across threads:** When reviewer leaves contradictory feedback in

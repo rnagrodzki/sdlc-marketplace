@@ -222,10 +222,12 @@ SCRIPT=$(find ~/.claude/plugins -name "validate-pr-template.js" 2>/dev/null | he
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/validate-pr-template.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/validate-pr-template.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate validate-pr-template.js. Is the sdlc plugin installed?" >&2; exit 2; }
 node "$SCRIPT" --project-root .
+EXIT_CODE=$?
 ```
 
-- If validation **passes**: show the summary table from the script output.
-- If validation **fails**: show the error and offer to fix it automatically.
+- Exit code 0 (validation **passes**): show the summary table from the script output.
+- Exit code 1 (validation **fails**): show the error and offer to fix it automatically.
+- Exit code 2 (script **crash**): show stderr and invoke `error-report-sdlc`.
 
 ---
 
@@ -238,6 +240,27 @@ Before marking complete, verify:
 - No duplicate section headings
 - File was written successfully to `.claude/pr-template.md`
 - Validation script passed
+
+---
+
+## Error Recovery
+
+> **Flow**: detect → diagnose → auto-recover (retry once if transient) → invoke `error-report-sdlc` for persistent actionable failures.
+
+| Error | Recovery | Invoke error-report-sdlc? |
+|-------|----------|---------------------------|
+| Not a git repo (`git rev-parse` fails) | Show error, stop | No — user setup |
+| `validate-pr-template.js` not found | Show error, stop | Yes |
+| `validate-pr-template.js` exit 1 (validation fails) | Show findings, offer auto-fix | No — recoverable |
+| `validate-pr-template.js` exit 2 (crash) | Show stderr, stop | Yes |
+| `gh pr list` fails in Step 1 scan | Skip recent PR signal, continue | No — bonus signal only |
+
+When invoking `error-report-sdlc`, provide:
+- **Skill**: pr-customize-sdlc
+- **Step**: Step 7 — Validate (script crash) or Step 0 (script not found)
+- **Operation**: `validate-pr-template.js` execution
+- **Error**: exit code 2 + stderr
+- **Suggested investigation**: Check installed plugin version; verify script is present in `~/.claude/plugins`
 
 ---
 

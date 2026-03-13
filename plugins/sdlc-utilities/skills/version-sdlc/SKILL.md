@@ -46,6 +46,19 @@ rm -f "$VERSION_CONTEXT_FILE"
 - Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
 - Exit code 2: Show `Script error — see output above` and stop.
 
+**Error-to-Jira proposal** (optional — requires jira-sdlc):
+
+For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
+under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
+
+- **Skill**: version-sdlc
+- **Step**: Step 0 — version-prepare.js execution
+- **Operation**: Running version-prepare.js to pre-compute release context
+- **Error**: Exit code 2 — script crash (full error on stderr)
+- **Suggested investigation**: Check Node.js version; inspect stderr for stack trace; verify version-prepare.js is accessible via the plugin path
+
+If not found, skip — the capability is not installed.
+
 **If `VERSION_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
 **If `VERSION_CONTEXT_JSON.warnings` is non-empty**, show the warnings to the user before continuing.
@@ -266,6 +279,21 @@ Resolve any issues found in Step 6 before proceeding. If a blocking issue cannot
    - Otherwise: `git tag -a ${newTag} -m "Release ${newTag}"`
 6. **Push** (unless `flags.noPush === true`): `git push && git push --tags`
 
+**If any git command fails** (commit, tag, or push) with a non-auth error, show the error.
+
+**Error-to-Jira proposal** (optional — requires jira-sdlc):
+
+Locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`,
+then retry with cwd. If found, follow the procedure with:
+
+- **Skill**: version-sdlc
+- **Step**: Step 8 — Release execution
+- **Operation**: Git commit, tag, or push during release
+- **Error**: Git command failure (full error from above)
+- **Suggested investigation**: Check remote connectivity, verify tag does not already exist, confirm git identity is configured
+
+If not found, skip — the capability is not installed.
+
 Display result:
 
 ```
@@ -314,6 +342,28 @@ If `flags.hotfix === true`, show instead:
 - Push to remote without checking `flags.noPush`
 - Modify the version file if `config.mode === "tag"` — in tag mode, the version lives in git only
 - Omit the pre-condition verification in Step 6 before executing
+
+## Error Recovery
+
+> **Flow**: detect → diagnose → auto-recover (retry once if transient) → invoke `error-report-sdlc` for persistent actionable failures.
+
+| Error | Recovery | Invoke error-report-sdlc? |
+|-------|----------|---------------------------|
+| `version-prepare.js` exit 1 | Show `errors[]`, stop | No — user input error |
+| `version-prepare.js` exit 2 (crash) | Show stderr, stop | Yes |
+| Tag already exists (`conflictsWithNext` true) | Suggest next patch/minor/major; let user choose | No — user decision |
+| `git commit` fails | Show error; check for uncommitted changes or hook failure | Yes if non-hook failure |
+| `git tag` fails | Show error; check for duplicate tag or missing git identity | Yes if non-duplicate failure |
+| `git push --tags` fails | Show error; check remote connectivity and branch protection rules | Yes if non-auth failure |
+
+When invoking `error-report-sdlc`, provide:
+- **Skill**: version-sdlc
+- **Step**: Step 0 (script crash) or Step 8 (git command failure)
+- **Operation**: `version-prepare.js` execution or `git commit`/`git tag`/`git push`
+- **Error**: exit code 2 + stderr, or git error output
+- **Suggested investigation**: Check installed plugin version; verify git identity is configured; confirm remote is accessible
+
+---
 
 ## Gotchas
 

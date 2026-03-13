@@ -201,6 +201,27 @@ sqlite3 -header -column tests/promptfoo/.promptfoo-data/promptfoo.db \
 - Do not assume `named_scores` has data — it is typically `{}` for this project
 - Do not run `promptfoo view` when the user asks for results — use sqlite3 queries instead
 
+## Error Recovery
+
+> **Flow**: detect → diagnose → auto-recover (retry once if transient) → invoke `error-report-sdlc` for persistent actionable failures.
+
+| Error | Recovery | Invoke error-report-sdlc? |
+|-------|----------|---------------------------|
+| DB file not found | Show `promptfoo eval` instructions; stop | No — user setup |
+| `sqlite3` not installed | Show install instructions (`brew install sqlite3`); stop | No — user setup |
+| `sqlite3` query fails with schema error | Try `promptfoo eval --list` to verify DB schema version; stop | No — environment issue |
+| No results for latest eval | List all available evals; ask user to pick one | No — expected (empty run) |
+| `sqlite3` crashes unexpectedly | Show full error; ask user to verify DB is not corrupted | Yes if persistent |
+
+When invoking `error-report-sdlc`, provide:
+- **Skill**: promptfoo-results
+- **Step**: whichever step failed (Step 1–8)
+- **Operation**: sqlite3 query against promptfoo.db
+- **Error**: Full sqlite3 error output
+- **Suggested investigation**: Verify DB schema with `.schema eval_results`; check promptfoo version compatibility
+
+---
+
 ## Quality Gates
 
 Before presenting results to the user:

@@ -17,22 +17,12 @@ cause analysis, and a prioritized fix plan.
 
 ## Step 0 — Run the Prepare Script
 
-Locate `test-report-prepare.js` relative to this skill file, then run it:
+> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Fallback: resolve from skill directory structure
-SCRIPT="$SCRIPT_DIR/test-report-prepare.js"
-
-if [ ! -f "$SCRIPT" ]; then
-  # Try locating via plugin cache path
-  SCRIPT=$(find ~/.claude/plugins -name "test-report-prepare.js" 2>/dev/null | head -1)
-fi
-
-if [ ! -f "$SCRIPT" ]; then
-  echo "ERROR: Could not locate test-report-prepare.js" >&2
-  exit 2
-fi
+SCRIPT=$(find ~/.claude/plugins -name "test-report-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f ".claude/skills/test-report/test-report-prepare.js" ] && SCRIPT=".claude/skills/test-report/test-report-prepare.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate test-report-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 DATA_FILE=$(mktemp /tmp/test-report-data-XXXXXX.json)
 node "$SCRIPT" $ARGUMENTS > "$DATA_FILE"
@@ -42,6 +32,19 @@ EXIT_CODE=$?
 - If exit code **1**: Read the JSON, surface `errors[]` to the user, stop.
 - If exit code **2**: Report the script crash, stop.
 - If exit code **0**: Read `DATA_FILE` into `REPORT_DATA_JSON`.
+
+**Error-to-Jira proposal** (optional — requires jira-sdlc):
+
+For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
+under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
+
+- **Skill**: test-report
+- **Step**: Step 0 — test-report-prepare.js execution
+- **Operation**: Running test-report-prepare.js to pre-compute test data
+- **Error**: Exit code 2 — script crash (full error on stderr)
+- **Suggested investigation**: Check Node.js version; inspect stderr for stack trace; verify test-report-prepare.js is accessible via the plugin path
+
+If not found, skip — the capability is not installed.
 
 Clean up `DATA_FILE` after writing the report.
 
@@ -282,6 +285,26 @@ Top fix priorities:
 
 {IF --compare: "Regressions: {count} | Improvements: {count}"}
 ```
+
+## Error Recovery
+
+> **Flow**: detect → diagnose → auto-recover (retry once if transient) → invoke `error-report-sdlc` for persistent actionable failures.
+
+| Error | Recovery | Invoke error-report-sdlc? |
+|-------|----------|---------------------------|
+| `test-report-prepare.js` exit 1 | Show `errors[]`, stop | No — user input error |
+| `test-report-prepare.js` exit 2 (crash) | Show stderr, stop | Yes |
+| Zero test results (empty eval) | List available evals; ask user to verify | No — expected (empty run) |
+| `.evidences/` directory not writable | Show error; ask user to check permissions | No — environment issue |
+
+When invoking `error-report-sdlc`, provide:
+- **Skill**: test-report
+- **Step**: Step 0 — test-report-prepare.js execution
+- **Operation**: Running test-report-prepare.js to pre-compute test report data
+- **Error**: Exit code 2 — script crash (full error on stderr)
+- **Suggested investigation**: Check Node.js version; inspect stderr for stack trace; verify promptfoo DB exists at `tests/promptfoo/.promptfoo-data/promptfoo.db`
+
+---
 
 ## DO NOT
 

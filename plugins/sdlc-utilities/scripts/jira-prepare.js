@@ -223,7 +223,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
     return;
   }
 
-  const maxAgeHours = typeof cache.maxAgeHours === 'number' ? cache.maxAgeHours : 24;
+  const maxAgeHours = typeof cache.maxAgeHours === 'number' ? cache.maxAgeHours : 0;
   let ageHours      = null;
   let fresh         = false;
 
@@ -231,7 +231,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
     const updatedMs = new Date(cache.lastUpdated).getTime();
     if (!isNaN(updatedMs)) {
       ageHours = (Date.now() - updatedMs) / (1000 * 60 * 60);
-      fresh    = ageHours < maxAgeHours;
+      fresh    = maxAgeHours === 0 ? true : ageHours < maxAgeHours;
     }
   }
 

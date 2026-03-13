@@ -310,7 +310,24 @@ Run the validation script (use `SCRIPT` resolved in Step 2, or re-resolve if Ste
 SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/validate-dimensions.js"
 node "$SCRIPT" --project-root . --markdown
+EXIT_CODE=$?
 ```
+
+- If exit code **1**: Show the validation errors; offer to fix them automatically.
+- If exit code **2**: Show `Script error — see output above` and stop.
+
+**Error-to-Jira proposal** (optional — requires jira-sdlc):
+
+For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
+under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
+
+- **Skill**: review-init-sdlc
+- **Step**: Step 7 — Validate Installation
+- **Operation**: Running validate-dimensions.js to check installed dimensions
+- **Error**: Exit code 2 — script crash (full error on stderr)
+- **Suggested investigation**: Check Node.js version; inspect stderr for stack trace; verify validate-dimensions.js is accessible via the plugin path
+
+If not found, skip — the capability is not installed.
 
 Present the markdown output table.
 

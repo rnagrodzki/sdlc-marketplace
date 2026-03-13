@@ -10,14 +10,15 @@ call — it eliminates guesswork and prevents the most common API errors.
 ## Section 0: Cache Schema
 
 The cache lives at `.claude/jira-cache/<PROJECT_KEY>.json`. It is created on first
-`--check` or `--init`, refreshed when older than `maxAgeHours`, and read before every
-MCP call to avoid redundant API round-trips.
+`--check`, permanent by default (`maxAgeHours: 0`), and read before every MCP call to
+avoid redundant API round-trips. Refreshed only on `--force-refresh`, when required
+sections are missing, or when an operation fails due to stale cached data.
 
 ```json
 {
   "version": 1,
   "lastUpdated": "2026-03-12T10:00:00.000Z",
-  "maxAgeHours": 24,
+  "maxAgeHours": 0,
   "cloudId": "uuid-string",
   "siteUrl": "yoursite.atlassian.net",
   "currentUser": {
@@ -140,12 +141,14 @@ MCP call to avoid redundant API round-trips.
 
 **Key invariant:** Always use `cloudId` from cache — never call
 `getAccessibleAtlassianResources` again after initialization. Similarly, never re-fetch
-`issueTypes`, `fieldSchemas`, `workflows`, or `linkTypes` unless the cache is stale or
-`--force-refresh` is explicitly passed.
+`issueTypes`, `fieldSchemas`, `workflows`, or `linkTypes` unless `--force-refresh` is
+passed or an operation error indicates stale cached data.
 
-Cache staleness check: compare `lastUpdated` + `maxAgeHours` against the current
-timestamp. If the cache is stale, run the full initialization sequence and overwrite the
-file before proceeding.
+Cache permanence: when `maxAgeHours` is `0` (the default), the cache never expires based
+on time — it is refreshed only when `--force-refresh` is passed or when operations fail
+due to stale data. If `maxAgeHours` is set to a positive number, the TTL behavior applies:
+compare `lastUpdated` + `maxAgeHours` against the current timestamp; if stale, run the
+full initialization sequence.
 
 ---
 
