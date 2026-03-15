@@ -1,6 +1,6 @@
 # Recovering From Failures
 
-Reference for the `executing-plans-smartly` skill — Step 6 (RECOVER).
+Reference for the `execute-plan-sdlc` skill — Step 6 (RECOVER).
 
 Maximum retries per task: **2**. After 2 failures on the same task, escalate to the user.
 
@@ -29,6 +29,25 @@ RETRY: Previous attempt failed with the following error:
 Please complete the task fully.
 ```
 Max 1 retry. If it fails again, escalate.
+
+### Model escalation on retry
+
+When re-dispatching a failed task, escalate the model one step up the chain:
+
+```
+haiku → sonnet → opus → user (escalate, do not retry further)
+```
+
+Rules:
+- Model escalation counts as one of the 2 allowed retries — it is not a separate retry budget.
+- Only escalate one step per retry. Do not jump from haiku directly to opus.
+- Always add failure context to the retry prompt regardless of model change. A stronger model with the same bad prompt produces the same bad output.
+- Tasks already on `opus` that fail: re-dispatch once with failure context and the same `opus` model. If that fails, escalate to user immediately.
+
+Add this line at the top of the retry prompt when escalating:
+```
+MODEL ESCALATED: This task previously failed on {previous-model}. You are now running on {new-model}. Previous failure: {brief description}.
+```
 
 ### Incomplete implementation
 Re-dispatch with specific feedback:
@@ -91,6 +110,7 @@ When escalating to the user after 2 failed retries or a systemic failure, provid
 Task: {task name and wave number}
 Failure: {clear description of what went wrong}
 Attempts: {N retries attempted}
+Models used:     {e.g., "haiku (attempt 1), sonnet (attempt 2)"}
 
 Recovery tried:
 {describe each recovery attempt and its outcome}
@@ -110,7 +130,7 @@ After escalating, also offer to track the failure as a GitHub issue. Locate the 
 Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`, then retry with cwd.
 If found, follow the procedure with:
 
-- **Skill**: executing-plans-smartly
+- **Skill**: execute-plan-sdlc
 - **Step**: Step 6 — RECOVER (Escalation)
 - **Operation**: Task execution (task name and wave from escalation output above)
 - **Error**: Persistent failure after 2 retries (details from escalation output above)

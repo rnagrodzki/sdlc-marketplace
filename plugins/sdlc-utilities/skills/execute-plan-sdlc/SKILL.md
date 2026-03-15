@@ -1,14 +1,14 @@
 ---
-name: executing-plans-smartly
-description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, smart execution, execute this plan."
+name: execute-plan-sdlc
+description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan."
 user-invocable: true
 ---
 
-# Executing Plans Smartly
+# Execute Plan (SDLC)
 
 Orchestrate plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. No external sub-skills required.
 
-**Announce at start:** "I'm using the executing-plans-smartly skill."
+**Announce at start:** "I'm using the execute-plan-sdlc skill."
 
 ## Step 0: Prerequisites
 
@@ -46,6 +46,13 @@ For each task, determine three things:
 
 **3. Dependencies** — which tasks must complete before this one (based on file outputs/inputs)
 
+**4. Model assignment** (drives which model the dispatched agent uses):
+- **Trivial** → `haiku` — fast, cheap; frees main context for orchestration
+- **Standard** → `sonnet` — capable, cost-efficient
+- **Complex** → `opus` — most capable, required for architectural and cross-cutting work
+
+The user selects a preset in Step 4 that applies these mappings (or overrides them). See `./classifying-and-waving-tasks.md` for override signals.
+
 Build waves from the dependency graph. See `./classifying-and-waving-tasks.md` for full heuristics, wave-building algorithm, and adaptive sizing table.
 
 Two tasks modifying the same file must be in different waves.
@@ -64,26 +71,36 @@ Note every issue found.
 
 ## Step 4 (IMPROVE): Revise and Confirm
 
-Fix each issue from the critique. Then present the final wave structure:
+Fix each issue from the critique. Then present the final wave structure showing per-task model assignments:
 
 ```
 Execution Plan
 ────────────────────────────────────────────
-Pre-wave (inline):  N trivial tasks
-Wave 1:             N tasks (parallel)
-Wave 2:             N tasks (parallel)
-Wave 3:             N tasks — contains HIGH RISK tasks (will pause for approval)
+Pre-wave:  N trivial tasks
+Wave 1 (N tasks, parallel):
+  - Task A: "short description"     [Trivial  → haiku]
+  - Task B: "short description"     [Standard → sonnet]
+  - Task C: "short description"     [Complex  → opus]
+Wave 2 (N tasks, parallel):
+  - Task D: "short description"     [Standard → sonnet]
+Wave 3 (N tasks — HIGH RISK, will pause):
+  - Task E: "short description"     [Complex  → opus]
 ────────────────────────────────────────────
 Total: N tasks across N waves + pre-wave
 
-Proceed? (yes / edit / cancel)
+Model Presets:
+  A) Speed:     N × haiku, N × sonnet              — fast, low cost
+  B) Balanced:  N × haiku, N × sonnet, N × opus    — default ✓
+  C) Quality:   N × sonnet, N × opus                — max correctness
+
+Select preset (A/B/C) or "custom" to edit individual tasks, then "yes" to execute:
 ```
 
-Wait for explicit user confirmation before executing.
+Always present all 3 presets. Default is Balanced. When the user selects a preset, update the per-task model assignments shown in the wave list before executing. Wait for explicit user confirmation (preset selection + yes/custom/cancel) before executing.
 
 ## Step 5 (DO): Execute
 
-**Pre-wave:** Execute all trivial tasks directly in main context. Mark each complete in TodoWrite.
+**Pre-wave:** Execute all trivial tasks directly in main context (no agent dispatch). Mark each complete in TodoWrite.
 
 **For each wave:**
 
@@ -99,6 +116,7 @@ Approve? (yes / skip / cancel)
 - Exact list of files the agent may touch
 - Expected deliverable: what changed + how to verify
 - For complex tasks: brief summary of relevant changes from prior waves
+- **Model**: pass `model: "<assigned-model>"` to the Agent tool (haiku, sonnet, or opus per the selected preset)
 
 **5c. Collect and verify** — After all agents return:
 - Check each agent's summary for completeness
@@ -128,7 +146,9 @@ See `./recovering-from-failures.md` for the full playbook. Summary:
 
 | Failure Type | Recovery Action |
 |---|---|
-| Agent error / incomplete output | Re-dispatch once with failure context added to prompt |
+| Agent error / incomplete output (haiku task) | Re-dispatch once with failure context added to prompt, escalate model to `sonnet` |
+| Agent error / incomplete output (sonnet task) | Re-dispatch once with failure context added to prompt, escalate model to `opus` |
+| Agent error / incomplete output (opus task) | Re-dispatch once with failure context; no further escalation — escalate to user on second failure |
 | File conflict between agents | Resolve manually in main context; re-run affected verification |
 | Test failure (1-2 tests) | Fix inline in main context |
 | Test failure (3+ tests) | Stop; diagnose root cause before proceeding |
@@ -230,6 +250,8 @@ Do NOT automatically commit, push, or create branches. The user decides what hap
 
 **Wave sizing heuristics are guidelines.** On resource-constrained systems or when tasks share state (databases, caches), reduce wave size to 2–3 regardless of the heuristic table.
 
+**Model escalation is not a retry substitute.** Escalating from haiku to sonnet (or sonnet to opus) gives the agent more capability, but if the failure was caused by a bad prompt or insufficient context, a stronger model won't help. Always add failure context to the retry prompt regardless of model change. Escalation consumes one of the 2 allowed retries.
+
 ## Learning Capture
 
 After completing execution, append to `.claude/learnings/log.md`:
@@ -240,10 +262,11 @@ After completing execution, append to `.claude/learnings/log.md`:
 - Plans that needed mid-execution restructuring and why
 - Projects where default wave sizing was too aggressive or too conservative
 - Tasks where missing context caused incorrect agent output
+- Tasks where the default model assignment was insufficient (e.g., a haiku task that needed sonnet, or a sonnet task that needed opus to handle edge cases)
 
 Format:
 ```
-## YYYY-MM-DD — executing-plans-smartly: <brief summary>
+## YYYY-MM-DD — execute-plan-sdlc: <brief summary>
 <what happened, what was learned>
 ```
 

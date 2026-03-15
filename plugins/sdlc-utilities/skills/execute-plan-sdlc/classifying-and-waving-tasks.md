@@ -1,6 +1,6 @@
 # Classifying Tasks and Building Waves
 
-Reference for the `executing-plans-smartly` skill — Step 2 (CLASSIFY).
+Reference for the `execute-plan-sdlc` skill — Step 2 (CLASSIFY).
 
 ## Complexity Classification Heuristics
 
@@ -33,6 +33,37 @@ When signals are mixed, round up (prefer higher complexity class).
 | Task touches shared state accessible by multiple services | High |
 
 When signals are mixed, round up (prefer higher risk level).
+
+## Model Assignment
+
+Model assignment derives from the complexity class. The three presets in Step 4 apply these mappings across all tasks.
+
+| Complexity | Default Model | Rationale |
+|---|---|---|
+| Trivial | `haiku` | Fast, cheap; frees main context for orchestration |
+| Standard | `sonnet` | Capable, cost-efficient |
+| Complex | `opus` | Most capable; needed for architectural work |
+
+### Override signals
+
+Assign `opus` to a Standard task when:
+- The task involves unfamiliar or poorly documented code
+- The task requires nuanced judgment (choosing between multiple valid approaches)
+- A prior `sonnet` attempt on a similar task in this project failed
+
+Assign `sonnet` to a Complex task when:
+- The task is complex only because it touches many files, but each individual change is mechanical
+- The changes are fully specified with exact code to write (no design judgment needed)
+
+### Model Presets
+
+Always present 3 presets in Step 4, regardless of plan size:
+
+| Preset | Trivial | Standard | Complex | Best when |
+|---|---|---|---|---|
+| **Speed** | haiku | haiku | sonnet | Plan is well-specified, changes are mechanical |
+| **Balanced** | haiku | sonnet | opus | Default — matches complexity to capability |
+| **Quality** | sonnet | opus | opus | Codebase is unfamiliar, tasks are ambiguous |
 
 ## Wave-Building Algorithm
 
@@ -99,6 +130,11 @@ When done, report:
 - Do NOT modify files outside the "Files You May Touch" list
 - If you encounter a genuine blocker, report it clearly rather than guessing or hallucinating an implementation
 - Do not add features, refactor, or clean up code beyond what the task requires
+
+## Execution Context
+- Assigned model: {MODEL — haiku, sonnet, or opus}
+- Attempt: {first attempt | retry N — previous attempt failed: {failure description}}
+- {If model was escalated: "Model escalated from {previous-model} to {this-model} due to prior failure."}
 ```
 
 ## Common Dependency Patterns
