@@ -1,15 +1,15 @@
-# `/executing-plans-smartly` — Plan Execution Orchestrator
+# `/execute-plan-sdlc` — Plan Execution Orchestrator
 
 ## Overview
 
-Orchestrates implementation plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. Classifies each task by complexity and risk, builds dependency-aware execution waves, dispatches agents in parallel, verifies results after each wave, and recovers from failures without stopping. Self-contained — no external sub-skills required. Unlike other skills in this plugin, this skill is not SDLC-specific and omits the `-sdlc` suffix.
+Orchestrates implementation plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. Classifies each task by complexity and risk, assigns a default model (haiku/sonnet/opus), presents 3 execution presets for user selection, dispatches agents in parallel, verifies results after each wave, and recovers from failures with automatic model escalation on retries. Self-contained — no external sub-skills required. When a phase contains 2 or more trivial tasks, they are batched into a single haiku agent rather than executed inline or dispatched separately.
 
 ---
 
 ## Usage
 
 ```text
-/executing-plans-smartly
+/execute-plan-sdlc
 ```
 
 Provide the plan in one of two ways:
@@ -26,6 +26,20 @@ No flags. The skill adapts behavior based on the plan content and task classific
 
 ---
 
+## Model Selection
+
+Each task is assigned a model based on its complexity class. Before executing, the skill presents 3 presets:
+
+| Preset | Trivial | Standard | Complex | Best when |
+|---|---|---|---|---|
+| **Speed** | haiku | haiku | sonnet | Plan is well-specified, changes are mechanical |
+| **Balanced** | haiku | sonnet | opus | Default — matches complexity to capability |
+| **Quality** | sonnet | opus | opus | Codebase is unfamiliar, tasks are ambiguous |
+
+Select a preset with a single letter (A/B/C) or choose `custom` to edit individual task assignments. On retry after failure, the model is automatically escalated one step (haiku → sonnet → opus) and counts toward the 2-retry budget.
+
+---
+
 ## Examples
 
 ### Execute a plan from conversation context
@@ -33,7 +47,7 @@ No flags. The skill adapts behavior based on the plan content and task classific
 After writing or discussing a plan in the current session:
 
 ```text
-/executing-plans-smartly
+/execute-plan-sdlc
 ```
 
 Claude presents the classified wave structure and waits for confirmation before executing:
@@ -41,20 +55,33 @@ Claude presents the classified wave structure and waits for confirmation before 
 ```
 Execution Plan
 ────────────────────────────────────────────
-Pre-wave (inline):  2 trivial tasks
-Wave 1:             3 tasks (parallel)
-Wave 2:             2 tasks (parallel)
-Wave 3:             1 task — contains HIGH RISK tasks (will pause for approval)
+Pre-wave (1 batch agent, 2 trivial tasks):
+  - Task 1: "add environment variable"     [Trivial → haiku]
+  - Task 2: "update config key name"       [Trivial → haiku]
+Wave 1 (3 tasks, parallel):
+  - Task 3: "Create UserService module"    [Standard → sonnet]
+  - Task 4: "Add API route handlers"       [Standard → sonnet]
+  - Task 5: "Write unit tests for models"  [Standard → sonnet]
+Wave 2 (2 tasks, parallel):
+  - Task 6: "Integrate auth middleware"    [Complex  → opus]
+  - Task 7: "Add E2E test coverage"        [Standard → sonnet]
+Wave 3 (1 task — HIGH RISK, will pause):
+  - Task 8: "Update database migration"    [Complex  → opus]
 ────────────────────────────────────────────
 Total: 8 tasks across 3 waves + pre-wave
 
-Proceed? (yes / edit / cancel)
+Model Presets:
+  A) Speed:     6 × haiku, 2 × sonnet                 — fast, low cost
+  B) Balanced:  2 × haiku, 4 × sonnet, 2 × opus       — default ✓
+  C) Quality:   2 × sonnet, 6 × opus                  — max correctness
+
+Select preset (A/B/C) or "custom" to edit individual tasks, then "yes" to execute:
 ```
 
 ### Execute a plan from a file
 
 ```text
-/executing-plans-smartly
+/execute-plan-sdlc
 
 .claude/plans/my-feature-plan.md
 ```

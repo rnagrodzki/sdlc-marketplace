@@ -16,7 +16,7 @@ Only proceed with a GitHub issue proposal for **issue-worthy** errors. Skip sile
 | CLI tool failure | `gh pr create` / `gh pr edit` fails with non-auth error; `git tag` or `git push` fails |
 | Persistent API error | HTTP 400/5xx on the same external API operation 2+ times in a row |
 | Persistent conflict | HTTP 409 that persists after one retry |
-| Escalated task failure | Task in `executing-plans-smartly` fails after 2 retries |
+| Escalated task failure | Task in `execute-plan-sdlc` fails after 2 retries |
 | Build failure blocking execution | Build fails and blocks wave progression |
 
 **NOT issue-worthy** (skip proposal, continue normal error handling):

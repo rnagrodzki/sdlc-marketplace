@@ -106,4 +106,4 @@ No local files are created or modified by this skill.
 - [`/pr-sdlc`](pr-sdlc.md) — Adopts error reporting at Step 0 (script crash) and Step 6 (gh failure)
 - [`/version-sdlc`](version-sdlc.md) — Adopts error reporting at Step 0 (script crash) and Step 8 (git failure)
 - [`/review-sdlc`](review-sdlc.md) — Adopts error reporting at Step 0 (script crash) and Step 3 (orchestrator failure)
-- [`/executing-plans-smartly`](executing-plans-smartly.md) — Adopts error reporting in the Escalation Protocol (after 2 retries)
+- [`/execute-plan-sdlc`](execute-plan-sdlc.md) — Adopts error reporting in the Escalation Protocol (after 2 retries)

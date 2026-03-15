@@ -1,14 +1,14 @@
 ---
-name: executing-plans-smartly
-description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, smart execution, execute this plan."
+name: execute-plan-sdlc
+description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan."
 user-invocable: true
 ---
 
-# Executing Plans Smartly
+# Execute Plan (SDLC)
 
 Orchestrate plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. No external sub-skills required.
 
-**Announce at start:** "I'm using the executing-plans-smartly skill."
+**Announce at start:** "I'm using the execute-plan-sdlc skill."
 
 ## Step 0: Prerequisites
 
@@ -35,7 +35,7 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
 For each task, determine three things:
 
 **1. Complexity class** (drives agent dispatch vs inline execution):
-- **Trivial** — single-file change, config edit, rename, or < 15 lines. Execute inline in main context; agent overhead exceeds the work.
+- **Trivial** — single-file change, config edit, rename, or < 15 lines. If there is 1 trivial task in a phase: execute inline. If there are 2+ trivials in the same phase: batch them into a single haiku agent dispatch.
 - **Standard** — multi-file change, feature implementation, test writing. Dispatch to agent.
 - **Complex** — architectural change, cross-cutting concern, touches > 5 files. Dispatch to agent with extra context.
 
@@ -45,6 +45,13 @@ For each task, determine three things:
 - **High** — breaking changes, credential handling, infrastructure, irreversible operations
 
 **3. Dependencies** — which tasks must complete before this one (based on file outputs/inputs)
+
+**4. Model assignment** (drives which model the dispatched agent uses):
+- **Trivial** → `haiku` — fast, cheap; frees main context for orchestration
+- **Standard** → `sonnet` — capable, cost-efficient
+- **Complex** → `opus` — most capable, required for architectural and cross-cutting work
+
+The user selects a preset in Step 4 that applies these mappings (or overrides them). See `./classifying-and-waving-tasks.md` for override signals.
 
 Build waves from the dependency graph. See `./classifying-and-waving-tasks.md` for full heuristics, wave-building algorithm, and adaptive sizing table.
 
@@ -58,32 +65,47 @@ Before executing any wave, self-review the entire plan:
 - **Dependency integrity**: Does every Wave N+1 task actually depend on something in Wave N? If not, move it earlier
 - **Risk clustering**: Multiple high-risk tasks in the same wave? → Spread across waves for easier rollback
 - **Context sufficiency**: Is each task self-contained enough to dispatch as an agent? Vague tasks produce vague output
-- **Trivial aggregation**: Are trivial tasks that have downstream dependents identified for pre-wave execution?
+- **Trivial aggregation**: Are trivial tasks that have downstream dependents identified for pre-wave execution? If 2+ pre-wave trivials exist, are they flagged for batch agent dispatch?
+- **In-wave trivial batching**: If a wave contains 2+ trivial tasks, are they flagged for a single batch agent dispatch rather than inline execution?
 
 Note every issue found.
 
 ## Step 4 (IMPROVE): Revise and Confirm
 
-Fix each issue from the critique. Then present the final wave structure:
+Fix each issue from the critique. Then present the final wave structure showing per-task model assignments:
 
 ```
 Execution Plan
 ────────────────────────────────────────────
-Pre-wave (inline):  N trivial tasks
-Wave 1:             N tasks (parallel)
-Wave 2:             N tasks (parallel)
-Wave 3:             N tasks — contains HIGH RISK tasks (will pause for approval)
+Pre-wave (1 batch agent, 2 trivial tasks):
+  - Task 1: "short description"     [Trivial → haiku]
+  - Task 2: "short description"     [Trivial → haiku]
+Wave 1 (N agents — includes 1 batch):
+  Batch (2 trivial tasks → 1 haiku agent):
+    - Task A: "short description"   [Trivial → haiku]
+    - Task B: "short description"   [Trivial → haiku]
+  - Task C: "short description"     [Standard → sonnet]
+  - Task D: "short description"     [Complex  → opus]
+Wave 2 (N tasks, parallel):
+  - Task E: "short description"     [Standard → sonnet]
+Wave 3 (N tasks — HIGH RISK, will pause):
+  - Task F: "short description"     [Complex  → opus]
 ────────────────────────────────────────────
 Total: N tasks across N waves + pre-wave
 
-Proceed? (yes / edit / cancel)
+Model Presets:
+  A) Speed:     N × haiku, N × sonnet              — fast, low cost
+  B) Balanced:  N × haiku, N × sonnet, N × opus    — default ✓
+  C) Quality:   N × sonnet, N × opus                — max correctness
+
+Select preset (A/B/C) or "custom" to edit individual tasks, then "yes" to execute:
 ```
 
-Wait for explicit user confirmation before executing.
+Always present all 3 presets. Default is Balanced. When the user selects a preset, update the per-task model assignments shown in the wave list before executing. Wait for explicit user confirmation (preset selection + yes/custom/cancel) before executing.
 
 ## Step 5 (DO): Execute
 
-**Pre-wave:** Execute all trivial tasks directly in main context. Mark each complete in TodoWrite.
+**Pre-wave:** If there is 1 pre-wave trivial task, execute it inline in the main context. If there are 2+ pre-wave trivials, dispatch them as a single batch agent (haiku) using the Batched Trivial Tasks Prompt Template in `./classifying-and-waving-tasks.md`. Mark each complete in TodoWrite after inline execution or after the batch agent returns.
 
 **For each wave:**
 
@@ -94,11 +116,12 @@ Wave N contains high-risk task(s):
 Approve? (yes / skip / cancel)
 ```
 
-**5b. Dispatch agents** — One agent per standard/complex task, all in a single message (parallel). Each agent prompt must include:
+**5b. Dispatch agents** — One agent per standard/complex task, all in a single message (parallel). If the wave contains 2+ trivial tasks, include one additional batch agent (haiku) dispatched alongside the others using the Batched Trivial Tasks Prompt Template in `./classifying-and-waving-tasks.md`. A single trivial in a wave is executed inline before dispatch. Each agent prompt must include:
 - Full task text (never a reference to the plan file — paste the entire task body)
 - Exact list of files the agent may touch
 - Expected deliverable: what changed + how to verify
 - For complex tasks: brief summary of relevant changes from prior waves
+- **Model**: pass `model: "<assigned-model>"` to the Agent tool (haiku, sonnet, or opus per the selected preset)
 
 **5c. Collect and verify** — After all agents return:
 - Check each agent's summary for completeness
@@ -128,7 +151,9 @@ See `./recovering-from-failures.md` for the full playbook. Summary:
 
 | Failure Type | Recovery Action |
 |---|---|
-| Agent error / incomplete output | Re-dispatch once with failure context added to prompt |
+| Agent error / incomplete output (haiku task) | Re-dispatch once with failure context added to prompt, escalate model to `sonnet` |
+| Agent error / incomplete output (sonnet task) | Re-dispatch once with failure context added to prompt, escalate model to `opus` |
+| Agent error / incomplete output (opus task) | Re-dispatch once with failure context; no further escalation — escalate to user on second failure |
 | File conflict between agents | Resolve manually in main context; re-run affected verification |
 | Test failure (1-2 tests) | Fix inline in main context |
 | Test failure (3+ tests) | Stop; diagnose root cause before proceeding |
@@ -210,7 +235,7 @@ Do NOT automatically commit, push, or create branches. The user decides what hap
 - Execute more than 2 retries on any single task
 - Automatically commit, push, or create branches
 - Reference external sub-skills by name — this skill is fully self-contained
-- Dispatch agents for trivial tasks — execute them inline
+- Dispatch a separate agent per trivial task — execute a single trivial inline; batch 2+ trivials into one haiku agent using the Batched Trivial Tasks Prompt Template
 
 ## Gotchas
 
@@ -218,7 +243,11 @@ Do NOT automatically commit, push, or create branches. The user decides what hap
 
 **File conflicts have a blind spot.** Two tasks may not list the same file but still conflict — for example, Task A creates a module and Task B modifies the barrel file that re-exports it. The dependency graph catches explicit file dependencies but not implicit ones (barrel files, config registrations, index files). Check for these during inter-wave critique (Step 5e).
 
-**Trivial task aggregation can backfire.** Only aggregate trivial tasks into pre-wave if they have downstream dependents (e.g., adding an env variable Wave 1 reads). Independent documentation updates don't need to run pre-wave.
+**Trivial pre-wave aggregation has a scope trap.** Only move trivial tasks into pre-wave if they have downstream dependents (e.g., adding an env variable Wave 1 reads). Independent documentation updates don't need to run pre-wave — moving them there delays Wave 1 for no reason.
+
+**Batch agent ordering matters for same-file trivials.** When 2+ trivial tasks in a batch touch the same file, include an Ordering Constraints section in the batch prompt that lists the required sequence. Without it, the agent may apply edits in the wrong order and the second edit will conflict with the first.
+
+**Partial batch failure requires per-task extraction.** When a batch agent reports some tasks as SUCCESS and others as FAILED, do not re-dispatch the entire batch. Extract only the failed tasks and re-dispatch each individually with model escalation (haiku → sonnet). Completed tasks in the batch are final — re-running them risks duplicate changes.
 
 **`bypassPermissions` must be set before agent dispatch.** Agents inherit the session's permission model. If an agent hits a permission prompt, it silently hangs. There is no way to answer it from inside an agent.
 
@@ -230,6 +259,8 @@ Do NOT automatically commit, push, or create branches. The user decides what hap
 
 **Wave sizing heuristics are guidelines.** On resource-constrained systems or when tasks share state (databases, caches), reduce wave size to 2–3 regardless of the heuristic table.
 
+**Model escalation is not a retry substitute.** Escalating from haiku to sonnet (or sonnet to opus) gives the agent more capability, but if the failure was caused by a bad prompt or insufficient context, a stronger model won't help. Always add failure context to the retry prompt regardless of model change. Escalation consumes one of the 2 allowed retries.
+
 ## Learning Capture
 
 After completing execution, append to `.claude/learnings/log.md`:
@@ -240,10 +271,11 @@ After completing execution, append to `.claude/learnings/log.md`:
 - Plans that needed mid-execution restructuring and why
 - Projects where default wave sizing was too aggressive or too conservative
 - Tasks where missing context caused incorrect agent output
+- Tasks where the default model assignment was insufficient (e.g., a haiku task that needed sonnet, or a sonnet task that needed opus to handle edge cases)
 
 Format:
 ```
-## YYYY-MM-DD — executing-plans-smartly: <brief summary>
+## YYYY-MM-DD — execute-plan-sdlc: <brief summary>
 <what happened, what was learned>
 ```
 
