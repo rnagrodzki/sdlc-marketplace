@@ -2,7 +2,7 @@
 
 ## Overview
 
-Orchestrates implementation plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. Classifies each task by complexity and risk, assigns a default model (haiku/sonnet/opus), presents 3 execution presets for user selection, dispatches agents in parallel, verifies results after each wave, and recovers from failures with automatic model escalation on retries. Self-contained — no external sub-skills required.
+Orchestrates implementation plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. Classifies each task by complexity and risk, assigns a default model (haiku/sonnet/opus), presents 3 execution presets for user selection, dispatches agents in parallel, verifies results after each wave, and recovers from failures with automatic model escalation on retries. Self-contained — no external sub-skills required. When a phase contains 2 or more trivial tasks, they are batched into a single haiku agent rather than executed inline or dispatched separately.
 
 ---
 
@@ -55,9 +55,11 @@ Claude presents the classified wave structure and waits for confirmation before 
 ```
 Execution Plan
 ────────────────────────────────────────────
-Pre-wave:  2 trivial tasks
+Pre-wave (1 batch agent, 2 trivial tasks):
+  - Task 1: "add environment variable"     [Trivial → haiku]
+  - Task 2: "update config key name"       [Trivial → haiku]
 Wave 1 (3 tasks, parallel):
-  - Task 3: "Create UserService module"    [Trivial  → haiku]
+  - Task 3: "Create UserService module"    [Standard → sonnet]
   - Task 4: "Add API route handlers"       [Standard → sonnet]
   - Task 5: "Write unit tests for models"  [Standard → sonnet]
 Wave 2 (2 tasks, parallel):
@@ -69,9 +71,9 @@ Wave 3 (1 task — HIGH RISK, will pause):
 Total: 8 tasks across 3 waves + pre-wave
 
 Model Presets:
-  A) Speed:     2 × haiku, 4 × sonnet              — fast, low cost
-  B) Balanced:  1 × haiku, 3 × sonnet, 2 × opus    — default ✓
-  C) Quality:   2 × sonnet, 4 × opus                — max correctness
+  A) Speed:     6 × haiku, 2 × sonnet                 — fast, low cost
+  B) Balanced:  2 × haiku, 4 × sonnet, 2 × opus       — default ✓
+  C) Quality:   2 × sonnet, 6 × opus                  — max correctness
 
 Select preset (A/B/C) or "custom" to edit individual tasks, then "yes" to execute:
 ```

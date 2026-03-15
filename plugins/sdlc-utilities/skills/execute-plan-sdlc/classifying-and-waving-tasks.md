@@ -40,7 +40,7 @@ Model assignment derives from the complexity class. The three presets in Step 4 
 
 | Complexity | Default Model | Rationale |
 |---|---|---|
-| Trivial | `haiku` | Fast, cheap; frees main context for orchestration |
+| Trivial | `haiku` | Fast, cheap; frees main context for orchestration. Single trivial → execute inline. Two or more trivials in the same phase → dispatch as one batch agent. |
 | Standard | `sonnet` | Capable, cost-efficient |
 | Complex | `opus` | Most capable; needed for architectural work |
 
@@ -84,7 +84,9 @@ Always present 3 presets in Step 4, regardless of plan size:
 
 6. **Apply risk spreading:** If a wave contains > 1 high-risk task, move the excess to the next wave
 
-7. **Identify pre-wave trivials:** Trivial tasks that have downstream dependents in Wave 1 should run in the pre-wave (inline, before any agent dispatch)
+7. **Identify pre-wave trivials:** Trivial tasks that have downstream dependents in Wave 1 should run in the pre-wave. If there is only 1 pre-wave trivial, execute it inline. If there are 2+, dispatch them as a single batch agent (see Batched Trivial Tasks Prompt Template below).
+
+8. **Identify in-wave trivial batches:** Within each wave, if 2 or more tasks are classified Trivial, dispatch them together as a single haiku batch agent rather than executing each inline. A single trivial task in a wave is still executed inline. Same-file ordering rules apply within the batch (see Batched Trivial Tasks Prompt Template below).
 
 ## Adaptive Wave Size Cap
 
@@ -136,6 +138,55 @@ When done, report:
 - Attempt: {first attempt | retry N — previous attempt failed: {failure description}}
 - {If model was escalated: "Model escalated from {previous-model} to {this-model} due to prior failure."}
 ```
+
+## Batched Trivial Tasks Prompt Template
+
+Use this template when dispatching 2+ trivial tasks as a single batch agent. Fill all placeholders. Tasks are listed sequentially; the agent completes them in order.
+
+~~~
+You are implementing a batch of trivial tasks from a larger plan. Complete all tasks in the order listed. Each task is small and self-contained.
+
+## Tasks (complete in order)
+
+### Task {N}: {TASK TITLE}
+{PASTE FULL TASK TEXT — include description, acceptance criteria, notes. Never summarize.}
+
+Files you may touch for this task:
+- path/to/file1
+- path/to/file2
+
+---
+
+### Task {N+1}: {TASK TITLE}
+{PASTE FULL TASK TEXT}
+
+Files you may touch for this task:
+- path/to/file3
+
+---
+
+(repeat for each task in the batch)
+
+## Ordering Constraints
+{List any same-file ordering requirements. Example: "Task 2 must complete before Task 3 — both modify config.ts and Task 3 depends on the key Task 2 adds." If none, write "None."}
+
+## Context From Prior Waves
+{Summary of relevant changes already completed. Omit if Wave 1. Be specific about interfaces, exports, and file locations.}
+
+## Expected Output
+For each task, report:
+1. Task title
+2. Files created or modified (one-line summary per file)
+3. Status: SUCCESS or FAILED
+4. If FAILED: what went wrong and what was completed before failure
+
+## Hard Constraints
+- Complete tasks in the listed order
+- Do NOT modify files outside each task's "Files you may touch" list
+- If one task fails, continue to the next — do not stop the batch
+- Report per-task status even if some tasks fail
+- Do not add features, refactor, or clean up beyond what each task requires
+~~~
 
 ## Common Dependency Patterns
 
