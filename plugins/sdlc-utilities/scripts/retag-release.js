@@ -22,8 +22,8 @@
 
 'use strict';
 
-/** @version 2 — retag script version. Bump when behavior changes (e.g. message preservation). */
-const RETAG_SCRIPT_VERSION = 2;
+/** @version 3 — retag script version. Bump when behavior changes (e.g. message preservation). */
+const RETAG_SCRIPT_VERSION = 3;
 
 const fs   = require('node:fs');
 const path = require('node:path');
@@ -125,9 +125,7 @@ function getTagCommit(tag, repoRoot) {
 
 function isAncestor(commit, repoRoot) {
   // Returns true if commit is an ancestor of (or equal to) HEAD
-  const result = exec(`git merge-base --is-ancestor "${commit}" HEAD 2>/dev/null`, { cwd: repoRoot, shell: true });
-  // exit code 0 = ancestor, 1 = not ancestor; exec returns null on non-zero
-  // We need to check exit code directly
+  // exit code 0 = ancestor, 1 = not ancestor
   try {
     execSync(`git merge-base --is-ancestor "${commit}" HEAD`, { cwd: repoRoot, stdio: 'pipe' });
     return true;
@@ -211,6 +209,34 @@ function main() {
 
   console.log(`Expected tag: ${tag}`);
   retagOnHead(tag, repoRoot);
+
+  // Non-blocking changelog advisory — errors here must never fail the script
+  try {
+    if (config.changelog === true) {
+      const changelogFile = config.changelogFile || 'CHANGELOG.md';
+      const changelogPath = path.resolve(repoRoot, changelogFile);
+      const prefix = config.tagPrefix || '';
+      const version = prefix && tag.startsWith(prefix) ? tag.slice(prefix.length) : tag;
+
+      if (fs.existsSync(changelogPath)) {
+        const content = fs.readFileSync(changelogPath, 'utf8');
+        const headingRe = new RegExp(`^##\\s+\\[${version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`, 'm');
+        if (!headingRe.test(content)) {
+          process.stdout.write(
+            `⚠  Changelog advisory: no entry found for ${tag} in ${changelogFile}.\n` +
+            `   Run /version-sdlc --changelog on the main branch to add or verify the entry.\n`
+          );
+        }
+      } else {
+        process.stdout.write(
+          `⚠  Changelog advisory: ${changelogFile} not found but changelog: true in config.\n` +
+          `   Run /version-sdlc --changelog on the main branch to create it.\n`
+        );
+      }
+    }
+  } catch (_) {
+    // changelog check failure must never affect exit code
+  }
 }
 
 main();

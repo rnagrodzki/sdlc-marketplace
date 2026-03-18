@@ -95,6 +95,10 @@ Large repositories may exceed the default git timeout. Set the environment varia
 export CLAUDE_CODE_PLUGIN_GIT_TIMEOUT_MS=300000
 ```
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## License
 
 [AGPL-3.0](LICENSE)

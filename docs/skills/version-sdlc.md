@@ -22,7 +22,7 @@ Manages the full semantic release workflow: detects the version source, bumps th
 | `--init` | Run the setup wizard and write `.claude/version.json`. Safe to re-run. | — |
 | `--pre <label>` | Create a pre-release version (e.g. `beta`, `rc`). Auto-increments the counter on repeated runs. | — |
 | `--no-push` | Commit and tag locally, skip `git push`. | — |
-| `--changelog` | Generate or update `CHANGELOG.md` for this release. | off |
+| `--changelog` | With a bump type: generate a CHANGELOG entry as part of the release. Without a bump type: update the changelog for the already-tagged current version (no new tag created). | off |
 | `--hotfix` | Mark this release as a hotfix for DORA metrics tracking. Annotates the commit message with `[hotfix]` and the tag message body with `Type: hotfix`. | off |
 
 ---
@@ -62,6 +62,32 @@ Does this look right? (yes / tag-only / changelog / cancel)
 
 ```text
 /version-sdlc minor --changelog
+```
+
+### Update changelog for already-tagged version
+
+Run on the main branch after a squash-merge to reconcile the changelog with the actual commits:
+
+```text
+/version-sdlc --changelog
+```
+
+```text
+Existing changelog entry for [1.3.0]:
+──────────────────────────────────────────────
+### Added
+- Dark mode support for the dashboard
+
+Updated changelog entry:
+──────────────────────────────────────────────
+### Added
+- Dark mode support for the dashboard
+
+### Fixed
+- Dark mode toggle state now persists across page reloads
+
+What changed: added 1 fix entry missing from original
+Proceed with update? (yes / edit / cancel)
 ```
 
 ### Tag locally without pushing
@@ -251,6 +277,7 @@ For projects with no version file (the git tag is the version):
 | `tagPrefix` | string | Git tag prefix. Usually `"v"`. Set to `""` for no prefix. |
 | `changelog` | boolean | Generate CHANGELOG by default. Defaults to `false`. |
 | `changelogFile` | string | Path to the CHANGELOG file. Defaults to `"CHANGELOG.md"`. |
+| `ticketPrefix` | string | Optional. Jira/project key prefix (e.g. `"PROJ"`). When set, ticket IDs matching this prefix are extracted from commit messages and appended to changelog entries: `- Added webhook support (PROJ-123)`. |
 
 ### Supported version files
 
@@ -267,6 +294,16 @@ Auto-detected in this priority order:
 | 7 | `version.txt` | Entire file content (trimmed) |
 
 ---
+
+## Changelog Accuracy
+
+The automated changelog is a **draft**, not a source of truth. Squash merges, parallel branches, and post-tag commits mean the changelog generated at release time may be incomplete. See the [Changelog Accuracy and Limitations](../skills/version-sdlc/SKILL.md) section in the SKILL.md for the full limitations table and the 4-layer mitigation strategy.
+
+**Recommended post-merge workflow** when using squash merges:
+1. Merge to main
+2. `git checkout main && git pull`
+3. Run `/version-sdlc --changelog` to reconcile the changelog with the actual tag-to-tag commits
+4. The CI `check-changelog.js` (scaffolded during `--init` when changelog is enabled) validates that an entry exists on every push to main
 
 ## Related Skills
 

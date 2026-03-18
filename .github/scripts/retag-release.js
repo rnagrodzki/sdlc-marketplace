@@ -22,8 +22,12 @@
 
 'use strict';
 
+/** @version 3 — retag script version. Bump when behavior changes (e.g. message preservation). */
+const RETAG_SCRIPT_VERSION = 3;
+
 const fs   = require('node:fs');
 const path = require('node:path');
+const os   = require('node:os');
 const { execSync } = require('node:child_process');
 
 // ---------------------------------------------------------------------------
@@ -121,9 +125,7 @@ function getTagCommit(tag, repoRoot) {
 
 function isAncestor(commit, repoRoot) {
   // Returns true if commit is an ancestor of (or equal to) HEAD
-  const result = exec(`git merge-base --is-ancestor "${commit}" HEAD 2>/dev/null`, { cwd: repoRoot, shell: true });
-  // exit code 0 = ancestor, 1 = not ancestor; exec returns null on non-zero
-  // We need to check exit code directly
+  // exit code 0 = ancestor, 1 = not ancestor
   try {
     execSync(`git merge-base --is-ancestor "${commit}" HEAD`, { cwd: repoRoot, stdio: 'pipe' });
     return true;
@@ -132,8 +134,23 @@ function isAncestor(commit, repoRoot) {
   }
 }
 
+/**
+ * Read the message body of an existing annotated tag.
+ * Returns null if the tag doesn't exist or has no message.
+ * @param {string} tag
+ * @param {string} repoRoot
+ * @returns {string|null}
+ */
+function getTagMessage(tag, repoRoot) {
+  const msg = exec(`git tag -l --format='%(contents)' "${tag}"`, { cwd: repoRoot, shell: true });
+  return msg ? msg.trim() : null;
+}
+
 function retagOnHead(tag, repoRoot) {
   const tagCommit = getTagCommit(tag, repoRoot);
+
+  // Capture original tag message before any deletion so metadata (e.g. Type: hotfix) is preserved
+  const originalMessage = tagCommit ? getTagMessage(tag, repoRoot) : null;
 
   if (tagCommit) {
     if (isAncestor(tagCommit, repoRoot)) {
@@ -148,7 +165,17 @@ function retagOnHead(tag, repoRoot) {
     console.log(`Tag ${tag} does not exist. Creating at HEAD...`);
   }
 
-  execOrThrow(`git tag -a "${tag}" -m "Release ${tag}" HEAD`, { cwd: repoRoot });
+  // Use original tag message if available (preserves metadata such as "Type: hotfix"),
+  // otherwise fall back to a generic "Release <tag>" message.
+  const tagMessage = originalMessage || `Release ${tag}`;
+  const tmpFile = path.join(os.tmpdir(), `retag-msg-${Date.now()}.txt`);
+  try {
+    fs.writeFileSync(tmpFile, tagMessage, 'utf8');
+    execOrThrow(`git tag -a "${tag}" -F "${tmpFile}" HEAD`, { cwd: repoRoot });
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch (_) {}
+  }
+
   execOrThrow(`git push origin "refs/tags/${tag}"`, { cwd: repoRoot });
 
   const headSha = exec('git rev-parse --short HEAD', { cwd: repoRoot });
@@ -182,6 +209,36 @@ function main() {
 
   console.log(`Expected tag: ${tag}`);
   retagOnHead(tag, repoRoot);
+
+  // Non-blocking changelog advisory — errors here must never fail the script
+  try {
+    if (config.changelog === true) {
+      const changelogFile = config.changelogFile || 'CHANGELOG.md';
+      const changelogPath = path.resolve(repoRoot, changelogFile);
+      const prefix = config.tagPrefix || '';
+      const version = prefix && tag.startsWith(prefix) ? tag.slice(prefix.length) : tag;
+
+      if (fs.existsSync(changelogPath)) {
+        const content = fs.readFileSync(changelogPath, 'utf8');
+        const headingRe = new RegExp(`^##\\s+\\[${version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`, 'm');
+        if (!headingRe.test(content)) {
+          process.stdout.write(
+            `⚠  Changelog advisory: no entry found for ${tag} in ${changelogFile}.\n` +
+            `   Run /version-sdlc --changelog on the main branch to add or verify the entry.\n`
+          );
+        }
+      } else {
+        process.stdout.write(
+          `⚠  Changelog advisory: ${changelogFile} not found but changelog: true in config.\n` +
+          `   Run /version-sdlc --changelog on the main branch to create it.\n`
+        );
+      }
+    }
+  } catch (_) {
+    // changelog check failure must never affect exit code
+  }
 }
 
 main();
+
+module.exports = { RETAG_SCRIPT_VERSION };

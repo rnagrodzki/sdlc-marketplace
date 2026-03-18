@@ -440,6 +440,57 @@ function getCommitsSinceRef(sinceRef, projectRoot) {
   return commits;
 }
 
+/**
+ * Get commits between two git refs using a `fromRef..toRef` range.
+ *
+ * Unlike `getCommitsSinceRef` (which always ends at HEAD), this function
+ * targets a closed range — useful for collecting exactly the commits that
+ * make up a specific release.
+ *
+ * Edge cases:
+ * - `fromRef` null/undefined → range = `toRef` (all commits up to toRef)
+ * - `toRef` null/undefined   → falls back to `fromRef..HEAD` (same as getCommitsSinceRef)
+ * - both null/undefined      → range = `HEAD`
+ *
+ * @param {string|null|undefined} fromRef    - Start of range (exclusive); e.g. previous tag
+ * @param {string|null|undefined} toRef      - End of range (inclusive); e.g. current tag
+ * @param {string}                projectRoot - Working directory for git
+ * @returns {Array<{ hash: string, subject: string, body: string, coAuthors: string[] }>}
+ */
+function getCommitsBetweenRefs(fromRef, toRef, projectRoot) {
+  if (!toRef) return getCommitsSinceRef(fromRef, projectRoot);
+
+  const SEP   = '---COMMIT---';
+  const range = fromRef ? `${fromRef}..${toRef}` : toRef;
+  const raw   = exec(
+    `git log --format="${SEP}%n%H%n%s%n%b%n%(trailers:key=Co-authored-by)" ${range}`,
+    { cwd: projectRoot }
+  );
+  if (!raw) return [];
+
+  const commits = [];
+  const blocks  = raw.split(SEP).filter(b => b.trim());
+
+  for (const block of blocks) {
+    const lines = block.trim().split('\n');
+    if (lines.length < 2) continue;
+
+    const hash    = lines[0].trim().slice(0, 8);
+    const subject = lines[1].trim();
+    const rest    = lines.slice(2);
+
+    const coAuthors = rest.filter(l => /^Co-authored-by:/i.test(l.trim())).map(l => l.trim());
+    const bodyLines = rest.filter(l => !/^Co-authored-by:/i.test(l.trim()));
+    const body      = bodyLines.join('\n').trim();
+
+    if (hash && subject) {
+      commits.push({ hash, subject, body, coAuthors });
+    }
+  }
+
+  return commits;
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
@@ -466,4 +517,5 @@ module.exports = {
   // Version-specific
   getTagList,
   getCommitsSinceRef,
+  getCommitsBetweenRefs,
 };
