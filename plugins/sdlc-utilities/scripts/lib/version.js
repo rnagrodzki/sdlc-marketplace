@@ -283,15 +283,31 @@ function computePreRelease(current, label) {
 // ---------------------------------------------------------------------------
 
 /**
- * Parse a Conventional Commit subject line.
+ * Parse a Conventional Commit subject line and optionally extract Jira/project
+ * ticket IDs from the subject and body.
+ *
  * Pattern: `^(\w+)(\([^)]+\))?(!)?: (.+)$`
- * @param {string} subject
- * @returns {{ type: string, scope: string|null, breaking: boolean, description: string }}
+ *
+ * @param {string} subject - The commit subject line.
+ * @param {string} [body=''] - Optional commit body text.
+ * @param {string|null} [ticketPrefix=null] - Optional ticket prefix filter (e.g. `"PROJ"`).
+ *   When provided, only ticket IDs whose prefix matches are included.
+ * @returns {{ type: string, scope: string|null, breaking: boolean, description: string, ticketIds: string[] }}
  */
-function parseConventionalCommit(subject) {
+function parseConventionalCommit(subject, body = '', ticketPrefix = null) {
   const match = subject.match(/^(\w+)(\([^)]+\))?(!)?: (.+)$/);
+
+  // Extract ticket IDs from both subject and body
+  const TICKET_RE = /\b([A-Z][A-Z0-9]+-\d+)\b/g;
+  const combined  = `${subject}\n${body || ''}`;
+  const allIds    = Array.from(combined.matchAll(TICKET_RE), m => m[1]);
+  const filtered  = ticketPrefix
+    ? allIds.filter(id => id.startsWith(`${ticketPrefix}-`))
+    : allIds;
+  const ticketIds = [...new Set(filtered)];
+
   if (!match) {
-    return { type: 'other', scope: null, breaking: false, description: subject };
+    return { type: 'other', scope: null, breaking: false, description: subject, ticketIds };
   }
 
   const type        = match[1];
@@ -302,7 +318,7 @@ function parseConventionalCommit(subject) {
   const scope    = scopeRaw ? scopeRaw.slice(1, -1) : null; // strip parens
   const breaking = bang === '!';
 
-  return { type, scope, breaking, description };
+  return { type, scope, breaking, description, ticketIds };
 }
 
 // ---------------------------------------------------------------------------

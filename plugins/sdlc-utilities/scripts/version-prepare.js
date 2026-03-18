@@ -32,7 +32,7 @@
 const fs   = require('node:fs');
 const path = require('node:path');
 
-const { checkGitState, getTagList, getCommitsSinceRef, getRemoteState } = require('./lib/git');
+const { checkGitState, getTagList, getCommitsSinceRef, getCommitsBetweenRefs, getRemoteState } = require('./lib/git');
 const {
   detectVersionFile, readVersion, validateSemver,
   computeNextVersions, computePreRelease, parseConventionalCommit,
@@ -223,6 +223,142 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
+  // Changelog-update flow (--changelog without a bump type)
+  // -------------------------------------------------------------------------
+
+  if (args.changelog && !args.requestedBump) {
+    const errors   = [...args.warnings.map(() => null).filter(Boolean)];
+    const warnings = [...args.warnings];
+
+    // 1. Read config
+    let config;
+    try {
+      config = readConfig(projectRoot);
+    } catch (err) {
+      errors.push(err.message);
+      output({ flow: 'changelog-update', errors, warnings }, 1);
+      return;
+    }
+
+    if (!config) {
+      errors.push('No version config found. Run /version-sdlc --init to set up versioning for this project.');
+      output({ flow: 'changelog-update', errors, warnings }, 1);
+      return;
+    }
+
+    // 2. Verify git repo
+    try {
+      checkGitState(projectRoot);
+    } catch (err) {
+      errors.push(err.message);
+      output({ flow: 'changelog-update', errors, warnings }, 1);
+      return;
+    }
+
+    // 3. Resolve current version
+    let currentVersion = null;
+
+    if (config.mode === 'file') {
+      const absFilePath = path.join(projectRoot, config.versionFile);
+      try {
+        currentVersion = readVersion(absFilePath, config.fileType);
+      } catch (_) {
+        currentVersion = null;
+      }
+      if (currentVersion === null) {
+        errors.push(`Could not read version from ${config.versionFile}`);
+        output({ flow: 'changelog-update', errors, warnings }, 1);
+        return;
+      }
+    } else {
+      // tag mode
+      const tags = getTagList(projectRoot);
+      if (!tags[0]) {
+        errors.push('No version tags found.');
+        output({ flow: 'changelog-update', errors, warnings }, 1);
+        return;
+      }
+      currentVersion = tags[0].startsWith('v') ? tags[0].slice(1) : tags[0];
+    }
+
+    if (!validateSemver(currentVersion)) {
+      errors.push(`Current version '${currentVersion}' is not valid semver.`);
+      output({ flow: 'changelog-update', errors, warnings }, 1);
+      return;
+    }
+
+    // 4. Build current tag and find previous tag
+    const tagPrefix  = config.tagPrefix || 'v';
+    const currentTag = `${tagPrefix}${currentVersion}`;
+    const allTags    = getTagList(projectRoot);
+
+    if (!allTags.includes(currentTag)) {
+      errors.push(`Tag '${currentTag}' not found. Has the release been tagged yet?`);
+      output({ flow: 'changelog-update', errors, warnings }, 1);
+      return;
+    }
+
+    const currentTagIndex = allTags.indexOf(currentTag);
+    const previousTag     = currentTagIndex < allTags.length - 1
+      ? allTags[currentTagIndex + 1]
+      : null;  // no previous tag — first release
+
+    // 5. Get commits between tags (previousTag..currentTag)
+    const rawCommits = getCommitsBetweenRefs(previousTag, currentTag, projectRoot);
+
+    if (rawCommits.length === 0) {
+      warnings.push('No commits found between the previous tag and current tag.');
+    }
+
+    const commits = rawCommits.map(commit => {
+      const parsed = parseConventionalCommit(commit.subject, commit.body, config.ticketPrefix || null);
+      return {
+        hash:        commit.hash,
+        subject:     commit.subject,
+        body:        commit.body,
+        coAuthors:   commit.coAuthors,
+        type:        parsed.type,
+        scope:       parsed.scope,
+        breaking:    parsed.breaking,
+        description: parsed.description,
+        ticketIds:   parsed.ticketIds,
+      };
+    });
+
+    // 6. Read existing changelog
+    const changelogFile = config.changelogFile || 'CHANGELOG.md';
+    const changelogPath = path.join(projectRoot, changelogFile);
+    const changelogExists = fs.existsSync(changelogPath);
+    let changelogContent  = null;
+
+    if (changelogExists) {
+      const raw = fs.readFileSync(changelogPath, 'utf8');
+      changelogContent = raw.length > 5000 ? raw.slice(0, 5000) : raw;
+    }
+
+    // 7. Output
+    output({
+      flow:         'changelog-update',
+      errors:       [],
+      warnings,
+      config,
+      currentVersion,
+      currentTag,
+      previousTag,
+      commits,
+      flags: {
+        noPush: args.noPush,
+      },
+      changelog: {
+        exists:         changelogExists,
+        filePath:       changelogFile,
+        currentContent: changelogContent,
+      },
+    }, 0);
+    return;
+  }
+
+  // -------------------------------------------------------------------------
   // Release flow
   // -------------------------------------------------------------------------
 
@@ -374,7 +510,7 @@ async function main() {
   }
 
   const commits = rawCommits.map(commit => {
-    const parsed = parseConventionalCommit(commit.subject);
+    const parsed = parseConventionalCommit(commit.subject, commit.body, config.ticketPrefix || null);
     return {
       hash:        commit.hash,
       subject:     commit.subject,
@@ -384,6 +520,7 @@ async function main() {
       scope:       parsed.scope,
       breaking:    parsed.breaking,
       description: parsed.description,
+      ticketIds:   parsed.ticketIds,
     };
   });
 

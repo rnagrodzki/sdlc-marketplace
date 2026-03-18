@@ -140,3 +140,60 @@
         clearly reports that the release cannot proceed. It recommends running /version-sdlc --init
         first to initialize versioning configuration. It does NOT attempt to guess a version or
         proceed with a release. The message is actionable and references the correct command.
+
+- description: "version-sdlc: --changelog standalone updates changelog without creating new tag"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-changelog-update.md"
+    user_request: >
+      Run /version-sdlc --changelog. The version-prepare.js output is provided in the project
+      context. Show the updated changelog entry and what changed compared to the existing entry.
+  assert:
+    # Must identify the current version
+    - type: regex
+      value: '1\.3\.0'
+    # Must NOT propose creating a new tag
+    - type: not-icontains
+      value: "git tag"
+    # Must show a comparison or diff of the changelog change
+    - type: llm-rubric
+      value: >
+        The response reads the version-prepare.js output showing flow="changelog-update",
+        currentVersion=1.3.0, currentTag=v1.3.0, previousTag=v1.2.0, and 2 commits
+        (a dark mode feat and a dark mode fix). It recognises this is a changelog-update
+        flow (not a release). It identifies that the existing ## [1.3.0] entry only has
+        the "dark mode support" feat but is missing the "dark mode toggle state" fix.
+        It drafts an updated entry that includes both commits. It presents the diff to the
+        user and asks for approval. It does NOT create a new tag or bump the version.
+
+- description: "version-sdlc: changelog entries include Jira ticket IDs when ticketPrefix is set"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-changelog-with-tickets.md"
+    user_request: >
+      Run /version-sdlc minor --changelog. The version-prepare.js output is provided in the
+      project context. Show the release plan and the draft changelog entry.
+  assert:
+    # Must show the new version
+    - type: regex
+      value: '2\.1\.0'
+    # Must include PROJ-123 in the changelog draft
+    - type: icontains
+      value: "PROJ-123"
+    # Must include PROJ-456 in the changelog draft
+    - type: icontains
+      value: "PROJ-456"
+    # Must NOT include fabricated ticket IDs
+    - type: not-regex
+      value: 'PROJ-(?!123|456)\d+'
+    # Behavioral: reads ticketPrefix, appends ticket IDs to changelog entries
+    - type: llm-rubric
+      value: >
+        The response reads the version-prepare.js output showing flow="release",
+        requestedBump="minor", config.ticketPrefix="PROJ", and 3 commits with ticketIds.
+        It drafts a ## [2.1.0] changelog entry that includes the two feat commits and one
+        fix commit. The webhook delivery entry includes (PROJ-123) and the token refresh
+        fix includes (PROJ-456). The email digest scheduling entry has no ticket ID (ticketIds
+        is empty for that commit). The ticket IDs are appended in parentheses at the end of
+        each relevant entry line. It presents a release plan and asks for confirmation before
+        proceeding.

@@ -1,6 +1,6 @@
 ---
 name: version-sdlc
-description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow. Consumes pre-computed context from version-prepare.js and handles the complete release process. Arguments: [major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix]. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate."
+description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow, updating an existing changelog entry for the current version. Consumes pre-computed context from version-prepare.js and handles the complete release process. Arguments: [major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix]. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate. Use --changelog without a bump type to update the changelog for the already-tagged current version."
 user-invocable: true
 ---
 
@@ -18,6 +18,7 @@ optional CHANGELOG entry, release commit, and push to origin.
 - Running a full semantic release workflow end-to-end
 - Creating or incrementing pre-release versions (alpha, beta, rc)
 - When the `/version` command delegates here after running `version-prepare.js`
+- Updating a CHANGELOG entry for an already-tagged release (e.g., after a squash merge added commits not captured in the original entry)
 
 ## Workflow
 
@@ -124,16 +125,26 @@ Then scaffold the retag workflow into the project:
 
 If either target file already exists, skip copying it (do not overwrite).
 
+**When `config.changelog === true`** (i.e., user chose `changelog` option, or changelog was already enabled):
+
+3. Copy `plugins/sdlc-utilities/scripts/check-changelog.js` → `.github/scripts/check-changelog.js` (reuse the same `.github/scripts/` directory)
+4. Copy `plugins/sdlc-utilities/templates/check-changelog.yml` → `.github/workflows/check-changelog.yml`
+
+If either target file already exists, skip copying it (do not overwrite).
+
 Display:
 
 ```
 ✓ .claude/version.json written.
 ✓ .github/workflows/retag-release.yml added (auto-fixes tags after squash merge to main).
 ✓ .github/scripts/retag-release.js added.
+✓ .github/workflows/check-changelog.yml added (validates changelog entry exists after each push to main).
+✓ .github/scripts/check-changelog.js added.
 Run /version-sdlc patch to create your first release.
 ```
 
 If a file was skipped because it already existed, show `(already exists — skipped)` instead of `added`.
+The check-changelog lines are only shown when `config.changelog === true`.
 
 **Retag script version check** — after scaffolding (whether files were added or skipped), check if the installed files are up to date:
 
@@ -157,6 +168,13 @@ On `yes`, overwrite the outdated files with the plugin's current copies. On `no`
 ```
 ⚠  Skipped update. Note: hotfix tag metadata (Type: hotfix) will not survive retagging until you update these files.
 ```
+
+**Changelog script version check** — after checking retag files, if `config.changelog === true`:
+
+1. Read `.github/scripts/check-changelog.js` (if it exists) and look for `const CHECK_CHANGELOG_SCRIPT_VERSION = (\d+);`. If absent, treat as version 1.
+2. Read `.github/workflows/check-changelog.yml` (if it exists) and look for `# check-changelog-version: (\d+)`. If absent, treat as version 1.
+3. Read the plugin's current copies and extract their version numbers.
+4. If either installed file's version is less than the plugin's current version, include them in the update prompt alongside outdated retag files.
 
 On `tag-only`, update `suggestedConfig.mode` to `"tag"` before writing. Apply the same workflow scaffolding.
 
@@ -183,6 +201,8 @@ Read `VERSION_CONTEXT_JSON`. Key fields to extract:
 | `commits` | Array of commits since last tag |
 | `flags` | `{ preLabel, noPush, changelog, hotfix }` — parsed CLI flags |
 | `flags.hotfix` | Whether this release is a hotfix (for DORA metrics tracking) |
+| `config.ticketPrefix` | Optional Jira/project key prefix (e.g. `"PROJ"`). When set, ticket IDs matching this prefix are extracted from commits. |
+| `commits[].ticketIds` | Array of extracted ticket IDs (e.g. `["PROJ-123"]`) found in the commit subject and body. Empty array if none. |
 | `conflictsWithNext` | `{ major, minor, patch }` — whether each tag already exists |
 
 ### Step 2 (PLAN): Determine Bump Type and Draft CHANGELOG
@@ -208,6 +228,12 @@ Read `VERSION_CONTEXT_JSON`. Key fields to extract:
 - Rewrite unclear or implementation-focused commit messages into user-facing language
 - Merge closely related commits into single entries where appropriate
 - Never fabricate entries not backed by a real commit
+
+**Ticket ID references** — when `config.ticketPrefix` is set and a commit has non-empty `ticketIds`:
+- Append the ticket IDs in parentheses at the end of the changelog entry: `- Added bulk operations endpoint (PROJ-456)`
+- Multiple IDs for one commit: `(PROJ-456, PROJ-789)`
+- Multiple commits contributing to one merged entry: include all unique ticket IDs from those commits
+- Only include ticket IDs when `config.ticketPrefix` is set — otherwise skip them to avoid false positives from random uppercase patterns
 
 ### Step 3 (CRITIQUE): Self-review Against Quality Gates
 
@@ -261,6 +287,20 @@ Before executing, verify:
 
 Resolve any issues found in Step 6 before proceeding. If a blocking issue cannot be resolved, report it clearly and stop.
 
+### Step 7.5 (CHECK): Verify Installed CI Scripts Are Up To Date
+
+Before executing, check whether the project's installed CI scripts need updating.
+This ensures projects that ran `--init` in a prior session get notified about improvements.
+
+1. Check retag scripts — same version check as described in Branch A Step 4 (retag script version check).
+2. If `config.changelog === true`: check check-changelog scripts — same version check as described in Branch A Step 4 (changelog script version check).
+3. If any scripts are outdated or missing (and `config.changelog === true` for the check-changelog check):
+   - Show the update prompt with what changed
+   - On `yes`: scaffold/overwrite the outdated files
+   - On `no`: warn and continue with the release — this check is non-blocking
+
+The release proceeds regardless of the user's answer. This is informational, not a gate.
+
 ### Step 8 (EXECUTE): Execute the Release
 
 **Only execute after explicit `yes` from Step 5.**
@@ -309,6 +349,98 @@ If `flags.hotfix === true`, show instead:
 ✓ Release v1.3.0 complete (hotfix).
   Commit: abc1234 — chore(release): v1.3.0 [hotfix]
   Tag:    v1.3.0  (annotated with Type: hotfix)
+  Pushed: yes → origin/main
+```
+
+---
+
+### Branch C: Changelog-Update Workflow (`flow === "changelog-update"`)
+
+This branch activates when `/version-sdlc --changelog` is run without a bump type.
+It updates the CHANGELOG entry for the **already-tagged current version** — useful after
+squash merges add commits that weren't captured when the release was originally tagged.
+
+### Step 1 (CONSUME): Read the Context
+
+Read `VERSION_CONTEXT_JSON`. Extract:
+
+| Field | Description |
+| ----- | ----------- |
+| `currentVersion` | The current version string (e.g. `1.2.3`) |
+| `currentTag` | The git tag for the current version (e.g. `v1.2.3`) |
+| `previousTag` | The tag immediately before the current one (e.g. `v1.2.2`), or `null` for the first release |
+| `commits` | Commits between `previousTag` and `currentTag` — the actual commits that make up this release |
+| `commits[].ticketIds` | Ticket IDs extracted from each commit |
+| `changelog.exists` | Whether `CHANGELOG.md` exists |
+| `changelog.filePath` | Path to the changelog file |
+| `changelog.currentContent` | Current content of the changelog (truncated to 5000 chars) |
+| `config.ticketPrefix` | Optional ticket prefix for filtering ticket IDs |
+| `flags.noPush` | Whether to skip pushing |
+
+### Step 2 (CHECK): Validate Preconditions
+
+- If `commits.length === 0`: inform the user `"No commits found between ${previousTag} and ${currentTag}. The changelog may already be up to date."` and stop.
+- If `changelog.exists === false`: inform the user that no CHANGELOG.md was found and offer to create one: `"CHANGELOG.md does not exist. Run /version-sdlc patch --changelog to create it as part of a release, or confirm to create it now with just the current version entry."` Ask yes/no.
+
+### Step 3 (PLAN): Draft Updated Changelog Entry
+
+Draft an updated `## [currentVersion]` changelog entry from the commits between `previousTag` and `currentTag`:
+
+- Use the same commit-type mapping as Branch B Step 2 (`feat` → **Added**, `fix` → **Fixed**, etc.)
+- Apply the same ticket ID rules as Branch B Step 2 (append when `config.ticketPrefix` is set)
+- If an existing `## [currentVersion]` section is present in `changelog.currentContent`:
+  - Compare the existing entries against the commits
+  - Keep entries that are still accurate
+  - Add entries for commits not yet represented
+  - Remove entries that cannot be traced to any commit in the `commits` array (they may be fabricated or from squashed commits that are no longer visible)
+  - **Preserve user-edited entries** — if an entry looks hand-written (not matching a commit description directly), keep it with a note
+- If no existing entry: draft fresh from the commits
+
+### Step 4 (CRITIQUE): Self-review
+
+Apply the same quality gates as Branch B: no fabricated entries, all user-facing commits represented, changelog completeness.
+
+### Step 5 (IMPROVE): Revise Based on Critique
+
+Fix any issues found in Step 4.
+
+### Step 6 (PRESENT): Show the User
+
+Display side-by-side (or sequentially with clear labels):
+
+```
+Existing changelog entry for [currentVersion]:
+──────────────────────────────────────────────
+[show existing ## [currentVersion] section, or "(none)" if no existing entry]
+
+Updated changelog entry:
+──────────────────────────────────────────────
+[show the new draft entry]
+
+What changed: [brief summary of additions/removals]
+```
+
+Ask: `Proceed with update? (yes / edit / cancel)`
+
+If `edit`: ask what to change, revise, present again.
+
+### Step 7 (EXECUTE): Apply the Update
+
+On `yes`:
+
+1. If `changelog.exists === false`: create CHANGELOG.md with a standard header + the new entry.
+2. If the `## [currentVersion]` section exists in the changelog: use the Edit tool to replace it with the updated entry.
+3. If the `## [currentVersion]` section does not exist yet: prepend the entry after the `## [Unreleased]` section (if present) or after the file header.
+4. Stage: `git add <changelog.filePath>`
+5. Commit: `git commit -m "docs: update changelog for ${currentTag}"`
+6. Push (unless `flags.noPush === true`): `git push`
+
+**Do NOT create a new tag.** This workflow only updates the changelog.
+
+Display result:
+```
+✓ Changelog updated for ${currentTag}.
+  Commit: abc1234 — docs: update changelog for v1.2.3
   Pushed: yes → origin/main
 ```
 
@@ -373,6 +505,27 @@ When invoking `error-report-sdlc`, provide:
 - `git push && git push --tags` are two separate pushes. `git push --tags` alone does NOT push the release commit — both commands are required.
 - If the working tree has uncommitted changes at execution time, the release commit will include only the staged version file and changelog changes. Warn the user so they are not surprised by files missing from the commit.
 - `conventionalSummary.suggestedBump` is derived from commit types. If there are no conventional commits since the last tag, the suggested bump may default to `patch` — confirm with the user if this seems wrong.
+
+## Changelog Accuracy and Limitations
+
+The automated changelog is a **draft, not a source of truth**. Correctness is the developer's responsibility. The tooling makes changelog maintenance fast, but cannot guarantee accuracy in all workflows.
+
+### Known Limitations
+
+| Limitation | Why it happens | Impact |
+|---|---|---|
+| **Squash merge loses commit granularity** | Squash-merge collapses N commits into 1. After retag, `previousTag..currentTag` on main sees only the squash commit. | Changelog drafted on the feature branch reflects individual commits; after squash, that detail no longer exists in main's git history. |
+| **Post-tag commits not in changelog** | Commits added after tagging but before merge (e.g. code review fixes). | These changes are released but not documented in the original changelog entry. |
+| **Parallel branches / merge order** | Multiple feature branches tag releases concurrently. Merge order determines which squash commit each tag lands on after retag. | Tag may end up on a different commit than intended; changelog was written against a different commit range. |
+| **Conventional commit compliance** | Changelog quality depends on developers writing `feat:`, `fix:`, etc. Non-conforming commits show as "other" and may be skipped. | Incomplete or inaccurate changelog entries. |
+| **LLM-drafted content** | The changelog entry is generated by an LLM from commit data and may misinterpret scope or miss nuances. | Entries require human review before they are authoritative. |
+
+### Mitigation: 4-Layer Defense
+
+1. **CI validates presence** — `check-changelog.js` (scaffolded during init when changelog is enabled) fails on push to main if no `## [version]` heading exists. Ensures at least a placeholder entry.
+2. **`/version-sdlc --changelog` on main** — After merge, switch to main and run this command. It re-derives the changelog from the actual `previousTag..currentTag` range (not the feature branch), shows a diff against the existing entry, and lets you approve or edit the update without creating a new tag.
+3. **Retag script advisory** — After retagging, `retag-release.js` prints a warning if `changelog: true` and no entry exists for the tag. Reminds developers to verify.
+4. **Manual review** — Before release communications, treat the CHANGELOG as a draft to review, not a finished document.
 
 ## Learning Capture
 
