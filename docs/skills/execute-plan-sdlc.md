@@ -118,7 +118,7 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 
 ## Prerequisites
 
-- **`bypassPermissions` mode** — must be active before invoking. The skill cannot switch modes itself — this is a host-level setting. If it is not active, the skill will stop at Step 0 and ask you to enable it. In Claude Code, Shift+Tab cycles through permission modes. Once confirmed active, the skill explicitly passes `mode: "bypassPermissions"` to every dispatched agent to prevent drift during execution.
+- **Permission mode** — the skill detects your current permission mode at Step 0 and locks it for the entire execution. `bypassPermissions` is recommended for uninterrupted execution, but other modes are supported — subagent permission prompts will surface to the user for manual approval. The mode lock prevents any mode changes during execution regardless of which mode was active at startup.
 - **An implementation plan** — either in the conversation context from the current session, or as a readable file. The plan must have at least 2 tasks; single-task plans don't need orchestration.
 
 ---
