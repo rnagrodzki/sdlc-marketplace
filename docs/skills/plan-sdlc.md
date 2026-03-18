@@ -36,6 +36,8 @@ Not every request needs a full planning pipeline:
 | 4+ files or unclear scope | Full pipeline (Steps 1–7) |
 | Multiple independent subsystems | Flags the split, suggests one plan per subsystem, and waits for your decision |
 
+For plans with 5+ tasks, the skill also writes a `## Key Decisions` section — placed between the plan header and the first task — capturing architecture choices with rationale so executing agents understand *why* an approach was chosen, not just what to do.
+
 ---
 
 ## Examples
@@ -116,6 +118,7 @@ To execute: /execute-plan-sdlc
 | File / Artifact | Description |
 |-----------------|-------------|
 | `$TMPDIR/claude-plans/YYYY-MM-DD-<feature-name>.md` | The written plan document, saved to temp storage. Not placed in the project tree. |
+| `$TMPDIR/claude-plans/<feature-name>-exploration.md` | Temporary exploration scratchpad written during Step 1 (full pipeline only). Updated after every 2 exploration actions and re-read before Step 2 begins. Contains a checkpoint block for session recovery. |
 | `.claude/learnings/log.md` | Planning learnings appended after writing: scope decisions, clarification patterns, decomposition issues. |
 
 ---

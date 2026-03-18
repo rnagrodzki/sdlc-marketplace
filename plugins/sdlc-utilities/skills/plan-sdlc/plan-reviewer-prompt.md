@@ -41,6 +41,7 @@ Task tool (general-purpose):
     | Verification strategy | Each task has an appropriate verification method (not TDD forced on config/docs tasks) |
     | Scope discipline | No tasks beyond stated requirements; no gold-plating |
     | Buildability | An agent with no codebase context could execute each task using only its description |
+    | Decision documentation | Key Decisions section present for plans with 5+ tasks; each rationale references codebase evidence, not preference; no obvious decisions included |
 
     ## Calibration
 

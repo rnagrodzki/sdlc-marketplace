@@ -31,6 +31,11 @@ Ask all questions at once. Wait for answers before continuing.
 | 4+ files or unclear scope | Full pipeline (Steps 1–7) |
 | Multiple independent subsystems | Decompose into separate plans first; suggest one plan per subsystem |
 
+**Session recovery (full pipeline only):** Before beginning exploration, check for an existing scratchpad at `$TMPDIR/claude-plans/<feature-name>-exploration.md`. If one exists:
+> Found exploration notes from a previous session for this feature. Resume from Step 2 using these findings, or restart exploration from scratch?
+
+Wait for explicit user response. If "resume", re-read the scratchpad and skip directly to Step 2. If "restart", delete the scratchpad and begin fresh.
+
 ## Step 1 (CONSUME): Analyze Requirements and Codebase
 
 Parse the requirements into a checklist: each requirement becomes one bullet. Number them.
@@ -43,6 +48,24 @@ Explore the codebase:
 - Naming conventions and code style
 
 Identify constraints: language, framework, existing conventions, testing approach, and anything that limits implementation choices.
+
+**Exploration scratchpad (full pipeline only):** On large codebases, exploration findings scroll out of context before Step 2. Create a scratchpad at `$TMPDIR/claude-plans/<feature-name>-exploration.md` and:
+- After every 2 exploration actions (Glob, Grep, Read, LSP), append key findings: file paths and their roles, interfaces and patterns the feature touches, constraints discovered, approach decisions considered
+- At the end of exploration, append a checkpoint block to the scratchpad:
+  ```
+  ## Checkpoint
+  Status: Step 1 complete
+  Requirements: [your numbered checklist]
+  Timestamp: [ISO timestamp]
+  ```
+- The scratchpad is a working document — not part of the plan output
+
+**Re-anchor before Step 2:** Before leaving Step 1, re-read:
+1. The original requirements (user description or spec file)
+2. Your numbered requirements checklist
+3. The exploration scratchpad (if created)
+
+This counters attention drift — after many exploration calls, the original requirements may have faded from the active context window.
 
 ## Step 2 (PLAN): Decompose Into Tasks
 
@@ -60,6 +83,8 @@ Wait for answer.
 - Each task touches 1–5 files (more than 5 → split the task)
 - Tasks ordered naturally: foundations → features → integration → polish
 - Dependencies made explicit (task B names task A if it needs A's output)
+
+**Key decisions:** While decomposing, note every decision where you chose between multiple valid approaches. Record each in the plan's `## Key Decisions` section. Focus on choices executing agents need to know — decisions where a reasonable implementer might choose differently without the rationale. Skip obvious decisions.
 
 **Per-task metadata (required, consumed by execute-plan-sdlc):**
 
@@ -99,6 +124,8 @@ Do not mandate TDD for config, documentation, or infrastructure tasks.
 ## Step 3 (CRITIQUE): Self-Review Plan
 
 Check each quality gate:
+
+**Re-anchor before critique:** Re-read your requirements checklist from Step 1 before evaluating the quality gates below. The checklist — not your memory of it — is the source of truth for requirements coverage.
 
 | Gate | Check |
 |---|---|

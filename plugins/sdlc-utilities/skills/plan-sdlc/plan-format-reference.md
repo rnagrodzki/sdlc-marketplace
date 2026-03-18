@@ -21,6 +21,28 @@ Every plan document must begin with this header:
 
 All four fields are required. `execute-plan-sdlc` uses `Verification` as the default test command.
 
+## Key Decisions (optional)
+
+Capture architecture and design decisions made during planning that executing agents need to understand. Place this section between the document header and the first task block.
+
+```markdown
+## Key Decisions
+
+- **[Choice A] over [Choice B]:** [Why — reference codebase patterns or constraints, not preference]
+- **[Choice C] over [Choice D]:** [Why]
+```
+
+**What to include:**
+- Choices where a reasonable implementer might choose differently without context
+- Decisions backed by codebase evidence (e.g., "existing modules use pattern X in Y")
+- Architecture decisions that affect multiple tasks
+
+**What to skip:**
+- Obvious decisions where only one reasonable option existed
+- Stylistic preferences with no execution impact
+
+Recommended for plans with 5+ tasks. Omit for simple plans. The Key Decisions section is free-text — `execute-plan-sdlc` does not parse it, but agents receive it as context alongside task descriptions.
+
 ---
 
 ## Per-Task Block (required for every task)
