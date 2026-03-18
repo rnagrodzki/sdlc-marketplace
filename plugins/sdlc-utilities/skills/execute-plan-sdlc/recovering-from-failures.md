@@ -44,6 +44,7 @@ Rules:
 - Model escalation counts as one of the 2 allowed retries — it is not a separate retry budget.
 - Only escalate one step per retry. Do not jump from haiku directly to opus.
 - Always add failure context to the retry prompt regardless of model change. A stronger model with the same bad prompt produces the same bad output.
+- Always pass `mode: "bypassPermissions"` when re-dispatching. Model escalation changes the model, not the mode — both parameters must be set on every dispatch.
 - Tasks already on `opus` that fail: re-dispatch once with failure context and the same `opus` model. If that fails, escalate to user immediately.
 
 Add this line at the top of the retry prompt when escalating:
@@ -111,6 +112,7 @@ When a batch agent reports mixed results (some tasks SUCCESS, some tasks FAILED)
 3. Re-dispatch each failed task as a standalone agent with:
    - The single-task Agent Prompt Template (not the batch template)
    - Model escalated one step: haiku → sonnet
+   - `mode: "bypassPermissions"` passed explicitly to the Agent tool
    - Failure context from the batch report added at the top of the prompt
 4. Treat each extracted retry independently — it counts toward that task's 2-retry budget
 5. If the extracted retry also fails, escalate to the user per the standard escalation protocol
@@ -138,7 +140,7 @@ When an agent reports successful completion but `git diff --stat` shows no chang
 
    Complete the task from scratch — assume none of your previous work exists.
    ```
-   Escalate model one step (haiku → sonnet → opus). This counts toward the 2-retry budget.
+   Escalate model one step (haiku → sonnet → opus) and pass `mode: "bypassPermissions"` explicitly. This counts toward the 2-retry budget.
 
 4. **After the retry, re-run filesystem verification.** Run `git diff --stat` and grep for the verification token. If still no changes, escalate to the user immediately — do not retry a third time. Include: "Agent reported success twice but produced no filesystem changes. Manual implementation required."
 

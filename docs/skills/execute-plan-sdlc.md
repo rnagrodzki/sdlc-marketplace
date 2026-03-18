@@ -118,7 +118,7 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 
 ## Prerequisites
 
-- **`bypassPermissions` mode** — must be active before invoking. Agents inherit the session's permission model; if an agent hits a permission prompt mid-execution, it silently hangs with no recovery path. Switch to `bypassPermissions` mode before running this skill.
+- **`bypassPermissions` mode** — must be active before invoking. The skill locks this mode at startup and explicitly passes `mode: "bypassPermissions"` to every dispatched agent, preventing permission mode drift during execution. If the session is not already in `bypassPermissions` mode when invoked, the skill switches to it in Step 0.
 - **An implementation plan** — either in the conversation context from the current session, or as a readable file. The plan must have at least 2 tasks; single-task plans don't need orchestration.
 
 ---

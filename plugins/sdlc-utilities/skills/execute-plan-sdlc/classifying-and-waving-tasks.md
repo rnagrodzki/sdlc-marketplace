@@ -144,6 +144,7 @@ Use the primary symbol you added or modified (function name, struct name, type n
 
 ## Execution Context
 - Assigned model: {MODEL — haiku, sonnet, or opus}
+- Permission mode: bypassPermissions (set explicitly on this agent — do not change)
 - Attempt: {first attempt | retry N — previous attempt failed: {failure description}}
 - {If model was escalated: "Model escalated from {previous-model} to {this-model} due to prior failure."}
 ```
