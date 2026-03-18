@@ -3,6 +3,6 @@
   "versionFile": "plugins/sdlc-utilities/.claude-plugin/plugin.json",
   "fileType": "plugin.json",
   "tagPrefix": "v",
-  "changelog": false,
+  "changelog": true,
   "changelogFile": "CHANGELOG.md"
 }
