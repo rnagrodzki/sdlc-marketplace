@@ -2,7 +2,7 @@
 
 ## Overview
 
-Orchestrates implementation plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. Classifies each task by complexity and risk, assigns a default model (haiku/sonnet/opus), presents 3 execution presets for user selection, dispatches agents in parallel, verifies results after each wave, and recovers from failures with automatic model escalation on retries. Self-contained — no external sub-skills required. When a phase contains 2 or more trivial tasks, they are batched into a single haiku agent rather than executed inline or dispatched separately.
+Orchestrates implementation plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. Classifies each task by complexity and risk, assigns a default model (haiku/sonnet/opus), presents 3 execution presets for user selection, dispatches agents in parallel, verifies results after each wave, and recovers from failures with automatic model escalation on retries. After each wave, verifies agent output against the filesystem using `git diff` and targeted symbol checks — agent self-reports are never trusted alone. Self-contained — no external sub-skills required. When a phase contains 2 or more trivial tasks, they are batched into a single haiku agent rather than executed inline or dispatched separately.
 
 ---
 
@@ -118,7 +118,7 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 
 ## Prerequisites
 
-- **`bypassPermissions` mode** — must be active before invoking. Agents inherit the session's permission model; if an agent hits a permission prompt mid-execution, it silently hangs with no recovery path. Switch to `bypassPermissions` mode before running this skill.
+- **Permission mode** — the skill detects your current permission mode at Step 0 and locks it for the entire execution. `bypassPermissions` is recommended for uninterrupted execution, but other modes are supported — subagent permission prompts will surface to the user for manual approval. The mode lock prevents any mode changes during execution regardless of which mode was active at startup.
 - **An implementation plan** — either in the conversation context from the current session, or as a readable file. The plan must have at least 2 tasks; single-task plans don't need orchestration.
 
 ---
