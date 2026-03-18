@@ -3,6 +3,10 @@
 This is the append-only learnings log for the `ai-setup-automation` marketplace repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-03-19 — execute-plan-sdlc: 7-improvement upgrade + plan-sdlc new skill
+Executed a 9-task, 2-wave plan upgrading execute-plan-sdlc and creating plan-sdlc. All tasks classified Standard/Complex; no Trivial tasks, so no batching or pre-wave needed. Wave 1 (7 parallel agents) completed cleanly. Spec compliance review found 1 minor issue in plan-reviewer-prompt.md (9-row table vs 8 specified — agent added "Decomposition balance" row not in spec); fixed inline. Wave 2 (2 parallel docs agents) completed cleanly. README update was required post-execution per AGENTS.md — add this check to standard plan-sdlc output for skill additions.
+Key outcome: grouping improvements by target file (not by improvement letter) was the right decomposition strategy — avoided wave conflicts without over-splitting.
+
 ---
 
 ### [DOC_GAP] Documentation not updated after structural feature PRs

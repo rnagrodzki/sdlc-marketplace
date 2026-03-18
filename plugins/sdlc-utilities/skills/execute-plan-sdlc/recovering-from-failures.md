@@ -20,6 +20,9 @@ Maximum retries per task: **2**. After 2 failures on the same task, escalate to 
 | Partial batch failure | Batch agent reports some tasks SUCCESS, some tasks FAILED | Medium |
 | Phantom success | Agent reports task complete, but `git diff --stat` shows no changes to expected files, or canary grep for the verification token fails | High |
 | Permission prompt hang (bypass mode) | Agent times out or hangs despite `mode: "bypassPermissions"` being set | Medium |
+| Agent status: NEEDS_CONTEXT | Agent completion checklist reports STATUS: NEEDS_CONTEXT | Low |
+| Agent status: BLOCKED | Agent completion checklist reports STATUS: BLOCKED | Medium–High |
+| Malformed completion checklist | Agent output is missing the COMPLETE:/VERIFY:/STATUS: block, or it cannot be parsed | Low |
 
 ## Recovery Strategies
 
@@ -158,6 +161,63 @@ When an agent times out or hangs indefinitely despite `mode: "bypassPermissions"
 3. **If the mode parameter appears not to be taking effect consistently:** note this in the escalation message so the user is aware — they may need to re-check their session's permission mode.
 
 In non-bypass modes (`default`, `acceptEdits`, etc.), agents pausing for permission approvals is **expected and normal** — not a failure. The user needs to respond to the prompt to unblock the agent.
+
+### Agent status: NEEDS_CONTEXT
+
+The agent cannot complete the task without additional information. Provide the missing context and re-dispatch:
+
+```
+CONTEXT PROVIDED: The following information you requested has been provided below.
+
+[Include the specific missing information directly in the prompt body]
+
+Complete the task with this additional context. Previous partial work (if any) is already in the filesystem — do not redo it.
+```
+
+This counts as one retry toward the 2-retry budget. If the agent reports NEEDS_CONTEXT again after context was provided, escalate to the user — the task specification may be fundamentally incomplete.
+
+### Agent status: BLOCKED
+
+The agent cannot complete the task. Assess the blocker before acting:
+
+1. **Context problem** — the agent lacks information to proceed:
+   Provide the missing context and re-dispatch with the same or escalated model. Counts as one retry.
+
+2. **Capability problem** — the task requires more reasoning than the assigned model:
+   Re-dispatch with an escalated model (haiku → sonnet → opus). Counts as one retry.
+
+3. **Scope problem** — the task is too large for a single agent dispatch:
+   Break the task into smaller sub-tasks. Each sub-task starts with a fresh retry budget.
+
+4. **Plan problem** — the plan itself is incorrect or contradictory:
+   Escalate to the user immediately — do not retry.
+
+When re-dispatching a blocked task, add at the top of the retry prompt:
+```
+PREVIOUSLY BLOCKED: The previous agent could not complete this task because:
+{blocker description from agent's completion checklist}
+
+{Provide additional context, or describe how the task scope has been adjusted}
+```
+
+### Malformed or missing completion checklist
+
+The agent returned output but the structured completion checklist block is absent or unparseable (cannot extract COMPLETE:/VERIFY:/STATUS: lines).
+
+Treat as incomplete output. Re-dispatch once:
+```
+RETRY: Your previous output did not include the required completion checklist. You must end your response with this exact block:
+
+```
+COMPLETE: files_created=[list or none] files_modified=[list or none] tests_added=[yes|no|n/a] tests_pass=[yes|no|n/a] build_pass=[yes|no|n/a]
+VERIFY: <symbol_name> in <file_path>
+STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
+```
+
+If your previous work is already complete, verify it persists in the filesystem and re-report with the checklist filled in.
+```
+
+This counts as one retry. If the checklist is still missing or malformed on retry, proceed using filesystem verification (git diff, canary check) alone — do not escalate purely due to a missing checklist.
 
 ## Escalation Protocol
 
