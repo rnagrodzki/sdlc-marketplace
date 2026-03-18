@@ -18,6 +18,7 @@ Maximum retries per task: **2**. After 2 failures on the same task, escalate to 
 | Lint failure | Linter reports new violations | Low |
 | File conflict between agents | Two agents in the same wave modified the same file | High |
 | Partial batch failure | Batch agent reports some tasks SUCCESS, some tasks FAILED | Medium |
+| Phantom success | Agent reports task complete, but `git diff --stat` shows no changes to expected files, or canary grep for the verification token fails | High |
 
 ## Recovery Strategies
 
@@ -115,6 +116,33 @@ When a batch agent reports mixed results (some tasks SUCCESS, some tasks FAILED)
 5. If the extracted retry also fails, escalate to the user per the standard escalation protocol
 
 Do not re-dispatch the entire batch — this risks re-applying changes from tasks that already succeeded.
+
+### Phantom success
+
+When an agent reports successful completion but `git diff --stat` shows no changes to the expected files (or the canary grep for the agent's verification token returns no matches):
+
+1. **Do NOT trust the agent's output.** The task is incomplete regardless of what the agent reported.
+
+2. **Diagnose the likely cause:**
+   - Agent used bash `sed`, `awk`, Python, or a compiled program in `/tmp` to patch files instead of the Edit tool → the patch silently failed
+   - Agent wrote to a wrong path (e.g., a copy in `/tmp`) instead of the actual file
+   - Agent hallucinated completing the task without invoking any file-editing tool
+
+3. **Re-dispatch with escalated model and explicit constraints:**
+   ```
+   RETRY: Previous attempt reported success, but git diff shows no changes to the expected files.
+   Your edits did NOT persist. This usually means a method other than the Edit tool was used.
+
+   MANDATORY: Use the Edit tool for every file modification. Do not use bash sed, awk, Python
+   scripts, Go programs, or any other indirect method. Each change must use Edit directly.
+
+   Complete the task from scratch — assume none of your previous work exists.
+   ```
+   Escalate model one step (haiku → sonnet → opus). This counts toward the 2-retry budget.
+
+4. **After the retry, re-run filesystem verification.** Run `git diff --stat` and grep for the verification token. If still no changes, escalate to the user immediately — do not retry a third time. Include: "Agent reported success twice but produced no filesystem changes. Manual implementation required."
+
+5. **For phantom success in batch agents:** Extract the phantom-success tasks from the batch. Re-dispatch each individually (not as a batch) with the constraints above and model escalation. Tasks that genuinely succeeded in the batch remain final — do not re-run them.
 
 ## Escalation Protocol
 

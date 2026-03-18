@@ -35,7 +35,7 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
 For each task, determine three things:
 
 **1. Complexity class** (drives agent dispatch vs inline execution):
-- **Trivial** — single-file change, config edit, rename, or < 15 lines. If there is 1 trivial task in a phase: execute inline. If there are 2+ trivials in the same phase: batch them into a single haiku agent dispatch.
+- **Trivial** — single-file change, config edit, rename, or < 15 lines at a single edit location. A task that edits multiple distinct locations in a single file (e.g., struct definition + interface implementation + init function + getter) is **Standard**, not Trivial, even if total line count is under 15. If there is 1 trivial task in a phase: execute inline. If there are 2+ trivials in the same phase: batch them into a single haiku agent dispatch.
 - **Standard** — multi-file change, feature implementation, test writing. Dispatch to agent.
 - **Complex** — architectural change, cross-cutting concern, touches > 5 files. Dispatch to agent with extra context.
 
@@ -124,10 +124,18 @@ Approve? (yes / skip / cancel)
 - **Model**: pass `model: "<assigned-model>"` to the Agent tool (haiku, sonnet, or opus per the selected preset)
 
 **5c. Collect and verify** — After all agents return:
-- Check each agent's summary for completeness
-- Detect file conflicts (two agents touched the same file)
-- Run verification commands specified in the plan (tests, build, lint)
-- On failure → apply recovery from Step 6
+
+1. **Filesystem verification (mandatory, always first):** Run `git diff --stat` in the main context. For each agent, confirm that the files it claimed to modify actually appear in the diff. If an agent reported success but `git diff --stat` shows no changes to its expected files, classify this as a **phantom success** (see Step 6).
+
+2. **Canary check per agent:** For each agent that reported creating or modifying code, grep in the main context for the verification token the agent reported (`VERIFY: <symbol> in <file>`). This catches cases where `git diff` shows the file changed but the agent's actual edits were incomplete or overwritten.
+
+3. **Conflict detection:** Check `git diff --stat` for files touched by multiple agents in this wave. If found, treat as a file conflict.
+
+4. **Verification suite:** Run verification commands specified in the plan (tests, build, lint).
+
+5. On any failure → apply recovery from Step 6.
+
+**Never trust agent self-reports alone.** An agent reporting "modified 3 files, build passes" means nothing until `git diff --stat` confirms the files changed and a build in the main context confirms it compiles.
 
 **5d. Progress report** — After each wave:
 ```
@@ -159,6 +167,7 @@ See `./recovering-from-failures.md` for the full playbook. Summary:
 | Test failure (3+ tests) | Stop; diagnose root cause before proceeding |
 | Build failure | Stop immediately; fix before next wave |
 | Lint failure | Fix inline; never block a wave on lint-only failures |
+| Phantom success (agent reports done, files unchanged) | Re-dispatch with model escalation and Edit-tool-only constraint; see recovering-from-failures.md |
 | Persistent failure (2+ retries) | Escalate to user with full context |
 
 Maximum retries per task: **2**. After 2 failures, escalate.
@@ -260,6 +269,8 @@ Do NOT automatically commit, push, or create branches. The user decides what hap
 **Wave sizing heuristics are guidelines.** On resource-constrained systems or when tasks share state (databases, caches), reduce wave size to 2–3 regardless of the heuristic table.
 
 **Model escalation is not a retry substitute.** Escalating from haiku to sonnet (or sonnet to opus) gives the agent more capability, but if the failure was caused by a bad prompt or insufficient context, a stronger model won't help. Always add failure context to the retry prompt regardless of model change. Escalation consumes one of the 2 allowed retries.
+
+**Agents may bypass the Edit tool.** Agents sometimes use bash `sed`, `awk`, Python scripts, or compiled programs in `/tmp` to modify files instead of the Edit tool. These approaches are fragile (wrong line numbers, regex mismatches, wrong working directory) and silently fail — the agent reports success, but the file is unchanged or corrupted. The Hard Constraints in the agent prompt forbid this, but the filesystem verification in Step 5c catches cases where the constraint was ignored.
 
 ## Learning Capture
 

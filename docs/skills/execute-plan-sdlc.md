@@ -2,7 +2,7 @@
 
 ## Overview
 
-Orchestrates implementation plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. Classifies each task by complexity and risk, assigns a default model (haiku/sonnet/opus), presents 3 execution presets for user selection, dispatches agents in parallel, verifies results after each wave, and recovers from failures with automatic model escalation on retries. Self-contained — no external sub-skills required. When a phase contains 2 or more trivial tasks, they are batched into a single haiku agent rather than executed inline or dispatched separately.
+Orchestrates implementation plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. Classifies each task by complexity and risk, assigns a default model (haiku/sonnet/opus), presents 3 execution presets for user selection, dispatches agents in parallel, verifies results after each wave, and recovers from failures with automatic model escalation on retries. After each wave, verifies agent output against the filesystem using `git diff` and targeted symbol checks — agent self-reports are never trusted alone. Self-contained — no external sub-skills required. When a phase contains 2 or more trivial tasks, they are batched into a single haiku agent rather than executed inline or dispatched separately.
 
 ---
 

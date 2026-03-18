@@ -8,7 +8,8 @@ Reference for the `execute-plan-sdlc` skill — Step 2 (CLASSIFY).
 |---|---|
 | Task mentions "rename", "update config", "change value", "add import" | Trivial |
 | Task body is < 3 sentences with a single clear action | Trivial |
-| Task creates or modifies 1 file with a well-defined output | Trivial |
+| Task creates or modifies 1 file with a well-defined output at a single location | Trivial |
+| Task edits multiple distinct locations in a single file (e.g., struct + interface + init + getter) | Standard |
 | Task creates or modifies 2–4 files with clear outputs | Standard |
 | Task implements a feature, writes tests, adds a component | Standard |
 | Task involves > 5 files or cross-cutting concerns | Complex |
@@ -130,8 +131,16 @@ When done, report:
 ## Hard Constraints
 - Do NOT read the plan file — all task information is provided above
 - Do NOT modify files outside the "Files You May Touch" list
+- **Use the Edit tool exclusively for all file modifications.** Never use bash sed, awk, perl, Python scripts, Go programs, or any other indirect method to patch files. If a file needs changing, use Edit. No exceptions.
 - If you encounter a genuine blocker, report it clearly rather than guessing or hallucinating an implementation
 - Do not add features, refactor, or clean up code beyond what the task requires
+
+## Verification Token
+After completing all edits, report a verification token on its own line:
+```
+VERIFY: <symbol_name> in <file_path>
+```
+Use the primary symbol you added or modified (function name, struct name, type name, config key, or variable name). The orchestrator greps for this symbol to confirm your changes persisted.
 
 ## Execution Context
 - Assigned model: {MODEL — haiku, sonnet, or opus}
@@ -183,9 +192,17 @@ For each task, report:
 ## Hard Constraints
 - Complete tasks in the listed order
 - Do NOT modify files outside each task's "Files you may touch" list
+- **Use the Edit tool exclusively for all file modifications.** Never use bash sed, awk, perl, Python scripts, Go programs, or any other indirect method to patch files. If a file needs changing, use Edit. No exceptions.
 - If one task fails, continue to the next — do not stop the batch
 - Report per-task status even if some tasks fail
 - Do not add features, refactor, or clean up beyond what each task requires
+
+## Verification Tokens
+After completing all tasks, report one verification token per task on its own line:
+```
+VERIFY Task {N}: <symbol_name> in <file_path>
+```
+Use the primary symbol added or modified in each task. The orchestrator greps for these symbols to confirm changes persisted.
 ~~~
 
 ## Common Dependency Patterns
