@@ -62,3 +62,11 @@ What must be in place before running this skill:
 ## Related Skills
 
 - [`/other-sdlc`](other-sdlc.md) — brief reason to use it together or as a follow-up
+
+<!--
+NOTE: This section is for GitHub markdown browsing only.
+On the site (rnagrodzki.github.io/sdlc-marketplace), Related Skills are rendered
+as styled SkillCard tiles auto-generated from `site/src/data/skills-meta.ts` connections.
+The remark-strip-related-skills plugin removes this section before site rendering.
+To add/update related skills on the site, edit the `connections` array in skills-meta.ts.
+-->

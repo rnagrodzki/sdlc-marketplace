@@ -3,6 +3,7 @@ import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
 import remarkRewriteLinks from './plugins/remark-rewrite-links.mjs';
+import remarkStripRelatedSkills from './plugins/remark-strip-related-skills.mjs';
 
 export default defineConfig({
   site: 'https://rnagrodzki.github.io',
@@ -13,7 +14,7 @@ export default defineConfig({
     sitemap(),
   ],
   markdown: {
-    remarkPlugins: [remarkRewriteLinks],
+    remarkPlugins: [remarkRewriteLinks, remarkStripRelatedSkills],
   },
   vite: {
     plugins: [

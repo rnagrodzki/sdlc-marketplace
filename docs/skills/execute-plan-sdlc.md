@@ -10,6 +10,7 @@ Orchestrates implementation plan execution with adaptive task classification, wa
 
 ```text
 /execute-plan-sdlc
+/execute-plan-sdlc --preset B
 ```
 
 Provide the plan in one of two ways:
@@ -22,7 +23,9 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 
 ## Flags
 
-No flags. The skill adapts behavior based on the plan content and task classification.
+| Flag | Description | Default |
+|---|---|---|
+| `--preset <A\|B\|C>` | Auto-select a model preset, skipping the interactive selection prompt. `A` = Speed, `B` = Balanced, `C` = Quality. Invalid values fall back to interactive selection. | Interactive prompt |
 
 ---
 
@@ -133,6 +136,14 @@ Select preset (A/B/C), "custom" to edit individual tasks, or "cancel":
 ```
 
 Claude loads the plan from the specified file, validates it, classifies tasks, and presents the wave structure for confirmation.
+
+### Skip preset selection
+
+```text
+/execute-plan-sdlc --preset B
+```
+
+Claude applies the Balanced preset automatically and proceeds to execution after showing the wave structure — no interactive prompt.
 
 ### High-risk task gate
 
