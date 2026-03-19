@@ -1,5 +1,6 @@
 {
   "name": "sdlc-marketplace-docs",
+  "packageManager": "pnpm@10.28.1",
   "type": "module",
   "version": "0.1.0",
   "scripts": {
