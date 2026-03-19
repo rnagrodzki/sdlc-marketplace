@@ -45,11 +45,9 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | [`/review-receive-sdlc`](docs/skills/review-receive-sdlc.md) | Process code review feedback with verification, self-critique, and implementation |
 | [`/version-sdlc`](docs/skills/version-sdlc.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
 | [`/commit-sdlc`](docs/skills/commit-sdlc.md) | Analyze staged changes, generate a commit message matching project style, stash unstaged changes, and commit |
-| [`/plugin-check-sdlc`](docs/skills/plugin-check-sdlc.md) | Validate the plugin discovery chain (manifests, skills, hooks) |
 | [`/plan-sdlc`](docs/skills/plan-sdlc.md) | Write an implementation plan from requirements, a spec, or a user description — produces plans optimized for execute-plan-sdlc |
 | [`/execute-plan-sdlc`](docs/skills/execute-plan-sdlc.md) | Execute an implementation plan with adaptive task classification, wave-based parallel dispatch, and automatic error recovery |
 | [`/jira-sdlc`](docs/skills/jira-sdlc.md) | Create, edit, search, and transition Jira issues with cached project metadata |
-| `error-report-sdlc` *(internal)* | Propose GitHub issue creation when skills encounter actionable errors — invoked by other skills, not user-invocable |
 
 ---
 

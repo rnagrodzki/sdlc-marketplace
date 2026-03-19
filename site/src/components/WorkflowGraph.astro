@@ -14,7 +14,6 @@ const colorMap: Record<string, string> = {
   review: 'var(--color-review)',
   gitops: 'var(--color-gitops)',
   integrations: 'var(--color-integrations)',
-  internal: 'var(--color-internal)',
 };
 
 const colorHex: Record<string, string> = {
@@ -22,7 +21,6 @@ const colorHex: Record<string, string> = {
   review: '#f59e0b',
   gitops: '#22c55e',
   integrations: '#a855f7',
-  internal: '#6b7280',
 };
 
 // --- Layout constants ---
@@ -162,7 +160,7 @@ const hasHighlight = highlightSlugs && highlightSlugs.length > 0;
     class="wf-svg"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="Skill workflow diagram showing how 12 SDLC skills connect across Plan, Review, and Ship lanes"
+    aria-label="Skill workflow diagram showing how 10 SDLC skills connect across Plan, Review, and Ship lanes"
   >
     <defs>
       {/* Arrowhead markers */}
@@ -412,7 +410,7 @@ const hasHighlight = highlightSlugs && highlightSlugs.length > 0;
                     <code class="wf-mobile-command">{node.command}</code>
                     <span class="wf-mobile-tagline">{node.tagline}</span>
                   </a>
-                  {i < laneNodes.length - 1 && lane !== 'utility' && (
+                  {i < laneNodes.length - 1 && (
                     <span class="wf-mobile-arrow" aria-hidden="true">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M4 8h8m0 0l-3-3m3 3l-3 3" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />

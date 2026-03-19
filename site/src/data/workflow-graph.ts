@@ -1,8 +1,8 @@
 export interface WorkflowNode {
   slug: string;
   command: string;
-  category: 'planning' | 'review' | 'gitops' | 'integrations' | 'internal';
-  lane: 'plan' | 'review' | 'ship' | 'utility';
+  category: 'planning' | 'review' | 'gitops' | 'integrations';
+  lane: 'plan' | 'review' | 'ship';
   col: number;
   tagline: string;
 }
@@ -26,11 +26,7 @@ export const workflowNodes: WorkflowNode[] = [
   // Ship lane
   { slug: 'commit-sdlc', command: '/commit-sdlc', category: 'gitops', lane: 'ship', col: 0, tagline: 'Smart commit message generation' },
   { slug: 'pr-sdlc', command: '/pr-sdlc', category: 'gitops', lane: 'ship', col: 1, tagline: 'Create structured pull requests' },
-  { slug: 'pr-customize-sdlc', command: '/pr-customize-sdlc', category: 'gitops', lane: 'ship', col: 2, tagline: 'Customize PR templates' },
-  { slug: 'version-sdlc', command: '/version-sdlc', category: 'gitops', lane: 'ship', col: 3, tagline: 'Bump version and create release' },
-  // Utility
-  { slug: 'error-report-sdlc', command: '(internal)', category: 'internal', lane: 'utility', col: 0, tagline: 'Error reporting and GitHub issues' },
-  { slug: 'plugin-check-sdlc', command: '/plugin-check-sdlc', category: 'internal', lane: 'utility', col: 1, tagline: 'Validate plugin discovery chain' },
+  { slug: 'version-sdlc', command: '/version-sdlc', category: 'gitops', lane: 'ship', col: 2, tagline: 'Bump version and create release' },
 ];
 
 export const workflowEdges: WorkflowEdge[] = [
@@ -42,7 +38,6 @@ export const workflowEdges: WorkflowEdge[] = [
   { from: 'review-sdlc', to: 'review-receive-sdlc', label: 'findings to', style: 'solid' },
   // Ship lane flow
   { from: 'commit-sdlc', to: 'pr-sdlc', label: 'staged for', style: 'solid' },
-  { from: 'pr-customize-sdlc', to: 'pr-sdlc', label: 'template for', style: 'dashed' },
   { from: 'pr-sdlc', to: 'version-sdlc', label: 'merged then', style: 'solid' },
   // Cross-lane
   { from: 'execute-plan-sdlc', to: 'review-sdlc', label: 'feeds into', style: 'cross-lane' },
@@ -54,7 +49,6 @@ export const laneLabels: Record<string, string> = {
   plan: 'PLAN',
   review: 'REVIEW',
   ship: 'SHIP',
-  utility: 'UTILITY',
 };
 
-export const laneOrder = ['plan', 'review', 'ship', 'utility'] as const;
+export const laneOrder = ['plan', 'review', 'ship'] as const;

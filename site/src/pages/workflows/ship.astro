@@ -5,7 +5,7 @@ import WorkflowGraph from '../../components/WorkflowGraph.astro';
 const base = import.meta.env.BASE_URL;
 ---
 
-<BaseLayout title="Ship Workflow" description="How commit-sdlc, pr-sdlc, pr-customize-sdlc, and version-sdlc form the shipping pipeline.">
+<BaseLayout title="Ship Workflow" description="How commit-sdlc, pr-sdlc, and version-sdlc form the shipping pipeline.">
   <section class="wd-hero">
     <div class="wd-hero-inner">
       <a href={`${base}/workflows/`} class="wd-back">&larr; All Workflows</a>
@@ -19,7 +19,7 @@ const base = import.meta.env.BASE_URL;
 
   <section class="wd-graph-section">
     <div class="wd-graph-container">
-      <WorkflowGraph highlightSlugs={['commit-sdlc', 'pr-sdlc', 'pr-customize-sdlc', 'version-sdlc']} />
+      <WorkflowGraph highlightSlugs={['commit-sdlc', 'pr-sdlc', 'version-sdlc']} />
     </div>
   </section>
 
@@ -67,22 +67,6 @@ const base = import.meta.env.BASE_URL;
         </div>
 
         <div class="wd-step" style="--step-color: var(--color-gitops);">
-          <div class="wd-step-marker">&middot;</div>
-          <div class="wd-step-body">
-            <h2 class="wd-step-title">
-              Customize templates with
-              <a href={`${base}/skills/pr-customize-sdlc/`} class="wd-skill-link">/pr-customize-sdlc</a>
-            </h2>
-            <p>
-              A setup skill that scans your PR conventions -- existing GitHub PR templates, recent
-              PR patterns, Jira usage in commits -- and proposes a tailored template. Interactive
-              editing lets you refine it. The result is saved to <code>.claude/pr-template.md</code>
-              and used automatically by pr-sdlc.
-            </p>
-          </div>
-        </div>
-
-        <div class="wd-step" style="--step-color: var(--color-gitops);">
           <div class="wd-step-marker">3</div>
           <div class="wd-step-body">
             <h2 class="wd-step-title">
@@ -101,6 +85,17 @@ const base = import.meta.env.BASE_URL;
             </p>
           </div>
         </div>
+      </div>
+
+      <div class="wd-setup">
+        <h2 class="wd-setup-title">One-Time Setup</h2>
+        <p class="wd-setup-body">
+          Run <a href={`${base}/skills/pr-customize-sdlc/`} class="wd-skill-link">/pr-customize-sdlc</a> once per
+          project to create a custom PR description template at <code>.claude/pr-template.md</code>.
+          It scans your existing PR conventions, proposes a tailored template, and lets you refine it
+          interactively. Once saved, <a href={`${base}/skills/pr-sdlc/`} class="wd-skill-link">/pr-sdlc</a> uses
+          it automatically for all future PRs. Re-run it any time to update the template.
+        </p>
       </div>
 
       <div class="wd-after">
@@ -264,6 +259,41 @@ const base = import.meta.env.BASE_URL;
   }
 
   .wd-step-body code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    padding: 1px 5px;
+    background: var(--color-surface-2);
+    border-radius: 3px;
+    color: var(--color-text);
+  }
+
+  .wd-setup {
+    margin-top: 2rem;
+    padding: 1.25rem 1.5rem;
+    background: color-mix(in srgb, var(--color-gitops) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-gitops) 20%, transparent);
+    border-left: 3px solid var(--color-gitops);
+    border-radius: 6px;
+    margin-bottom: 2rem;
+  }
+
+  .wd-setup-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-gitops);
+    margin: 0 0 0.625rem;
+  }
+
+  .wd-setup-body {
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  .wd-setup-body code {
     font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
     font-size: 0.8125rem;
     padding: 1px 5px;

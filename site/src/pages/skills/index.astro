@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import SkillCard from '../../components/SkillCard.astro';
-import { skillsMeta, getSkillsByCategory } from '../../data/skills-meta';
+import { getSkillsByCategory } from '../../data/skills-meta';
 
 const categoryOrder = ['planning', 'review', 'gitops', 'integrations'] as const;
 const categoryLabels = {
@@ -10,7 +10,6 @@ const categoryLabels = {
   gitops: 'Git Operations',
   integrations: 'Integrations',
 };
-const internalSkills = skillsMeta.filter(s => s.category === 'internal');
 ---
 
 <BaseLayout
@@ -49,25 +48,6 @@ const internalSkills = skillsMeta.filter(s => s.category === 'internal');
       );
     })}
 
-    {internalSkills.length > 0 && (
-      <section class="internal-section">
-        <h2 class="internal-heading">Internal Skills</h2>
-        <p class="internal-description">
-          These skills are invoked automatically by other skills and are not typically called
-          directly by users.
-        </p>
-        <div class="skill-grid skill-grid--internal">
-          {internalSkills.map(meta => (
-            <SkillCard
-              slug={meta.slug}
-              command={meta.command}
-              tagline={meta.tagline}
-              category={meta.category}
-            />
-          ))}
-        </div>
-      </section>
-    )}
   </div>
 </BaseLayout>
 
@@ -131,36 +111,8 @@ const internalSkills = skillsMeta.filter(s => s.category === 'internal');
     gap: 1rem;
   }
 
-  .internal-section {
-    margin-top: 3rem;
-    padding-top: 2rem;
-    border-top: 1px solid var(--color-border);
-  }
-
-  .internal-heading {
-    margin: 0 0 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-text-muted);
-  }
-
-  .internal-description {
-    margin: 0 0 1.25rem;
-    font-size: 0.875rem;
-    color: var(--color-text-muted);
-    max-width: 60ch;
-  }
-
-  .skill-grid--internal {
-    grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
-    opacity: 0.8;
-  }
-
   @media (max-width: 640px) {
-    .skill-grid,
-    .skill-grid--internal {
+    .skill-grid {
       grid-template-columns: 1fr;
     }
   }

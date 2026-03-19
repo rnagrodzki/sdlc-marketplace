@@ -1,5 +1,5 @@
 export type StepType = 'script' | 'llm' | 'critique' | 'user' | 'dispatch' | 'verify';
-export type SkillCategory = 'planning' | 'review' | 'gitops' | 'integrations' | 'internal';
+export type SkillCategory = 'planning' | 'review' | 'gitops' | 'integrations';
 
 export interface PipelineStep {
   id: string;
@@ -213,43 +213,6 @@ export const skillsMeta: SkillMeta[] = [
     connections: [
       { to: 'pr-sdlc', label: 'create PR after story' },
       { to: 'review-sdlc', label: 'review before closing task' },
-    ],
-  },
-  {
-    slug: 'plugin-check-sdlc',
-    command: '/plugin-check-sdlc',
-    category: 'internal',
-    userInvocable: true,
-    tagline: 'Validates 16 structural properties across marketplace manifests, plugin manifests, skills, scripts, hooks, and agents.',
-    pipeline: [
-      { id: 'read-manifests', label: 'Read manifests', type: 'script', description: 'Reads .claude-plugin/marketplace.json and plugins/*/plugin.json' },
-      { id: 'run-checks', label: 'Run 16 checks', type: 'verify', description: 'Validates PD1–PD16: manifest schema, name consistency, skill/script/agent cross-references' },
-      { id: 'report', label: 'Report results', type: 'script', description: 'Outputs pass/fail counts; lists errors and warnings with check IDs and remediation hints' },
-      { id: 'guide-fixes', label: 'Guide fixes', type: 'user', description: 'When issues are found, walks through targeted edits and re-runs validation' },
-    ],
-    connections: [
-      { to: 'version-sdlc', label: 'validates version bumped by' },
-      { to: 'review-init-sdlc', label: 'validates dimensions created by' },
-    ],
-  },
-  {
-    slug: 'error-report-sdlc',
-    command: 'error-report-sdlc',
-    category: 'internal',
-    userInvocable: false,
-    tagline: 'Internal skill that proposes creating a GitHub issue when an SDLC skill encounters an actionable error.',
-    pipeline: [
-      { id: 'verify-prereqs', label: 'Verify gh & remote', type: 'verify', description: 'Confirms gh CLI is authenticated and a GitHub remote is resolvable' },
-      { id: 'first-consent', label: 'First consent gate', type: 'user', description: 'Asks: "This error may be worth tracking as a GitHub issue. Create one?"' },
-      { id: 'assemble-issue', label: 'Assemble issue draft', type: 'llm', description: 'Constructs structured issue from error context, skill name, step, and suggested investigation' },
-      { id: 'second-consent', label: 'Second consent gate', type: 'user', description: 'Presents draft issue for review; accepts yes/edit/cancel' },
-      { id: 'create-issue', label: 'Create GitHub issue', type: 'script', description: 'Runs gh issue create with tooling-error label in rnagrodzki/sdlc-marketplace' },
-    ],
-    connections: [
-      { to: 'pr-sdlc', label: 'called by on script crash' },
-      { to: 'version-sdlc', label: 'called by on git failure' },
-      { to: 'review-sdlc', label: 'called by on orchestrator failure' },
-      { to: 'execute-plan-sdlc', label: 'called by after 2 retries' },
     ],
   },
 ];
