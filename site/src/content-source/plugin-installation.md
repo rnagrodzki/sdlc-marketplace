@@ -272,7 +272,7 @@ If you modify any file under `plugins/<name>/`, you must increment the `version`
 
 ## Troubleshooting
 
-See the [README troubleshooting section](../README.md#troubleshooting) for solutions to:
+Troubleshooting solutions for common issues:
 
 - **"Plugin not found"** when updating via `/plugin` UI — name mismatch between
   `marketplace.json` and `plugin.json`
@@ -281,12 +281,3 @@ See the [README troubleshooting section](../README.md#troubleshooting) for solut
   marketplaces
 - **Timeout during marketplace add** — set `CLAUDE_CODE_PLUGIN_GIT_TIMEOUT_MS=300000`
 
----
-
-## See Also
-
-- [Architecture](architecture.md) — repository structure, plugin manifest fields, name resolution
-- [Getting Started](getting-started.md) — first-use walkthrough and what gets created
-- [Adding Skills](adding-skills.md) — how to create new skills
-- [Adding Commands](adding-commands.md) — how to create slash commands (legacy)
-- [Adding Hooks](adding-hooks.md) — how to configure session hooks

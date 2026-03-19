@@ -24,7 +24,7 @@
 /plugin install sdlc@sdlc-marketplace
 ```
 
-> **Note:** Skills are invoked directly by name with no prefix. The `pr-sdlc` skill is invoked as `/pr-sdlc`. See [Architecture](architecture.md#name-resolution) for details.
+> **Note:** Skills are invoked directly by name with no prefix. The `pr-sdlc` skill is invoked as `/pr-sdlc`.
 
 ## Updating
 
@@ -77,9 +77,3 @@ Generates a structured PR description from your commits and diffs, then opens th
 | `.claude/pr-template.md` | Project PR template (created by `/pr-customize-sdlc`) |
 | `.claude/version.json` | Release configuration (created by `/version-sdlc --init`) |
 
-## Next Steps
-
-- Read [Architecture](architecture.md) to understand how the plugin works
-- Read [Adding Skills](adding-skills.md) to create project-specific skills
-- Read [Adding Commands](adding-commands.md) to create custom slash commands (legacy — prefer skills)
-- Read [Adding Hooks](adding-hooks.md) to set up automated actions

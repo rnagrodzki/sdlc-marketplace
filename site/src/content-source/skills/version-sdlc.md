@@ -297,7 +297,7 @@ Auto-detected in this priority order:
 
 ## Changelog Accuracy
 
-The automated changelog is a **draft**, not a source of truth. Squash merges, parallel branches, and post-tag commits mean the changelog generated at release time may be incomplete. See the [Changelog Accuracy and Limitations](../skills/version-sdlc/SKILL.md) section in the SKILL.md for the full limitations table and the 4-layer mitigation strategy.
+The automated changelog is a **draft**, not a source of truth. Squash merges, parallel branches, and post-tag commits mean the changelog generated at release time may be incomplete.
 
 **Recommended post-merge workflow** when using squash merges:
 1. Merge to main

@@ -119,10 +119,10 @@ Model Presets:
   B) Balanced:  N × haiku, N × sonnet, N × opus    — default ✓
   C) Quality:   N × sonnet, N × opus                — max correctness
 
-Select preset (A/B/C) or "custom" to edit individual tasks, then "yes" to execute:
+Select preset (A/B/C), "custom" to edit individual tasks, or "cancel":
 ```
 
-Always present all 3 presets. Default is Balanced. When the user selects a preset, update the per-task model assignments shown in the wave list before executing. Wait for explicit user confirmation (preset selection + yes/custom/cancel) before executing.
+Always present all 3 presets. Default is Balanced. When the user selects a preset (A/B/C), update the per-task model assignments and proceed to execution immediately. "custom" opens per-task editing before execution. "cancel" aborts. No additional confirmation needed — preset selection is the approval.
 
 ## Step 5 (DO): Execute
 
@@ -286,7 +286,7 @@ Do NOT automatically commit, push, or create branches. The user decides what hap
 |---|---|
 | Plan validated | No blocking validation issues |
 | Wave structure critiqued | All file conflicts and dependency issues resolved |
-| User approved | Explicit "yes" received in Step 4 |
+| User approved | Preset selected (A/B/C) or custom editing completed in Step 4 |
 | All tasks completed | No tasks skipped without user consent |
 | Per-wave verification | Tests/build/lint pass after each wave |
 | Final verification | Full suite green |

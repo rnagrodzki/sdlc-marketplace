@@ -121,7 +121,7 @@ Model Presets:
   B) Balanced:  2 × haiku, 4 × sonnet, 2 × opus       — default ✓
   C) Quality:   2 × sonnet, 6 × opus                  — max correctness
 
-Select preset (A/B/C) or "custom" to edit individual tasks, then "yes" to execute:
+Select preset (A/B/C), "custom" to edit individual tasks, or "cancel":
 ```
 
 ### Execute a plan from a file
