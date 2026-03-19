@@ -308,3 +308,7 @@ Default severity: high
 - **Base branch**: Copilot uses instructions from the PR's base branch, not the feature branch.
 
 Use `--no-copilot` to skip this prompt if you manage Copilot instructions separately.
+
+## Related Skills
+
+- [`/review-sdlc`](review-sdlc.md) — uses the review dimensions this skill creates

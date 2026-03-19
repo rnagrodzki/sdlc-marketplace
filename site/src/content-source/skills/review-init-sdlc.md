@@ -309,8 +309,6 @@ Default severity: high
 
 Use `--no-copilot` to skip this prompt if you manage Copilot instructions separately.
 
----
-
 ## Related Skills
 
-- [`/review-sdlc`](review-sdlc.md) — run the review using dimension files created by this skill
+- [`/review-sdlc`](review-sdlc.md) — uses the review dimensions this skill creates

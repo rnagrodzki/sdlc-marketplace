@@ -21,3 +21,7 @@ tests:
   - file://datasets/plugin-check-sdlc.yaml
   - file://datasets/review-init-sdlc.yaml
   - file://datasets/pr-customize-sdlc.yaml
+  - file://datasets/execute-plan-sdlc.yaml
+  - file://datasets/commit-sdlc.yaml
+  - file://datasets/jira-sdlc.yaml
+  - file://datasets/plan-sdlc.yaml

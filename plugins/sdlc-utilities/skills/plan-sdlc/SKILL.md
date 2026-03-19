@@ -219,10 +219,14 @@ Dispatch a plan reviewer subagent using the template in `./plan-reviewer-prompt.
 ```
 Plan written to `<path>`.
 
-To execute: /execute-plan-sdlc
+Would you like to execute this plan now?
+  execute  — start execution (/execute-plan-sdlc)
+  done     — stop here
+
+Select:
 ```
 
-Do NOT automatically invoke execute-plan-sdlc. The user decides when to execute.
+On "execute", invoke `/execute-plan-sdlc` via the Skill tool. Do NOT invoke execute-plan-sdlc without the user selecting "execute" from the prompt. On "done", end without further action.
 
 ## Error Recovery
 
@@ -278,4 +282,4 @@ Format:
 
 - `./plan-reviewer-prompt.md` — plan review subagent template
 - `./plan-format-reference.md` — plan document format specification
-- execute-plan-sdlc — skill that executes the plans this skill produces
+- [`/execute-plan-sdlc`](../execute-plan-sdlc/SKILL.md) — skill that executes the plans this skill produces

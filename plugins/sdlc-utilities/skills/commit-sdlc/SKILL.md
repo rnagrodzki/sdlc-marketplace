@@ -239,7 +239,22 @@ After completing a commit, if the project's detected commit style was non-conven
 <what was learned about this project's commit style or any edge case encountered>
 ```
 
+## Workflow Continuation
+
+After Step 6 verification completes successfully, present the user with available next actions:
+
+```
+What would you like to do next?
+  pr       — create a pull request (/pr-sdlc)
+  version  — tag a release (/version-sdlc)
+  done     — stop here
+
+Select:
+```
+
+On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+
 ## See Also
 
-- [`/pr-sdlc`](../../pr-sdlc/SKILL.md) — create a PR after committing
-- [`/version-sdlc`](../../version-sdlc/SKILL.md) — tag a release after committing
+- [`/pr-sdlc`](../pr-sdlc/SKILL.md) — create a PR after committing
+- [`/version-sdlc`](../version-sdlc/SKILL.md) — tag a release after committing

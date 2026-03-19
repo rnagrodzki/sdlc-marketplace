@@ -307,4 +307,7 @@ The automated changelog is a **draft**, not a source of truth. Squash merges, pa
 
 ## Related Skills
 
-- [`/pr-sdlc`](pr-sdlc.md) — open the PR before or after tagging a release
+- [`/commit-sdlc`](commit-sdlc.md) — commit changes before tagging a release
+- [`/pr-sdlc`](pr-sdlc.md) — the PR that preceded this release
+- [`/jira-sdlc`](jira-sdlc.md) — update Jira ticket status after the release
+

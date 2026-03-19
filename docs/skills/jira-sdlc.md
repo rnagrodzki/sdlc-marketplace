@@ -177,3 +177,8 @@ After initialization, most operations require a single MCP call instead of 4–8
 | `.claude/jira-cache/<KEY>.json` | Project metadata cache: cloudId, issue types, field schemas, workflows, user mappings |
 | `.claude/jira-templates/<Type>.md` | Project-level issue description templates (created only when `--init-templates` is run, or manually) |
 | Jira issues | Created or updated via the Atlassian MCP |
+
+## Related Skills
+
+- [`/plan-sdlc`](plan-sdlc.md) — write an implementation plan from a Jira ticket
+- [`/execute-plan-sdlc`](execute-plan-sdlc.md) — execute an existing plan

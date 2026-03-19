@@ -64,6 +64,8 @@ export const skillsMeta: SkillMeta[] = [
       { to: 'plan-sdlc', label: 'executes plans from' },
       { to: 'review-sdlc', label: 'review changes after' },
       { to: 'pr-sdlc', label: 'open PR after' },
+      { to: 'commit-sdlc', label: 'commit changes after' },
+      { to: 'version-sdlc', label: 'release after' },
     ],
   },
   {
@@ -84,6 +86,7 @@ export const skillsMeta: SkillMeta[] = [
       { to: 'review-init-sdlc', label: 'requires dimensions from' },
       { to: 'review-receive-sdlc', label: 'hands off findings to' },
       { to: 'pr-sdlc', label: 'reviews PRs from' },
+      { to: 'commit-sdlc', label: 'commit after approval' },
     ],
   },
   {
@@ -121,6 +124,7 @@ export const skillsMeta: SkillMeta[] = [
     connections: [
       { to: 'review-sdlc', label: 'responds to findings from' },
       { to: 'pr-sdlc', label: 'addresses review on PR from' },
+      { to: 'commit-sdlc', label: 'commit fixes after' },
     ],
   },
   {
@@ -194,6 +198,7 @@ export const skillsMeta: SkillMeta[] = [
     connections: [
       { to: 'pr-sdlc', label: 'follows PR merge in' },
       { to: 'commit-sdlc', label: 'follows commits from' },
+      { to: 'jira-sdlc', label: 'update ticket after release' },
     ],
   },
   {
@@ -213,6 +218,7 @@ export const skillsMeta: SkillMeta[] = [
     connections: [
       { to: 'pr-sdlc', label: 'create PR after story' },
       { to: 'review-sdlc', label: 'review before closing task' },
+      { to: 'plan-sdlc', label: 'informs planning in' },
     ],
   },
 ];

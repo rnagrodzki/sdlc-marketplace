@@ -130,10 +130,7 @@ To execute: /execute-plan-sdlc
 
 No external tools, credentials, or config files are needed.
 
----
-
 ## Related Skills
 
-- [`/execute-plan-sdlc`](execute-plan-sdlc.md) — executes the plans this skill produces; consumes the Complexity, Risk, Depends on, and Verify fields per task
-- [`/review-sdlc`](review-sdlc.md) — review the resulting implementation after execution
-- [`/pr-sdlc`](pr-sdlc.md) — open a PR after execution completes
+- [`/execute-plan-sdlc`](execute-plan-sdlc.md) — executes the plans this skill produces
+- [`/review-sdlc`](review-sdlc.md) — review changes after plan execution

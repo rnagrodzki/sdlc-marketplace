@@ -1,0 +1,25 @@
+# Fixture appropriateness:
+#   jira-ticket-created            -- CORRECT: simulates a created Jira ticket, triggers workflow continuation
+
+- description: "jira-sdlc: shows workflow continuation menu after Jira ticket created"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-ticket-created.md"
+    user_request: >
+      Run /jira-sdlc. A Jira ticket PROJ-142 has been created successfully — it's a Story
+      in the PROJ project with implementation acceptance criteria. Now show what comes next.
+  assert:
+    # Must offer plan as a next action
+    - type: icontains
+      value: "/plan-sdlc"
+    # Must offer done as an option
+    - type: icontains
+      value: "done"
+    # Behavioral: interactive menu asking whether to plan
+    - type: llm-rubric
+      value: >
+        The response asks the user whether to plan implementation for the Jira ticket,
+        presenting an interactive menu. The menu includes at minimum: plan (/plan-sdlc) and
+        done. Since a ticket with implementation work was just created, the plan option is
+        offered. The user is asked to select an option rather than being given a passive
+        suggestion.

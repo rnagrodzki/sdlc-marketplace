@@ -539,3 +539,23 @@ After completing a release or encountering unexpected behavior, append to `.clau
 Record entries for: project-specific version file locations, non-standard tag conventions,
 monorepo versioning patterns, CI requirements that gate tag pushes, or any edge cases
 encountered during release execution.
+
+## Workflow Continuation
+
+After the release is complete, present the user with available next actions:
+
+```
+What would you like to do next?
+  jira     — update Jira ticket status (/jira-sdlc)
+  done     — stop here
+
+Select:
+```
+
+On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+
+## See Also
+
+- [`/commit-sdlc`](../commit-sdlc/SKILL.md) — commit changes before tagging a release
+- [`/jira-sdlc`](../jira-sdlc/SKILL.md) — update Jira ticket status after release
+- [`/pr-sdlc`](../pr-sdlc/SKILL.md) — the PR that triggered this release

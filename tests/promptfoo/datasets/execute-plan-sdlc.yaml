@@ -1,0 +1,47 @@
+# Fixture appropriateness:
+#   plan-execution-complete        -- CORRECT: simulates completed plan execution, triggers workflow continuation
+#   feature-branch-with-commits   -- CORRECT: provides branch context for plan execution with --preset
+
+- description: "execute-plan-sdlc: shows workflow continuation menu after plan execution"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-execution-complete.md"
+    user_request: >
+      Run /execute-plan-sdlc. The plan execution has completed — all waves finished, all tasks
+      succeeded, and final verification passed. The Step 9 summary report has been presented.
+      Now show what comes next.
+  assert:
+    # Must offer commit as a next action
+    - type: icontains
+      value: "/commit-sdlc"
+    # Must offer PR as a next action
+    - type: icontains
+      value: "/pr-sdlc"
+    # Must offer done as an option
+    - type: icontains
+      value: "done"
+    # Behavioral: interactive menu with skill options
+    - type: llm-rubric
+      value: >
+        The response presents an interactive menu asking the user what to do next after plan
+        execution, with specific skill options to choose from. The menu includes at minimum:
+        commit (/commit-sdlc), pr (/pr-sdlc), review (/review-sdlc), and done. The user is
+        asked to select an option rather than being given a passive suggestion.
+
+- description: "execute-plan-sdlc: skips preset selection when --preset B is provided"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/feature-branch-with-commits.md"
+    user_request: >
+      Run /execute-plan-sdlc --preset B. A plan with 5 tasks has been loaded and validated.
+      Task classification and wave building are complete. Show the wave structure and proceed
+      with the Balanced preset applied automatically.
+  assert:
+    # Behavioral: applies Balanced preset without interactive selection
+    - type: llm-rubric
+      value: >
+        The response applies preset B (Balanced) without presenting the A/B/C selection menu
+        to the user. It shows the wave structure with model assignments that reflect the
+        Balanced preset (haiku for Trivial, sonnet for Standard, opus for Complex) and
+        proceeds directly to execution. The response does not ask the user to "Select preset
+        (A/B/C)" — the selection is already made via the --preset argument.

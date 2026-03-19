@@ -43,6 +43,8 @@ export const workflowEdges: WorkflowEdge[] = [
   { from: 'execute-plan-sdlc', to: 'review-sdlc', label: 'feeds into', style: 'cross-lane' },
   { from: 'review-receive-sdlc', to: 'commit-sdlc', label: 'fixes flow into', style: 'cross-lane' },
   { from: 'execute-plan-sdlc', to: 'commit-sdlc', label: 'or ship directly', style: 'cross-lane' },
+  { from: 'execute-plan-sdlc', to: 'version-sdlc', label: 'release after', style: 'cross-lane' },
+  { from: 'review-sdlc', to: 'commit-sdlc', label: 'approved, then', style: 'cross-lane' },
 ];
 
 export const laneLabels: Record<string, string> = {

@@ -179,9 +179,10 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.
 
----
-
 ## Related Skills
 
-- [`/review-sdlc`](review-sdlc.md) — review the changes produced by plan execution before opening a PR
-- [`/pr-sdlc`](pr-sdlc.md) — open a PR after plan execution completes
+- [`/plan-sdlc`](plan-sdlc.md) — writes the plans this skill executes
+- [`/commit-sdlc`](commit-sdlc.md) — commit changes after plan execution
+- [`/pr-sdlc`](pr-sdlc.md) — create a pull request after plan execution
+- [`/review-sdlc`](review-sdlc.md) — review changes after plan execution
+- [`/version-sdlc`](version-sdlc.md) — tag a release after plan execution

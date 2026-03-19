@@ -1,0 +1,27 @@
+# Fixture appropriateness:
+#   commit-staged-changes          -- CORRECT: simulates a completed commit, triggers workflow continuation
+
+- description: "commit-sdlc: shows workflow continuation menu after commit"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-staged-changes.md"
+    user_request: >
+      Run /commit-sdlc. The commit has been created successfully — Step 6 verification
+      confirmed the commit at a3f8d92 and the stash was restored. Now show what comes next.
+  assert:
+    # Must offer PR as a next action
+    - type: icontains
+      value: "/pr-sdlc"
+    # Must offer version as a next action
+    - type: icontains
+      value: "/version-sdlc"
+    # Must offer done as an option
+    - type: icontains
+      value: "done"
+    # Behavioral: interactive menu with skill options
+    - type: llm-rubric
+      value: >
+        The response presents an interactive menu asking the user what to do next after
+        committing, with specific skill options to choose from. The menu includes at minimum:
+        pr (/pr-sdlc), version (/version-sdlc), and done. The user is asked to select an
+        option rather than being given a passive suggestion.

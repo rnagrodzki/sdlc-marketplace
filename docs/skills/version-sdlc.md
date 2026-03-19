@@ -305,3 +305,9 @@ The automated changelog is a **draft**, not a source of truth. Squash merges, pa
 3. Run `/version-sdlc --changelog` to reconcile the changelog with the actual tag-to-tag commits
 4. The CI `check-changelog.js` (scaffolded during `--init` when changelog is enabled) validates that an entry exists on every push to main
 
+## Related Skills
+
+- [`/commit-sdlc`](commit-sdlc.md) — commit changes before tagging a release
+- [`/pr-sdlc`](pr-sdlc.md) — the PR that preceded this release
+- [`/jira-sdlc`](jira-sdlc.md) — update Jira ticket status after the release
+

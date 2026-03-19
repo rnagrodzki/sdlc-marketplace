@@ -208,3 +208,10 @@ Choosing `fix` invokes `/review-receive-sdlc`, which picks up the findings from 
 | File / Artifact | Description |
 |-----------------|-------------|
 | GitHub PR comment | Consolidated review findings posted to the current PR |
+
+## Related Skills
+
+- [`/review-init-sdlc`](review-init-sdlc.md) — creates the review dimensions this skill uses
+- [`/review-receive-sdlc`](review-receive-sdlc.md) — implements fixes for findings from this skill
+- [`/commit-sdlc`](commit-sdlc.md) — commit changes after review approval
+- [`/pr-sdlc`](pr-sdlc.md) — review a PR branch

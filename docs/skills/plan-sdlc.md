@@ -129,3 +129,8 @@ To execute: /execute-plan-sdlc
 - **Requirements or a description** — at minimum a sentence describing what to build; a spec file is accepted but not required
 
 No external tools, credentials, or config files are needed.
+
+## Related Skills
+
+- [`/execute-plan-sdlc`](execute-plan-sdlc.md) — executes the plans this skill produces
+- [`/review-sdlc`](review-sdlc.md) — review changes after plan execution
