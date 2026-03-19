@@ -37,7 +37,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'critique-plan', label: 'Self-critique plan', type: 'critique', description: 'Reviews decomposition for completeness, conflicting tasks, and missing dependencies' },
       { id: 'present', label: 'Present for approval', type: 'user', description: 'Shows requirements checklist, task mappings, and wave preview; waits for approval or changes' },
       { id: 'plan-review', label: 'Cross-model review', type: 'dispatch', description: 'Dispatches a second model to review the plan for correctness and completeness' },
-      { id: 'save', label: 'Save plan', type: 'script', description: 'Writes plan to plansDirectory with date-prefixed filename' },
+      { id: 'save', label: 'Save plan', type: 'script', description: 'Writes plan to plansDirectory with date-prefixed filename (or plan mode designated file when active)' },
     ],
     connections: [
       { to: 'execute-plan-sdlc', label: 'produces plans for' },

@@ -10,6 +10,19 @@ Write an implementation plan from requirements, a spec, or a user description. P
 
 **Announce at start:** "I'm using the plan-sdlc skill."
 
+## Plan Mode Awareness
+
+**Detection:** Check whether a system-reminder in the current conversation contains the text "Plan mode is active". If it does, plan mode is active for this session.
+
+**When plan mode is active:**
+- The system-reminder specifies a designated plan file path in the text "You should create your plan at `<path>`". Extract this path — it is the ONLY file you are allowed to write.
+- Steps 0–4 are unaffected (they are read-only exploration and user interaction).
+- Step 5 MUST write to the designated plan file path instead of the normal path resolution logic.
+- Step 6 is unaffected (the reviewer subagent reads; it does not write).
+- Step 7 MUST NOT present the execute/done handoff. Instead, call ExitPlanMode after announcing the plan is ready.
+
+**When plan mode is NOT active:** All steps behave as documented below. No changes.
+
 ## Step 0: Prerequisites and Complexity Routing
 
 **Gather requirements:** If no spec or requirements document is in context, ask the user:
@@ -168,14 +181,18 @@ Do not proceed to Step 5 without explicit approval.
 
 ## Step 5 (DO): Write Plan Document
 
-Save to the location the user specified, or resolve the default path:
+**Path resolution:**
+
+If plan mode is active (see Plan Mode Awareness above), write to the designated plan file path extracted from the system-reminder. Do not apply the path resolution logic below — that path is the only writable file in plan mode.
+
+Otherwise, save to the location the user specified, or resolve the default path:
 
 1. User-specified path (if provided in conversation)
 2. Project `.claude/settings.json` → `plansDirectory` (relative paths resolve from workspace root)
 3. Global `~/.claude/settings.json` → `plansDirectory`
 4. Default fallback: `~/.claude/plans/`
 
-Naming convention: `YYYY-MM-DD-<feature-name>.md`. Create the directory if it does not exist.
+Naming convention (non-plan-mode only): `YYYY-MM-DD-<feature-name>.md`. Create the directory if it does not exist.
 
 Plans are stored alongside Claude Code's own plan files for cross-session reference.
 
@@ -216,6 +233,18 @@ Dispatch a plan reviewer subagent using the template in `./plan-reviewer-prompt.
 
 ## Step 7: Handoff
 
+**If plan mode is active:**
+
+```
+Plan written to `<designated plan file path>`.
+
+The plan is ready for review. After you approve it, invoke /execute-plan-sdlc to begin execution.
+```
+
+Then call ExitPlanMode. Do NOT present the execute/done prompt. Do NOT invoke execute-plan-sdlc directly — plan mode requires the user to approve the plan through Claude Code's plan approval flow first.
+
+**If plan mode is NOT active:**
+
 ```
 Plan written to `<path>`.
 
@@ -248,6 +277,7 @@ On "execute", invoke `/execute-plan-sdlc` via the Skill tool. Do NOT invoke exec
 - Use absolute file paths that only work on one machine
 - Put plans in `$TMPDIR` — plans should survive session boundaries
 - Put plans in plugin-branded directories (no `docs/superpowers/plans/`)
+- Ignore plan mode's designated file path when plan mode is active — always write to it, never to a self-chosen path
 
 ## Gotchas
 

@@ -40,6 +40,18 @@ For plans with 5+ tasks, the skill also writes a `## Key Decisions` section — 
 
 ---
 
+## Plan Mode
+
+When Claude Code's [plan mode](https://docs.anthropic.com/en/docs/claude-code/plan-mode) is active, the skill adapts automatically:
+
+- **Path:** The plan is written to the plan mode designated file (the only writable file in plan mode) instead of the normal `plansDirectory` path.
+- **Handoff:** The skill calls `ExitPlanMode` at the end instead of presenting the execute/done prompt. No manual exit needed.
+- **After approval:** Once you approve the plan in Claude Code's review UI, invoke `/execute-plan-sdlc` to start execution.
+
+Steps 0–4 (requirements gathering, codebase exploration, decomposition, self-critique, and user approval) run unchanged in plan mode — they are read-only and use `AskUserQuestion`, both compatible with plan mode constraints.
+
+---
+
 ## Examples
 
 ### From conversation context
@@ -111,13 +123,25 @@ Plan written to ~/.claude/plans/2026-03-19-auth-layer.md
 To execute: /execute-plan-sdlc
 ```
 
+### Using plan-sdlc inside plan mode
+
+Invoke `/plan-sdlc` while Claude Code plan mode is active:
+
+1. The skill runs the full pipeline (requirements, exploration, decomposition, self-critique, user approval)
+2. On approval, the plan is written to the plan mode designated file (shown in the system banner)
+3. The skill calls `ExitPlanMode` — Claude Code presents the plan for your review
+4. After you approve, invoke `/execute-plan-sdlc` to begin execution
+
+The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads it without any adjustments.
+
 ---
 
 ## What It Creates or Modifies
 
 | File / Artifact | Description |
 |-----------------|-------------|
-| `<plansDirectory>/YYYY-MM-DD-<feature-name>.md` | The written plan document. Path resolved from: user-specified → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → `~/.claude/plans/` fallback. |
+| `<plansDirectory>/YYYY-MM-DD-<feature-name>.md` | The written plan document (normal mode). Path resolved from: user-specified → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → `~/.claude/plans/` fallback. |
+| Plan mode designated file | When Claude Code plan mode is active, the plan is written to the system-designated file path instead of the above. The path appears in the plan mode system banner. |
 | `$TMPDIR/claude-plans/<feature-name>-exploration.md` | Temporary exploration scratchpad written during Step 1 (full pipeline only). Updated after every 2 exploration actions and re-read before Step 2 begins. Contains a checkpoint block for session recovery. |
 | `.claude/learnings/log.md` | Planning learnings appended after writing: scope decisions, clarification patterns, decomposition issues. |
 
