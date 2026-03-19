@@ -197,3 +197,9 @@ and any project-specific conventions.
 - Look for missing sections rather than rewriting what exists
 - Suggest additions, not replacements
 ```
+
+---
+
+## Next: Design Quality
+
+For patterns that make skills reliable and effective — pipeline structure, critique loops, error recovery, consent gates — see [Skill Best Practices](skill-best-practices.md).

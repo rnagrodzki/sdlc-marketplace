@@ -61,6 +61,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | [Architecture](docs/architecture.md) | Repository structure, plugin system, name resolution |
 | [Plugin Installation](docs/plugin-installation.md) | How plugins are installed, discovered, and resolved at runtime |
 | [Adding Skills](docs/adding-skills.md) | Create custom skills for your project |
+| [Skill Best Practices](docs/skill-best-practices.md) | Design patterns for reliable, maintainable skills |
 | [Adding Commands](docs/adding-commands.md) | Create custom slash commands (legacy — prefer skills) |
 | [Adding Hooks](docs/adding-hooks.md) | Set up automated actions on session events |
 
