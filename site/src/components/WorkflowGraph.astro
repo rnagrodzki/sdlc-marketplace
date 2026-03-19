@@ -1,0 +1,705 @@
+---
+import { workflowNodes, workflowEdges, laneOrder, laneLabels } from '../data/workflow-graph';
+import type { WorkflowNode, WorkflowEdge } from '../data/workflow-graph';
+
+interface Props {
+  highlightSlugs?: string[];
+}
+
+const { highlightSlugs } = Astro.props;
+const base = import.meta.env.BASE_URL;
+
+const colorMap: Record<string, string> = {
+  planning: 'var(--color-planning)',
+  review: 'var(--color-review)',
+  gitops: 'var(--color-gitops)',
+  integrations: 'var(--color-integrations)',
+  internal: 'var(--color-internal)',
+};
+
+const colorHex: Record<string, string> = {
+  planning: '#3b82f6',
+  review: '#f59e0b',
+  gitops: '#22c55e',
+  integrations: '#a855f7',
+  internal: '#6b7280',
+};
+
+// --- Layout constants ---
+const LANE_LABEL_W = 72;
+const NODE_W = 156;
+const NODE_H = 72;
+const COL_GAP = 48;
+const ROW_GAP = 56;
+const PAD_TOP = 24;
+const PAD_RIGHT = 32;
+const PAD_BOTTOM = 24;
+const PAD_LEFT = 8;
+
+// Compute max columns per lane
+const maxCol = Math.max(...workflowNodes.map(n => n.col));
+
+// Pre-compute node positions
+function getNodePos(node: WorkflowNode): { x: number; y: number } {
+  const laneIdx = laneOrder.indexOf(node.lane as typeof laneOrder[number]);
+  const x = PAD_LEFT + LANE_LABEL_W + node.col * (NODE_W + COL_GAP);
+  const y = PAD_TOP + laneIdx * (NODE_H + ROW_GAP);
+  return { x, y };
+}
+
+const nodePositions = new Map<string, { x: number; y: number }>();
+for (const node of workflowNodes) {
+  nodePositions.set(node.slug, getNodePos(node));
+}
+
+const svgW = PAD_LEFT + LANE_LABEL_W + (maxCol + 1) * (NODE_W + COL_GAP) - COL_GAP + PAD_RIGHT;
+const svgH = PAD_TOP + laneOrder.length * (NODE_H + ROW_GAP) - ROW_GAP + PAD_BOTTOM;
+
+// --- Edge path computation ---
+interface EdgePath {
+  edge: WorkflowEdge;
+  d: string;
+  labelX: number;
+  labelY: number;
+  fromNode: WorkflowNode;
+  toNode: WorkflowNode;
+}
+
+function computeEdgePath(edge: WorkflowEdge): EdgePath {
+  const fromNode = workflowNodes.find(n => n.slug === edge.from)!;
+  const toNode = workflowNodes.find(n => n.slug === edge.to)!;
+  const fromPos = nodePositions.get(edge.from)!;
+  const toPos = nodePositions.get(edge.to)!;
+
+  let d: string;
+  let labelX: number;
+  let labelY: number;
+
+  if (fromNode.lane === toNode.lane) {
+    // Same lane: horizontal connection
+    const fromRight = fromPos.x + NODE_W;
+    const toLeft = toPos.x;
+    const midY = fromPos.y + NODE_H / 2;
+
+    if (edge.style === 'dashed' && fromNode.col > toNode.col) {
+      // pr-customize-sdlc -> pr-sdlc: connect from left of from to right of to
+      const fromLeft = fromPos.x;
+      const toRight = toPos.x + NODE_W;
+      const midX = (fromLeft + toRight) / 2;
+      const curveY = midY - 30;
+      d = `M ${fromLeft} ${midY} C ${midX} ${curveY}, ${midX} ${curveY}, ${toRight} ${midY}`;
+      labelX = midX;
+      labelY = curveY - 6;
+    } else {
+      d = `M ${fromRight} ${midY} L ${toLeft} ${midY}`;
+      labelX = (fromRight + toLeft) / 2;
+      labelY = midY - 8;
+    }
+  } else {
+    // Cross-lane: vertical + curve
+    const fromCenterX = fromPos.x + NODE_W / 2;
+    const toCenterX = toPos.x + NODE_W / 2;
+    const fromBottom = fromPos.y + NODE_H;
+    const toTop = toPos.y;
+
+    // For cross-lane edges, connect from bottom of source to top of target
+    // Use side exits to avoid overlapping with the node body
+    let startX: number;
+    let startY: number;
+    let endX: number;
+    let endY: number;
+
+    if (fromCenterX < toCenterX) {
+      // Going right and down
+      startX = fromPos.x + NODE_W;
+      startY = fromPos.y + NODE_H * 0.75;
+      endX = toPos.x;
+      endY = toPos.y + NODE_H * 0.25;
+    } else {
+      // Going left and down
+      startX = fromPos.x;
+      startY = fromPos.y + NODE_H * 0.75;
+      endX = toPos.x + NODE_W;
+      endY = toPos.y + NODE_H * 0.25;
+    }
+
+    const cpX1 = startX + (endX - startX) * 0.4;
+    const cpY1 = startY;
+    const cpX2 = startX + (endX - startX) * 0.6;
+    const cpY2 = endY;
+
+    d = `M ${startX} ${startY} C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${endX} ${endY}`;
+    labelX = (startX + endX) / 2;
+    labelY = (startY + endY) / 2 - 6;
+  }
+
+  return { edge, d, labelX, labelY, fromNode, toNode };
+}
+
+const edgePaths = workflowEdges.map(computeEdgePath);
+
+// Build adjacency for hover highlighting
+const adjacency: Record<string, string[]> = {};
+for (const node of workflowNodes) {
+  adjacency[node.slug] = [];
+}
+for (const edge of workflowEdges) {
+  adjacency[edge.from].push(edge.to);
+  adjacency[edge.to].push(edge.from);
+}
+const adjacencyJSON = JSON.stringify(adjacency);
+
+// Determine initial highlight state
+const hasHighlight = highlightSlugs && highlightSlugs.length > 0;
+---
+
+<div class="wf-graph-wrap" data-adjacency={adjacencyJSON} data-has-highlight={hasHighlight ? 'true' : 'false'}>
+  <!-- Background grid pattern -->
+  <div class="wf-grid-bg" aria-hidden="true"></div>
+
+  <svg
+    viewBox={`0 0 ${svgW} ${svgH}`}
+    class="wf-svg"
+    xmlns="http://www.w3.org/2000/svg"
+    role="img"
+    aria-label="Skill workflow diagram showing how 12 SDLC skills connect across Plan, Review, and Ship lanes"
+  >
+    <defs>
+      {/* Arrowhead markers */}
+      <marker id="wf-arrow" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 4 L 0 8 z" fill="#475569" />
+      </marker>
+      <marker id="wf-arrow-cross" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 4 L 0 8 z" fill="#64748b" opacity="0.6" />
+      </marker>
+      {/* Signal glow filter */}
+      <filter id="wf-signal-glow" x="-100%" y="-100%" width="300%" height="300%">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+      {/* Node glow filter */}
+      <filter id="wf-node-glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="6" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+
+    {/* Lane background stripes */}
+    {laneOrder.map((lane, i) => {
+      const y = PAD_TOP + i * (NODE_H + ROW_GAP) - 8;
+      const h = NODE_H + 16;
+      return (
+        <rect
+          x={PAD_LEFT + LANE_LABEL_W - 8}
+          y={y}
+          width={svgW - PAD_LEFT - LANE_LABEL_W - PAD_RIGHT + 16}
+          height={h}
+          rx="4"
+          fill={i % 2 === 0 ? 'rgba(30,41,59,0.4)' : 'rgba(30,41,59,0.15)'}
+        />
+      );
+    })}
+
+    {/* Lane labels */}
+    {laneOrder.map((lane, i) => {
+      const y = PAD_TOP + i * (NODE_H + ROW_GAP) + NODE_H / 2;
+      return (
+        <text
+          x={PAD_LEFT + 4}
+          y={y}
+          font-family="ui-monospace, 'SF Mono', 'Fira Code', monospace"
+          font-size="10"
+          font-weight="700"
+          letter-spacing="0.14em"
+          fill="#475569"
+          dominant-baseline="central"
+        >
+          {laneLabels[lane]}
+        </text>
+      );
+    })}
+
+    {/* Render edges */}
+    {edgePaths.map((ep) => {
+      const isCross = ep.edge.style === 'cross-lane';
+      const isDashed = ep.edge.style === 'dashed';
+      const edgeColor = isCross ? '#64748b' : '#475569';
+      const dashArray = isDashed ? '6 4' : isCross ? '4 6' : 'none';
+      const opacity = isCross ? 0.5 : 0.7;
+      const markerEnd = isCross ? 'url(#wf-arrow-cross)' : 'url(#wf-arrow)';
+      const signalColor = colorHex[ep.toNode.category];
+
+      return (
+        <g
+          class="wf-edge"
+          data-from={ep.edge.from}
+          data-to={ep.edge.to}
+        >
+          {/* Edge path */}
+          <path
+            d={ep.d}
+            fill="none"
+            stroke={edgeColor}
+            stroke-width={isCross ? 1.5 : 2}
+            stroke-dasharray={dashArray}
+            stroke-linecap="round"
+            opacity={opacity}
+            marker-end={markerEnd}
+          />
+          {/* Animated signal dot traveling along the path */}
+          <circle r="3" fill={signalColor} class="wf-signal-dot" filter="url(#wf-signal-glow)">
+            <animateMotion dur={isCross ? '2.5s' : '2s'} repeatCount="indefinite" calcMode="linear">
+              <mpath href={`#wf-edge-path-${ep.edge.from}-${ep.edge.to}`} />
+            </animateMotion>
+          </circle>
+          {/* Hidden path for animateMotion mpath reference */}
+          <path
+            id={`wf-edge-path-${ep.edge.from}-${ep.edge.to}`}
+            d={ep.d}
+            fill="none"
+            stroke="none"
+          />
+          {/* Edge label */}
+          {ep.edge.label && (
+            <text
+              x={ep.labelX}
+              y={ep.labelY}
+              font-family="system-ui, -apple-system, sans-serif"
+              font-size="9"
+              fill="#64748b"
+              text-anchor="middle"
+              class="wf-edge-label"
+            >
+              {ep.edge.label}
+            </text>
+          )}
+        </g>
+      );
+    })}
+
+    {/* Render nodes */}
+    {workflowNodes.map((node) => {
+      const pos = nodePositions.get(node.slug)!;
+      const accentHex = colorHex[node.category];
+      const dimmed = hasHighlight && !highlightSlugs!.includes(node.slug);
+
+      return (
+        <g
+          class:list={['wf-node', { 'wf-node--dimmed': dimmed }]}
+          data-node={node.slug}
+          style={`--node-accent: ${accentHex};`}
+        >
+          {/* Glow rect (hidden until hover) */}
+          <rect
+            x={pos.x - 3}
+            y={pos.y - 3}
+            width={NODE_W + 6}
+            height={NODE_H + 6}
+            rx="9"
+            fill={accentHex}
+            opacity="0"
+            class="wf-node-glow"
+            filter="url(#wf-node-glow)"
+          />
+          {/* Node background */}
+          <rect
+            x={pos.x}
+            y={pos.y}
+            width={NODE_W}
+            height={NODE_H}
+            rx="6"
+            fill="#1e293b"
+            stroke={accentHex}
+            stroke-width="1"
+            class="wf-node-bg"
+          />
+          {/* Left accent bar */}
+          <rect
+            x={pos.x}
+            y={pos.y + 4}
+            width="3"
+            height={NODE_H - 8}
+            rx="1.5"
+            fill={accentHex}
+          />
+          {/* Command name */}
+          <text
+            x={pos.x + 14}
+            y={pos.y + 22}
+            font-family="ui-monospace, 'SF Mono', 'Fira Code', monospace"
+            font-size="11"
+            font-weight="600"
+            fill="#f1f5f9"
+            class="wf-node-command"
+          >
+            {node.command}
+          </text>
+          {/* Tagline */}
+          <text
+            x={pos.x + 14}
+            y={pos.y + 40}
+            font-family="system-ui, -apple-system, sans-serif"
+            font-size="9"
+            fill="#94a3b8"
+            class="wf-node-tagline"
+          >
+            {node.tagline.length > 26 ? node.tagline.slice(0, 26) + '\u2026' : node.tagline}
+          </text>
+          {/* Category badge */}
+          <rect
+            x={pos.x + 14}
+            y={pos.y + 49}
+            width={node.category.length * 6.2 + 10}
+            height={14}
+            rx="3"
+            fill={accentHex}
+            opacity="0.12"
+          />
+          <text
+            x={pos.x + 19}
+            y={pos.y + 59}
+            font-family="ui-monospace, 'SF Mono', 'Fira Code', monospace"
+            font-size="8"
+            font-weight="600"
+            letter-spacing="0.06em"
+            fill={accentHex}
+            text-transform="uppercase"
+          >
+            {node.category.toUpperCase()}
+          </text>
+          {/* Invisible clickable overlay */}
+          <a href={`${base}/skills/${node.slug}/`} class="wf-node-link">
+            <rect
+              x={pos.x}
+              y={pos.y}
+              width={NODE_W}
+              height={NODE_H}
+              fill="transparent"
+              class="wf-node-hitarea"
+            />
+          </a>
+        </g>
+      );
+    })}
+  </svg>
+
+  {/* Mobile fallback: stacked list */}
+  <div class="wf-mobile-fallback">
+    {laneOrder.map((lane) => {
+      const laneNodes = workflowNodes
+        .filter(n => n.lane === lane)
+        .sort((a, b) => a.col - b.col);
+      return (
+        <div class="wf-mobile-lane">
+          <h3 class="wf-mobile-lane-label">{laneLabels[lane]}</h3>
+          <div class="wf-mobile-lane-nodes">
+            {laneNodes.map((node, i) => {
+              const accent = colorMap[node.category];
+              const dimmed = hasHighlight && !highlightSlugs!.includes(node.slug);
+              return (
+                <>
+                  <a
+                    href={`${base}/skills/${node.slug}/`}
+                    class:list={['wf-mobile-node', { 'wf-mobile-node--dimmed': dimmed }]}
+                    style={`--node-accent: ${accent};`}
+                  >
+                    <code class="wf-mobile-command">{node.command}</code>
+                    <span class="wf-mobile-tagline">{node.tagline}</span>
+                  </a>
+                  {i < laneNodes.length - 1 && lane !== 'utility' && (
+                    <span class="wf-mobile-arrow" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M4 8h8m0 0l-3-3m3 3l-3 3" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                  )}
+                </>
+              );
+            })}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
+
+<script>
+  function initWorkflowGraph() {
+    const wrap = document.querySelector('.wf-graph-wrap');
+    if (!wrap) return;
+
+    const adjacencyStr = wrap.getAttribute('data-adjacency');
+    if (!adjacencyStr) return;
+
+    const adjacency: Record<string, string[]> = JSON.parse(adjacencyStr);
+    const hasHighlight = wrap.getAttribute('data-has-highlight') === 'true';
+
+    const allNodes = wrap.querySelectorAll<SVGGElement>('.wf-node');
+    const allEdges = wrap.querySelectorAll<SVGGElement>('.wf-edge');
+
+    // Don't add hover behavior if we have a highlight preset
+    if (hasHighlight) return;
+
+    function highlightNode(slug: string) {
+      const connected = new Set<string>([slug, ...(adjacency[slug] || [])]);
+
+      allNodes.forEach(nodeEl => {
+        const ns = nodeEl.getAttribute('data-node') || '';
+        if (connected.has(ns)) {
+          nodeEl.classList.add('wf-node--active');
+          nodeEl.classList.remove('wf-node--dimmed');
+        } else {
+          nodeEl.classList.add('wf-node--dimmed');
+          nodeEl.classList.remove('wf-node--active');
+        }
+      });
+
+      allEdges.forEach(edgeEl => {
+        const from = edgeEl.getAttribute('data-from') || '';
+        const to = edgeEl.getAttribute('data-to') || '';
+        if (from === slug || to === slug) {
+          edgeEl.classList.add('wf-edge--active');
+          edgeEl.classList.remove('wf-edge--dimmed');
+        } else {
+          edgeEl.classList.add('wf-edge--dimmed');
+          edgeEl.classList.remove('wf-edge--active');
+        }
+      });
+    }
+
+    function resetAll() {
+      allNodes.forEach(nodeEl => {
+        nodeEl.classList.remove('wf-node--active', 'wf-node--dimmed');
+      });
+      allEdges.forEach(edgeEl => {
+        edgeEl.classList.remove('wf-edge--active', 'wf-edge--dimmed');
+      });
+    }
+
+    allNodes.forEach(nodeEl => {
+      const slug = nodeEl.getAttribute('data-node') || '';
+
+      nodeEl.addEventListener('mouseenter', () => highlightNode(slug));
+      nodeEl.addEventListener('mouseleave', () => resetAll());
+      nodeEl.addEventListener('focusin', () => highlightNode(slug));
+      nodeEl.addEventListener('focusout', () => resetAll());
+    });
+  }
+
+  // Run on load and on Astro page transitions
+  initWorkflowGraph();
+  document.addEventListener('astro:page-load', initWorkflowGraph);
+</script>
+
+<style>
+  /* --- Container --- */
+  .wf-graph-wrap {
+    position: relative;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Subtle dot grid background */
+  .wf-grid-bg {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, #334155 0.7px, transparent 0.7px);
+    background-size: 20px 20px;
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  /* --- SVG --- */
+  .wf-svg {
+    display: block;
+    width: 100%;
+    min-width: 720px;
+    height: auto;
+  }
+
+  /* --- Node states --- */
+  .wf-node {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+  }
+
+  .wf-node-bg {
+    transition: stroke-width 0.15s ease, filter 0.15s ease;
+  }
+
+  .wf-node-glow {
+    transition: opacity 0.2s ease;
+  }
+
+  .wf-node--active .wf-node-bg {
+    stroke-width: 2;
+  }
+
+  .wf-node--active .wf-node-glow {
+    opacity: 0.1;
+  }
+
+  .wf-node--dimmed {
+    opacity: 0.2;
+  }
+
+  .wf-node:hover .wf-node-bg,
+  .wf-node:focus-within .wf-node-bg {
+    stroke-width: 2;
+  }
+
+  .wf-node:hover .wf-node-glow,
+  .wf-node:focus-within .wf-node-glow {
+    opacity: 0.1;
+  }
+
+  .wf-node-link {
+    outline: none;
+  }
+
+  .wf-node-link:focus-visible .wf-node-hitarea {
+    stroke: var(--color-planning);
+    stroke-width: 2;
+    stroke-dasharray: 4 2;
+  }
+
+  /* --- Edge states --- */
+  .wf-edge {
+    transition: opacity 0.2s ease;
+  }
+
+  .wf-edge--dimmed {
+    opacity: 0.08;
+  }
+
+  .wf-edge--active path:first-of-type {
+    opacity: 1;
+    stroke-width: 2.5;
+  }
+
+  .wf-edge-label {
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+
+  .wf-edge--dimmed .wf-edge-label {
+    opacity: 0;
+  }
+
+  /* --- Signal dots --- */
+  .wf-signal-dot {
+    opacity: 0.7;
+  }
+
+  .wf-edge--dimmed .wf-signal-dot {
+    opacity: 0;
+  }
+
+  /* --- Mobile fallback --- */
+  .wf-mobile-fallback {
+    display: none;
+  }
+
+  @media (max-width: 720px) {
+    .wf-svg {
+      display: none;
+    }
+
+    .wf-grid-bg {
+      display: none;
+    }
+
+    .wf-mobile-fallback {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .wf-mobile-lane {
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 1rem;
+      background: var(--color-surface);
+    }
+
+    .wf-mobile-lane-label {
+      font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      margin: 0 0 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .wf-mobile-lane-nodes {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+
+    .wf-mobile-arrow {
+      display: flex;
+      justify-content: center;
+      padding: 0.125rem 0;
+    }
+
+    .wf-mobile-arrow svg {
+      transform: rotate(90deg);
+    }
+
+    .wf-mobile-node {
+      display: block;
+      padding: 0.625rem 0.75rem 0.625rem 1rem;
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-left: 3px solid var(--node-accent);
+      border-radius: 6px;
+      text-decoration: none;
+      color: var(--color-text);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .wf-mobile-node:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 12px -2px color-mix(in srgb, var(--node-accent) 20%, transparent);
+    }
+
+    .wf-mobile-node--dimmed {
+      opacity: 0.3;
+    }
+
+    .wf-mobile-command {
+      display: block;
+      font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--color-text);
+      margin-bottom: 0.25rem;
+    }
+
+    .wf-mobile-tagline {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      line-height: 1.4;
+    }
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .wf-signal-dot {
+      display: none;
+    }
+  }
+</style>

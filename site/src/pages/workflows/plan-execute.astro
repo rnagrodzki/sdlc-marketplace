@@ -1,0 +1,323 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import WorkflowGraph from '../../components/WorkflowGraph.astro';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Plan & Execute Workflow" description="How jira-sdlc, plan-sdlc, and execute-plan-sdlc work together to turn requirements into code.">
+  <section class="wd-hero">
+    <div class="wd-hero-inner">
+      <a href={`${base}/workflows/`} class="wd-back">&larr; All Workflows</a>
+      <span class="wd-overline" style="--lane-color: var(--color-planning);">Plan Lane</span>
+      <h1 class="wd-title">Plan & Execute</h1>
+      <p class="wd-subtitle">
+        From requirements to working code through structured plans and parallel wave execution.
+      </p>
+    </div>
+  </section>
+
+  <section class="wd-graph-section">
+    <div class="wd-graph-container">
+      <WorkflowGraph highlightSlugs={['jira-sdlc', 'plan-sdlc', 'execute-plan-sdlc']} />
+    </div>
+  </section>
+
+  <section class="wd-content">
+    <div class="wd-content-inner">
+      <div class="wd-steps">
+        <div class="wd-step" style="--step-color: var(--color-integrations);">
+          <div class="wd-step-marker">1</div>
+          <div class="wd-step-body">
+            <h2 class="wd-step-title">
+              Gather Context with
+              <a href={`${base}/skills/jira-sdlc/`} class="wd-skill-link">/jira-sdlc</a>
+            </h2>
+            <p>
+              Start with a Jira ticket or create one. The skill auto-detects your project from
+              the git branch, caches project metadata locally, and translates natural language
+              into Jira API calls. It provides the structured context that plan-sdlc uses to
+              understand what needs to be built.
+            </p>
+            <p>
+              This step is optional -- you can feed requirements directly to plan-sdlc as free text,
+              a spec file, or through interactive Q&A. But when a Jira ticket exists, it anchors
+              the plan to a trackable work item.
+            </p>
+          </div>
+        </div>
+
+        <div class="wd-step" style="--step-color: var(--color-planning);">
+          <div class="wd-step-marker">2</div>
+          <div class="wd-step-body">
+            <h2 class="wd-step-title">
+              Decompose with
+              <a href={`${base}/skills/plan-sdlc/`} class="wd-skill-link">/plan-sdlc</a>
+            </h2>
+            <p>
+              The planning skill explores the codebase, identifies affected files, and decomposes
+              the work into classified tasks. Each task gets complexity, risk, and dependency metadata.
+              A self-critique pass checks for gaps, contradictions, and missing dependencies.
+            </p>
+            <p>
+              You review the plan before it's saved. A cross-model review dispatches a second
+              model to validate correctness. The final plan is written to your plans directory with
+              wave assignments ready for execution.
+            </p>
+          </div>
+        </div>
+
+        <div class="wd-step" style="--step-color: var(--color-planning);">
+          <div class="wd-step-marker">3</div>
+          <div class="wd-step-body">
+            <h2 class="wd-step-title">
+              Execute with
+              <a href={`${base}/skills/execute-plan-sdlc/`} class="wd-skill-link">/execute-plan-sdlc</a>
+            </h2>
+            <p>
+              Execution dispatches tasks in parallel waves. Trivial tasks get batched into fast
+              agents; complex tasks get dedicated agents. Each wave checkpoint is persisted for
+              session resume on large plans.
+            </p>
+            <p>
+              After each wave, mechanical verification checks the actual git diff -- agent
+              self-reports are never trusted alone. A spec compliance review catches drift
+              between what was planned and what was implemented. High-risk tasks pause for
+              your approval before proceeding.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="wd-after">
+        <h2 class="wd-after-title">What happens next?</h2>
+        <div class="wd-after-paths">
+          <a href={`${base}/workflows/review-cycle/`} class="wd-after-path" style="--path-color: var(--color-review);">
+            <span class="wd-path-label">Review the output</span>
+            <span class="wd-path-desc">execute-plan-sdlc feeds into review-sdlc for multi-dimensional code review</span>
+          </a>
+          <a href={`${base}/workflows/ship/`} class="wd-after-path" style="--path-color: var(--color-gitops);">
+            <span class="wd-path-label">Ship directly</span>
+            <span class="wd-path-desc">Or skip review and flow into commit-sdlc to package the changes</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .wd-hero {
+    padding: 3rem 1.5rem 1.5rem;
+  }
+
+  .wd-hero-inner {
+    max-width: 40rem;
+    margin: 0 auto;
+  }
+
+  .wd-back {
+    display: inline-block;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    margin-bottom: 1rem;
+    transition: color 0.12s ease;
+  }
+
+  .wd-back:hover {
+    color: var(--color-text);
+  }
+
+  .wd-overline {
+    display: inline-block;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--lane-color);
+    margin-bottom: 0.75rem;
+    padding: 3px 10px;
+    border: 1px solid color-mix(in srgb, var(--lane-color) 30%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--lane-color) 8%, transparent);
+  }
+
+  .wd-title {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.01em;
+  }
+
+  .wd-subtitle {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  .wd-graph-section {
+    padding: 1rem 1.5rem 2rem;
+  }
+
+  .wd-graph-container {
+    max-width: 72rem;
+    margin: 0 auto;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg);
+    padding: 1.5rem;
+    overflow: hidden;
+  }
+
+  .wd-content {
+    padding: 0 1.5rem 3rem;
+  }
+
+  .wd-content-inner {
+    max-width: 40rem;
+    margin: 0 auto;
+  }
+
+  /* --- Steps --- */
+  .wd-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    margin-bottom: 3rem;
+  }
+
+  .wd-step {
+    display: flex;
+    gap: 1.25rem;
+    position: relative;
+  }
+
+  .wd-step-marker {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--step-color) 15%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--step-color) 40%, transparent);
+    color: var(--step-color);
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.125rem;
+  }
+
+  .wd-step-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .wd-step-title {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0 0 0.625rem;
+    line-height: 1.4;
+  }
+
+  .wd-skill-link {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.9375rem;
+    color: var(--step-color);
+    text-decoration: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--step-color) 30%, transparent);
+    transition: border-color 0.12s ease;
+  }
+
+  .wd-skill-link:hover {
+    border-color: var(--step-color);
+  }
+
+  .wd-step-body p {
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: var(--color-text-muted);
+    margin: 0 0 0.75rem;
+  }
+
+  .wd-step-body p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* --- After section --- */
+  .wd-after-title {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin: 0 0 1rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .wd-after-paths {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .wd-after-path {
+    display: block;
+    padding: 1rem 1rem 1rem 1.125rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--path-color);
+    border-radius: 6px;
+    text-decoration: none;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .wd-after-path:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 12px -2px color-mix(in srgb, var(--path-color) 15%, transparent);
+  }
+
+  .wd-path-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 0.375rem;
+  }
+
+  .wd-path-desc {
+    display: block;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+  }
+
+  @media (max-width: 640px) {
+    .wd-hero {
+      padding: 2rem 1rem 1rem;
+    }
+
+    .wd-graph-section,
+    .wd-content {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .wd-graph-container {
+      padding: 1rem;
+    }
+
+    .wd-after-paths {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

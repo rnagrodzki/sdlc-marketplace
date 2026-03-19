@@ -1,0 +1,262 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import WorkflowGraph from '../../components/WorkflowGraph.astro';
+
+const base = import.meta.env.BASE_URL;
+
+const workflows = [
+  {
+    title: 'Plan & Execute',
+    href: `${base}/workflows/plan-execute/`,
+    accent: 'var(--color-planning)',
+    accentHex: '#3b82f6',
+    description: 'From Jira tickets to structured plans to parallel wave execution. The planning lane handles the full lifecycle of turning requirements into working code.',
+    skills: ['/jira-sdlc', '/plan-sdlc', '/execute-plan-sdlc'],
+  },
+  {
+    title: 'Review Cycle',
+    href: `${base}/workflows/review-cycle/`,
+    accent: 'var(--color-review)',
+    accentHex: '#f59e0b',
+    description: 'Initialize review dimensions, run multi-dimensional code reviews, and process feedback with dual critique gates that prevent blind acceptance.',
+    skills: ['/review-init-sdlc', '/review-sdlc', '/review-receive-sdlc'],
+  },
+  {
+    title: 'Ship with Confidence',
+    href: `${base}/workflows/ship/`,
+    accent: 'var(--color-gitops)',
+    accentHex: '#22c55e',
+    description: 'Smart commits, structured PRs with custom templates, and semantic versioning with changelogs. Every release artifact is consistent and traceable.',
+    skills: ['/commit-sdlc', '/pr-sdlc', '/pr-customize-sdlc', '/version-sdlc'],
+  },
+];
+---
+
+<BaseLayout title="Skill Workflows" description="How the 12 SDLC skills connect into development lifecycle workflows.">
+  <section class="wf-hero">
+    <div class="wf-hero-inner">
+      <span class="wf-overline">System Map</span>
+      <h1 class="wf-title">Skill Workflows</h1>
+      <p class="wf-subtitle">
+        How the skills connect into development lifecycle workflows.
+        Hover any node to trace its connections across the system.
+      </p>
+    </div>
+  </section>
+
+  <section class="wf-graph-section">
+    <div class="wf-graph-container">
+      <WorkflowGraph />
+    </div>
+  </section>
+
+  <section class="wf-cards-section">
+    <div class="wf-cards-inner">
+      <h2 class="wf-cards-heading">Workflow Deep Dives</h2>
+      <div class="wf-cards-grid">
+        {workflows.map((wf) => (
+          <a
+            href={wf.href}
+            class="wf-card"
+            style={`--wf-accent: ${wf.accent}; --wf-accent-hex: ${wf.accentHex};`}
+          >
+            <div class="wf-card-header">
+              <h3 class="wf-card-title">{wf.title}</h3>
+              <svg class="wf-card-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M4 8h8m0 0l-3-3m3 3l-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <p class="wf-card-desc">{wf.description}</p>
+            <div class="wf-card-skills">
+              {wf.skills.map((s) => (
+                <code class="wf-card-skill">{s}</code>
+              ))}
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  /* --- Hero --- */
+  .wf-hero {
+    padding: 3rem 1.5rem 1.5rem;
+    text-align: center;
+  }
+
+  .wf-hero-inner {
+    max-width: 40rem;
+    margin: 0 auto;
+  }
+
+  .wf-overline {
+    display: inline-block;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-planning);
+    margin-bottom: 0.75rem;
+    padding: 3px 10px;
+    border: 1px solid color-mix(in srgb, var(--color-planning) 30%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-planning) 8%, transparent);
+  }
+
+  .wf-title {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.01em;
+  }
+
+  .wf-subtitle {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+    margin: 0;
+    max-width: 32rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* --- Graph section --- */
+  .wf-graph-section {
+    padding: 1rem 1.5rem 2rem;
+  }
+
+  .wf-graph-container {
+    max-width: 72rem;
+    margin: 0 auto;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg);
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* --- Cards section --- */
+  .wf-cards-section {
+    padding: 1rem 1.5rem 3rem;
+  }
+
+  .wf-cards-inner {
+    max-width: 72rem;
+    margin: 0 auto;
+  }
+
+  .wf-cards-heading {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin: 0 0 1.25rem;
+  }
+
+  .wf-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+
+  .wf-card {
+    display: block;
+    padding: 1.25rem 1.25rem 1.25rem 1.5rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--wf-accent);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--color-text);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+
+  .wf-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 24px -4px color-mix(in srgb, var(--wf-accent) 20%, transparent);
+    border-color: color-mix(in srgb, var(--wf-accent) 50%, var(--color-border));
+  }
+
+  .wf-card:focus-visible {
+    outline: 2px solid var(--color-planning);
+    outline-offset: 2px;
+  }
+
+  .wf-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .wf-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0;
+  }
+
+  .wf-card-arrow {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+    transition: transform 0.15s ease, color 0.15s ease;
+  }
+
+  .wf-card:hover .wf-card-arrow {
+    transform: translateX(3px);
+    color: var(--wf-accent);
+  }
+
+  .wf-card-desc {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--color-text-muted);
+    margin: 0 0 0.75rem;
+  }
+
+  .wf-card-skills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+
+  .wf-card-skill {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    padding: 2px 7px;
+    background: color-mix(in srgb, var(--wf-accent) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--wf-accent) 20%, transparent);
+    border-radius: 4px;
+    color: color-mix(in srgb, var(--wf-accent) 80%, var(--color-text));
+  }
+
+  @media (max-width: 640px) {
+    .wf-hero {
+      padding: 2rem 1rem 1rem;
+    }
+
+    .wf-graph-section {
+      padding: 1rem;
+    }
+
+    .wf-graph-container {
+      padding: 1rem;
+    }
+
+    .wf-cards-section {
+      padding: 1rem;
+    }
+
+    .wf-cards-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

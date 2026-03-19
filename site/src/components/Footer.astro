@@ -1,0 +1,59 @@
+---
+const repoUrl = 'https://github.com/rnagrodzki/sdlc-marketplace';
+---
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-text">
+      <a href={repoUrl} class="footer-link" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <span class="footer-sep" aria-hidden="true">&middot;</span>
+      <span>AGPL-3.0</span>
+      <span class="footer-sep" aria-hidden="true">&middot;</span>
+      <span>Built with <a href="https://astro.build" class="footer-link" target="_blank" rel="noopener noreferrer">Astro</a></span>
+    </span>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-top: 1px solid var(--color-border);
+    padding: 1.5rem 0;
+    margin-top: 4rem;
+  }
+
+  .footer-inner {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    text-align: center;
+  }
+
+  .footer-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .footer-sep {
+    opacity: 0.4;
+  }
+
+  .footer-link {
+    color: var(--color-text-muted);
+    text-decoration: none;
+    transition: color 0.12s ease;
+  }
+
+  .footer-link:hover {
+    color: var(--color-text);
+  }
+
+  .footer-link:focus-visible {
+    outline: 2px solid var(--color-planning);
+    outline-offset: 2px;
+  }
+</style>

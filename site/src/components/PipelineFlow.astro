@@ -1,0 +1,223 @@
+---
+import type { PipelineStep } from '../data/skills-meta';
+
+interface Props {
+  steps: PipelineStep[];
+  category?: 'planning' | 'review' | 'gitops' | 'integrations' | 'internal';
+  title?: string;
+}
+
+const { steps, title = 'Pipeline' } = Astro.props;
+
+const stepColors: Record<string, string> = {
+  script: '#64748b',
+  llm: '#3b82f6',
+  critique: '#f59e0b',
+  user: '#22c55e',
+  dispatch: '#a855f7',
+  verify: '#10b981',
+};
+
+const stepTypeLabels: Record<string, string> = {
+  script: 'SCRIPT',
+  llm: 'LLM',
+  critique: 'CRITIQUE',
+  user: 'WAIT',
+  dispatch: 'DISPATCH',
+  verify: 'VERIFY',
+};
+
+const NODE_WIDTH = 260;
+const NODE_PADDING_X = 10;
+const NODE_BASE_HEIGHT = 52;
+const DESC_HEIGHT = 16;
+const CONNECTOR_HEIGHT = 28;
+const SVG_WIDTH = NODE_WIDTH + NODE_PADDING_X * 2;
+
+function getNodeHeight(step: PipelineStep): number {
+  return step.description ? NODE_BASE_HEIGHT + DESC_HEIGHT : NODE_BASE_HEIGHT;
+}
+
+const nodePositions: number[] = [];
+let y = 0;
+for (const step of steps) {
+  nodePositions.push(y);
+  y += getNodeHeight(step) + CONNECTOR_HEIGHT;
+}
+const svgHeight = y - CONNECTOR_HEIGHT;
+const midX = SVG_WIDTH / 2;
+---
+
+<figure
+  class="pipeline-figure"
+  role="img"
+  aria-label={`Pipeline: ${steps.map(s => s.label).join(' \u2192 ')}`}
+>
+  {title && <figcaption class="pipeline-title">{title}</figcaption>}
+  <svg
+    viewBox={`0 0 ${SVG_WIDTH} ${svgHeight}`}
+    width="100%"
+    xmlns="http://www.w3.org/2000/svg"
+    class="pipeline-svg"
+    aria-hidden="true"
+  >
+    <defs>
+      {/* Glow filter for flow dots */}
+      <filter id="dotGlow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="2" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+
+    {/* Render connectors first (below nodes) */}
+    {steps.slice(0, -1).map((step, i) => {
+      const fromY = nodePositions[i] + getNodeHeight(step);
+      const toY = nodePositions[i + 1];
+      const connectorLen = toY - fromY;
+      const destColor = stepColors[steps[i + 1].type] ?? '#64748b';
+      return (
+        <g>
+          {/* Dashed connector line */}
+          <line
+            x1={midX} y1={fromY}
+            x2={midX} y2={toY}
+            stroke="#334155"
+            stroke-width="2"
+            stroke-dasharray="4 4"
+          />
+          {/* Arrow head at destination */}
+          <polygon
+            points={`${midX - 4},${toY - 4} ${midX},${toY} ${midX + 4},${toY - 4}`}
+            fill="#334155"
+          />
+          {/* Animated flow dot — transform positions it at connector start,
+              animateMotion moves relative from there */}
+          <circle
+            cx={midX} cy={fromY}
+            r="3"
+            fill={destColor}
+            class="flow-dot"
+            filter="url(#dotGlow)"
+          >
+            <animateMotion
+              path={`M 0 0 L 0 ${connectorLen}`}
+              dur="1.5s"
+              begin={`${i * 0.3}s`}
+              repeatCount="indefinite"
+              calcMode="linear"
+            />
+          </circle>
+        </g>
+      );
+    })}
+
+    {/* Render nodes */}
+    {steps.map((step, i) => {
+      const nodeY = nodePositions[i];
+      const nodeH = getNodeHeight(step);
+      const color = stepColors[step.type] ?? '#64748b';
+      const typeLabel = stepTypeLabels[step.type] ?? step.type.toUpperCase();
+      const truncatedDesc = step.description
+        ? step.description.length > 38
+          ? step.description.slice(0, 38) + '\u2026'
+          : step.description
+        : null;
+      const stepNum = String(i + 1);
+      return (
+        <g aria-label={`${step.label}: ${step.type}`}>
+          {/* Node background */}
+          <rect
+            x={NODE_PADDING_X} y={nodeY}
+            width={NODE_WIDTH} height={nodeH}
+            rx="6" ry="6"
+            fill="#1e293b"
+            stroke={color}
+            stroke-width="1.5"
+          />
+          {/* Left accent bar */}
+          <rect
+            x={NODE_PADDING_X} y={nodeY + 3}
+            width="4" height={nodeH - 6}
+            rx="2" ry="2"
+            fill={color}
+          />
+          {/* Step counter badge (top-right) */}
+          <circle
+            cx={NODE_PADDING_X + NODE_WIDTH - 16}
+            cy={nodeY + 16}
+            r="9"
+            fill={color}
+            opacity="0.15"
+          />
+          <text
+            x={NODE_PADDING_X + NODE_WIDTH - 16}
+            y={nodeY + 20}
+            font-family="ui-monospace, 'SF Mono', 'Fira Code', monospace"
+            font-size="9"
+            font-weight="700"
+            fill={color}
+            text-anchor="middle"
+          >{stepNum}</text>
+          {/* Step label */}
+          <text
+            x={NODE_PADDING_X + 18}
+            y={nodeY + 20}
+            font-family="ui-monospace, 'SF Mono', 'Fira Code', monospace"
+            font-size="12"
+            font-weight="600"
+            fill="#f1f5f9"
+          >{step.label}</text>
+          {/* Type badge */}
+          <text
+            x={NODE_PADDING_X + 18}
+            y={nodeY + 34}
+            font-family="ui-monospace, 'SF Mono', 'Fira Code', monospace"
+            font-size="9"
+            fill={color}
+            opacity="0.9"
+          >{typeLabel}</text>
+          {/* Description if present */}
+          {truncatedDesc && (
+            <text
+              x={NODE_PADDING_X + 18}
+              y={nodeY + nodeH - 6}
+              font-family="system-ui, -apple-system, sans-serif"
+              font-size="10"
+              fill="#94a3b8"
+            >{truncatedDesc}</text>
+          )}
+        </g>
+      );
+    })}
+  </svg>
+</figure>
+
+<style>
+  .pipeline-figure {
+    margin: 0;
+    padding: 0;
+  }
+
+  .pipeline-title {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .pipeline-svg {
+    max-width: 100%;
+    display: block;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flow-dot {
+      display: none;
+    }
+  }
+</style>

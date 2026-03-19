@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  /* Base colors */
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-surface-2: #334155;
+  --color-border: #475569;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+
+  /* Category accent colors */
+  --color-planning: #3b82f6;
+  --color-review: #f59e0b;
+  --color-gitops: #22c55e;
+  --color-integrations: #a855f7;
+  --color-internal: #6b7280;
+
+  /* Pipeline step type colors */
+  --step-script: #64748b;
+  --step-llm: #3b82f6;
+  --step-critique: #f59e0b;
+  --step-user: #22c55e;
+  --step-dispatch: #a855f7;
+  --step-verify: #10b981;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+*:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  padding: 0.5rem 1rem;
+  background: #3b82f6;
+  color: #fff;
+  z-index: 100;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,86 @@
+---
+import { getCollection, render } from 'astro:content';
+import SkillLayout from '../../layouts/SkillLayout.astro';
+import PipelineFlow from '../../components/PipelineFlow.astro';
+import SkillCard from '../../components/SkillCard.astro';
+import { getSkillMeta } from '../../data/skills-meta';
+
+export async function getStaticPaths() {
+  const skills = await getCollection('skills');
+  return skills.map(entry => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const meta = getSkillMeta(entry.id);
+const relatedSkills = meta?.connections
+  .map(c => ({ ...c, meta: getSkillMeta(c.to) }))
+  .filter(c => c.meta) ?? [];
+---
+
+<SkillLayout
+  title={meta?.command ?? entry.id}
+  description={meta?.tagline ?? ''}
+  command={meta?.command}
+  category={meta?.category}
+>
+  <Content />
+
+  {relatedSkills.length > 0 && (
+    <section class="related-skills">
+      <h2>Related Skills</h2>
+      <div class="related-grid">
+        {relatedSkills.map(({ meta: relMeta, label }) => relMeta && (
+          <div class="related-item">
+            <span class="related-label">{label}</span>
+            <SkillCard
+              slug={relMeta.slug}
+              command={relMeta.command}
+              tagline={relMeta.tagline}
+              category={relMeta.category}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+  )}
+
+  {meta?.pipeline && meta.pipeline.length > 0 && (
+    <PipelineFlow
+      steps={meta.pipeline}
+      category={meta.category}
+      title="Pipeline"
+      slot="pipeline"
+    />
+  )}
+</SkillLayout>
+
+<style>
+  .related-skills {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-border);
+  }
+  .related-skills h2 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    margin-bottom: 1rem;
+  }
+  .related-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .related-label {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+</style>

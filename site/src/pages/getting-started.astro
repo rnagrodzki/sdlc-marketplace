@@ -1,0 +1,12 @@
+---
+import { render, getEntry } from 'astro:content';
+import GuideLayout from '../layouts/GuideLayout.astro';
+
+const entry = await getEntry('guides', 'getting-started');
+if (!entry) throw new Error('getting-started.md not found in guides collection');
+const { Content } = await render(entry);
+---
+
+<GuideLayout title="Getting Started" description="Installation, first use, and what gets created when you install the SDLC Marketplace plugin.">
+  <Content />
+</GuideLayout>

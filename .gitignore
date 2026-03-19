@@ -1,3 +1,7 @@
 .worktrees/
 tests/promptfoo/.promptfoo-data/
 .evidences/
+
+site/node_modules/
+site/dist/
+site/.astro/

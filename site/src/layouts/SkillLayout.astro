@@ -1,0 +1,236 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import CategoryBadge from '../components/CategoryBadge.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  command?: string;
+  category?: 'planning' | 'review' | 'gitops' | 'integrations' | 'internal';
+}
+
+const { title, description, command, category } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title={title} description={description}>
+  <div class="skill-page">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <ol>
+        <li><a href={`${base}/skills/`}>Skills</a></li>
+        <li aria-current="page">{title}</li>
+      </ol>
+    </nav>
+
+    <header class="skill-header">
+      <div class="skill-header-meta">
+        {command && <code class="skill-command">{command}</code>}
+        {category && <CategoryBadge category={category} />}
+      </div>
+      <h1 class="skill-title">{title}</h1>
+    </header>
+
+    <div class="skill-columns">
+      <article class="skill-content">
+        <slot />
+      </article>
+      <aside class="skill-pipeline">
+        <div class="pipeline-sticky">
+          <h2 class="pipeline-heading">Pipeline</h2>
+          <slot name="pipeline" />
+        </div>
+      </aside>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .skill-page {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  /* Breadcrumb */
+  .breadcrumb ol {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    list-style: none;
+    margin: 0 0 1.5rem;
+    padding: 0;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  .breadcrumb li + li::before {
+    content: '/';
+    margin-right: 0.25rem;
+    opacity: 0.4;
+  }
+
+  .breadcrumb a {
+    color: var(--color-text-muted);
+    text-decoration: none;
+    transition: color 0.12s ease;
+  }
+
+  .breadcrumb a:hover {
+    color: var(--color-text);
+  }
+
+  .breadcrumb [aria-current='page'] {
+    color: var(--color-text);
+  }
+
+  /* Header */
+  .skill-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .skill-header-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .skill-command {
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid var(--color-border);
+  }
+
+  .skill-title {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--color-text);
+  }
+
+  /* Two-column layout */
+  .skill-columns {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 3rem;
+    align-items: start;
+  }
+
+  .skill-content {
+    max-width: 65ch;
+    font-size: 0.9375rem;
+    line-height: 1.75;
+  }
+
+  .skill-pipeline {
+    min-width: 0;
+  }
+
+  .pipeline-sticky {
+    position: sticky;
+    top: 5rem;
+  }
+
+  .pipeline-heading {
+    margin: 0 0 1rem;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', 'Courier New', monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* Prose styling for content slot */
+  .skill-content :global(h2) {
+    margin: 2.5rem 0 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .skill-content :global(h3) {
+    margin: 2rem 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .skill-content :global(p) {
+    margin: 0 0 1rem;
+    color: var(--color-text);
+  }
+
+  .skill-content :global(code) {
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', 'Courier New', monospace;
+    font-size: 0.875em;
+    background: var(--color-surface);
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    border: 1px solid var(--color-border);
+  }
+
+  .skill-content :global(pre) {
+    margin: 0 0 1.5rem;
+    padding: 1rem 1.25rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+  }
+
+  .skill-content :global(pre code) {
+    background: none;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+  }
+
+  .skill-content :global(ul),
+  .skill-content :global(ol) {
+    margin: 0 0 1rem;
+    padding-left: 1.5rem;
+  }
+
+  .skill-content :global(li) {
+    margin-bottom: 0.25rem;
+  }
+
+  .skill-content :global(a) {
+    color: var(--color-planning);
+    text-decoration: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-planning) 30%, transparent);
+    transition: border-color 0.12s ease;
+  }
+
+  .skill-content :global(a:hover) {
+    border-bottom-color: var(--color-planning);
+  }
+
+  /* Mobile: stack columns */
+  @media (max-width: 768px) {
+    .skill-columns {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .pipeline-sticky {
+      position: static;
+    }
+
+    .skill-content {
+      max-width: none;
+    }
+  }
+</style>

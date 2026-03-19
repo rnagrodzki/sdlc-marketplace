@@ -1,0 +1,44 @@
+---
+interface Props {
+  category: 'planning' | 'review' | 'gitops' | 'integrations' | 'internal';
+}
+
+const { category } = Astro.props;
+
+const colorMap: Record<string, string> = {
+  planning: 'var(--color-planning)',
+  review: 'var(--color-review)',
+  gitops: 'var(--color-gitops)',
+  integrations: 'var(--color-integrations)',
+  internal: 'var(--color-internal)',
+};
+
+const accent = colorMap[category];
+---
+
+<span
+  class="category-badge"
+  style={`--badge-color: ${accent};`}
+>
+  {category}
+</span>
+
+<style>
+  .category-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', 'Courier New', monospace;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--badge-color);
+    background: color-mix(in srgb, var(--badge-color) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--badge-color) 30%, transparent);
+    border-radius: 4px;
+    line-height: 1.5;
+    white-space: nowrap;
+    user-select: none;
+  }
+</style>

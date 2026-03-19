@@ -1,0 +1,82 @@
+---
+import CategoryBadge from './CategoryBadge.astro';
+
+interface Props {
+  slug: string;
+  command: string;
+  tagline: string;
+  category: 'planning' | 'review' | 'gitops' | 'integrations' | 'internal';
+}
+
+const { slug, command, tagline, category } = Astro.props;
+
+const colorMap: Record<string, string> = {
+  planning: 'var(--color-planning)',
+  review: 'var(--color-review)',
+  gitops: 'var(--color-gitops)',
+  integrations: 'var(--color-integrations)',
+  internal: 'var(--color-internal)',
+};
+
+const accent = colorMap[category];
+const href = `${import.meta.env.BASE_URL}/skills/${slug}/`;
+---
+
+<a href={href} class="skill-card" style={`--card-accent: ${accent};`}>
+  <div class="card-header">
+    <code class="card-command" title="Click card to view details">{command}</code>
+    <CategoryBadge category={category} />
+  </div>
+  <p class="card-tagline">{tagline}</p>
+</a>
+
+<style>
+  .skill-card {
+    display: block;
+    position: relative;
+    padding: 1.25rem 1.25rem 1.25rem 1.5rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--card-accent);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--color-text);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    outline: none;
+  }
+
+  .skill-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 24px -4px color-mix(in srgb, var(--card-accent) 20%, transparent);
+    border-color: color-mix(in srgb, var(--card-accent) 50%, var(--color-border));
+  }
+
+  .skill-card:focus-visible {
+    outline: 2px solid var(--color-planning);
+    outline-offset: 2px;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-command {
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', 'Courier New', monospace;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--color-text);
+    background: none;
+    padding: 0;
+  }
+
+  .card-tagline {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+  }
+</style>
