@@ -106,7 +106,7 @@ Before I decompose this, I need to clarify three things:
 After you approve the plan, the skill saves it and hands off:
 
 ```
-Plan written to /var/folders/xx/tmpXXXXXX/claude-plans/2026-03-19-auth-layer.md
+Plan written to ~/.claude/plans/2026-03-19-auth-layer.md
 
 To execute: /execute-plan-sdlc
 ```
@@ -117,7 +117,7 @@ To execute: /execute-plan-sdlc
 
 | File / Artifact | Description |
 |-----------------|-------------|
-| `$TMPDIR/claude-plans/YYYY-MM-DD-<feature-name>.md` | The written plan document, saved to temp storage. Not placed in the project tree. |
+| `<plansDirectory>/YYYY-MM-DD-<feature-name>.md` | The written plan document. Path resolved from: user-specified → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → `~/.claude/plans/` fallback. |
 | `$TMPDIR/claude-plans/<feature-name>-exploration.md` | Temporary exploration scratchpad written during Step 1 (full pipeline only). Updated after every 2 exploration actions and re-read before Step 2 begins. Contains a checkpoint block for session recovery. |
 | `.claude/learnings/log.md` | Planning learnings appended after writing: scope decisions, clarification patterns, decomposition issues. |
 

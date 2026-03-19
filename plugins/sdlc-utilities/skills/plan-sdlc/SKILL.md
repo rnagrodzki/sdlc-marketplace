@@ -168,12 +168,16 @@ Do not proceed to Step 5 without explicit approval.
 
 ## Step 5 (DO): Write Plan Document
 
-Save to the location the user specified, or default to:
-`$TMPDIR/claude-plans/YYYY-MM-DD-<feature-name>.md`
+Save to the location the user specified, or resolve the default path:
 
-Create the directory if it does not exist: `mkdir -p $TMPDIR/claude-plans`
+1. User-specified path (if provided in conversation)
+2. Project `.claude/settings.json` → `plansDirectory` (relative paths resolve from workspace root)
+3. Global `~/.claude/settings.json` → `plansDirectory`
+4. Default fallback: `~/.claude/plans/`
 
-Plans are ephemeral working documents — they belong in temp storage, not in the project tree.
+Naming convention: `YYYY-MM-DD-<feature-name>.md`. Create the directory if it does not exist.
+
+Plans are stored alongside Claude Code's own plan files for cross-session reference.
 
 See `./plan-format-reference.md` for the exact format specification. The plan header:
 
@@ -238,7 +242,7 @@ Do NOT automatically invoke execute-plan-sdlc. The user decides when to execute.
 - Create plans with fewer than 2 tasks (just do the work directly)
 - Skip the plan review loop (unless lightweight routing applies)
 - Use absolute file paths that only work on one machine
-- Put plans in the project tree — plans are temp working documents
+- Put plans in `$TMPDIR` — plans should survive session boundaries
 - Put plans in plugin-branded directories (no `docs/superpowers/plans/`)
 
 ## Gotchas
