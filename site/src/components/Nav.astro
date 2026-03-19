@@ -13,6 +13,7 @@ const navItems: NavItem[] = [
     label: 'Skills',
     href: `${base}/skills/`,
     children: [
+      { label: 'View All', href: `${base}/skills/` },
       { label: 'Planning', href: `${base}/skills/?category=planning` },
       { label: 'Review', href: `${base}/skills/?category=review` },
       { label: 'GitOps', href: `${base}/skills/?category=gitops` },
@@ -64,6 +65,7 @@ function isActive(href: string): boolean {
             class:list={['nav-link', { active: isActive(item.href) }]}
             role="menuitem"
             aria-haspopup={item.children ? 'true' : undefined}
+            aria-expanded={item.children ? 'false' : undefined}
           >
             {item.label}
             {item.children && (
@@ -90,6 +92,14 @@ function isActive(href: string): boolean {
 </nav>
 
 <script>
+  function closeAllDropdowns() {
+    document.querySelectorAll('.has-dropdown.open').forEach((el) => {
+      el.classList.remove('open');
+      el.querySelector('.nav-link')?.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  // Mobile hamburger toggle
   const toggle = document.querySelector('.nav-toggle') as HTMLButtonElement | null;
   const menu = document.getElementById('nav-menu');
 
@@ -98,8 +108,44 @@ function isActive(href: string): boolean {
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
       toggle.setAttribute('aria-expanded', String(!expanded));
       menu.classList.toggle('open');
+      if (expanded) closeAllDropdowns();
     });
   }
+
+  // Dropdown click toggle — prevents navigation and toggles open/closed
+  document.querySelectorAll('.has-dropdown > .nav-link').forEach((link) => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const parent = link.closest('.has-dropdown') as HTMLElement;
+      const wasOpen = parent.classList.contains('open');
+      closeAllDropdowns();
+      if (!wasOpen) {
+        parent.classList.add('open');
+        link.setAttribute('aria-expanded', 'true');
+      }
+    });
+  });
+
+  // Close on click outside
+  document.addEventListener('click', (e) => {
+    if (!(e.target as HTMLElement).closest('.has-dropdown')) {
+      closeAllDropdowns();
+    }
+  });
+
+  // Close on Escape, return focus to trigger
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const hadOpen = document.querySelector('.has-dropdown.open');
+      closeAllDropdowns();
+      if (hadOpen) (hadOpen.querySelector('.nav-link') as HTMLElement)?.focus();
+    }
+  });
+
+  // Close dropdown when a child item is clicked (future-proofs for client-side nav)
+  document.querySelectorAll('.dropdown-link').forEach((link) => {
+    link.addEventListener('click', () => closeAllDropdowns());
+  });
 </script>
 
 <style>
@@ -217,7 +263,7 @@ function isActive(href: string): boolean {
     left: 0;
     min-width: 10rem;
     padding: 0.375rem 0;
-    margin: 0.25rem 0 0;
+    margin: 0;
     list-style: none;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -225,14 +271,30 @@ function isActive(href: string): boolean {
     box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
   }
 
+  /* Bridge the gap between nav link and dropdown panel so hover doesn't drop */
+  .dropdown::before {
+    content: '';
+    display: block;
+    height: 0.25rem;
+  }
+
   .has-dropdown:hover .dropdown,
-  .has-dropdown:focus-within .dropdown {
+  .has-dropdown:focus-within .dropdown,
+  .has-dropdown.open .dropdown {
     display: block;
   }
 
   .has-dropdown:hover .dropdown-arrow,
-  .has-dropdown:focus-within .dropdown-arrow {
+  .has-dropdown:focus-within .dropdown-arrow,
+  .has-dropdown.open .dropdown-arrow {
     transform: rotate(180deg);
+  }
+
+  /* Visual separator under "View All" */
+  .dropdown li:first-child {
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 0.25rem;
+    padding-bottom: 0.125rem;
   }
 
   .dropdown-link {
