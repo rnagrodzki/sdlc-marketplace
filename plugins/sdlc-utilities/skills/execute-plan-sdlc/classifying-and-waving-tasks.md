@@ -121,12 +121,33 @@ You are implementing a single task from a larger plan. Focus only on your assign
 ## Context From Prior Waves
 {Summary of relevant changes already completed. Omit if this is Wave 1. Be specific: "Task 3 created UserService at src/services/user.service.ts with methods getUser(id) and createUser(data)." Not: "Task 3 was completed."}
 
-## Expected Output
-When done, report:
-1. Files created or modified (list each with a one-line summary of what changed)
-2. Verification performed (tests run, build checked, manual verification done)
-3. Any decisions made that the orchestrator should know about
-4. Any issues encountered
+## Completion Checklist (fill every line)
+
+```
+COMPLETE: files_created=[list or none] files_modified=[list or none] tests_added=[yes|no|n/a] tests_pass=[yes|no|n/a] build_pass=[yes|no|n/a]
+VERIFY: <symbol_name> in <file_path>
+STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
+```
+
+**Status definitions:**
+- **DONE** — task complete, no issues
+- **DONE_WITH_CONCERNS** — task complete but you have doubts about correctness or approach; add explanation below the checklist block
+- **NEEDS_CONTEXT** — cannot complete without additional information; describe what you need below the checklist block
+- **BLOCKED** — cannot complete the task; describe the blocker and what you tried below the checklist block
+
+For `VERIFY`, use the primary symbol you added or modified (function name, class name, config key, or constant). The orchestrator greps for this symbol to confirm your changes persisted in the filesystem.
+
+## When You're in Over Your Head
+
+It is always OK to stop and report BLOCKED. Bad work is worse than no work.
+
+**STOP and report BLOCKED when:**
+- The task requires architectural decisions with multiple valid approaches
+- You need to understand code beyond what was provided and can't find clarity
+- You feel uncertain about whether your approach is correct
+- You've been reading files trying to understand the system without progress
+
+The orchestrator can provide more context, escalate to a more capable model, break the task into smaller pieces, or escalate to the user.
 
 ## Hard Constraints
 - Do NOT read the plan file — all task information is provided above
@@ -135,16 +156,28 @@ When done, report:
 - If you encounter a genuine blocker, report it clearly rather than guessing or hallucinating an implementation
 - Do not add features, refactor, or clean up code beyond what the task requires
 
-## Verification Token
-After completing all edits, report a verification token on its own line:
-```
-VERIFY: <symbol_name> in <file_path>
-```
-Use the primary symbol you added or modified (function name, struct name, type name, config key, or variable name). The orchestrator greps for this symbol to confirm your changes persisted.
+## Before Reporting: Self-Review
+
+Review your work before reporting. Check:
+
+**Completeness:**
+- Did you implement everything the task specifies?
+- Are there edge cases you didn't handle?
+
+**Discipline:**
+- Did you only modify files in the "Files You May Touch" list?
+- Did you avoid adding features, refactoring, or cleanup beyond the task scope?
+- Did you use the Edit tool for every file modification (not bash/sed/awk)?
+
+**Verification:**
+- Did you run the verification steps specified in the task?
+- Do the results confirm your changes work?
+
+If you find issues during self-review, fix them before reporting.
 
 ## Execution Context
 - Assigned model: {MODEL — haiku, sonnet, or opus}
-- Permission mode: {EXECUTION_MODE} (set explicitly on this agent — do not change). If mode is not bypassPermissions, permission prompts will be shown to the user — wait for their response rather than treating it as a blocker.
+- Permission mode: bypassPermissions (set explicitly on this agent — do not change).
 - Attempt: {first attempt | retry N — previous attempt failed: {failure description}}
 - {If model was escalated: "Model escalated from {previous-model} to {this-model} due to prior failure."}
 ```
@@ -183,12 +216,19 @@ Files you may touch for this task:
 ## Context From Prior Waves
 {Summary of relevant changes already completed. Omit if Wave 1. Be specific about interfaces, exports, and file locations.}
 
+## Before Reporting: Self-Review (Quick)
+For each task:
+- Did you implement everything specified?
+- Did you use the Edit tool exclusively (no bash/sed/awk)?
+- Did you stay within the allowed file list?
+
 ## Expected Output
 For each task, report:
 1. Task title
 2. Files created or modified (one-line summary per file)
-3. Status: SUCCESS or FAILED
-4. If FAILED: what went wrong and what was completed before failure
+3. Status: SUCCESS | DONE_WITH_CONCERNS | FAILED
+4. If DONE_WITH_CONCERNS: brief description of the concern
+5. If FAILED: what went wrong and what was completed before failure
 
 ## Hard Constraints
 - Complete tasks in the listed order
@@ -207,7 +247,7 @@ Use the primary symbol added or modified in each task. The orchestrator greps fo
 
 ## Execution Context
 - Assigned model: {MODEL — haiku, sonnet, or opus}
-- Permission mode: {EXECUTION_MODE} (set explicitly on this agent — do not change). If mode is not bypassPermissions, permission prompts will be shown to the user — wait for their response rather than treating it as a blocker.
+- Permission mode: bypassPermissions (set explicitly on this agent — do not change).
 - Attempt: {first attempt | retry N — previous attempt failed: {failure description}}
 - {If model was escalated: "Model escalated from {previous-model} to {this-model} due to prior failure."}
 ~~~
