@@ -29,7 +29,7 @@ const categoryLabels = {
       const skills = getSkillsByCategory(category).filter(s => s.userInvocable);
       if (skills.length === 0) return null;
       return (
-        <section class="category-section" data-category={category}>
+        <section class="category-section" id={category} data-category={category}>
           <h2 class="category-heading">
             <span class="category-label">{categoryLabels[category]}</span>
             <span class="category-underline" style={`background-color: var(--color-${category});`} />
@@ -82,6 +82,7 @@ const categoryLabels = {
 
   .category-section {
     margin-bottom: 3rem;
+    scroll-margin-top: 4.5rem;
   }
 
   .category-heading {
