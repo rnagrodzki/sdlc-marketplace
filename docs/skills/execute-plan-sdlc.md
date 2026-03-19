@@ -178,10 +178,3 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 | `$TMPDIR/claude-exec/<plan-name>-checkpoint.md` | Execution checkpoint written after each wave; enables session resume |
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.
-
----
-
-## Related Skills
-
-- [`/review-sdlc`](review-sdlc.md) — review the changes produced by plan execution before opening a PR
-- [`/pr-sdlc`](pr-sdlc.md) — open a PR after plan execution completes

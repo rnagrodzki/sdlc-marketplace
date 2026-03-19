@@ -88,9 +88,3 @@ A PR template is a plain markdown file with `## Section` headings. Text under ea
 ## Testing
 [How was this verified? Manual steps, automated tests, edge cases.]
 ```
-
----
-
-## Related Skills
-
-- [`/pr-sdlc`](pr-sdlc.md) — uses `.claude/pr-template.md` when present

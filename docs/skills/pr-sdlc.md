@@ -129,10 +129,3 @@ To override manually: `gh auth switch --user <login>` before running the skill.
 | File / Artifact | Description |
 |-----------------|-------------|
 | GitHub PR | Opens a new PR or updates the description of an existing one |
-
----
-
-## Related Skills
-
-- [`/pr-customize-sdlc`](pr-customize-sdlc.md) — create or edit a project-specific PR template
-- [`/review-sdlc`](review-sdlc.md) — run code review on the branch before opening the PR

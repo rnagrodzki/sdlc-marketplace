@@ -73,10 +73,3 @@ Claude fetches review comments via `gh pr view 142 --comments` and processes the
 |-----------------|-------------|
 | GitHub PR thread replies | In-thread responses posted to reviewer comment threads via `gh api` |
 | Source code changes | Edits implementing accepted review feedback, in priority order |
-
----
-
-## Related Skills
-
-- [`/review-sdlc`](review-sdlc.md) — runs the code review that this skill responds to; offers to launch this skill when findings are actionable
-- [`/pr-sdlc`](pr-sdlc.md) — creates the PR that gets reviewed

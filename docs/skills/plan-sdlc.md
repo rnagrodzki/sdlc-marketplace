@@ -129,11 +129,3 @@ To execute: /execute-plan-sdlc
 - **Requirements or a description** — at minimum a sentence describing what to build; a spec file is accepted but not required
 
 No external tools, credentials, or config files are needed.
-
----
-
-## Related Skills
-
-- [`/execute-plan-sdlc`](execute-plan-sdlc.md) — executes the plans this skill produces; consumes the Complexity, Risk, Depends on, and Verify fields per task
-- [`/review-sdlc`](review-sdlc.md) — review the resulting implementation after execution
-- [`/pr-sdlc`](pr-sdlc.md) — open a PR after execution completes

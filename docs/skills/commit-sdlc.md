@@ -104,10 +104,3 @@ No external tools or configuration files are required beyond `git`.
 |-----------------|-------------|
 | Git commit | A new commit on the current branch, or an amended HEAD commit when `--amend` is passed |
 | Git stash (temporary) | Created from unstaged tracked-file changes before the commit and immediately popped after — not a permanent stash entry |
-
----
-
-## Related Skills
-
-- [`/pr-sdlc`](pr-sdlc.md) — create a pull request from the current branch after committing
-- [`/version-sdlc`](version-sdlc.md) — tag a release after the commit is in place

@@ -208,11 +208,3 @@ Choosing `fix` invokes `/review-receive-sdlc`, which picks up the findings from 
 | File / Artifact | Description |
 |-----------------|-------------|
 | GitHub PR comment | Consolidated review findings posted to the current PR |
-
----
-
-## Related Skills
-
-- [`/review-init-sdlc`](review-init-sdlc.md) — create review dimension files for this project
-- [`/pr-sdlc`](pr-sdlc.md) — open the PR that this skill reviews
-- [`/review-receive-sdlc`](review-receive-sdlc.md) — respond to findings produced by this review
