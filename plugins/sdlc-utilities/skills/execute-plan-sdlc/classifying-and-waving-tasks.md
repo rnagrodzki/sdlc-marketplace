@@ -177,7 +177,7 @@ If you find issues during self-review, fix them before reporting.
 
 ## Execution Context
 - Assigned model: {MODEL — haiku, sonnet, or opus}
-- Permission mode: {EXECUTION_MODE} (set explicitly on this agent — do not change). If mode is not bypassPermissions, permission prompts will be shown to the user — wait for their response rather than treating it as a blocker.
+- Permission mode: bypassPermissions (set explicitly on this agent — do not change).
 - Attempt: {first attempt | retry N — previous attempt failed: {failure description}}
 - {If model was escalated: "Model escalated from {previous-model} to {this-model} due to prior failure."}
 ```
@@ -247,7 +247,7 @@ Use the primary symbol added or modified in each task. The orchestrator greps fo
 
 ## Execution Context
 - Assigned model: {MODEL — haiku, sonnet, or opus}
-- Permission mode: {EXECUTION_MODE} (set explicitly on this agent — do not change). If mode is not bypassPermissions, permission prompts will be shown to the user — wait for their response rather than treating it as a blocker.
+- Permission mode: bypassPermissions (set explicitly on this agent — do not change).
 - Attempt: {first attempt | retry N — previous attempt failed: {failure description}}
 - {If model was escalated: "Model escalated from {previous-model} to {this-model} due to prior failure."}
 ~~~

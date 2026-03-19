@@ -11,13 +11,11 @@ Use this template in plan-sdlc Step 6 (CRITIQUE) when dispatching the plan revie
 - `{PLAN_FILE_PATH}` — path to the written plan document
 - `{REQUIREMENTS_CHECKLIST}` — numbered list from Step 1 (CONSUME)
 - `{SOURCE_REQUIREMENTS}` — file path or inline text of the original spec/requirements (if available)
-- `{EXECUTION_MODE}` — the session's permission mode
-
 ```
 Task tool (general-purpose):
   description: "Plan review for <feature name>"
   model: <reviewer model — different from plan author model when 5+ tasks>
-  mode: {EXECUTION_MODE}
+  mode: bypassPermissions
   prompt: |
     You are reviewing a plan document for completeness, accuracy, and executability.
     The plan will be executed by an automated plan orchestrator (execute-plan-sdlc).

@@ -20,7 +20,7 @@ For `{WAVE_NUMBER}`, use the current wave number.
 Task tool (general-purpose):
   description: "Spec compliance review for Wave {WAVE_NUMBER}"
   model: sonnet
-  mode: {EXECUTION_MODE}
+  mode: bypassPermissions
   prompt: |
     You are reviewing whether implementations match their specifications. Read the actual
     code — do not trust agent reports.
