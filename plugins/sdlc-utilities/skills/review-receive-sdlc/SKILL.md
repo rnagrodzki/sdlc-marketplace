@@ -275,7 +275,22 @@ facts uncovered during verification.
 
 ---
 
+## Workflow Continuation
+
+After implementing the accepted fixes, present the user with available next actions:
+
+```
+What would you like to do next?
+  commit   — commit the fixes (/commit-sdlc)
+  done     — stop here
+
+Select:
+```
+
+On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+
 ## See Also
 
-- `review-sdlc` — runs the code review that this skill responds to
-- `pr-sdlc` — creates the PR that gets reviewed
+- [`/review-sdlc`](../review-sdlc/SKILL.md) — source of findings this skill responds to
+- [`/commit-sdlc`](../commit-sdlc/SKILL.md) — commit the fixes after review
+- [`/pr-sdlc`](../pr-sdlc/SKILL.md) — the PR being reviewed

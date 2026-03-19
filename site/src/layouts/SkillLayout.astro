@@ -218,6 +218,32 @@ const base = import.meta.env.BASE_URL;
     border-bottom-color: var(--color-planning);
   }
 
+  .skill-content :global(table) {
+    width: 100%;
+    margin: 0 0 1.5rem;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .skill-content :global(th),
+  .skill-content :global(td) {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .skill-content :global(th) {
+    font-weight: 600;
+    color: var(--color-text);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .skill-content :global(td) {
+    color: var(--color-text-muted);
+  }
+
   /* Mobile: stack columns */
   @media (max-width: 768px) {
     .skill-columns {

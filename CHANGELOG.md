@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-03-19
+
+### Added
+- Skills now present an interactive "what next?" menu after completing, enabling automatable chains (jira → plan → execute → commit → pr → version)
+- Added `--preset` flag to `execute-plan-sdlc` to skip the A/B/C model selection prompt
+- Normalized `See Also` cross-skill links and added `Related Skills` sections across all SKILL.md and docs/skills/*.md files
+- Added promptfoo test datasets and fixtures for workflow continuation behavior
+
+### Changed
+- `execute-plan-sdlc` no longer shows a confirmation prompt before executing a plan (removed the "yes" confirmation gate)
+- Removed duplicate skill references in nav bar
+
+### Fixed
+- Fixed skill navigation links in the site
+- Fixed GitHub Pages deployment
+
 ## [0.12.1] - 2026-03-19
 
 ### Added

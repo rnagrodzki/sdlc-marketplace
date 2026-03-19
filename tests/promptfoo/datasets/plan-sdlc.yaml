@@ -1,0 +1,25 @@
+# Fixture appropriateness:
+#   plan-written                   -- CORRECT: simulates a written plan file, triggers Step 7 handoff
+
+- description: "plan-sdlc: asks whether to execute after plan is written"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-written.md"
+    user_request: >
+      Run /plan-sdlc. The plan has been written to ~/.claude/plans/2026-03-19-user-authentication.md
+      and passed the plan review loop. Step 7 handoff is now active. Present the next action
+      options to the user.
+  assert:
+    # Must offer execute as a next action
+    - type: icontains
+      value: "/execute-plan-sdlc"
+    # Must offer done as an option
+    - type: icontains
+      value: "done"
+    # Behavioral: interactive choice to execute or stop
+    - type: llm-rubric
+      value: >
+        The response asks the user whether to execute the plan now, presenting an interactive
+        choice rather than a passive suggestion. The menu includes at minimum: execute
+        (/execute-plan-sdlc) and done. The response mentions the plan file path and waits
+        for the user to select an option before proceeding.

@@ -362,3 +362,25 @@ When creating pull requests, capture discoveries by appending to `.claude/learni
 Record entries for: repository PR conventions not covered by this skill, branch naming
 patterns, CI requirements that affect PR descriptions, team-specific template preferences,
 JIRA project key patterns, or review process quirks encountered while generating PR content.
+
+## Workflow Continuation
+
+After the PR is created or updated, present the user with available next actions:
+
+```
+What would you like to do next?
+  review   — review the branch (/review-sdlc)
+  version  — tag a release after merge (/version-sdlc)
+  done     — stop here
+
+Select:
+```
+
+On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+
+## See Also
+
+- [`/commit-sdlc`](../commit-sdlc/SKILL.md) — commit changes before creating a PR
+- [`/review-sdlc`](../review-sdlc/SKILL.md) — review the branch
+- [`/pr-customize-sdlc`](../pr-customize-sdlc/SKILL.md) — create a custom PR template
+- [`/version-sdlc`](../version-sdlc/SKILL.md) — tag a release after merge

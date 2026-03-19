@@ -10,6 +10,7 @@ Orchestrates implementation plan execution with adaptive task classification, wa
 
 ```text
 /execute-plan-sdlc
+/execute-plan-sdlc --preset B
 ```
 
 Provide the plan in one of two ways:
@@ -22,7 +23,9 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 
 ## Flags
 
-No flags. The skill adapts behavior based on the plan content and task classification.
+| Flag | Description | Default |
+|---|---|---|
+| `--preset <A\|B\|C>` | Auto-select a model preset, skipping the interactive selection prompt. `A` = Speed, `B` = Balanced, `C` = Quality. Invalid values fall back to interactive selection. | Interactive prompt |
 
 ---
 
@@ -121,7 +124,7 @@ Model Presets:
   B) Balanced:  2 × haiku, 4 × sonnet, 2 × opus       — default ✓
   C) Quality:   2 × sonnet, 6 × opus                  — max correctness
 
-Select preset (A/B/C) or "custom" to edit individual tasks, then "yes" to execute:
+Select preset (A/B/C), "custom" to edit individual tasks, or "cancel":
 ```
 
 ### Execute a plan from a file
@@ -133,6 +136,14 @@ Select preset (A/B/C) or "custom" to edit individual tasks, then "yes" to execut
 ```
 
 Claude loads the plan from the specified file, validates it, classifies tasks, and presents the wave structure for confirmation.
+
+### Skip preset selection
+
+```text
+/execute-plan-sdlc --preset B
+```
+
+Claude applies the Balanced preset automatically and proceeds to execution after showing the wave structure — no interactive prompt.
 
 ### High-risk task gate
 
@@ -179,9 +190,10 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.
 
----
-
 ## Related Skills
 
-- [`/review-sdlc`](review-sdlc.md) — review the changes produced by plan execution before opening a PR
-- [`/pr-sdlc`](pr-sdlc.md) — open a PR after plan execution completes
+- [`/plan-sdlc`](plan-sdlc.md) — writes the plans this skill executes
+- [`/commit-sdlc`](commit-sdlc.md) — commit changes after plan execution
+- [`/pr-sdlc`](pr-sdlc.md) — create a pull request after plan execution
+- [`/review-sdlc`](review-sdlc.md) — review changes after plan execution
+- [`/version-sdlc`](version-sdlc.md) — tag a release after plan execution

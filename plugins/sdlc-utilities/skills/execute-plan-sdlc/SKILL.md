@@ -95,6 +95,10 @@ Note every issue found.
 
 Fix each issue from the critique. Then present the final wave structure showing per-task model assignments:
 
+**Preset auto-selection:** If the user invoked the skill with `--preset <A|B|C>` (e.g., `/execute-plan-sdlc --preset B`), apply the specified preset without presenting the selection prompt. Show the wave structure with the applied preset and proceed directly to Step 5.
+
+Valid values: `A` (Speed), `B` (Balanced), `C` (Quality). Invalid values → fall back to interactive selection.
+
 ```
 Execution Plan
 ────────────────────────────────────────────
@@ -119,10 +123,11 @@ Model Presets:
   B) Balanced:  N × haiku, N × sonnet, N × opus    — default ✓
   C) Quality:   N × sonnet, N × opus                — max correctness
 
-Select preset (A/B/C) or "custom" to edit individual tasks, then "yes" to execute:
+Select preset (A/B/C), "custom" to edit individual tasks, or "cancel":
+Tip: Use --preset B to skip this prompt next time.
 ```
 
-Always present all 3 presets. Default is Balanced. When the user selects a preset, update the per-task model assignments shown in the wave list before executing. Wait for explicit user confirmation (preset selection + yes/custom/cancel) before executing.
+Always present all 3 presets. Default is Balanced. When the user selects a preset (A/B/C), update the per-task model assignments and proceed to execution immediately. "custom" opens per-task editing before execution. "cancel" aborts. No additional confirmation needed — preset selection is the approval.
 
 ## Step 5 (DO): Execute
 
@@ -278,7 +283,6 @@ Files changed:    N files (N added, N modified, N deleted)
 ────────────────────────────────────────────
 ```
 
-Do NOT automatically commit, push, or create branches. The user decides what happens next.
 
 ## Quality Gates
 
@@ -286,7 +290,7 @@ Do NOT automatically commit, push, or create branches. The user decides what hap
 |---|---|
 | Plan validated | No blocking validation issues |
 | Wave structure critiqued | All file conflicts and dependency issues resolved |
-| User approved | Explicit "yes" received in Step 4 |
+| User approved | Preset selected (A/B/C) or custom editing completed in Step 4 |
 | All tasks completed | No tasks skipped without user consent |
 | Per-wave verification | Tests/build/lint pass after each wave |
 | Final verification | Full suite green |
@@ -365,7 +369,27 @@ Format:
 <what happened, what was learned>
 ```
 
+## Workflow Continuation
+
+After completing Step 9 and presenting the execution summary, present the user with available next actions:
+
+```
+What would you like to do next?
+  commit   — commit the changes (/commit-sdlc)
+  pr       — create a pull request (/pr-sdlc)
+  review   — review the changes (/review-sdlc)
+  done     — stop here
+
+Select:
+```
+
+On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+
 ## See Also
 
 - `./classifying-and-waving-tasks.md` — task classification heuristics, wave algorithm, agent prompt template
 - `./recovering-from-failures.md` — full error recovery playbook and escalation protocol
+- [`/commit-sdlc`](../commit-sdlc/SKILL.md) — commit changes after plan execution
+- [`/pr-sdlc`](../pr-sdlc/SKILL.md) — create a pull request after plan execution
+- [`/version-sdlc`](../version-sdlc/SKILL.md) — tag a release after plan execution
+- [`/review-sdlc`](../review-sdlc/SKILL.md) — review changes after plan execution

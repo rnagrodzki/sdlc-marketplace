@@ -2,6 +2,8 @@
 
 A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that automates SDLC tasks: generates structured PR descriptions from commits and diffs, and runs project-customizable multi-dimension code reviews.
 
+**[Documentation & Skill Reference](https://rnagrodzki.github.io/sdlc-marketplace/)** — interactive skill docs, workflow diagrams, and pipeline visualizations.
+
 ## Installation
 
 ### Via the plugin UI (recommended)

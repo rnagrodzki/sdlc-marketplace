@@ -560,3 +560,23 @@ Record entries for: field formats that differ from the defaults documented here,
 quirks discovered in specific projects, issue type names that aren't standard (e.g., custom
 subtask type names), user lookup disambiguation patterns, and transition required fields not
 captured by the workflow sampling.
+
+## Workflow Continuation
+
+After completing any Jira operation, present the user with available next actions:
+
+```
+What would you like to do next?
+  plan     — write an implementation plan for this ticket (/plan-sdlc)
+  execute  — execute an existing plan (/execute-plan-sdlc)
+  done     — stop here
+
+Select:
+```
+
+Only offer `plan` when a ticket was created or read that implies implementation work. Only offer `execute` when a plan already exists in conversation context. On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+
+## See Also
+
+- [`/plan-sdlc`](../plan-sdlc/SKILL.md) — write an implementation plan from a Jira ticket
+- [`/execute-plan-sdlc`](../execute-plan-sdlc/SKILL.md) — execute an existing plan

@@ -497,4 +497,4 @@ Log to `.claude/learnings/log.md` when:
 
 - `review-sdlc/REFERENCE.md` — dimension file format spec and examples
 - `review-sdlc/EXAMPLES.md` — 5 copy-paste-ready dimension files to adapt
-- `review-sdlc` — runs the dimensions created by this skill
+- [`/review-sdlc`](../review-sdlc/SKILL.md) — uses the dimensions created by this skill

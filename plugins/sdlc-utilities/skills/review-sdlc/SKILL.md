@@ -242,9 +242,25 @@ by any dimension, subagent findings that were systematically miscalibrated, base
 branch detection failures, or dimension trigger globs that needed adjustment for
 this project's directory layout.
 
+## Workflow Continuation
+
+When the review verdict is APPROVED and the user declines self-fix, or after self-fix is complete, present the user with available next actions:
+
+```
+What would you like to do next?
+  commit   — commit the changes (/commit-sdlc)
+  done     — stop here
+
+Select:
+```
+
+On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+
 ## See Also
 
 - `agents/review-orchestrator.md` — full orchestration logic
 - `REFERENCE.md` — dimension format spec, subagent prompt template, comment template
 - `EXAMPLES.md` — 5 ready-to-use example dimension files
-- `review-init-sdlc` — creates tailored dimensions for a project
+- [`/review-init-sdlc`](../review-init-sdlc/SKILL.md) — creates review dimensions used by this skill
+- [`/review-receive-sdlc`](../review-receive-sdlc/SKILL.md) — responds to findings from this skill
+- [`/commit-sdlc`](../commit-sdlc/SKILL.md) — commit after review approval
