@@ -1,6 +1,6 @@
 ---
 name: review-init-sdlc
-description: "Use this skill to initialize or expand review dimensions for a project. Scans the project's tech stack, dependencies, file patterns, and architecture to propose relevant review dimensions tailored to the specific project. Arguments: [--add] [--no-copilot]. Triggers on: initialize review dimensions, add review dimension, setup code review, create dimension files, expand review config, review-init."
+description: "Use this skill when initializing or expanding review dimensions for a project. Scans the project's tech stack, dependencies, file patterns, and architecture to propose relevant review dimensions tailored to the specific project. Arguments: [--add] [--no-copilot]. Triggers on: initialize review dimensions, add review dimension, setup code review, create dimension files, expand review config, review-init."
 user-invocable: true
 ---
 
@@ -60,61 +60,7 @@ codebases — read only manifests, config files, and directory listings.
 
 **Structural signals (Glob only — do not read content):**
 
-```text
-**/middleware/**      → auth / request pipeline
-**/auth/**           → authentication
-**/routes/**         → HTTP routing
-**/controllers/**    → MVC controllers
-**/handlers/**       → request handlers
-**/migrations/**     → database migrations
-**/models/**         → data models
-**/repositories/**   → data access layer
-**/workers/**        → background workers
-**/queues/**         → message queues
-**/jobs/**           → scheduled jobs
-**/components/**     → UI components
-**/pages/**          → page components (Next.js, Nuxt, etc.)
-**/views/**          → view templates
-**/*.scss            → CSS/styling
-**/terraform/**      → infrastructure as code
-**/k8s/**            → Kubernetes manifests
-**/Dockerfile        → containerization
-**/*.test.*          → test files
-**/*.spec.*          → test files
-docs/                → documentation directory
-
-**/i18n/**           → internationalization
-**/locales/**        → internationalization
-**/translations/**   → internationalization
-**/.env*             → configuration management
-**/config/**         → configuration management
-**/feature-flags/**  → configuration management
-**/*.graphql         → API contract (GraphQL)
-**/*.proto           → API contract (gRPC/protobuf)
-**/openapi.*         → API contract (OpenAPI)
-**/swagger.*         → API contract (Swagger)
-**/*.schema.*        → config/type schemas
-**/a11y/**           → accessibility
-**/cypress/**        → E2E testing
-**/playwright/**     → E2E testing
-**/packages/*/       → monorepo workspace
-**/apps/*/           → monorepo workspace
-**/libs/*/           → monorepo shared libs
-**/plugins/*/        → plugin architecture
-**/extensions/*/     → plugin architecture
-**/*.d.ts            → TypeScript type definitions
-**/tsconfig*.json    → TypeScript project config
-**/Jenkinsfile       → CI/CD
-**/.circleci/**      → CI/CD
-**/android/**        → mobile app
-**/ios/**            → mobile app
-**/model*/**         → ML/AI
-**/dags/**           → data pipeline (Airflow)
-**/pipeline*/**      → data pipeline
-**/store/**          → state management
-**/state/**          → state management
-**/bin/**            → CLI entry points
-```
+Read `./scan-patterns.md` for the complete structural signal glob patterns. Run all relevant patterns in parallel using Glob.
 
 **Config files (read if they exist):**
 
@@ -164,53 +110,7 @@ If NOT in expansion mode: skip this step.
 
 ### Step 3 (PLAN) — Propose Dimension Catalog
 
-Based on evidence from Step 1, select dimensions to propose using this table:
-
-**Core dimensions (technical):**
-
-| Evidence found | Dimension | Severity |
-| --- | --- | --- |
-| Auth dirs, JWT/OAuth/session deps | `security-review` | high |
-| ORM deps, migration files, SQL dirs | `data-integrity-review` | high |
-| Route/controller/handler dirs, OpenAPI/Swagger files | `api-review` | high |
-| Queue libs, worker dirs, async patterns, thread pools | `concurrency-review` | high |
-| Cache libs (Redis, Memcached), service/repo layers | `performance-review` | medium |
-| Test files present (`*.test.*`, `*.spec.*`) | `test-coverage-review` | medium |
-| Multiple `.md` files, `docs/` directory | `documentation-review` | low |
-| Docker, k8s, Terraform, CI/CD files | `infrastructure-review` | medium |
-| UI components, CSS/SCSS, template files | `ui-review` | medium |
-| Any project (always include) | `code-quality-review` | medium |
-
-**Extended dimensions (non-technical and cross-cutting):**
-
-| Evidence found | Dimension | Severity |
-| --- | --- | --- |
-| Mixed casing styles across files, ESLint naming rules configured | `naming-conventions-review` | low |
-| JSDoc/docstring config, CHANGELOG.md, README quality signals | `documentation-quality-review` | low |
-| `.github/workflows/`, `.circleci/`, `Jenkinsfile`, CI config | `ci-cd-pipeline-review` | medium |
-| OpenAPI/Swagger/GraphQL schemas (`*.graphql`, `openapi.*`), `*.proto` files | `api-contract-review` | high |
-| Lock files (`package-lock.json`, `yarn.lock`, `poetry.lock`), `.npmrc`, license-checking deps | `dependency-management-review` | medium |
-| `.env*` files, `config/` directory, feature flag libs (LaunchDarkly, Unleash, ConfigCat) | `configuration-management-review` | medium |
-| Error boundary files, custom error classes, retry/circuit-breaker patterns | `error-handling-review` | medium |
-| UI components + a11y testing deps (`jest-axe`, `@axe-core/*`, `@testing-library/jest-axe`) | `accessibility-review` | medium |
-| `i18n/`, `locales/`, `translations/` dirs, i18n lib deps (`i18next`, `react-intl`, `vue-i18n`) | `internationalization-review` | low |
-| `migrations/` dir, Prisma/Alembic/Flyway/Liquibase files, `*.sql` migration scripts | `database-migrations-review` | high |
-| Structured logging libs (`winston`, `pino`, `structlog`), OpenTelemetry deps | `logging-observability-review` | medium |
-| `tsconfig.json` with `strict: true`, `.d.ts` files present | `type-safety-review` | medium |
-| Redux/Zustand/Vuex/MobX/Pinia deps, `store/` or `state/` dirs | `state-management-review` | medium |
-| `bin/` dir, `commander`/`yargs`/`meow`/`clap`/`cobra` deps | `cli-ux-review` | medium |
-
-**Project-type dimensions (conditional on project structure):**
-
-| Evidence found | Dimension | Severity |
-| --- | --- | --- |
-| `packages/`/`apps/` dirs + workspace config (`lerna.json`, `pnpm-workspace.yaml`, `nx.json`, or `workspaces` in package.json) | `monorepo-governance-review` | medium |
-| `plugins/` or `extensions/` dirs + manifest files (`plugin.json`, `manifest.json`) or hook registration patterns | `plugin-architecture-review` | medium |
-| Package exports, `index.ts`/`index.js` barrel files, semver in package.json, `CHANGELOG.md` | `sdk-library-design-review` | high |
-| `android/`/`ios/` dirs, React Native/Flutter/Capacitor deps | `mobile-app-review` | medium |
-| DAG definitions, ETL scripts, `pipeline/` dirs, Spark/Airflow/Dagster deps | `data-pipeline-review` | high |
-| Model files, `training/` dirs, ML libs (torch, tensorflow, sklearn) in requirements | `ml-ai-review` | medium |
-| Docker Compose with multiple services, `services/` dir, API gateway config, contract test files | `microservices-review` | medium |
+Read `./dimension-catalog.md` now to access the full dimension catalog. Select relevant dimensions from Core, Extended, and Project-type sections based on the tech stack signals from Step 1.
 
 **Rules:**
 
@@ -481,6 +381,40 @@ Before marking complete, verify:
 
 ---
 
+## Error Recovery
+
+| Error Type | Example | Invoke error-report-sdlc? | Recovery Action |
+|---|---|---|---|
+| User error — missing tools | `gh` not authenticated, `node` not on PATH | No | Tell user clearly. Provide the command to fix it. Do not report. |
+| User error — wrong flags | `--add` specified but no dimension name given | No | Show correct usage. Ask user to re-invoke with correct args. |
+| Transient — MCP timeout | Atlassian MCP call fails due to network | No | Retry once. If fails again, skip MCP-dependent signal (don't block the scan). |
+| Stale cache | Dimension metadata out of sync with project state | No | Re-run the scan from scratch (Step 1). Rebuild from current codebase. |
+| Script crash — validate-dimensions.js exit 2 | Script throws uncaught exception | Yes | Invoke `error-report-sdlc` with full context. |
+| Script error — validate-dimensions.js exit 1 | Invalid dimension file format | No | Show the validation errors. Let user correct the dimension file manually. |
+| MCP tool unavailable | Atlassian MCP not configured | No | Warn user that JIRA-dependent signals will be skipped. Continue scan with remaining signals. |
+
+---
+
+## Gotchas
+
+- **Dimension file naming collision.** When `--add` is used to add a new dimension, the skill generates a filename from the dimension name. If a file with that name already exists in `.claude/review-dimensions/`, the skill will silently overwrite it. Always check for existing files before writing a new dimension.
+- **Glob pattern count explosion.** Step 1 runs ~35 glob patterns to detect the tech stack. On large monorepos, this can produce thousands of matches and slow the scan significantly. If the Glob tool returns very large result sets (>500 paths), sample the first 20 rather than processing all of them.
+- **Copilot step gated on gh auth.** The Step 8 copilot sub-cycle requires `gh auth status` to pass to read the `.github/copilot-instructions.md` path. If `gh` is not authenticated, the copilot step will fail mid-workflow. Check `gh auth status` at the start of the copilot step before attempting any `gh` reads — and skip the step gracefully if unauthenticated, rather than failing.
+- **validate-dimensions.js YAML parser limitations.** The script uses a hand-rolled YAML frontmatter parser that handles simple key-value pairs only. Dimension files with multi-line values or nested YAML will fail validation with a misleading "malformed frontmatter" error. The root cause is the parser, not the file. Tell the user to use flat key-value frontmatter only.
+- **review-prepare.js not available at init time.** The skill references `review-prepare.js` in --add mode, but this script may not be installed if the plugin cache hasn't been primed yet. If `review-prepare.js` is not found via the standard resolution, skip the dimension matching step and proceed with manual scan only.
+
+---
+
+## DO NOT
+
+- Do NOT create dimension files without first running the tech stack scan (Step 1) — dimensions must be grounded in actual project signals
+- Do NOT skip the validate-dimensions.js step — invalid dimensions cause review-sdlc to fail silently on those dimensions
+- Do NOT overwrite existing dimension files without explicit user consent — use `--add` only for new dimensions
+- Do NOT propose more than 10 dimensions at once — users can't meaningfully evaluate more than that in a single session; offer expansion in follow-up runs with `--add`
+- Do NOT invoke `error-report-sdlc` for user errors (missing tools, wrong flags, unauthenticated CLI) — only for script crashes (exit 2)
+
+---
+
 ## Learning Capture
 
 Log to `.claude/learnings/log.md` when:
@@ -492,6 +426,21 @@ Log to `.claude/learnings/log.md` when:
 - User opted in to Copilot instructions — note how many dimensions were converted and any that needed condensing
 - User declined Copilot instructions — note for awareness (they may want to know about `--no-copilot` for future runs)
 - A Copilot instruction exceeded the 4,000-char limit — note which dimension and how it was condensed
+
+## Workflow Continuation
+
+After completing the review dimension setup, present the user with available next actions:
+
+```
+What would you like to do next?
+  review   — run a code review with the new dimensions (/review-sdlc)
+  commit   — commit the dimension files (/commit-sdlc)
+  done     — stop here
+
+Select:
+```
+
+On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
 
 ## See Also
 

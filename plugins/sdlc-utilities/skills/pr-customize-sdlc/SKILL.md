@@ -264,6 +264,40 @@ When invoking `error-report-sdlc`, provide:
 
 ---
 
+## Gotchas
+
+1. **Existing template detection false negative.**
+   *Symptom:* The skill proposes creating a new PR template even though the project already has one, causing conflicts or duplicates.
+   *Root cause:* The skill scans for `.github/PULL_REQUEST_TEMPLATE.md` but projects may store templates at `.github/PULL_REQUEST_TEMPLATE/*.md` (multi-template setup). The single-file check misses the directory-based pattern entirely.
+   *Mitigation:* Before proposing creation, also check for `.github/PULL_REQUEST_TEMPLATE/` as a directory. If multiple templates exist there, present the list to the user and ask which one to use as a baseline.
+
+2. **JIRA project key extraction fails silently.**
+   *Symptom:* The generated template omits the Jira link section or formats it incorrectly (e.g., wrong project key prefix).
+   *Root cause:* The `[A-Z]{2,10}-\d+` regex scans recent PR titles/bodies and branch names, but fails when the project uses a non-standard key format, when no PRs mention JIRA, or when the branch naming convention does not include the ticket key.
+   *Mitigation:* If JIRA evidence is ambiguous (fewer than 2 matches, or multiple distinct key prefixes found), ask the user for the project key explicitly before generating the template.
+
+3. **validate-pr-template.js path resolution failure.**
+   *Symptom:* Validation step errors out and the user sees "ERROR: Could not locate validate-pr-template.js" — but the exit code is 2 (script not found), not 1 (validation failure), so the error recovery table routes it to `error-report-sdlc` instead of a simple retry.
+   *Root cause:* The `find ~/.claude/plugins` command finds nothing on a fresh install or when the plugin has not yet been fully cached locally. The fallback path (`plugins/sdlc-utilities/scripts/`) also fails if the skill is invoked from outside the marketplace repo.
+   *Mitigation:* If the script is not found, skip validation and warn the user that validation was skipped rather than blocking the entire flow. Log the missing-script event so `error-report-sdlc` can surface it later.
+
+4. **Interactive customization loop accumulates inconsistent state.**
+   *Symptom:* After several edit rounds, the template contains contradictory sections (e.g., the user removed "Summary", then asked to "add linked issues above the summary" — the skill re-adds a summary section implicitly).
+   *Root cause:* Each edit is applied as a delta to the previous version. Contradictory edits are not detected because the skill only tracks the latest change, not the full edit history.
+   *Mitigation:* After each edit, re-present the full rendered template (not just the diff). Before applying an edit that references a previously removed section, confirm with the user whether the section should be restored.
+
+---
+
+## DO NOT
+
+- Do NOT overwrite an existing `.claude/pr-template.md` without first showing the user the current template content and obtaining explicit "yes" consent.
+- Do NOT skip the `validate-pr-template.js` step — an invalid template will break `gh pr create` for the entire project.
+- Do NOT hard-code JIRA project keys or ticket formats based on assumptions — always derive from actual evidence or ask the user.
+- Do NOT present a generic template without first completing the project signal scan (Step 1) — every template must be tailored to the project's conventions.
+- Do NOT allow the edit loop to bypass validation — each final save must run the validator before marking the skill complete.
+
+---
+
 ## Learning Capture
 
 Log to `.claude/learnings/log.md` when:
@@ -273,6 +307,21 @@ Log to `.claude/learnings/log.md` when:
 - User removed a proposed section — note which section and the likely reason
 - User requested a section that was not proposed — note which scan signal was missed
 - Validation failed — note which check failed and the root cause
+
+## Workflow Continuation
+
+After completing the PR template customization, present the user with available next actions:
+
+```
+What would you like to do next?
+  pr       — create a pull request with the new template (/pr-sdlc)
+  commit   — commit the template file to the repo (/commit-sdlc)
+  done     — stop here
+
+Select:
+```
+
+On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
 
 ## See Also
 
