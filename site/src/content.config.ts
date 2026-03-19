@@ -6,9 +6,4 @@ const skills = defineCollection({
   schema: z.object({}).passthrough(),
 });
 
-const guides = defineCollection({
-  loader: glob({ pattern: '*.md', base: '../docs' }),
-  schema: z.object({}).passthrough(),
-});
-
-export const collections = { skills, guides };
+export const collections = { skills };
