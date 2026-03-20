@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] - 2026-03-20
+
+### Changed
+- Refactored jira-sdlc, version-sdlc, and review-init-sdlc to use conditional loading for operation-specific content, reducing initial prompt size
+- Added Gotchas, DO NOT, Error Recovery, and Workflow Continuation sections to pr-customize-sdlc and review-init-sdlc
+- Added DO NOT section to review-sdlc
+- Updated plan-sdlc Workflow Continuation menu to include commit option
+- Added skill best practices documentation guide and removed guides section from site
+
 ## [0.13.0] - 2026-03-19
 
 ### Added
