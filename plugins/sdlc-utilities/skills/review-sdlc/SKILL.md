@@ -191,14 +191,14 @@ If the orchestrator's return summary contains actionable findings — verdict is
 
 ```text
 Would you like to address these findings? (fix / no)
-  fix — process findings and implement fixes using review-receive-sdlc
+  fix — process findings and implement fixes using received-review-sdlc
   no  — done
 ```
 
 **Wait for explicit user response before proceeding.**
 
 **On `fix`:** The review findings are already in the conversation context.
-Invoke the `review-receive-sdlc` skill. It will read the findings from context
+Invoke the `received-review-sdlc` skill. It will read the findings from context
 and walk through verification, evaluation, self-critique, and implementation.
 
 **On `no`:** Stop. Done.
@@ -240,7 +240,7 @@ When invoking `error-report-sdlc`, provide:
 - Do NOT skip the dry run output for first-time users — it shows which dimensions will run and how many files are in scope; hiding it causes confused feedback.
 - Do NOT pass the plan file path inside the agent prompt — always paste the full orchestrator prompt contents directly.
 - Do NOT invoke `error-report-sdlc` for user errors (unauthenticated `gh`, missing dimension files, no changes to review) — only for script crashes (exit 2).
-- Do NOT present review findings without offering to trigger `review-receive-sdlc` — users should never be stranded after a review.
+- Do NOT present review findings without offering to trigger `received-review-sdlc` — users should never be stranded after a review.
 
 ## Learning Capture
 
@@ -270,5 +270,5 @@ On selection, invoke the chosen skill using the Skill tool. On "done", end witho
 - `REFERENCE.md` — dimension format spec, subagent prompt template, comment template
 - `EXAMPLES.md` — 5 ready-to-use example dimension files
 - [`/review-init-sdlc`](../review-init-sdlc/SKILL.md) — creates review dimensions used by this skill
-- [`/review-receive-sdlc`](../review-receive-sdlc/SKILL.md) — responds to findings from this skill
+- [`/received-review-sdlc`](../received-review-sdlc/SKILL.md) — responds to findings from this skill
 - [`/commit-sdlc`](../commit-sdlc/SKILL.md) — commit after review approval

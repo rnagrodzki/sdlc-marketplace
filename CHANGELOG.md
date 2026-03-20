@@ -90,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `execute-plan-sdlc` skill for adaptive parallel plan execution with wave dependency management
-- `review-receive-sdlc` skill for responding to code review feedback with dual self-critique gate
+- `received-review-sdlc` skill for responding to code review feedback with dual self-critique gate
 
 ## [0.9.0] - 2026-03-12
 

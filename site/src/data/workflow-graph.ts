@@ -22,7 +22,7 @@ export const workflowNodes: WorkflowNode[] = [
   // Review lane
   { slug: 'review-init-sdlc', command: '/review-init-sdlc', category: 'review', lane: 'review', col: 0, tagline: 'Initialize review dimensions' },
   { slug: 'review-sdlc', command: '/review-sdlc', category: 'review', lane: 'review', col: 1, tagline: 'Multi-dimension code review' },
-  { slug: 'review-receive-sdlc', command: '/review-receive-sdlc', category: 'review', lane: 'review', col: 2, tagline: 'Process review feedback' },
+  { slug: 'received-review-sdlc', command: '/received-review-sdlc', category: 'review', lane: 'review', col: 2, tagline: 'Process review feedback' },
   // Ship lane
   { slug: 'commit-sdlc', command: '/commit-sdlc', category: 'gitops', lane: 'ship', col: 0, tagline: 'Smart commit message generation' },
   { slug: 'pr-sdlc', command: '/pr-sdlc', category: 'gitops', lane: 'ship', col: 1, tagline: 'Create structured pull requests' },
@@ -35,13 +35,13 @@ export const workflowEdges: WorkflowEdge[] = [
   { from: 'plan-sdlc', to: 'execute-plan-sdlc', label: 'executes', style: 'solid' },
   // Review lane flow
   { from: 'review-init-sdlc', to: 'review-sdlc', label: 'configures', style: 'solid' },
-  { from: 'review-sdlc', to: 'review-receive-sdlc', label: 'findings to', style: 'solid' },
+  { from: 'review-sdlc', to: 'received-review-sdlc', label: 'findings to', style: 'solid' },
   // Ship lane flow
   { from: 'commit-sdlc', to: 'pr-sdlc', label: 'staged for', style: 'solid' },
   { from: 'pr-sdlc', to: 'version-sdlc', label: 'merged then', style: 'solid' },
   // Cross-lane
   { from: 'execute-plan-sdlc', to: 'review-sdlc', label: 'feeds into', style: 'cross-lane' },
-  { from: 'review-receive-sdlc', to: 'commit-sdlc', label: 'fixes flow into', style: 'cross-lane' },
+  { from: 'received-review-sdlc', to: 'commit-sdlc', label: 'fixes flow into', style: 'cross-lane' },
   { from: 'execute-plan-sdlc', to: 'commit-sdlc', label: 'or ship directly', style: 'cross-lane' },
   { from: 'execute-plan-sdlc', to: 'version-sdlc', label: 'release after', style: 'cross-lane' },
   { from: 'review-sdlc', to: 'commit-sdlc', label: 'approved, then', style: 'cross-lane' },

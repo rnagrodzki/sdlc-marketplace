@@ -39,7 +39,7 @@ const base = import.meta.env.BASE_URL;
               You review and approve before the commit executes. The stash is restored after.
             </p>
             <p>
-              This is the entry point from other lanes. Both execute-plan-sdlc and review-receive-sdlc
+              This is the entry point from other lanes. Both execute-plan-sdlc and received-review-sdlc
               flow their output here when changes are ready to be packaged.
             </p>
           </div>
@@ -107,7 +107,7 @@ const base = import.meta.env.BASE_URL;
           </a>
           <a href={`${base}/workflows/review-cycle/`} class="wd-after-path" style="--path-color: var(--color-review);">
             <span class="wd-path-label">From Review Cycle</span>
-            <span class="wd-path-desc">review-receive-sdlc flows accepted fixes into commit-sdlc</span>
+            <span class="wd-path-desc">received-review-sdlc flows accepted fixes into commit-sdlc</span>
           </a>
         </div>
       </div>
