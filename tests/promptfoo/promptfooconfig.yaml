@@ -18,10 +18,11 @@ tests:
   - file://datasets/pr-sdlc.yaml
   - file://datasets/review-sdlc.yaml
   - file://datasets/version-sdlc.yaml
-  - file://datasets/plugin-check-sdlc.yaml
   - file://datasets/review-init-sdlc.yaml
   - file://datasets/pr-customize-sdlc.yaml
   - file://datasets/execute-plan-sdlc.yaml
   - file://datasets/commit-sdlc.yaml
   - file://datasets/jira-sdlc.yaml
   - file://datasets/plan-sdlc.yaml
+  - file://datasets/review-receive-sdlc.yaml
+  - file://datasets/error-report-sdlc.yaml

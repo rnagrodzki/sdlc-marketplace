@@ -13,6 +13,9 @@
     # Must offer execute as a next action
     - type: icontains
       value: "/execute-plan-sdlc"
+    # Must offer commit as an option
+    - type: icontains
+      value: "/commit-sdlc"
     # Must offer done as an option
     - type: icontains
       value: "done"
@@ -21,5 +24,5 @@
       value: >
         The response asks the user whether to execute the plan now, presenting an interactive
         choice rather than a passive suggestion. The menu includes at minimum: execute
-        (/execute-plan-sdlc) and done. The response mentions the plan file path and waits
-        for the user to select an option before proceeding.
+        (/execute-plan-sdlc), commit (/commit-sdlc), and done. The response mentions the plan
+        file path and waits for the user to select an option before proceeding.

@@ -245,17 +245,7 @@ Then call ExitPlanMode. Do NOT present the execute/done prompt. Do NOT invoke ex
 
 **If plan mode is NOT active:**
 
-```
-Plan written to `<path>`.
-
-Would you like to execute this plan now?
-  execute  — start execution (/execute-plan-sdlc)
-  done     — stop here
-
-Select:
-```
-
-On "execute", invoke `/execute-plan-sdlc` via the Skill tool. Do NOT invoke execute-plan-sdlc without the user selecting "execute" from the prompt. On "done", end without further action.
+Announce the plan path, then present the Workflow Continuation menu (see [Workflow Continuation](#workflow-continuation) below).
 
 ## Error Recovery
 
@@ -307,6 +297,21 @@ Format:
 ## YYYY-MM-DD — plan-sdlc: <feature name>
 <what was learned>
 ```
+
+## Workflow Continuation
+
+After writing the plan, present the user with available next actions:
+
+```
+What would you like to do next?
+  execute  — execute the plan (/execute-plan-sdlc)
+  commit   — commit any scaffolding changes (/commit-sdlc)
+  done     — stop here
+
+Select:
+```
+
+On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
 
 ## See Also
 

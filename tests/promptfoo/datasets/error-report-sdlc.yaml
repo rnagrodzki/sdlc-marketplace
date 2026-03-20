@@ -1,0 +1,62 @@
+# Fixture appropriateness:
+#   script-crash-context     -- CORRECT: exit code 2 script crash, issue-worthy error
+#   user-error-context       -- CORRECT: exit code 1 user error, NOT issue-worthy
+
+- description: "error-report-sdlc: proposes GitHub issue for script crash (exit code 2)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/error-report-sdlc/SKILL.md"
+    project_context: "file://fixtures/script-crash-context.md"
+    user_request: >
+      The pr-sdlc skill encountered an error during Step 1 and has invoked
+      error-report-sdlc. The error context is provided above. Process this
+      error and determine whether to propose a GitHub issue.
+  assert:
+    # Must propose creating a GitHub issue
+    - type: regex
+      value: "(GitHub issue|issue.*track|create.*issue|propose.*issue)"
+    # Must identify the calling skill
+    - type: icontains
+      value: "pr-sdlc"
+    # Must reference the error details
+    - type: regex
+      value: "(exit code 2|script crash|TypeError|Cannot read properties)"
+    # Must ask for user consent before creating
+    - type: regex
+      value: "(yes.*no|consent|confirm|create.*\\?|approve)"
+    # Must target the correct repository
+    - type: icontains
+      value: "rnagrodzki/sdlc-marketplace"
+    # Behavioral: classifies as issue-worthy, proposes with consent flow
+    - type: llm-rubric
+      value: >
+        The response classifies the exit code 2 error as issue-worthy (script crash
+        category). It proposes creating a GitHub issue in rnagrodzki/sdlc-marketplace
+        to track the error. The proposal includes the calling skill (pr-sdlc), the
+        step that failed (Step 1), the error message (TypeError), and asks for user
+        consent before creating the issue (consent gate). It does NOT create the issue
+        without asking. The proposed issue title references pr-sdlc and the error.
+
+- description: "error-report-sdlc: skips issue proposal for user error (exit code 1)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/error-report-sdlc/SKILL.md"
+    project_context: "file://fixtures/user-error-context.md"
+    user_request: >
+      The version-sdlc skill encountered an error during Step 0 and has invoked
+      error-report-sdlc. The error context is provided above. Process this
+      error and determine whether to propose a GitHub issue.
+  assert:
+    # Must NOT propose creating a GitHub issue
+    - type: not-regex
+      value: "(propose.*issue|create.*GitHub issue|draft.*issue|assemble.*issue)"
+    # Must explain why it's not issue-worthy
+    - type: regex
+      value: "(not issue-worthy|user error|user.*(setup|action|config|input)|exit code 1|not.*bug|skip)"
+    # Behavioral: classifies as NOT issue-worthy, returns to normal handling
+    - type: llm-rubric
+      value: >
+        The response classifies the exit code 1 error as NOT issue-worthy. It explains
+        that this is a user input/setup error (missing version config), not a script
+        crash or bug. It does NOT propose creating a GitHub issue. Instead, it
+        indicates that normal error handling should continue (the user should run
+        /version-sdlc --init). The response clearly distinguishes between exit code 1
+        (user error) and exit code 2 (script crash) in its classification reasoning.

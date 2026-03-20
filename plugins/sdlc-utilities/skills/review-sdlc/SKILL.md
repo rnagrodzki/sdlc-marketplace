@@ -234,6 +234,14 @@ When invoking `error-report-sdlc`, provide:
   directly to a parser truncates the JSON silently (failure manifests as "Unterminated string in
   JSON at position N"). Clean up both `MANIFEST_FILE` and `manifest.diff_dir` in Step 4.
 
+## DO NOT
+
+- Do NOT run `review-prepare.js` without first confirming the working tree state (`--staged`, `--committed`, etc.) — the default scope may not match what the user intends.
+- Do NOT skip the dry run output for first-time users — it shows which dimensions will run and how many files are in scope; hiding it causes confused feedback.
+- Do NOT pass the plan file path inside the agent prompt — always paste the full orchestrator prompt contents directly.
+- Do NOT invoke `error-report-sdlc` for user errors (unauthenticated `gh`, missing dimension files, no changes to review) — only for script crashes (exit 2).
+- Do NOT present review findings without offering to trigger `review-receive-sdlc` — users should never be stranded after a review.
+
 ## Learning Capture
 
 After completing a review, append discoveries to `.claude/learnings/log.md`. Record
