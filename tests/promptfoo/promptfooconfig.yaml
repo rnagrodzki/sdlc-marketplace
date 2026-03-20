@@ -24,5 +24,5 @@ tests:
   - file://datasets/commit-sdlc.yaml
   - file://datasets/jira-sdlc.yaml
   - file://datasets/plan-sdlc.yaml
-  - file://datasets/review-receive-sdlc.yaml
+  - file://datasets/received-review-sdlc.yaml
   - file://datasets/error-report-sdlc.yaml

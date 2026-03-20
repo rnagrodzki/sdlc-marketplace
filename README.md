@@ -44,7 +44,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | [`/pr-customize-sdlc`](docs/skills/pr-customize-sdlc.md) | Create or edit a project-specific PR template interactively |
 | [`/review-sdlc`](docs/skills/review-sdlc.md) | Run multi-dimension code review on the current branch |
 | [`/review-init-sdlc`](docs/skills/review-init-sdlc.md) | Scan the project and create tailored review dimension files |
-| [`/review-receive-sdlc`](docs/skills/review-receive-sdlc.md) | Process code review feedback with verification, self-critique, and implementation |
+| [`/received-review-sdlc`](docs/skills/received-review-sdlc.md) | Process code review feedback with verification, self-critique, and implementation |
 | [`/version-sdlc`](docs/skills/version-sdlc.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
 | [`/commit-sdlc`](docs/skills/commit-sdlc.md) | Analyze staged changes, generate a commit message matching project style, stash unstaged changes, and commit |
 | [`/plan-sdlc`](docs/skills/plan-sdlc.md) | Write an implementation plan from requirements, a spec, or a user description — produces plans optimized for execute-plan-sdlc |

@@ -1,14 +1,15 @@
 ---
-name: review-receive-sdlc
-description: "Use this skill when responding to code review feedback on a pull request or inline reviewer comments. Covers reading, verifying, evaluating, and responding to reviewer comments with a dual self-critique gate — prevents performative agreement and ensures technical rigor. Can be launched manually or automatically after /review-sdlc. Triggers on: process review feedback, respond to review, handle review comments, address PR feedback, fix review findings, review-receive."
+name: received-review-sdlc
+description: "Use this skill when responding to code review feedback on a pull request or inline reviewer comments. Covers reading, verifying, evaluating, and responding to reviewer comments with a dual self-critique gate — prevents performative agreement and ensures technical rigor. Can be launched manually or automatically after /review-sdlc. Triggers on: process review feedback, respond to review, handle review comments, address PR feedback, fix review findings, received-review."
 user-invocable: true
 ---
 
 # Responding to Code Review Feedback
 
-Process reviewer comments with technical rigor. Each item is verified against the
-actual codebase before any response is drafted or any change is made. Two self-critique
-gates prevent performative agreement and catch weak reasoning before it reaches the reviewer.
+Process reviewer comments with technical rigor. Each item is verified against the full
+codebase context — not just the change diff — before any response is drafted. Internal
+self-critique gates ensure quality. No changes are made until the user explicitly approves
+the proposed action plan.
 
 ---
 
@@ -50,10 +51,18 @@ Only proceed to Step 3 after all items are understood.
 
 ---
 
-## Step 3 — VERIFY: Check Against Codebase
+## Step 3 — VERIFY: Check Against Full Codebase Context
 
-For each feedback item, read the referenced code. Determine:
-- **confirmed** — reviewer's claim is factually correct
+For each feedback item, gather context beyond the immediate change diff:
+
+1. **Read the referenced code** — understand what the code actually does
+2. **Trace callers and dependents** — use LSP references or grep to find who calls the changed code, what imports it, and what would be affected by the suggested change
+3. **Check architectural context** — read related modules, interfaces, and tests to understand the design intent behind the current implementation
+4. **Evaluate ripple effects** — determine whether the suggested change would break or improve behavior beyond the immediate diff
+
+Determine the verification status:
+- **confirmed** — reviewer's claim is correct, and the suggestion works in full context
+- **confirmed, but suggestion is incomplete** — the issue is real but the proposed fix has side effects or misses related code that also needs updating
 - **incorrect** — reviewer is wrong about what the code does
 - **partially correct** — some aspects correct, some not
 - **cannot verify** — would need runtime data or external context
@@ -86,6 +95,8 @@ IF used: Then evaluate the suggestion on merit
 
 ## Step 5 — CRITIQUE #1: Self-Critique the Evaluation
 
+> **INTERNAL** — Do not display gate results, pass/fail status, or any output from this step to the user. Process silently and proceed to the next step.
+
 Before drafting responses, review the evaluation against these gates:
 
 | Gate | Check | Pass Criteria |
@@ -101,6 +112,8 @@ Note every failing gate.
 ---
 
 ## Step 6 — IMPROVE #1: Revise Evaluation
+
+> **INTERNAL** — Do not display output from this step to the user. Process silently.
 
 Fix each issue found in Step 5:
 - Re-read code for items where verification was incomplete
@@ -146,6 +159,8 @@ gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies \
 
 ## Step 8 — CRITIQUE #2: Self-Critique the Responses
 
+> **INTERNAL** — Do not display gate results, pass/fail status, or any output from this step to the user. Process silently and proceed to the next step.
+
 Review drafted responses against these gates:
 
 | Gate | Check | Pass Criteria |
@@ -164,6 +179,8 @@ Note every failing gate.
 
 ## Step 9 — IMPROVE #2: Revise Responses
 
+> **INTERNAL** — Do not display output from this step to the user. Process silently.
+
 Fix each issue found in Step 8:
 - Delete performative openers, replace with substance
 - Add specific code references where missing
@@ -173,18 +190,56 @@ Continue until all gates pass (max 2 iterations per gate).
 
 ---
 
-## Step 10 — IMPLEMENT: Execute Changes
+## Step 10 — PRESENT: Show Findings and Proposed Plan
 
-Post responses (with explicit user approval for PR comments) then implement accepted changes.
+This is the first user-visible output after the analysis phase. Present the complete analysis
+and proposed actions to the user. **No changes have been made yet.**
 
-**Presentation before posting:**
-Show all drafted responses to the user:
+**1. Analysis summary table:**
+
 ```
-Responses ready. Post to PR #<number>? (post / edit / skip)
-  post  — post all responses to their threads
-  edit  — show me which ones to change
-  skip  — don't post, just implement the code changes
+| # | File | Line | Type | Verdict | Reasoning |
 ```
+
+Show every item with its type (bug, style, architecture, etc.) and verdict (agree will fix /
+agree won't fix / disagree / needs discussion) with a one-line reasoning summary.
+
+**2. Proposed action plan:**
+
+Group items by action:
+- **Will fix:** list items with brief description of the change
+- **Will push back:** list items with the core technical reason
+- **Needs discussion:** list items with what's unresolved
+
+**3. Drafted PR responses:**
+
+Show the full text of each drafted response, labeled by item number.
+
+**4. Consent gate:**
+
+```
+No changes have been made yet.
+
+How to proceed? (implement / edit / skip)
+  implement — post responses to PR and apply code changes
+  edit      — modify the plan before proceeding
+  skip      — discard, make no changes
+
+Select:
+```
+
+If the user chooses `edit`, ask what to change, revise, and present again.
+Loop until explicit `implement` or `skip`.
+
+**Do NOT proceed to Step 11 without explicit `implement` from the user.**
+
+---
+
+## Step 11 — IMPLEMENT: Execute Changes
+
+**Only execute after explicit `implement` from Step 10.**
+
+Post responses to PR threads, then implement accepted code changes.
 
 **Implementation order:**
 1. Blocking issues (breaks functionality, security)
@@ -229,6 +284,7 @@ State the correction factually and move on.
 - Skip the self-critique steps even when evaluation seems obvious
 - Batch implement without testing each change individually
 - Express gratitude — let the code changes speak
+- Display output from internal critique steps (Steps 5-6, 8-9) to the user
 
 ---
 
@@ -244,8 +300,8 @@ State the correction factually and move on.
 | `gh api` 5xx or unexpected server error when posting reply | Retry once; if still failing, show the drafted response for manual posting | Yes if second attempt also fails |
 
 When invoking `error-report-sdlc`, provide:
-- **Skill**: review-receive-sdlc
-- **Step**: Step 7 — RESPOND (posting GitHub thread replies)
+- **Skill**: received-review-sdlc
+- **Step**: Step 11 — IMPLEMENT (posting GitHub thread replies, only after user consent in Step 10)
 - **Operation**: `gh api` call to post comment reply
 - **Error**: HTTP status + error message from above
 - **Suggested investigation**: Check `gh auth status`; verify PR number is correct and accessible; confirm repo permissions
@@ -277,7 +333,7 @@ facts uncovered during verification.
 
 ## Workflow Continuation
 
-After implementing the accepted fixes, present the user with available next actions:
+After implementing the accepted fixes (Step 11), present the user with available next actions:
 
 ```
 What would you like to do next?

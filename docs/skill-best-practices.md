@@ -48,7 +48,7 @@ Quality gate tables are not decoration. They are the machine-readable contract f
 
 Separate pre-execution gates (plan quality) from post-execution gates (output quality). These answer different questions and should not share a table.
 
-Cap iterations at 2 per gate. If issues remain after two passes, surface to the user rather than looping indefinitely. See `review-receive-sdlc` Steps 5 and 8 for a dual-gate implementation: Step 5 gates the *evaluation* of feedback, Step 8 gates the *drafted response*.
+Cap iterations at 2 per gate. If issues remain after two passes, surface to the user rather than looping indefinitely. See `received-review-sdlc` Steps 5 and 8 for a dual-gate implementation: Step 5 gates the *evaluation* of feedback, Step 8 gates the *drafted response*.
 
 **Critique checkpoint:**
 

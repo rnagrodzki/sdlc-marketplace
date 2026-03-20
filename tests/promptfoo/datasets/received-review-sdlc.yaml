@@ -2,12 +2,12 @@
 #   pr-review-feedback       -- CORRECT: 3 review items (bug, style, incorrect claim) for processing
 #   review-fixes-complete    -- CORRECT: simulates completed fixes, triggers workflow continuation
 
-- description: "review-receive-sdlc: processes feedback with technical rigor and pushes back on incorrect claims"
+- description: "received-review-sdlc: processes feedback with technical rigor and pushes back on incorrect claims"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/review-receive-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
     project_context: "file://fixtures/pr-review-feedback.md"
     user_request: >
-      Run /review-receive-sdlc. Process the 3 review comments from PR #42.
+      Run /received-review-sdlc. Process the 3 review comments from PR #42.
       Verify each claim against the codebase context, categorize them, and
       draft responses.
   assert:
@@ -37,12 +37,12 @@
         catching". Responses start with substance (the technical issue), not social
         filler. The pushback on Comment 3 cites specific code locations as evidence.
 
-- description: "review-receive-sdlc: shows workflow continuation menu after implementing fixes"
+- description: "received-review-sdlc: shows workflow continuation menu after implementing fixes"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/review-receive-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
     project_context: "file://fixtures/review-fixes-complete.md"
     user_request: >
-      Run /review-receive-sdlc. The accepted review fixes have been implemented,
+      Run /received-review-sdlc. The accepted review fixes have been implemented,
       verified, and responses posted to PR #42. The workflow is complete.
       Now show what comes next.
   assert:

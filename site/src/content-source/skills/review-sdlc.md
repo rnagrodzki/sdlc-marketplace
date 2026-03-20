@@ -188,11 +188,11 @@ After a review completes with actionable findings (verdict **CHANGES REQUESTED**
 
 ```text
 Would you like to address these findings? (fix / no)
-  fix — process findings and implement fixes using review-receive-sdlc
+  fix — process findings and implement fixes using received-review-sdlc
   no  — done
 ```
 
-Choosing `fix` invokes `/review-receive-sdlc`, which picks up the findings from conversation context and walks through verification, self-critique, and implementation. The prompt is skipped when the verdict is `APPROVED` (no findings to address).
+Choosing `fix` invokes `/received-review-sdlc`, which picks up the findings from conversation context, analyzes each finding against the full codebase context, presents a proposed action plan, and implements only after user approval. The prompt is skipped when the verdict is `APPROVED` (no findings to address).
 
 ---
 
@@ -212,6 +212,6 @@ Choosing `fix` invokes `/review-receive-sdlc`, which picks up the findings from 
 ## Related Skills
 
 - [`/review-init-sdlc`](review-init-sdlc.md) — creates the review dimensions this skill uses
-- [`/review-receive-sdlc`](review-receive-sdlc.md) — implements fixes for findings from this skill
+- [`/received-review-sdlc`](received-review-sdlc.md) — process and respond to review findings
 - [`/commit-sdlc`](commit-sdlc.md) — commit changes after review approval
 - [`/pr-sdlc`](pr-sdlc.md) — review a PR branch
