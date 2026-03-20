@@ -10,6 +10,15 @@ Orchestrate plan execution with adaptive task classification, wave-based paralle
 
 **Announce at start:** "I'm using the execute-plan-sdlc skill."
 
+## Plan Mode Check
+
+If the system context contains "Plan mode is active":
+
+1. Announce: "This skill requires write operations (file edits, shell commands). Exit plan mode first, then re-invoke `/execute-plan-sdlc`."
+2. Stop. Do not proceed to subsequent steps.
+
+---
+
 ## Step 0: Prerequisites
 
 **Execution mode:** Always dispatch agents with `mode: "bypassPermissions"`. The runtime caps child agent permissions to the parent session's level — if the session is not in bypassPermissions, agents will surface permission prompts to the user automatically. No detection or warning needed.

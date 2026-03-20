@@ -168,6 +168,13 @@ After initialization, most operations require a single MCP call instead of 4–8
 - **Jira project access** — the authenticated user must have read/write permission on the target project
 - No additional CLI tools required
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| `argument-hint` | `[--project <KEY>] [--force-refresh] [--init-templates]` |
+| Plan mode | Not adapted (writes to Jira) |
+
 ---
 
 ## What It Creates or Modifies

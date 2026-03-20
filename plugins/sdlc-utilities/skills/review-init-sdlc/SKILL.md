@@ -2,6 +2,7 @@
 name: review-init-sdlc
 description: "Use this skill when initializing or expanding review dimensions for a project. Scans the project's tech stack, dependencies, file patterns, and architecture to propose relevant review dimensions tailored to the specific project. Arguments: [--add] [--no-copilot]. Triggers on: initialize review dimensions, add review dimension, setup code review, create dimension files, expand review config, review-init."
 user-invocable: true
+argument-hint: "[--add] [--no-copilot]"
 ---
 
 # Initializing Review Dimensions

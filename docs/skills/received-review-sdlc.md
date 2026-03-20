@@ -91,6 +91,12 @@ How to proceed? (implement / edit / skip)
 - **`gh` CLI** — recommended for fetching review comments and posting in-thread replies. Falls back to manual copy-paste if unavailable.
 - **Active PR with review feedback** — or review findings already in the conversation context from `/review-sdlc`.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| Plan mode | Graceful refusal (Step 0) |
+
 ---
 
 ## What It Creates or Modifies

@@ -96,6 +96,13 @@ No stash entry is created or restored. The commit proceeds with only the staged 
 
 No external tools or configuration files are required beyond `git`.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| `argument-hint` | `[--no-stash] [--scope <scope>] [--type <type>] [--amend]` |
+| Plan mode | Graceful refusal (Step 0) |
+
 ---
 
 ## What It Creates or Modifies

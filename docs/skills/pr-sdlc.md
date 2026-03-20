@@ -122,6 +122,13 @@ To override manually: `gh auth switch --user <login>` before running the skill.
 - **`gh` CLI** — required to open or update the PR (`gh auth login`). Falls back to printing the description for manual use if unavailable. Multiple authenticated accounts are handled automatically.
 - **Active branch with commits** — the skill diffs against the target base branch.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| `argument-hint` | `[--draft] [--update] [--base <branch>]` |
+| Plan mode | Graceful refusal (Step 0) |
+
 ---
 
 ## What It Creates or Modifies

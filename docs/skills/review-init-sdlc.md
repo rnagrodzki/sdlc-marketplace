@@ -180,6 +180,13 @@ Proposes only dimensions not yet present in `.claude/review-dimensions/`. In `--
 
 - **Git repository** — the skill scans the project structure and git history.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| `argument-hint` | `[--add] [--no-copilot]` |
+| Plan mode | Not adapted (writes dimension files) |
+
 ---
 
 ## What It Creates or Modifies

@@ -61,6 +61,12 @@ Running `/pr-customize-sdlc` again when `.claude/pr-template.md` exists opens th
 - **Git repository** — the skill scans commits and project files.
 - No additional tools required.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| Plan mode | Not adapted (interactive template creation) |
+
 ---
 
 ## What It Creates or Modifies

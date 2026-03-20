@@ -2,12 +2,22 @@
 name: pr-sdlc
 description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Arguments: [--draft] [--update] [--base <branch>]. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
 user-invocable: true
+argument-hint: "[--draft] [--update] [--base <branch>]"
 ---
 
 # Creating Pull Requests
 
 Consume pre-computed git context from `pr-prepare.js` and generate an 8-section
 PR description readable by both technical and non-technical stakeholders.
+
+## Step 0 — Plan Mode Check
+
+If the system context contains "Plan mode is active":
+
+1. Announce: "This skill requires write operations (gh pr create/edit). Exit plan mode first, then re-invoke `/pr-sdlc`."
+2. Stop. Do not proceed to subsequent steps.
+
+---
 
 ## When to Use This Skill
 

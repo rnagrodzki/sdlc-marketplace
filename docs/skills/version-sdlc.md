@@ -224,6 +224,13 @@ git tag -l --format='%(refname:short)%09%(contents:subject)%09%(contents:body)'
 - **`.claude/version.json`** — must exist before a release run. Created by `--init`.
 - No `gh` CLI required.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| `argument-hint` | `[major\|minor\|patch] [--pre <label>] [--changelog] [--hotfix]` |
+| Plan mode | Graceful refusal (Step 0) |
+
 ---
 
 ## What It Creates or Modifies

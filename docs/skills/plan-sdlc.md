@@ -154,6 +154,12 @@ The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads i
 
 No external tools, credentials, or config files are needed.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| Plan mode | Native support (writes to plan file, calls `ExitPlanMode`) |
+
 ## Related Skills
 
 - [`/execute-plan-sdlc`](execute-plan-sdlc.md) — executes the plans this skill produces

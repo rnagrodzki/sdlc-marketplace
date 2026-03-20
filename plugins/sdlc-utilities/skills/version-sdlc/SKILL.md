@@ -2,6 +2,7 @@
 name: version-sdlc
 description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow, updating an existing changelog entry for the current version. Consumes pre-computed context from version-prepare.js and handles the complete release process. Use --changelog without a bump type to update the changelog for the already-tagged current version. Arguments: [major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix]. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate."
 user-invocable: true
+argument-hint: "[major|minor|patch] [--pre <label>] [--changelog] [--hotfix]"
 ---
 
 # Versioning Releases Skill
@@ -21,6 +22,15 @@ optional CHANGELOG entry, release commit, and push to origin.
 - Updating a CHANGELOG entry for an already-tagged release (e.g., after a squash merge added commits not captured in the original entry)
 
 ## Workflow
+
+## Step 0 — Plan Mode Check
+
+If the system context contains "Plan mode is active":
+
+1. Announce: "This skill requires write operations (git tag, git push). Exit plan mode first, then re-invoke `/version-sdlc`."
+2. Stop. Do not proceed to subsequent steps.
+
+---
 
 ### Step 0: Resolve and Run version-prepare.js
 

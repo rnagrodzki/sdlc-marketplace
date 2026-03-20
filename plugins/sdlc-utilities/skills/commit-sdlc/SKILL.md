@@ -2,6 +2,7 @@
 name: commit-sdlc
 description: "Use this skill when committing staged changes, creating a git commit, or generating a commit message. Analyzes staged diff and recent commit history to generate a message matching the project's style. Stashes unstaged changes to isolate the commit, commits after user confirmation, and auto-restores the stash. Arguments: [--no-stash] [--scope <scope>] [--type <type>] [--amend]. Triggers on: commit changes, create commit, write commit message, git commit, smart commit, commit staged, stage and commit."
 user-invocable: true
+argument-hint: "[--no-stash] [--scope <scope>] [--type <type>] [--amend]"
 ---
 
 # Smart Commit Skill
@@ -18,6 +19,15 @@ confirmation, and auto-restore the stash.
 - Amending the most recent commit with updated staged changes
 
 ## Workflow
+
+## Step 0 — Plan Mode Check
+
+If the system context contains "Plan mode is active":
+
+1. Announce: "This skill requires write operations (git commit). Exit plan mode first, then re-invoke `/commit-sdlc`."
+2. Stop. Do not proceed to subsequent steps.
+
+---
 
 ### Step 0: Resolve and Run commit-prepare.js
 

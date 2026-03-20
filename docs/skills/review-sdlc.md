@@ -201,6 +201,13 @@ Choosing `fix` invokes `/received-review-sdlc`, which picks up the findings from
 - **`.claude/review-dimensions/`** — at least one dimension file must exist. Run `/review-init-sdlc` to create them.
 - **`gh` CLI** — recommended for posting the PR comment. Falls back to terminal output if unavailable.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| `argument-hint` | `[--base <branch>] [--committed] [--staged] [--dimensions <name,...>]` |
+| Plan mode | Compatible (read-only analysis; skips PR comment posting) |
+
 ---
 
 ## What It Creates or Modifies

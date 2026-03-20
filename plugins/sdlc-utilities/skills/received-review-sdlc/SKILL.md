@@ -13,6 +13,15 @@ the proposed action plan.
 
 ---
 
+## Step 0 — Plan Mode Check
+
+If the system context contains "Plan mode is active":
+
+1. Announce: "This skill requires write operations (file edits, gh api calls). Exit plan mode first, then re-invoke `/received-review-sdlc`."
+2. Stop. Do not proceed to subsequent steps.
+
+---
+
 ## Step 1 — READ: Gather Review Feedback
 
 Locate the review feedback from one of:

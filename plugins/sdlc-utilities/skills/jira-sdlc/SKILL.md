@@ -2,6 +2,7 @@
 name: jira-sdlc
 description: "Use this skill when creating, editing, searching, transitioning, commenting on, or linking Jira issues using Atlassian MCP tools. Caches project metadata (custom fields, workflows, transitions, user mappings) to eliminate redundant discovery calls. Uses per-issue-type description templates (customizable per project). Arguments: [--project <KEY>] [--force-refresh] [--init-templates]. Triggers on: create jira issue, edit jira ticket, search jira, transition jira, jira comment, link jira, assign jira, log work jira, bulk jira operations, manage jira, jira template."
 user-invocable: true
+argument-hint: "[--project <KEY>] [--force-refresh] [--init-templates]"
 ---
 
 # Managing Jira Issues

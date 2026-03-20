@@ -178,6 +178,12 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 - **Permission mode** — the skill always dispatches agents with `bypassPermissions`. The runtime caps child agent permissions to the parent session's level — if your session is not in bypassPermissions, agents will surface permission prompts to you automatically. The mode lock prevents any mode changes during execution based on plan content.
 - **An implementation plan** — either in the conversation context from the current session, or as a readable file. The plan must have at least 2 tasks; single-task plans don't need orchestration.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| Plan mode | Graceful refusal (Plan Mode Check) |
+
 ---
 
 ## What It Creates or Modifies
