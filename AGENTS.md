@@ -40,6 +40,12 @@ scripts/                     # Node.js helper scripts (optional; invoked via Bas
 
 ---
 
+## Plan Mode Routing
+
+When plan mode is active, **always invoke plan-sdlc** via the Skill tool for plan creation. Do not follow the default plan mode workflow independently. plan-sdlc handles plan-mode detection, writes to the designated plan file, runs critique gates, and calls ExitPlanMode when done.
+
+---
+
 ## Working in This Repository
 
 - **Adding a skill:** Follow `docs/adding-skills.md`. Place the skill under `plugins/<plugin>/skills/<skill-name>/SKILL.md`.

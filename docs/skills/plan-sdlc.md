@@ -17,6 +17,10 @@ Provide requirements in one of three ways:
 - Provide a path to a requirements or spec file
 - Invoke with nothing — the skill will ask for requirements
 
+### Auto-resolution in plan mode
+
+When Claude Code's plan mode is active, this skill activates automatically — no explicit `/plan-sdlc` invocation needed. Describe what you want to implement and the skill loads itself.
+
 ---
 
 ## Flags
