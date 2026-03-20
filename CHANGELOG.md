@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-03-20
+
+### Added
+- Consent gate in `received-review-sdlc` requiring explicit user approval before any PR changes or code modifications
+- Full codebase context verification in `received-review-sdlc` — traces callers, dependents, and architectural intent instead of only checking the change diff
+
+### Changed
+- Renamed `review-receive-sdlc` to `received-review-sdlc` across all documentation, tests, and site pages
+- Internal critique steps in `received-review-sdlc` no longer produce user-visible output
+
 ## [0.13.2] - 2026-03-20
 
 ### Fixed
