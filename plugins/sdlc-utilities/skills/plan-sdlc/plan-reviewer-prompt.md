@@ -1,6 +1,6 @@
 # Plan Reviewer Prompt Template
 
-Use this template in plan-sdlc Step 6 (CRITIQUE) when dispatching the plan review subagent.
+Use this template in plan-sdlc Step 5 (CRITIQUE) when dispatching the plan review subagent.
 
 **Purpose:** Verify the plan is complete, accurate, and ready for execution by execute-plan-sdlc.
 
@@ -40,6 +40,7 @@ Task tool (general-purpose):
     | Scope discipline | No tasks beyond stated requirements; no gold-plating |
     | Buildability | An agent with no codebase context could execute each task using only its description |
     | Decision documentation | Key Decisions section present for plans with 5+ tasks; each rationale references codebase evidence, not preference; no obvious decisions included |
+    | Plan completeness | All header fields (Goal, Architecture, Source, Verification) are filled in — no placeholders like "[TBD]"; no leftover working sections (e.g., `## Requirements` scaffolding); task numbering is sequential with no gaps |
 
     ## Calibration
 

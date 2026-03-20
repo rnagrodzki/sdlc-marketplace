@@ -10,98 +10,97 @@ Write an implementation plan from requirements, a spec, or a user description. P
 
 **Announce at start:** "I'm using the plan-sdlc skill."
 
-## Plan Mode Awareness
+## Step 0: Mode Detection, Routing, and Setup
 
-**Detection:** Check whether a system-reminder in the current conversation contains the text "Plan mode is active". If it does, plan mode is active for this session.
+**Mode detection:** Check whether a system-reminder contains "Plan mode is active". If yes, extract the designated plan file path from "You should create your plan at `<path>`". That path is the only writable file.
 
-**When plan mode is active:**
-- The system-reminder specifies a designated plan file path in the text "You should create your plan at `<path>`". Extract this path — it is the ONLY file you are allowed to write.
-- Steps 0–4 are unaffected (they are read-only exploration and user interaction).
-- Step 5 MUST write to the designated plan file path instead of the normal path resolution logic.
-- Step 6 is unaffected (the reviewer subagent reads; it does not write).
-- Step 7 MUST NOT present the execute/done handoff. Instead, call ExitPlanMode after announcing the plan is ready.
-
-**When plan mode is NOT active:** All steps behave as documented below. No changes.
-
-## Step 0: Prerequisites and Complexity Routing
-
-**Gather requirements:** If no spec or requirements document is in context, ask the user:
+**Gather requirements:** If no spec or requirements document is in context, use AskUserQuestion:
 > What do you want to implement? (describe in free form, bullet points, or provide a file path)
 
-**Structured discovery** — when requirements are vague (a single sentence or ambiguous goal), ask 2–3 targeted questions before proceeding:
+**Complexity routing:**
+
+| Scope Signal | Normal Mode | Plan Mode |
+|---|---|---|
+| 1 file, clear change | Stop — no plan needed. Tell the user. | Lightweight plan (user explicitly chose to plan) |
+| 2–3 files, clear scope | Lightweight: skip exploration and review loop | Lightweight |
+| 4+ files or unclear scope | Full pipeline (Steps 1–7) | Full pipeline |
+| Multiple independent subsystems | Decompose into separate plans | Decompose |
+
+**TodoWrite setup (full pipeline only):** Create TodoWrite items for Steps 1–7. Skip TodoWrite for lightweight plans.
+
+**Session recovery (full pipeline only):** Check if the plan file already has content. If yes, use AskUserQuestion:
+> Found existing plan draft with N tasks. Resume from critique (Step 3), or restart?
+
+Wait for explicit response. If "resume", re-read the plan file and skip to Step 3. If "restart", clear the file and begin fresh.
+
+**Initialize plan file:** Write the skeleton header immediately:
+
+```markdown
+# [Feature Name] Implementation Plan
+
+**Goal:** [TBD]
+**Architecture:** [TBD]
+**Source:** [Spec file path or "conversation context"]
+**Verification:** [TBD]
+
+---
+```
+
+**Normal mode path resolution:** Resolve the output path before writing:
+1. User-specified path (if provided in conversation)
+2. Project `.claude/settings.json` → `plansDirectory` (relative paths resolve from workspace root)
+3. Global `~/.claude/settings.json` → `plansDirectory`
+4. Default fallback: `~/.claude/plans/`
+
+Naming convention: `YYYY-MM-DD-<feature-name>.md`. Create the directory if needed.
+
+**Plan mode:** Write to the designated plan file path. Skip path resolution.
+
+## Step 1 (CONSUME): Requirements Discovery and Exploration
+
+**Structured discovery:** When requirements are vague (a single sentence or ambiguous goal), use AskUserQuestion with 2–3 targeted questions at once:
 1. **Scope** — what's in, what's explicitly out?
 2. **Integration** — what existing code does this touch?
 3. **Success** — how will we know it works?
 
-Ask all questions at once. Wait for answers before continuing.
+Wait for answers before continuing.
 
-**Complexity routing:**
-
-| Scope Signal | Action |
-|---|---|
-| 1 file, clear change | Stop — this doesn't need a plan. Just do the work. Tell the user: "This is a single-file change — no plan needed." |
-| 2–3 files, clear scope | Lightweight: skip codebase exploration and plan review loop; write plan directly and present for approval |
-| 4+ files or unclear scope | Full pipeline (Steps 1–7) |
-| Multiple independent subsystems | Decompose into separate plans first; suggest one plan per subsystem |
-
-**Session recovery (full pipeline only):** Before beginning exploration, check for an existing scratchpad at `$TMPDIR/claude-plans/<feature-name>-exploration.md`. If one exists:
-> Found exploration notes from a previous session for this feature. Resume from Step 2 using these findings, or restart exploration from scratch?
-
-Wait for explicit user response. If "resume", re-read the scratchpad and skip directly to Step 2. If "restart", delete the scratchpad and begin fresh.
-
-## Step 1 (CONSUME): Analyze Requirements and Codebase
-
-Parse the requirements into a checklist: each requirement becomes one bullet. Number them.
-
-Explore the codebase:
-- Relevant file structure and patterns in the affected areas
-- Existing modules, interfaces, and types the feature will touch
+**Codebase exploration (skip for lightweight):** Use read-only tools (Glob, Grep, Read, LSP):
+- Relevant file structure and patterns in affected areas
+- Existing modules, interfaces, and types the feature touches
 - Testing patterns used in the project
 - Build/lint/test commands (from Makefile, package.json, or similar)
 - Naming conventions and code style
 
-Identify constraints: language, framework, existing conventions, testing approach, and anything that limits implementation choices.
+Identify constraints: language, framework, existing conventions, testing approach.
 
-**Exploration scratchpad (full pipeline only):** On large codebases, exploration findings scroll out of context before Step 2. Create a scratchpad at `$TMPDIR/claude-plans/<feature-name>-exploration.md` and:
-- After every 2 exploration actions (Glob, Grep, Read, LSP), append key findings: file paths and their roles, interfaces and patterns the feature touches, constraints discovered, approach decisions considered
-- At the end of exploration, append a checkpoint block to the scratchpad:
-  ```
-  ## Checkpoint
-  Status: Step 1 complete
-  Requirements: [your numbered checklist]
-  Timestamp: [ISO timestamp]
-  ```
-- The scratchpad is a working document — not part of the plan output
+**Write to plan file:** After exploration, update the plan file:
+- Fill in Goal, Architecture, Verification header fields
+- Append a `## Requirements` section with numbered checklist (one bullet per requirement)
 
-**Re-anchor before Step 2:** Before leaving Step 1, re-read:
-1. The original requirements (user description or spec file)
-2. Your numbered requirements checklist
-3. The exploration scratchpad (if created)
-
-This counters attention drift — after many exploration calls, the original requirements may have faded from the active context window.
+**Re-anchor:** Before leaving Step 1, re-read the plan file's Requirements section. This counters attention drift after many exploration calls.
 
 ## Step 2 (PLAN): Decompose Into Tasks
 
-**Scope check first:** If requirements span multiple independent subsystems with no shared state, flag it:
+**Scope check:** If requirements span independent subsystems with no shared state, use AskUserQuestion:
 > These requirements cover independent subsystems. Recommend splitting into N plans. Proceed as one plan or split?
+
 Wait for answer.
 
 **File structure mapping** — before writing tasks, map out:
-- Files to create (path + one-line responsibility description)
-- Files to modify (path + what changes and where)
+- Files to create (path + one-line responsibility)
+- Files to modify (path + what changes)
 - Test files (aligned with source files)
 
 **Task decomposition rules:**
-- Each task = one independently completable unit of work with a clear deliverable
-- Each task touches 1–5 files (more than 5 → split the task)
-- Tasks ordered naturally: foundations → features → integration → polish
-- Dependencies made explicit (task B names task A if it needs A's output)
+- Each task = one independently completable unit with a clear deliverable
+- Each task touches 1–5 files (more than 5 → split)
+- Order: foundations → features → integration → polish
+- Dependencies explicit (task B names task A if it needs A's output)
 
-**Key decisions:** While decomposing, note every decision where you chose between multiple valid approaches. Record each in the plan's `## Key Decisions` section. Focus on choices executing agents need to know — decisions where a reasonable implementer might choose differently without the rationale. Skip obvious decisions.
+**Key decisions:** Note every decision where you chose between valid approaches. Focus on choices where a reasonable implementer might differ without the rationale. Skip obvious decisions.
 
-**Per-task metadata (required, consumed by execute-plan-sdlc):**
-
-Every task must have these fields:
+**Per-task metadata (required, consumed by execute-plan-sdlc):** Use the exact format from `./plan-format-reference.md`:
 
 ```markdown
 ### Task N: [Component Name]
@@ -118,8 +117,7 @@ Every task must have these fields:
 
 **Description:**
 [What to implement, how it connects to existing code, expected behavior, edge cases.
-Complete enough that an agent with no codebase context can execute it. Include code
-snippets for non-obvious patterns; do not write the full implementation.]
+Complete enough that an agent with no codebase context can execute it.]
 
 **Acceptance criteria:**
 - [ ] [Specific, verifiable criterion]
@@ -127,18 +125,22 @@ snippets for non-obvious patterns; do not write the full implementation.]
 ```
 
 **Verification strategy — match to task type:**
-- Feature/logic tasks → TDD (write failing test, implement, pass)
-- Config/infrastructure → build verification (does it compile/deploy?)
+- Feature/logic → TDD (write failing test, implement, pass)
+- Config/infrastructure → build verification
 - Documentation → manual review
 - Integration → integration test or E2E
 
 Do not mandate TDD for config, documentation, or infrastructure tasks.
 
+**Write to plan file:** Append Key Decisions section (if applicable) and all task blocks.
+
+**Post-write cleanup:** Remove the `## Requirements` working section from the plan file. Requirements are traceable through task acceptance criteria; the section was temporary scaffolding.
+
 ## Step 3 (CRITIQUE): Self-Review Plan
 
-Check each quality gate:
+**Re-anchor:** Re-read the plan file before evaluating gates. The file — not your memory of it — is the source of truth.
 
-**Re-anchor before critique:** Re-read your requirements checklist from Step 1 before evaluating the quality gates below. The checklist — not your memory of it — is the source of truth for requirements coverage.
+Check each quality gate:
 
 | Gate | Check |
 |---|---|
@@ -150,102 +152,73 @@ Check each quality gate:
 | Classification accuracy | Complexity/risk assignments match the heuristics |
 | No scope creep | No tasks beyond stated requirements |
 | Verification completeness | Every task has at least one verification method |
-| Decomposition balance | No task touches > 5 files; no plan with > 80% Trivial tasks (likely over-decomposed) |
+| Decomposition balance | No task touches > 5 files; no plan with > 80% Trivial tasks |
+| File existence | Every path under "Modify:" exists in the codebase (verify with Glob) |
+| Dependency target existence | Every "Depends on: Task N" references a task number that exists in the plan |
+| Self-containment test | Pick the most complex task — could an agent implement it using only its description + Key Decisions? If not, the description is incomplete |
 
-Note every issue found. Fix all issues in Step 4 before presenting.
+Note every issue. Do NOT write to the plan file in this step.
 
-## Step 4 (IMPROVE): Revise and Present
+## Step 4 (IMPROVE): Revise Plan and Present for Approval
 
-Fix every issue found in Step 3. Then present:
+Fix all issues from Step 3. Rewrite the plan file with fixes applied (edit the existing file, don't append).
 
-1. **Requirements checklist** (from Step 1) with task mappings:
-   - [ ] Requirement 1 → Task 2, Task 3
-   - [ ] Requirement 2 → Task 4
+Present to user via AskUserQuestion:
 
-2. **Full plan document** (all tasks with metadata)
+1. **Requirements-to-task mapping:**
+   - Requirement 1 → Task 2, Task 3
+   - Requirement 2 → Task 4
 
-3. **Wave preview** (estimated — execute-plan-sdlc will finalize):
+2. **Full task list summary:**
+   | Task | Name | Complexity | Risk |
+   |---|---|---|---|
+   | 1 | [name] | Standard | Low |
+   | ... | ... | ... | ... |
+
+3. **Wave preview:**
    ```
    Wave preview:
      Pre-wave: Task 1 [Trivial]
-     Wave 1:   Task 2 [Standard], Task 3 [Standard], Task 4 [Complex]
-     Wave 2:   Task 5 [Standard]
+     Wave 1:   Task 2 [Standard], Task 3 [Standard]
+     Wave 2:   Task 4 [Complex]
    ```
 
-Wait for user feedback. User may:
-- Approve → proceed to Step 5
-- Request changes → revise and re-present (no limit on iterations)
-- Ask questions → answer and re-present
+4. **Options:** approve / change (describe what) / question (ask anything)
 
-Do not proceed to Step 5 without explicit approval.
+Approval loop is unbounded. Do not proceed without explicit approval.
 
-## Step 5 (DO): Write Plan Document
-
-**Path resolution:**
-
-If plan mode is active (see Plan Mode Awareness above), write to the designated plan file path extracted from the system-reminder. Do not apply the path resolution logic below — that path is the only writable file in plan mode.
-
-Otherwise, save to the location the user specified, or resolve the default path:
-
-1. User-specified path (if provided in conversation)
-2. Project `.claude/settings.json` → `plansDirectory` (relative paths resolve from workspace root)
-3. Global `~/.claude/settings.json` → `plansDirectory`
-4. Default fallback: `~/.claude/plans/`
-
-Naming convention (non-plan-mode only): `YYYY-MM-DD-<feature-name>.md`. Create the directory if it does not exist.
-
-Plans are stored alongside Claude Code's own plan files for cross-session reference.
-
-See `./plan-format-reference.md` for the exact format specification. The plan header:
-
-```markdown
-# [Feature Name] Implementation Plan
-
-**Goal:** [One sentence]
-**Architecture:** [2–3 sentences about the overall approach]
-**Source:** [Spec file path or "conversation context"]
-**Verification:** [Primary verification command, e.g., "npm test", "go test ./..."]
-
----
-```
-
-Followed by each task in the standard task format (from Step 2).
-
-## Step 6 (CRITIQUE): Plan Review Loop
+## Step 5 (CRITIQUE): Plan Review Loop
 
 Skip for lightweight plans (2–3 file scope from Step 0 routing).
 
-Dispatch a plan reviewer subagent using the template in `./plan-reviewer-prompt.md`. Provide:
-- Path to the written plan file
+Dispatch a plan reviewer subagent using `./plan-reviewer-prompt.md`. Provide:
+- Path to the plan file
 - The requirements checklist from Step 1
 - Source requirements or spec (if a file exists)
 
-**Model selection:** Use a different model than the one that wrote the plan when the plan has 5+ tasks. Same-model review has a blind spot — it tends to approve its own reasoning patterns. Cross-model review is more adversarial.
-
-- If plan was written by sonnet → dispatch reviewer as opus
-- If plan was written by opus → dispatch reviewer as sonnet
-- For plans under 5 tasks → same model is acceptable
+**Model selection:** Use a different model than the one that wrote the plan when the plan has 5+ tasks. Cross-model review catches blind spots.
+- Plan written by sonnet → dispatch reviewer as opus
+- Plan written by opus → dispatch reviewer as sonnet
+- Plans under 5 tasks → same model is acceptable
 
 **Review loop:**
-- Approved → proceed to Step 7
-- Issues found → fix and re-dispatch reviewer
-- Max 3 iterations → surface to user if still unresolved
+- Approved → Step 6 is a no-op, proceed to Step 7
+- Issues found → go to Step 6
+- Max 3 iterations → use AskUserQuestion to surface unresolved issues to user
+
+## Step 6 (IMPROVE): Apply Review Fixes
+
+Fix each blocking issue identified by the reviewer. Rewrite the plan file with fixes applied.
+
+Re-dispatch the reviewer (back to Step 5 loop).
+
+If this is the 3rd iteration, use AskUserQuestion to surface remaining issues instead of looping.
 
 ## Step 7: Handoff
 
-**If plan mode is active:**
+**Plan mode:** Announce the plan path. Call ExitPlanMode. Do NOT present workflow continuation. Do NOT invoke execute-plan-sdlc.
 
-```
-Plan written to `<designated plan file path>`.
-
-The plan is ready for review. After you approve it, invoke /execute-plan-sdlc to begin execution.
-```
-
-Then call ExitPlanMode. Do NOT present the execute/done prompt. Do NOT invoke execute-plan-sdlc directly — plan mode requires the user to approve the plan through Claude Code's plan approval flow first.
-
-**If plan mode is NOT active:**
-
-Announce the plan path, then present the Workflow Continuation menu (see [Workflow Continuation](#workflow-continuation) below).
+**Normal mode:** Announce the plan path, then present the Workflow Continuation menu (see below).
 
 ## Error Recovery
 
@@ -267,7 +240,8 @@ Announce the plan path, then present the Workflow Continuation menu (see [Workfl
 - Use absolute file paths that only work on one machine
 - Put plans in `$TMPDIR` — plans should survive session boundaries
 - Put plans in plugin-branded directories (no `docs/superpowers/plans/`)
-- Ignore plan mode's designated file path when plan mode is active — always write to it, never to a self-chosen path
+- Ignore plan mode's designated file path when plan mode is active — always write to it
+- Use TodoWrite for lightweight plans — it adds overhead without value
 
 ## Gotchas
 
@@ -282,6 +256,8 @@ Announce the plan path, then present the Workflow Continuation menu (see [Workfl
 **Under-decomposition.** A task that creates 8 files or implements 3 independent behaviors will fail in execution. If a task touches > 5 files, split it.
 
 **Plan-execution format mismatch.** The plan MUST include Complexity, Risk, Depends on, and Verify fields per task — execute-plan-sdlc consumes these for wave building. Missing metadata forces inference, which is slower and less accurate.
+
+**Plan file is the single source of truth.** All working state lives in the plan file. Do not create temporary files, scratchpads, or side documents. If exploration findings are needed later, they belong in the plan file's Requirements section until cleanup.
 
 ## Learning Capture
 
@@ -300,7 +276,7 @@ Format:
 
 ## Workflow Continuation
 
-After writing the plan, present the user with available next actions:
+After writing the plan (normal mode only), present the user with available next actions:
 
 ```
 What would you like to do next?
