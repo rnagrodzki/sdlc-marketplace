@@ -1,0 +1,61 @@
+# Fixture appropriateness:
+#   pr-review-feedback       -- CORRECT: 3 review items (bug, style, incorrect claim) for processing
+#   review-fixes-complete    -- CORRECT: simulates completed fixes, triggers workflow continuation
+
+- description: "review-receive-sdlc: processes feedback with technical rigor and pushes back on incorrect claims"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-receive-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-feedback.md"
+    user_request: >
+      Run /review-receive-sdlc. Process the 3 review comments from PR #42.
+      Verify each claim against the codebase context, categorize them, and
+      draft responses.
+  assert:
+    # Must acknowledge the null check bug
+    - type: regex
+      value: "(null|empty string|falsy|query)"
+    # Must NOT use performative openers
+    - type: not-regex
+      value: "(Great catch|You're absolutely right|Thanks for catching|Excellent feedback|Great point)"
+    # Must push back on the incorrect "unused function" claim
+    - type: regex
+      value: "(disagree|incorrect|wrong|actually used|is used|imported)"
+    # Must reference evidence for pushback (the import locations)
+    - type: regex
+      value: "(search\\.ts|indexer\\.ts|imported)"
+    # Behavioral: technical rigor, no performative language, correct categorization
+    - type: llm-rubric
+      value: >
+        The response processes all 3 review comments with technical rigor:
+        (1) Comment 1 (null check bug): categorized as a confirmed bug, agrees and
+        describes the fix — changing `if (query)` to handle empty strings correctly.
+        (2) Comment 2 (rename): categorized as style, agrees to rename `res` to
+        `searchResults`. (3) Comment 3 (unused function claim): categorized as
+        incorrect, pushes back with evidence — the tokenize function IS used, imported
+        in src/routes/search.ts and src/services/indexer.ts. The response does NOT use
+        performative openers like "Great catch!", "You're right!", or "Thanks for
+        catching". Responses start with substance (the technical issue), not social
+        filler. The pushback on Comment 3 cites specific code locations as evidence.
+
+- description: "review-receive-sdlc: shows workflow continuation menu after implementing fixes"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-receive-sdlc/SKILL.md"
+    project_context: "file://fixtures/review-fixes-complete.md"
+    user_request: >
+      Run /review-receive-sdlc. The accepted review fixes have been implemented,
+      verified, and responses posted to PR #42. The workflow is complete.
+      Now show what comes next.
+  assert:
+    # Must offer commit as a next action
+    - type: icontains
+      value: "/commit-sdlc"
+    # Must offer done as an option
+    - type: icontains
+      value: "done"
+    # Behavioral: interactive menu asking what to do next
+    - type: llm-rubric
+      value: >
+        The response presents an interactive menu asking the user what to do next
+        after implementing review fixes. The menu includes at minimum: commit
+        (/commit-sdlc) and done. The user is asked to select an option rather than
+        being given a passive suggestion.

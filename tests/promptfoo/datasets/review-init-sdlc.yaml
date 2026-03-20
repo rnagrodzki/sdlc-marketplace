@@ -90,3 +90,29 @@
         Each proposal cites specific evidence from the fixture (requirements.txt dependencies,
         directory names). The response does NOT propose ui-review since there is no frontend
         evidence. It presents proposals to the user and asks which ones to install.
+
+- description: "review-init-sdlc: shows workflow continuation menu after dimension setup"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    project_context: "file://fixtures/review-dimensions-created.md"
+    user_request: >
+      Run /review-init-sdlc. The review dimensions have been created — 3 dimension
+      files written to .claude/review-dimensions/ and all validation checks passed.
+      The workflow is complete. Now show what comes next.
+  assert:
+    # Must offer review as a next action
+    - type: icontains
+      value: "/review-sdlc"
+    # Must offer commit as a next action
+    - type: icontains
+      value: "/commit-sdlc"
+    # Must offer done as an option
+    - type: icontains
+      value: "done"
+    # Behavioral: interactive menu with skill options
+    - type: llm-rubric
+      value: >
+        The response presents an interactive menu asking the user what to do next after
+        review dimension setup, with specific skill options to choose from. The menu
+        includes at minimum: review (/review-sdlc), commit (/commit-sdlc), and done.
+        The user is asked to select an option rather than being given a passive suggestion.

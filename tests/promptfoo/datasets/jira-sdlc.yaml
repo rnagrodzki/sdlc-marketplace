@@ -1,5 +1,6 @@
 # Fixture appropriateness:
 #   jira-ticket-created            -- CORRECT: simulates a created Jira ticket, triggers workflow continuation
+#   jira-create-task               -- CORRECT: simulates Jira cache with project metadata for create operation
 
 - description: "jira-sdlc: shows workflow continuation menu after Jira ticket created"
   vars:
@@ -23,3 +24,39 @@
         done. Since a ticket with implementation work was just created, the plan option is
         offered. The user is asked to select an option rather than being given a passive
         suggestion.
+
+- description: "jira-sdlc: follows create operation procedure from operations reference"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      Run /jira-sdlc. Create a Task in PROJ with summary "Add rate limiting to
+      API endpoints", priority High, and labels backend and security. The Jira
+      cache is loaded in the project context.
+  assert:
+    # Must reference creating an issue
+    - type: regex
+      value: "(create|creating|Create)"
+    # Must identify the correct issue type from cache
+    - type: regex
+      value: "(Task|issue.?type)"
+    # Must reference the project
+    - type: regex
+      value: "(PROJ|project)"
+    # Must include priority from cache allowedValues
+    - type: regex
+      value: "(priority|High)"
+    # Must not fabricate field values not in the cache
+    - type: not-regex
+      value: "(guess|fabricat|invent|assume)"
+    # Behavioral: follows create operation procedure with cache-driven values
+    - type: llm-rubric
+      value: >
+        The response follows the Create Operation procedure: it maps "task" to the
+        "Task" issue type from the cache's issueTypes list (exact match, not
+        lowercase). It uses priority "High" from the cache's fieldSchemas.Task.priority
+        allowedValues (not guessed). It includes the labels as a flat string array
+        ["backend", "security"]. It describes the MCP call it would make including
+        contentFormat: "markdown" and the cloudId from cache. It does NOT fabricate
+        fields not present in the cache (no components, no custom fields unless the
+        user asked). The summary matches what the user requested exactly.

@@ -50,3 +50,29 @@
         template already has tailored Deployment and Rollback sections consistent with recent
         PR patterns, it proposes minimal changes. It presents the current state and proposed
         adaptations (if any) and asks the user for feedback.
+
+- description: "pr-customize-sdlc: shows workflow continuation menu after template customization"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-customize-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-template-customized.md"
+    user_request: >
+      Run /pr-customize-sdlc. The PR template has been customized and saved to
+      .claude/pr-template.md — all V1-V5 validation checks passed. The workflow is
+      complete. Now show what comes next.
+  assert:
+    # Must offer PR creation as a next action
+    - type: icontains
+      value: "/pr-sdlc"
+    # Must offer commit as a next action
+    - type: icontains
+      value: "/commit-sdlc"
+    # Must offer done as an option
+    - type: icontains
+      value: "done"
+    # Behavioral: interactive menu with skill options
+    - type: llm-rubric
+      value: >
+        The response presents an interactive menu asking the user what to do next after
+        PR template customization, with specific skill options to choose from. The menu
+        includes at minimum: pr (/pr-sdlc), commit (/commit-sdlc), and done. The user
+        is asked to select an option rather than being given a passive suggestion.
