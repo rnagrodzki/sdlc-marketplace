@@ -226,21 +226,18 @@ Show the full text of each drafted response, labeled by item number.
 
 **4. Consent gate:**
 
-```
-No changes have been made yet.
+Use AskUserQuestion to ask:
+> No changes have been made yet. How to proceed?
 
-How to proceed? (implement / edit / skip)
-  implement — post responses to PR and apply code changes
-  edit      — modify the plan before proceeding
-  skip      — discard, make no changes
+Options:
+- **implement** — post responses to PR and apply code changes
+- **edit** — modify the plan before proceeding
+- **skip** — discard, make no changes
 
-Select:
-```
+If the user chooses **edit**, ask what to change, revise, and present again.
+Loop until explicit **implement** or **skip**.
 
-If the user chooses `edit`, ask what to change, revise, and present again.
-Loop until explicit `implement` or `skip`.
-
-**Do NOT proceed to Step 11 without explicit `implement` from the user.**
+**Do NOT proceed to Step 11 without explicit `implement` from the user via AskUserQuestion.**
 
 ---
 
@@ -340,19 +337,10 @@ facts uncovered during verification.
 
 ---
 
-## Workflow Continuation
+## What's Next
 
-After implementing the accepted fixes (Step 11), present the user with available next actions:
-
-```
-What would you like to do next?
-  commit   — commit the fixes (/commit-sdlc)
-  done     — stop here
-
-Select:
-```
-
-On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+After implementing the accepted fixes, common follow-ups include:
+- `/commit-sdlc` — commit the fixes
 
 ## See Also
 

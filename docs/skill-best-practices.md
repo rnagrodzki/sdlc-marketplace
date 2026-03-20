@@ -151,17 +151,17 @@ The VERBATIM pattern appears in `commit-sdlc`, `pr-sdlc`, `review-sdlc`, and `ve
 
 ## 6. User Consent Gates
 
-Never execute an externally-visible action — git push, PR creation, API mutations, file writes to the user's project — without explicit user approval. Show the full plan or output first, then prompt.
+Never execute an externally-visible action — git push, PR creation, API mutations, file writes to the user's project — without explicit user approval via the `AskUserQuestion` tool. Show the full plan or output first, then use `AskUserQuestion` to present the consent prompt. This ensures structured user interaction in VSCode and consistent UX across all skills.
 
-**Standard consent menu:**
-```
-Would you like to proceed?
-  yes    — execute as shown above
-  edit   — revise and re-present
-  cancel — stop here
+**Standard consent pattern (using AskUserQuestion):**
 
-Select:
-```
+Use AskUserQuestion to ask:
+> [Action-specific question, e.g. "Commit as shown?" or "Create this PR?"]
+
+Options:
+- **yes** — execute as shown above
+- **edit** — revise and re-present
+- **cancel** — stop here
 
 Rules:
 - Show the complete output *before* the consent prompt. The user approves what they see.
@@ -252,17 +252,17 @@ Reference in `SKILL.md`: `See ./plan-format-reference.md for the exact format sp
 - [`/pr-sdlc`](../pr-sdlc/SKILL.md) — create the pull request
 ```
 
-**Workflow Continuation:** After completing its task, a skill should offer the user logical next steps rather than ending abruptly:
-```
-What would you like to do next?
-  commit   — commit the changes (/commit-sdlc)
-  pr       — create a pull request (/pr-sdlc)
-  done     — stop here
+**What's Next:** After completing its task, a skill should show available follow-up skills as a passive hint — no prompt, no waiting, no `Select:`. The skill ends immediately after displaying the hint. The user invokes the next skill on their own terms.
 
-Select:
+```
+## What's Next
+
+After completing the commit, common follow-ups include:
+- `/pr-sdlc` — create a pull request
+- `/version-sdlc` — tag a release
 ```
 
-On selection, invoke the next skill via the `Skill` tool. The user should never need to remember the name of the next step in a workflow.
+No `Select:` prompt. No AskUserQuestion. No Skill tool invocation. Just a signpost, then the skill ends.
 
 **Critique checkpoint:**
 
@@ -270,7 +270,7 @@ On selection, invoke the next skill via the `Skill` tool. The user should never 
 |---|---|
 | Long reference content is in separate files, not inlined | SKILL.md stays focused |
 | See Also links use relative paths to SKILL.md files | Links work from the skill directory |
-| Workflow Continuation offers logical next steps | User is not stranded after completion |
+| What's Next section lists follow-up skills without prompting | User knows options without being forced to choose |
 
 ---
 

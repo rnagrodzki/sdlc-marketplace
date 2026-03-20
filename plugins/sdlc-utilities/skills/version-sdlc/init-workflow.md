@@ -28,17 +28,14 @@ Suggested config:
 
 ### Step 3 (CONFIRM): Ask User to Confirm
 
-Present options:
+Use AskUserQuestion to present the detected setup and ask:
+> Does this look right?
 
-```
-Does this look right? Options:
-  yes          — write .claude/version.json as shown
-  tag-only     — use git tags as version source (no version file)
-  changelog    — same as yes, but enable changelog by default
-  cancel       — abort setup
-```
-
-Wait for explicit user response before proceeding.
+Options:
+- **yes** — write .claude/version.json as shown
+- **tag-only** — use git tags as version source (no version file)
+- **changelog** — same as yes, but enable changelog by default
+- **cancel** — abort setup
 
 ### Step 4 (WRITE): Write Config on Confirmation
 

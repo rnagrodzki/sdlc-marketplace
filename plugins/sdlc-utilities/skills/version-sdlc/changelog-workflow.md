@@ -64,9 +64,15 @@ Updated changelog entry:
 What changed: [brief summary of additions/removals]
 ```
 
-Ask: `Proceed with update? (yes / edit / cancel)`
+Use AskUserQuestion to ask:
+> Proceed with this changelog update?
 
-If `edit`: ask what to change, revise, present again.
+Options:
+- **yes** — apply the update
+- **edit** — tell me what to change
+- **cancel** — abort
+
+If the user chooses **edit**, ask what to change, revise, and present again. Loop until explicit **yes** or **cancel**.
 
 ### Step 7 (EXECUTE): Apply the Update
 

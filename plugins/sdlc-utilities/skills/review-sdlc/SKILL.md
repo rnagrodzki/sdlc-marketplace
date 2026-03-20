@@ -80,21 +80,20 @@ files written by the script. Clean both up in Step 3.
 
 Apply based on `manifest.scope`:
 
-- **`all`** (default): The review includes committed + staged changes. If `manifest.uncommitted_changes` is `true`, warn that **unstaged** files are not included:
+- **`all`** (default): The review includes committed + staged changes. If `manifest.uncommitted_changes` is `true`, show this note prominently:
   ```
   Note: you have unstaged or untracked files not included in this review.
   Only staged and committed changes are reviewed in the default scope.
-  Use --working to include unstaged changes. Continue? (yes/no)
+  Use --working to include unstaged changes.
   ```
-  Wait for confirmation before proceeding.
+  Continue automatically — this is informational only.
 
-- **`committed`**: If `manifest.uncommitted_changes` is `true`, warn the user:
+- **`committed`**: If `manifest.uncommitted_changes` is `true`, show this note prominently:
   ```
-  Warning: you have uncommitted changes ({dirty_files.length} files). They are NOT
+  Note: you have uncommitted changes ({dirty_files.length} files). They are NOT
   included in this review. Use the default scope (no flags) or --working to include them.
-  Continue? (yes/no)
   ```
-  Wait for confirmation before proceeding.
+  Continue automatically — this is informational only.
 
 - **`staged`** or **`working`**: Do NOT warn — reviewing uncommitted changes is the purpose.
 
@@ -190,13 +189,12 @@ rm -rf {manifest.diff_dir}
 If the orchestrator's return summary contains actionable findings — verdict is
 **CHANGES REQUESTED** or **APPROVED WITH NOTES** — offer to process and fix them:
 
-```text
-Would you like to address these findings? (fix / no)
-  fix — process findings and implement fixes using received-review-sdlc
-  no  — done
-```
+Use AskUserQuestion to ask:
+> The review found actionable items. Address them now?
 
-**Wait for explicit user response before proceeding.**
+Options:
+- **fix** — process findings and implement fixes using received-review-sdlc
+- **no** — done, leave findings unaddressed
 
 **On `fix`:** The review findings are already in the conversation context.
 Invoke the `received-review-sdlc` skill. It will read the findings from context
@@ -251,19 +249,10 @@ by any dimension, subagent findings that were systematically miscalibrated, base
 branch detection failures, or dimension trigger globs that needed adjustment for
 this project's directory layout.
 
-## Workflow Continuation
+## What's Next
 
-When the review verdict is APPROVED and the user declines self-fix, or after self-fix is complete, present the user with available next actions:
-
-```
-What would you like to do next?
-  commit   — commit the changes (/commit-sdlc)
-  done     — stop here
-
-Select:
-```
-
-On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+After the review completes, common follow-ups include:
+- `/commit-sdlc` — commit the changes
 
 ## See Also
 

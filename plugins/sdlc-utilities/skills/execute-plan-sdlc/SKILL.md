@@ -44,8 +44,14 @@ Once the plan content is available, validate it:
 Blocking issues → stop and ask. Warnings only → show them and proceed.
 
 **Checkpoint detection:** Before reading the plan content, check for an existing checkpoint file at `$TMPDIR/claude-exec/<plan-name>-checkpoint.md` (where `<plan-name>` is derived from the plan filename or first 20 characters of the plan title). If found, display:
-> Found execution checkpoint from <timestamp>. Resume from Wave <N>? (yes / restart)
-Wait for explicit user response. If "yes", skip to the checkpoint's "Next" wave. If "restart", proceed normally from Step 2.
+Use AskUserQuestion to ask:
+> Found execution checkpoint from <timestamp>. Resume from Wave <N>?
+
+Options:
+- **yes** — resume from where execution left off
+- **restart** — discard checkpoint and start from the beginning
+
+If "yes", skip to the checkpoint's "Next" wave. If "restart", proceed normally from Step 2.
 
 ## Step 2 (CLASSIFY): Classify Tasks and Build Waves
 
@@ -132,7 +138,10 @@ Model Presets:
   B) Balanced:  N × haiku, N × sonnet, N × opus    — default ✓
   C) Quality:   N × sonnet, N × opus                — max correctness
 
-Select preset (A/B/C), "custom" to edit individual tasks, or "cancel":
+Use AskUserQuestion to select a preset:
+> Select execution preset
+
+Options: **A** (Speed) | **B** (Balanced, default) | **C** (Quality) | **custom** | **cancel**
 Tip: Use --preset B to skip this prompt next time.
 ```
 
@@ -144,12 +153,16 @@ Always present all 3 presets. Default is Balanced. When the user selects a prese
 
 **For each wave:**
 
-**5a. High-risk gate** — If the wave contains high-risk tasks, show what will be done and wait:
-```
-Wave N contains high-risk task(s):
-  - Task N: "..." [HIGH RISK: database change]
-Approve? (yes / skip / cancel)
-```
+**5a. High-risk gate** — If the wave contains high-risk tasks, use AskUserQuestion to ask:
+> Wave N contains high-risk task(s):
+> - Task N: "..." [HIGH RISK: database change]
+>
+> Approve execution?
+
+Options:
+- **yes** — execute this wave
+- **skip** — skip high-risk tasks, continue with remaining waves
+- **cancel** — stop execution entirely
 
 **5b. Dispatch agents** — One agent per standard/complex task, all in a single message (parallel). If the wave contains 2+ trivial tasks, include one additional batch agent (haiku) dispatched alongside the others using the Batched Trivial Tasks Prompt Template in `./classifying-and-waving-tasks.md`. A single trivial in a wave is executed inline before dispatch. Each agent prompt must include:
 - Full task text (never a reference to the plan file — paste the entire task body)
@@ -378,21 +391,12 @@ Format:
 <what happened, what was learned>
 ```
 
-## Workflow Continuation
+## What's Next
 
-After completing Step 9 and presenting the execution summary, present the user with available next actions:
-
-```
-What would you like to do next?
-  commit   — commit the changes (/commit-sdlc)
-  pr       — create a pull request (/pr-sdlc)
-  review   — review the changes (/review-sdlc)
-  done     — stop here
-
-Select:
-```
-
-On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+After completing plan execution, common follow-ups include:
+- `/commit-sdlc` — commit the changes
+- `/pr-sdlc` — create a pull request
+- `/review-sdlc` — review the changes
 
 ## See Also
 

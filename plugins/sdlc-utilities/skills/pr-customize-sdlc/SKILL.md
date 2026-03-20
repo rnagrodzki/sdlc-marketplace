@@ -172,21 +172,16 @@ Based on the critique:
 Present the refined template in a readable format. Show each section heading and its fill
 instruction.
 
-Then ask the user:
-
-```text
-This is the proposed PR template for your project.
+Use AskUserQuestion to present the template and ask:
+> Accept this PR template?
 
 Options:
-  accept      — write this template as-is to .claude/pr-template.md
-  edit        — tell me which sections to add, remove, rename, or modify
-  section N   — tell me to change section N specifically
+- **accept** — write this template as-is to .claude/pr-template.md
+- **edit** — tell me which sections to add, remove, rename, or modify
+- **section N** — change a specific section (tell me the number)
 
-What would you like to do?
-```
-
-If the user chooses `edit` or `section N`: make the requested changes and present the
-updated template again. Loop until the user says `accept`.
+If the user chooses **edit** or **section N**: make the requested changes and present the
+updated template again. Loop until the user says **accept**.
 
 ---
 
@@ -308,20 +303,11 @@ Log to `.claude/learnings/log.md` when:
 - User requested a section that was not proposed — note which scan signal was missed
 - Validation failed — note which check failed and the root cause
 
-## Workflow Continuation
+## What's Next
 
-After completing the PR template customization, present the user with available next actions:
-
-```
-What would you like to do next?
-  pr       — create a pull request with the new template (/pr-sdlc)
-  commit   — commit the template file to the repo (/commit-sdlc)
-  done     — stop here
-
-Select:
-```
-
-On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+After completing the PR template customization, common follow-ups include:
+- `/pr-sdlc` — create a PR with the new template
+- `/commit-sdlc` — commit the template file
 
 ## See Also
 

@@ -73,7 +73,15 @@ If not found, skip — the capability is not installed.
 **If `VERSION_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
 **If `VERSION_CONTEXT_JSON.warnings` is non-empty**, show the warnings to the user before continuing.
-For the warning `"You have uncommitted changes"`, ask the user to confirm they want to proceed.
+For the warning `"You have uncommitted changes"`, use AskUserQuestion to ask:
+> You have uncommitted changes that will NOT be included in this release.
+
+Options:
+- **proceed** — release without the uncommitted changes
+- **commit first** — run /commit-sdlc to commit changes, then re-invoke /version-sdlc
+- **cancel** — abort the release
+
+On **commit first**: invoke `/commit-sdlc` via the Skill tool. After the commit completes, re-invoke `/version-sdlc` with the same original arguments.
 
 ---
 
@@ -150,7 +158,7 @@ Fix each issue found in Step 3. Continue until all gates pass (max 2 iterations 
 
 ### Step 5 (DO): Present Release Plan for Approval
 
-Show the full release plan to the user. **Do not execute any git commands before receiving explicit user approval.**
+Show the full release plan to the user. **Do not execute any git commands before receiving explicit user approval via AskUserQuestion.**
 
 ```
 Release Plan
@@ -163,10 +171,13 @@ Changelog:  no
 Hotfix:     yes             ← only shown when flags.hotfix === true
 ────────────────────────────────────────────
 
-Proceed? (yes / edit / cancel)
-  yes    — execute all steps
-  edit   — describe what to change
-  cancel — abort
+Use AskUserQuestion to ask:
+> Execute this release?
+
+Options:
+- **yes** — execute all steps
+- **edit** — describe what to change
+- **cancel** — abort
 ```
 
 If changelog is enabled, show the draft CHANGELOG entry between the release plan table and the prompt.
@@ -200,9 +211,10 @@ This ensures projects that ran `--init` in a prior session get notified about im
 1. Check retag scripts — same version check as described in Branch A Step 4 (retag script version check).
 2. If `config.changelog === true`: check check-changelog scripts — same version check as described in Branch A Step 4 (changelog script version check).
 3. If any scripts are outdated or missing (and `config.changelog === true` for the check-changelog check):
-   - Show the update prompt with what changed
+   - Show what changed and which files would be updated
+   - Use AskUserQuestion to ask: "Update CI scripts? (yes / no) — this does not block the release."
    - On `yes`: scaffold/overwrite the outdated files
-   - On `no`: warn and continue with the release — this check is non-blocking
+   - On `no`: warn and continue with the release
 
 The release proceeds regardless of the user's answer. This is informational, not a gate.
 
@@ -359,19 +371,10 @@ Record entries for: project-specific version file locations, non-standard tag co
 monorepo versioning patterns, CI requirements that gate tag pushes, or any edge cases
 encountered during release execution.
 
-## Workflow Continuation
+## What's Next
 
-After the release is complete, present the user with available next actions:
-
-```
-What would you like to do next?
-  jira     — update Jira ticket status (/jira-sdlc)
-  done     — stop here
-
-Select:
-```
-
-On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+After completing the release, common follow-ups include:
+- `/jira-sdlc` — update Jira ticket status
 
 ## See Also
 

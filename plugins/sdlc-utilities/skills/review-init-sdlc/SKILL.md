@@ -183,10 +183,13 @@ Proposed review dimensions for this project:
    Coverage: **/routes/**, **/controllers/**
    Why: Express.js routes in src/routes/ (12 files), OpenAPI spec at docs/api.yaml
 
-Install which? (numbers comma-separated, or "all"):
-```
+Use AskUserQuestion to ask:
+> Install which dimensions?
 
-Wait for user selection.
+Options:
+- **all** — install all proposed dimensions
+- **select** — enter comma-separated numbers to choose specific dimensions
+- **cancel** — abort without installing
 
 For each selected dimension:
 
@@ -214,7 +217,7 @@ node "$SCRIPT" --project-root . --markdown
 EXIT_CODE=$?
 ```
 
-- If exit code **1**: Show the validation errors; offer to fix them automatically.
+- If exit code **1**: Show the validation errors. Use AskUserQuestion to ask: "Fix these validation errors automatically? (yes / no)"
 - If exit code **2**: Show `Script error — see output above` and stop.
 
 **Error-to-GitHub issue proposal**:
@@ -244,14 +247,14 @@ If any file has errors, show the error detail and offer to fix them automaticall
 
 **Opt-in prompt:**
 
-```text
-Would you also like to generate GitHub Copilot review instructions?
-These mirror your review dimensions so Copilot's automatic PR code review follows the same standards.
-Files will be created in .github/instructions/ (one per dimension, ~1-2 KB each).
-(yes/no):
-```
+Use AskUserQuestion to ask:
+> Generate GitHub Copilot review instructions? Files will be created in .github/instructions/ (~1-2 KB each).
 
-If the user answers no, skip to the next section.
+Options:
+- **yes** — generate Copilot instruction files that mirror your review dimensions
+- **no** — skip Copilot instructions
+
+If the user answers **no**, skip to the next section.
 
 ---
 
@@ -281,8 +284,13 @@ Proposed Copilot instruction files:
    applyTo: "**/*.ts,**/*.tsx"
    ~1,180 chars (limit: 4,000) ✓
 
-Generate all? (yes/no/select numbers):
-```
+Use AskUserQuestion to ask:
+> Generate these Copilot instruction files?
+
+Options:
+- **yes** — generate all listed files
+- **no** — skip Copilot instructions
+- **select** — enter numbers to generate specific files
 
 ---
 
@@ -428,20 +436,11 @@ Log to `.claude/learnings/log.md` when:
 - User declined Copilot instructions — note for awareness (they may want to know about `--no-copilot` for future runs)
 - A Copilot instruction exceeded the 4,000-char limit — note which dimension and how it was condensed
 
-## Workflow Continuation
+## What's Next
 
-After completing the review dimension setup, present the user with available next actions:
-
-```
-What would you like to do next?
-  review   — run a code review with the new dimensions (/review-sdlc)
-  commit   — commit the dimension files (/commit-sdlc)
-  done     — stop here
-
-Select:
-```
-
-On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+After setting up review dimensions, common follow-ups include:
+- `/review-sdlc` — run a code review with the new dimensions
+- `/commit-sdlc` — commit the dimension files
 
 ## See Also
 

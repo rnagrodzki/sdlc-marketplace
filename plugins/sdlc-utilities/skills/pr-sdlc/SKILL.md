@@ -127,8 +127,8 @@ If not found, skip — the capability is not installed.
 
 **If `PR_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
-**If `PR_CONTEXT_JSON.warnings` is non-empty**, show the warnings to the user before continuing.
-Ask them to confirm if they want to proceed (particularly for uncommitted changes).
+**If `PR_CONTEXT_JSON.warnings` is non-empty**, show the warnings prominently before continuing.
+Do not ask for confirmation — the Step 5 approval gate (AskUserQuestion) is the consent point before PR creation.
 
 **If `PR_CONTEXT_JSON.ghAuth` is not null**, inform the user before continuing (no confirmation needed):
 
@@ -170,7 +170,7 @@ For each section, apply the fill rules:
 
 - **Summary**: Plain-language, no jargon, 1-3 sentences
 - **JIRA Ticket**: Use `context.jiraTicket` or "Not detected"
-- **Business Context / Benefits**: Infer from `context.commits` and `context.diffContent`. If insufficient evidence, **ask the user** before writing. Don't guess. Acceptable question: *"What business problem does this PR solve? Who benefits and how?"*
+- **Business Context / Benefits**: Infer from `context.commits` and `context.diffContent`. If insufficient evidence, **use AskUserQuestion** to ask the user before writing. Don't guess. Acceptable question: *"What business problem does this PR solve? Who benefits and how?"*
 - **Technical Design**: Infer from `context.diffContent` — architecture, patterns, key decisions
 - **Technical Impact**: Identify affected systems/APIs/services from the diff
 - **Changes Overview**: Group by logical concern, no file paths
@@ -209,7 +209,7 @@ Fix each issue found in Step 3:
 - Rewrite vague sections with specifics from the diff
 - Replace invented content with "N/A" or "Not detected" plus a note
 - If a business section still can't be filled confidently after revision,
-  **ask the user** a targeted clarifying question and incorporate the answer
+  **use AskUserQuestion** to ask a targeted clarifying question and incorporate the answer
 - Re-check all quality gates after revisions
 
 Continue until all gates pass (max 2 iterations per gate).
@@ -217,7 +217,7 @@ Continue until all gates pass (max 2 iterations per gate).
 ### Step 5 (DO): Present for Review
 
 Show the complete title and description. **Do not execute any `gh` command
-before receiving explicit user approval.**
+before receiving explicit user approval via AskUserQuestion.**
 
 ```text
 PR Title: <title>
@@ -227,17 +227,15 @@ PR Description:
 <full description>
 ─────────────────────────────────────────────
 
-<if mode = create>
-Create this PR? (yes / edit / cancel)
-  yes    — create the PR as shown
-  edit   — tell me what to change
-  cancel — abort without creating
+Use AskUserQuestion to ask (adapt question to mode):
 
-<if mode = update>
-Update PR #<number>? (yes / edit / cancel)
-  yes    — update the PR title and description as shown
-  edit   — tell me what to change
-  cancel — abort without updating
+For create mode:
+> Create this PR as shown?
+Options: **yes** — create the PR | **edit** — tell me what to change | **cancel** — abort
+
+For update mode:
+> Update PR #<number> as shown?
+Options: **yes** — update the PR | **edit** — tell me what to change | **cancel** — abort
 ```
 
 If the user chooses `edit`, ask what to change, revise, and present again.
@@ -373,20 +371,11 @@ Record entries for: repository PR conventions not covered by this skill, branch 
 patterns, CI requirements that affect PR descriptions, team-specific template preferences,
 JIRA project key patterns, or review process quirks encountered while generating PR content.
 
-## Workflow Continuation
+## What's Next
 
-After the PR is created or updated, present the user with available next actions:
-
-```
-What would you like to do next?
-  review   — review the branch (/review-sdlc)
-  version  — tag a release after merge (/version-sdlc)
-  done     — stop here
-
-Select:
-```
-
-On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+After creating or updating the PR, common follow-ups include:
+- `/review-sdlc` — review the branch
+- `/version-sdlc` — tag a release after merge
 
 ## See Also
 

@@ -115,7 +115,7 @@ Fix each issue found in Step 3. Max 2 iterations per gate.
 
 ### Step 5 (DO): Present and Execute
 
-Show the full commit plan to the user. **Do not execute any git commands before receiving explicit user approval.**
+Show the full commit plan to the user. **Do not execute any git commands before receiving explicit user approval via AskUserQuestion.**
 
 ```
 Commit
@@ -133,11 +133,15 @@ Staged:     3 files changed, +142, -12
 Stash:      2 unstaged files will be stashed and restored
 ────────────────────────────────────────────
 
-Commit? (yes / edit / cancel)
-  yes    — commit as shown
-  edit   — tell me what to change
-  cancel — abort
 ```
+
+Use AskUserQuestion to ask:
+> Commit as shown?
+
+Options:
+- **yes** — commit as shown
+- **edit** — tell me what to change
+- **cancel** — abort
 
 Omit the `Stash:` line if `unstaged.hasChanges` is false or `flags.noStash` is true.
 Show `Amend:` instead of `Commit:` heading when `flags.amend` is true.
@@ -249,20 +253,11 @@ After completing a commit, if the project's detected commit style was non-conven
 <what was learned about this project's commit style or any edge case encountered>
 ```
 
-## Workflow Continuation
+## What's Next
 
-After Step 6 verification completes successfully, present the user with available next actions:
-
-```
-What would you like to do next?
-  pr       — create a pull request (/pr-sdlc)
-  version  — tag a release (/version-sdlc)
-  done     — stop here
-
-Select:
-```
-
-On selection, invoke the chosen skill using the Skill tool. On "done", end without further action.
+After completing the commit, common follow-ups include:
+- `/pr-sdlc` — create a pull request
+- `/version-sdlc` — tag a release
 
 ## See Also
 
