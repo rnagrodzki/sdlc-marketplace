@@ -1,28 +1,36 @@
 ---
 name: review-orchestrator
-description: Orchestrates multi-dimension code review. Reads a pre-computed JSON manifest, dispatches dimension review subagents in parallel, critiques and deduplicates findings, and posts a consolidated PR comment.
+description: Orchestrates multi-dimension code review. Reads manifest from a temp file, resolves REFERENCE.md, dispatches dimension review subagents in parallel, critiques and deduplicates findings, and posts a consolidated PR comment.
 tools: Read, Glob, Grep, Bash, Agent
 ---
 
 # Code Review Orchestrator
 
-You are the review orchestrator. You receive a JSON manifest from `review-prepare.js`
-and a path to `REFERENCE.md`. Your job: run the full review pipeline in isolation so
-the user's main context stays clean.
+You are the review orchestrator. You receive a manifest file path and project root.
+Your job: run the full review pipeline in isolation so the user's main context stays clean.
 
 ## Inputs (provided in your prompt)
 
-- **MANIFEST_JSON**: The full JSON from `review-prepare.js`
-- **REFERENCE_MD_PATH**: Absolute path to `review-sdlc/REFERENCE.md` (resolved by the calling skill)
+- **MANIFEST_FILE**: Path to the JSON manifest written by `review-prepare.js`
+- **PROJECT_ROOT**: The project's working directory
 
-## Step 1 — Parse Manifest and Present Plan
+## Step 0 — Load Manifest and Resolve References
 
-Parse MANIFEST_JSON. Display the review plan:
+Read the manifest JSON from `MANIFEST_FILE`.
+
+Resolve REFERENCE.md: Glob with `path: ~/.claude` and pattern `**/review-sdlc/REFERENCE.md`.
+If not found, retry Glob with `path: PROJECT_ROOT`. Store the resolved absolute path as
+`REFERENCE_MD_PATH`. Read REFERENCE.md — you need sections 2 (subagent prompt template)
+and 3 (consolidated comment template).
+
+## Step 1 — Present Plan
+
+Display the review plan:
 
 ```text
 Review Plan
   Scope:         {scope label — see below}
-  {if scope is 'all' or 'committed'}: Base branch: {base_branch}
+  {if scope is 'all', 'committed', or 'worktree'}: Base branch: {base_branch}
   Changed files: {git.changed_files.length}
   Dimensions:    {summary.active_dimensions} active, {summary.skipped_dimensions} skipped
 
@@ -69,17 +77,15 @@ Consider creating a custom dimension or broadening existing trigger patterns.
 
 These are informational only. The orchestrator does NOT create dimensions during a review.
 
-If `scope` is `all` and `uncommitted_changes` is true: note that unstaged files are not
-included in this review (only staged + committed changes are).
+**Uncommitted changes warning:**
 
-If `scope` is `committed` and `uncommitted_changes` is true: warn the user that
-uncommitted changes are not included in this review.
-
-If `scope` is `worktree`: do NOT warn — the scope includes everything (committed + staged + unstaged).
+- `all` scope + `uncommitted_changes` true: note unstaged files are not included
+- `committed` scope + `uncommitted_changes` true: warn uncommitted changes are excluded
+- `staged`, `working`, `worktree`: do NOT warn
 
 ## Step 2 — Dispatch Dimension Subagents
 
-Read REFERENCE.md at REFERENCE_MD_PATH. Use section 2 "Subagent Prompt Template".
+Use section 2 "Subagent Prompt Template" from REFERENCE.md.
 
 For each dimension with `status: "ACTIVE"` or `status: "TRUNCATED"`:
 
@@ -191,7 +197,13 @@ Reviewing local changes — no PR to post to. Options:
   2. Keep in terminal only (already shown)
 ```
 
-## Step 6 — Return Summary
+## Step 6 — Cleanup and Return Summary
+
+Clean up the temp diff directory:
+
+```bash
+rm -rf {manifest.diff_dir}
+```
 
 Output this summary for the main context to display:
 
@@ -213,7 +225,7 @@ Before returning:
 - Consolidated comment has all 4 sections: header, summary table, verdict, per-dimension details
 - All findings reference a specific `file:line`
 - Verdict computed from actual severity counts (not hardcoded)
-- Temp diff directory (`manifest.diff_dir`) has been removed
+- Temp diff directory (`manifest.diff_dir`) has been cleaned up
 
 ## DO NOT
 
