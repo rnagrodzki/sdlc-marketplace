@@ -72,6 +72,10 @@ codebases — read only manifests, config files, and directory listings.
 - `lerna.json`, `pnpm-workspace.yaml`, `nx.json` → monorepo evidence
 - `*.graphql`, `openapi.yaml`, `openapi.json` → API contract evidence
 
+**Spec framework signals:**
+
+- `openspec/config.yaml` → OpenSpec spec-driven development; propose `spec-compliance-review` dimension
+
 From the scan, extract: primary language(s)/framework(s), key dependency categories, directory patterns with file counts, and infrastructure/tooling signals.
 
 ---
@@ -115,6 +119,7 @@ Read `./dimension-catalog.md` for dimension definitions. Propose dimensions matc
 - In `--add` mode: exclude installed dimensions; cite uncovered file suggestions as evidence
 - Distinguish `api-review` (route/controller code quality) from `api-contract-review` (schema file changes); flag if both are proposed
 - Distinguish `documentation-review` (docs presence/structure) from `documentation-quality-review` (docs content accuracy); flag if both are proposed
+- When `openspec/config.yaml` is detected, propose `spec-compliance-review` (high severity) — this dimension verifies that code changes satisfy the delta spec requirements from the active OpenSpec change. The dimension body should reference `openspec/changes/*/specs/` as the authoritative requirements source and include checklist items for: every ADDED requirement has corresponding implementation, every MODIFIED requirement's changes are reflected in code, no REMOVED requirements still have active code paths.
 
 For each proposed dimension, prepare: name (lowercase-hyphenated), description (one sentence, max 256 chars), why relevant (cite specific evidence), trigger patterns (match actual directory names), skip-when patterns, and a tailored body checklist.
 

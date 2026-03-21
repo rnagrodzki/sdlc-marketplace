@@ -44,6 +44,8 @@ Once the plan content is available, validate it:
 
 Blocking issues → stop and ask. Warnings only → show them and proceed.
 
+**OpenSpec context loading (optional):** After the plan is loaded, check the plan header's `**Source:**` field. If it points to an `openspec/changes/<name>/` path, Read all markdown files matching `openspec/changes/<name>/specs/*.md` (the delta specs). Store these as `openspecSpecs` for use in Step 5c-bis. If the path does not exist or yields no files, proceed without OpenSpec context — this is not a blocking error.
+
 **Checkpoint detection:** Before reading the plan content, check for an existing checkpoint file at `$TMPDIR/claude-exec/<plan-name>-checkpoint.md` (where `<plan-name>` is derived from the plan filename or first 20 characters of the plan title). If found, display:
 Use AskUserQuestion to ask:
 > Found execution checkpoint from <timestamp>. Resume from Wave <N>?
@@ -248,6 +250,7 @@ Preset: <selected preset>
 - Did any task's actual output differ from what upcoming tasks assumed as input?
 - Did any task change an interface that downstream tasks depend on?
 - If yes, update the next wave's task descriptions to reflect the actual (not planned) outputs.
+- When `openspecSpecs` is available: did any task's implementation contradict an OpenSpec delta spec requirement that was not explicitly captured in the task description? If so, flag it before proceeding to the next wave.
 
 **Context management** — Between waves, check context usage. If high, compact before dispatching the next wave: summarize completed wave results into a compact status block and discard the verbose agent output. This prevents context exhaustion on plans with 4+ waves.
 

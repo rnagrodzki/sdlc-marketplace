@@ -316,6 +316,17 @@ Default severity: high
 
 Use `--no-copilot` to skip this prompt if you manage Copilot instructions separately.
 
+## OpenSpec Integration
+
+When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this skill proposes a `spec-compliance-review` dimension (high severity) during the tech stack scan.
+
+- **Evidence:** `openspec/config.yaml` present with delta spec files in `openspec/changes/*/specs/`
+- **Dimension purpose:** Verifies that code changes satisfy delta spec requirements — checks ADDED, MODIFIED, and REMOVED requirements
+
+See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
+
 ## Related Skills
 
 - [`/review-sdlc`](review-sdlc.md) — uses the review dimensions this skill creates

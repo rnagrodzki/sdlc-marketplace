@@ -166,6 +166,18 @@ No external tools, credentials, or config files are needed.
 |---|---|
 | Plan mode | Native support (writes to plan file, calls `ExitPlanMode`) |
 
+## OpenSpec Integration
+
+When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this skill reads the active change's artifacts as requirements input.
+
+- **Reads:** `proposal.md` (goal/scope), `specs/*.md` (delta specs as requirements), `design.md` (architecture), `tasks.md` (coarse decomposition reference)
+- **Behavior change:** Skips structured discovery questions when OpenSpec artifacts provide sufficient scope. Maps every ADDED/MODIFIED delta spec requirement to at least one task.
+- **Plan header:** Sets `**Source:**` to `openspec/changes/<name>/` instead of "conversation context"
+
+See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
+
 ## Related Skills
 
 - [`/execute-plan-sdlc`](execute-plan-sdlc.md) — executes the plans this skill produces

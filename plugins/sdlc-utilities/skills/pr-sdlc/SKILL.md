@@ -155,6 +155,17 @@ Key fields available (including `customTemplate` added for project-level PR temp
 
 Using data from `PR_CONTEXT_JSON`, draft all sections of the active PR template (custom sections if `customTemplate` is present, or the default 8 sections below).
 
+**OpenSpec enrichment (optional — skip if `openspec/` not found):**
+
+1. Glob for `openspec/config.yaml`. If absent, skip this block entirely.
+2. Identify the active change: Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If one matches, use it. If multiple, match against `PR_CONTEXT_JSON.currentBranch`. If ambiguous, skip — do not ask during PR creation.
+3. If an active change is found, Read in parallel:
+   - `proposal.md` — use intent and scope to pre-fill **Business Context** and **Business Benefits** (reduces need for AskUserQuestion clarification)
+   - `design.md` (if exists) — use architectural approach for **Technical Design** section
+4. Add to the PR description, below the title: `**OpenSpec:** openspec/changes/<name>/`
+
+When OpenSpec context provides business rationale, use it directly instead of asking the user. Still ask if the proposal is too vague to fill Business Context/Benefits confidently.
+
 For each section, apply the fill rules:
 
 - **Summary**: Plain-language, no jargon, 1-3 sentences
@@ -340,6 +351,8 @@ When invoking `error-report-sdlc`, provide:
   falls back to the currently active account with a warning. In that case, run
   `gh auth switch --user <login>` manually before invoking the skill. The switch persists for
   subsequent commands.
+
+- **OpenSpec change detection during PR creation should not block.** Unlike plan-sdlc which can ask the user to disambiguate multiple active changes, pr-sdlc should silently skip OpenSpec enrichment if the change cannot be uniquely identified from the branch name. PR creation should never be blocked by spec detection ambiguity.
 
 ## Learning Capture
 

@@ -39,6 +39,17 @@ Task tool (general-purpose):
     ---
     {repeat for each task}
 
+    ## OpenSpec Delta Specs (when available)
+
+    {OPENSPEC_DELTA_SPECS — if openspecSpecs was loaded in Step 1, paste the full content
+    of each delta spec file here. If not available, omit this entire section.}
+
+    When delta specs are provided, verify that implementations satisfy BOTH the task
+    acceptance criteria AND the OpenSpec delta spec requirements. A task may pass its own
+    criteria but violate a broader delta spec requirement — flag those cases specifically.
+    Pay special attention to ADDED requirements (must have new code), MODIFIED requirements
+    (must reflect the change), and REMOVED requirements (must not have active code paths).
+
     ## CRITICAL: Do Not Trust Agent Reports
 
     Agents may have incomplete, inaccurate, or optimistic completion reports.

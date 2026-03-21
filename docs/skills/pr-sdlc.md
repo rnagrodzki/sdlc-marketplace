@@ -137,6 +137,18 @@ To override manually: `gh auth switch --user <login>` before running the skill.
 |-----------------|-------------|
 | GitHub PR | Opens a new PR or updates the description of an existing one |
 
+## OpenSpec Integration
+
+When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this skill pre-fills PR sections from the active change's proposal.
+
+- **Business Context / Benefits:** Pre-filled from `proposal.md` intent and scope, reducing clarification questions
+- **Technical Design:** References `design.md` architectural approach when available
+- **Header line:** Adds `**OpenSpec:** openspec/changes/<name>/` to the PR description
+
+See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
+
 ## Related Skills
 
 - [`/commit-sdlc`](commit-sdlc.md) — commit changes before creating a PR

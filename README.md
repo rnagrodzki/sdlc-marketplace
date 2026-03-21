@@ -64,6 +64,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | [Skill Best Practices](docs/skill-best-practices.md) | Design patterns for reliable, maintainable skills |
 | [Adding Commands](docs/adding-commands.md) | Create custom slash commands (legacy — prefer skills) |
 | [Adding Hooks](docs/adding-hooks.md) | Set up automated actions on session events |
+| [OpenSpec Integration](docs/openspec-integration.md) | Using SDLC skills with OpenSpec for spec-driven development |
 
 ## Troubleshooting
 

@@ -18,6 +18,20 @@ Write an implementation plan from requirements, a spec, or a user description. P
 **Gather requirements:** If no spec or requirements document is in context, use AskUserQuestion:
 > What do you want to implement? (describe in free form, bullet points, or provide a file path)
 
+**OpenSpec integration (optional — skip if `openspec/` not found):**
+
+1. Glob for `openspec/config.yaml`. If absent, skip this entire block — no OpenSpec in this project.
+2. If the user provided a spec file path pointing into `openspec/changes/<name>/`, extract `<name>` as the active change.
+3. Otherwise, Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If exactly one non-archived change exists, use it. If multiple, try matching change directory names against the current git branch name. If still ambiguous, use AskUserQuestion:
+   > Multiple active OpenSpec changes found. Which one are you working on?
+   List the change names as options.
+4. Once the active change is identified, Read in parallel:
+   - `openspec/changes/<name>/proposal.md` — intent and scope
+   - `openspec/changes/<name>/design.md` — technical approach (may not exist yet; skip if absent)
+   - All files matching `openspec/changes/<name>/specs/*.md` — delta specs (the requirements)
+   - `openspec/changes/<name>/tasks.md` — OpenSpec's task checklist (may not exist; skip if absent)
+5. Store these as `openspecContext` for use in Steps 1–5. Update the plan file header `**Source:**` to `openspec/changes/<name>/`.
+
 **Complexity routing:**
 
 | Scope Signal | Normal Mode | Plan Mode |
@@ -75,6 +89,13 @@ Wait for answers before continuing.
 
 Identify constraints: language, framework, existing conventions, testing approach.
 
+**OpenSpec enrichment (when `openspecContext` is available):**
+- Use `proposal.md` for goal and scope understanding (what's in, what's out)
+- Use delta specs (`specs/*.md`) with their ADDED/MODIFIED/REMOVED sections as the authoritative requirements — each delta entry is a requirement
+- Use `design.md` for architecture constraints and technical approach decisions
+- Use `tasks.md` as a coarse reference for decomposition — OpenSpec tasks are higher-level than plan-sdlc tasks, so decompose further rather than copying verbatim
+- When the OpenSpec artifacts provide sufficient scope, integration, and success criteria, skip the "Structured discovery" AskUserQuestion — the proposal and delta specs already answer those questions
+
 **Write to plan file:** After exploration, update the plan file:
 - Fill in Goal, Architecture, Verification header fields
 - Append a `## Requirements` section with numbered checklist (one bullet per requirement)
@@ -98,6 +119,11 @@ Wait for answer.
 - Each task touches 1–5 files (more than 5 → split)
 - Order: foundations → features → integration → polish
 - Dependencies explicit (task B names task A if it needs A's output)
+
+**OpenSpec-aware decomposition (when `openspecContext` is available):**
+- Map each ADDED and MODIFIED requirement from the delta specs to at least one task
+- In the Key Decisions section, note which OpenSpec `design.md` decisions were adopted and which (if any) were overridden with rationale
+- Set the plan header `**Source:**` field to `openspec/changes/<name>/` (not "conversation context")
 
 **Key decisions:** Note every decision where you chose between valid approaches. Focus on choices where a reasonable implementer might differ without the rationale. Skip obvious decisions.
 
@@ -155,6 +181,7 @@ Check each quality gate:
 | Verification completeness | Every task has at least one verification method |
 | Decomposition balance | No task touches > 5 files; no plan with > 80% Trivial tasks |
 | File existence | Every path under "Modify:" exists in the codebase (verify with Glob) |
+| OpenSpec requirements coverage | When `openspecContext` exists: every ADDED/MODIFIED requirement in delta specs has at least one task |
 | Dependency target existence | Every "Depends on: Task N" references a task number that exists in the plan |
 | Self-containment test | Pick the most complex task — could an agent implement it using only its description + Key Decisions? If not, the description is incomplete |
 
@@ -196,6 +223,7 @@ Dispatch a plan reviewer subagent using `./plan-reviewer-prompt.md`. Provide:
 - Path to the plan file
 - The requirements checklist from Step 1
 - Source requirements or spec (if a file exists)
+- When `openspecContext` is available, include the delta spec files as the "Source requirements" input — this gives the cross-model reviewer the ability to verify that every OpenSpec requirement is covered by at least one task
 
 **Model selection:** Use a different model than the one that wrote the plan when the plan has 5+ tasks. Cross-model review catches blind spots.
 - Plan written by sonnet → dispatch reviewer as opus

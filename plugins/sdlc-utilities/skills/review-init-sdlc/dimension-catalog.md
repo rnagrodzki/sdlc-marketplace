@@ -37,6 +37,7 @@ dimension when the corresponding evidence is found during the Step 1 scan.
 | `tsconfig.json` with `strict: true`, `.d.ts` files present | `type-safety-review` | medium |
 | Redux/Zustand/Vuex/MobX/Pinia deps, `store/` or `state/` dirs | `state-management-review` | medium |
 | `bin/` dir, `commander`/`yargs`/`meow`/`clap`/`cobra` deps | `cli-ux-review` | medium |
+| `openspec/config.yaml` present, `openspec/changes/*/specs/*.md` delta spec files | `spec-compliance-review` | high |
 
 ## Project-type Dimensions (conditional on project structure)
 

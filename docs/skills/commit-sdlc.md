@@ -112,6 +112,14 @@ No external tools or configuration files are required beyond `git`.
 | Git commit | A new commit on the current branch, or an amended HEAD commit when `--amend` is passed |
 | Git stash (temporary) | Created from unstaged tracked-file changes before the commit and immediately popped after — not a permanent stash entry |
 
+## OpenSpec Integration
+
+When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/) and no explicit `--scope` flag is provided, this skill uses the active OpenSpec change name as a scope candidate (e.g., `feat(add-dark-mode): ...`). The project's existing commit style from recent commits takes precedence.
+
+See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
+
 ## Related Skills
 
 - [`/pr-sdlc`](pr-sdlc.md) — create a pull request after committing

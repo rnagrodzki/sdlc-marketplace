@@ -196,6 +196,17 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.
 
+## OpenSpec Integration
+
+When executing a plan whose `**Source:**` header points to an OpenSpec change path, this skill loads the delta specs for enhanced compliance checking.
+
+- **Spec compliance reviewer** additionally checks implementations against OpenSpec delta spec requirements — not just task acceptance criteria
+- **Inter-wave critique** checks for contradictions between implementations and delta spec requirements not captured in task descriptions
+
+See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
+
 ## Related Skills
 
 - [`/plan-sdlc`](plan-sdlc.md) — writes the plans this skill executes
