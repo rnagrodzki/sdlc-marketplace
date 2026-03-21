@@ -3,6 +3,7 @@ name: review-sdlc
 description: "Use this skill when reviewing code changes across project-defined dimensions (security, performance, docs, concurrency, etc.). Runs review-prepare.js to pre-compute all git data, then delegates to the review-orchestrator agent. Arguments: [--base <branch>] [--committed] [--staged] [--working] [--worktree] [--set-default] [--dimensions <name,...>] [--dry-run]. Triggers on: review changes, code review, review PR, multi-dimension review, run review."
 user-invocable: true
 argument-hint: "[--base <branch>] [--committed] [--staged] [--dimensions <name,...>]"
+context: fork
 ---
 
 # Reviewing Changes
@@ -38,18 +39,7 @@ rm -f "$MANIFEST_FILE"
 - Exit code 1: show the stderr message to the user and stop.
 - Exit code 2: show `Script error — see output above` and stop.
 
-**Error-to-GitHub issue proposal**:
-
-For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
-under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
-
-- **Skill**: review-sdlc
-- **Step**: Step 0 — review-prepare.js execution
-- **Operation**: Running review-prepare.js to pre-compute review manifest
-- **Error**: Exit code 2 — script crash (full error on stderr)
-- **Suggested investigation**: Check Node.js version; inspect stderr for stack trace; verify review-prepare.js is accessible via the plugin path
-
-If not found, skip — the capability is not installed.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=review-sdlc, step=Step 0 — review-prepare.js execution, error=stderr.
 
 ## Step 1 — Consume Pre-computed Context
 
@@ -157,18 +147,7 @@ Wait for the orchestrator to complete and return results.
 
 **If the agent dispatch fails or returns an error** (not a review verdict — an actual agent error):
 
-**Error-to-GitHub issue proposal**:
-
-Locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`,
-then retry with cwd. If found, follow the procedure with:
-
-- **Skill**: review-sdlc
-- **Step**: Step 3 — Spawn Orchestrator Agent
-- **Operation**: Dispatching review-orchestrator agent
-- **Error**: Agent dispatch failure or error return (details from above)
-- **Suggested investigation**: Check that the review-orchestrator.md agent file is resolvable; verify bypassPermissions mode is active
-
-If not found, skip — the capability is not installed.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=review-sdlc, step=Step 3 — Spawn Orchestrator Agent, error=agent dispatch failure details.
 
 ---
 

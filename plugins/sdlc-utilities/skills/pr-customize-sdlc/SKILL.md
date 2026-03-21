@@ -2,12 +2,22 @@
 name: pr-customize-sdlc
 description: "Use this skill when guiding the user through creating or editing a custom PR template for this project. Scans project signals (GitHub PR template, recent PRs, manifests) to propose a tailored starter, then guides the user through interactive customization. Triggers on: /pr-customize-sdlc, create PR template, edit PR template, customize PR description format."
 user-invocable: true
+argument-hint: "[template-file-path]"
 ---
 
 # Customizing PR Template
 
 Project-aware PR template creator: scan existing conventions, propose a tailored template,
 guide the user through customization section by section, then write `.claude/pr-template.md`.
+
+---
+
+## Plan Mode Check
+
+If the system context contains "Plan mode is active":
+
+1. Announce: "This skill requires write operations. Exit plan mode first, then re-invoke `/pr-customize-sdlc`."
+2. Stop. Do not proceed to subsequent steps.
 
 ---
 

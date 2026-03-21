@@ -112,18 +112,7 @@ rm -f "$PR_CONTEXT_FILE"
 - Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
 - Exit code 2: Show `Script error — see output above` and stop.
 
-**Error-to-GitHub issue proposal**:
-
-For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
-under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
-
-- **Skill**: pr-sdlc
-- **Step**: Step 0 — pr-prepare.js execution
-- **Operation**: Running pr-prepare.js to pre-compute PR context
-- **Error**: Exit code 2 — script crash (full error on stderr)
-- **Suggested investigation**: Check Node.js version; inspect stderr for stack trace; verify pr-prepare.js is accessible via the plugin path
-
-If not found, skip — the capability is not installed.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=pr-sdlc, step=Step 0 — pr-prepare.js execution, error=stderr.
 
 **If `PR_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
@@ -281,19 +270,7 @@ Title: <title>
 <description>
 ```
 
-**Error-to-GitHub issue proposal**:
-
-For non-auth `gh` failures (e.g., server error, unexpected exit), locate the procedure:
-Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`, then retry with cwd.
-If found, follow the procedure with:
-
-- **Skill**: pr-sdlc
-- **Step**: Step 6 — Create or Update PR
-- **Operation**: Running `gh pr create` or `gh pr edit`
-- **Error**: gh CLI failure (full error message from above)
-- **Suggested investigation**: Check `gh status`, verify repo permissions, check if branch is pushed to remote
-
-If not found, skip — the capability is not installed.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=pr-sdlc, step=Step 6 — Create or Update PR, error=gh CLI failure message.
 
 ---
 

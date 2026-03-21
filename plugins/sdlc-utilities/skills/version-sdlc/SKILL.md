@@ -57,18 +57,7 @@ rm -f "$VERSION_CONTEXT_FILE"
 - Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
 - Exit code 2: Show `Script error — see output above` and stop.
 
-**Error-to-GitHub issue proposal**:
-
-For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
-under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
-
-- **Skill**: version-sdlc
-- **Step**: Step 0 — version-prepare.js execution
-- **Operation**: Running version-prepare.js to pre-compute release context
-- **Error**: Exit code 2 — script crash (full error on stderr)
-- **Suggested investigation**: Check Node.js version; inspect stderr for stack trace; verify version-prepare.js is accessible via the plugin path
-
-If not found, skip — the capability is not installed.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=version-sdlc, step=Step 0 — version-prepare.js execution, error=stderr.
 
 **If `VERSION_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
@@ -238,18 +227,7 @@ The release proceeds regardless of the user's answer. This is informational, not
 
 **If any git command fails** (commit, tag, or push) with a non-auth error, show the error.
 
-**Error-to-GitHub issue proposal**:
-
-Locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md` under `~/.claude/plugins`,
-then retry with cwd. If found, follow the procedure with:
-
-- **Skill**: version-sdlc
-- **Step**: Step 8 — Release execution
-- **Operation**: Git commit, tag, or push during release
-- **Error**: Git command failure (full error from above)
-- **Suggested investigation**: Check remote connectivity, verify tag does not already exist, confirm git identity is configured
-
-If not found, skip — the capability is not installed.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=version-sdlc, step=Step 8 — Release execution, error=git command failure message.
 
 Display result:
 

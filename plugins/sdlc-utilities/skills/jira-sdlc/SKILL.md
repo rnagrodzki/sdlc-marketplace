@@ -307,9 +307,9 @@ After operations that reveal new information, update the cache incrementally:
 
 | Error | Diagnosis | Recovery |
 |-------|-----------|----------|
-| 400 on create | Missing required field or wrong field shape | Check `fieldSchemas` for the issue type; cross-reference REFERENCE.md Section 2. If field key or allowed values don't match the API error, **auto-refresh**: run `--force-refresh`, reload cache, retry once |
+| 400 on create | Missing required field or wrong field shape | Verify field key/shape against the cached `fieldSchemas` object. If the field doesn't match, run `--force-refresh`, reload cache, retry once. If still failing after refresh, invoke `error-report-sdlc` |
 | 400 on transition | Missing required transition field (e.g., resolution) | Check `workflows[type].transitions[status][n].requiredFields`; include required fields. If transition ID is not recognized, **auto-refresh**: run `--force-refresh`, reload cache, retry once |
-| 400 on edit | Wrong field shape or incorrect custom field key | Verify field key spelling; check type in REFERENCE.md Section 2. If field no longer exists, **auto-refresh**: run `--force-refresh`, reload cache, retry once |
+| 400 on edit | Wrong field shape or incorrect custom field key | Verify field key/shape against the cached `fieldSchemas` object. If the field doesn't match, run `--force-refresh`, reload cache, retry once. If field format details are needed, Read `./REFERENCE.md` Section 2 only |
 | 401 | Auth token expired | Reconnect Atlassian MCP; cannot recover programmatically |
 | 403 | Insufficient permission | Report to user — cannot fix |
 | 404 issue | Issue key wrong or issue deleted | Ask user to verify the issue key |

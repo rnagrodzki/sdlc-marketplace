@@ -2,6 +2,7 @@
 name: execute-plan-sdlc
 description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan."
 user-invocable: true
+argument-hint: "[plan-file-path] [--preset A|B|C]"
 ---
 
 # Execute Plan (SDLC)
@@ -74,9 +75,9 @@ For each task, determine three things:
 - **Standard** → `sonnet` — capable, cost-efficient
 - **Complex** → `opus` — most capable, required for architectural and cross-cutting work
 
-The user selects a preset in Step 4 that applies these mappings (or overrides them). See `./classifying-and-waving-tasks.md` for override signals.
+The user selects a preset in Step 4 that applies these mappings (or overrides them).
 
-Build waves from the dependency graph. See `./classifying-and-waving-tasks.md` for full heuristics, wave-building algorithm, and adaptive sizing table.
+After classification, Read `./classifying-and-waving-tasks.md` for wave-building algorithm and adaptive sizing.
 
 Two tasks modifying the same file must be in different waves.
 
@@ -204,7 +205,7 @@ Options:
 
 Skip for waves containing only Trivial tasks. Skip if the Speed preset was selected.
 
-After mechanical verification passes (Steps 5c.1–4), dispatch a single spec compliance reviewer (sonnet) using the prompt template in `./spec-compliance-reviewer.md`. Provide:
+After mechanical verification passes (Steps 5c.1–4), dispatch a single spec compliance reviewer (sonnet). At dispatch time, Read `./spec-compliance-reviewer.md` and use it as the prompt template. Provide:
 - Each non-trivial task's full specification text
 - The files each agent's completion checklist listed as modified
 
@@ -252,7 +253,7 @@ Preset: <selected preset>
 
 ## Step 6 (RECOVER): Error Recovery
 
-See `./recovering-from-failures.md` for the full playbook. Summary:
+**On failure:** Read `./recovering-from-failures.md` for the full playbook. Do not read this file preemptively — only when a failure occurs in this step. Summary:
 
 | Failure Type | Recovery Action |
 |---|---|
@@ -264,7 +265,7 @@ See `./recovering-from-failures.md` for the full playbook. Summary:
 | Test failure (3+ tests) | Stop; diagnose root cause before proceeding |
 | Build failure | Stop immediately; fix before next wave |
 | Lint failure | Fix inline; never block a wave on lint-only failures |
-| Phantom success (agent reports done, files unchanged) | Re-dispatch with model escalation and Edit-tool-only constraint; see recovering-from-failures.md |
+| Phantom success (agent reports done, files unchanged) | Re-dispatch with model escalation and Edit-tool-only constraint; see `./recovering-from-failures.md` (read on failure only) |
 | Persistent failure (2+ retries) | Escalate to user with full context |
 | Agent status: NEEDS_CONTEXT | Provide missing context, re-dispatch (counts as retry) |
 | Agent status: BLOCKED | Assess blocker: provide context + re-dispatch, escalate model, break task, or escalate to user |

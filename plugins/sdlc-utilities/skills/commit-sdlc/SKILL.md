@@ -3,7 +3,9 @@ name: commit-sdlc
 description: "Use this skill when committing staged changes, creating a git commit, or generating a commit message. Analyzes staged diff and recent commit history to generate a message matching the project's style. Stashes unstaged changes to isolate the commit, commits after user confirmation, and auto-restores the stash. Arguments: [--no-stash] [--scope <scope>] [--type <type>] [--amend]. Triggers on: commit changes, create commit, write commit message, git commit, smart commit, commit staged, stage and commit."
 user-invocable: true
 argument-hint: "[--no-stash] [--scope <scope>] [--type <type>] [--amend]"
+model: haiku
 ---
+
 
 # Smart Commit Skill
 
@@ -54,18 +56,7 @@ rm -f "$COMMIT_CONTEXT_FILE"
 - Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
 - Exit code 2: Show `Script error — see output above` and stop.
 
-**Error-to-GitHub issue proposal**:
-
-For exit code 2 (script crash), locate the procedure: Glob for `**/error-report-sdlc/REFERENCE.md`
-under `~/.claude/plugins`, then retry with cwd. If found, follow the procedure with:
-
-- **Skill**: commit-sdlc
-- **Step**: Step 0 — commit-prepare.js execution
-- **Operation**: Running commit-prepare.js to pre-compute commit context
-- **Error**: Exit code 2 — script crash (full error on stderr)
-- **Suggested investigation**: Check Node.js version; inspect stderr for stack trace; verify commit-prepare.js is accessible via the plugin path
-
-If not found, skip — the capability is not installed.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=commit-sdlc, step=Step 0 — commit-prepare.js execution, error=stderr.
 
 **If `COMMIT_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
