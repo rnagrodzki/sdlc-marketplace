@@ -1,8 +1,8 @@
 ---
 name: pr-sdlc
-description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Arguments: [--draft] [--update] [--base <branch>] [--spec]. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
+description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Arguments: [--draft] [--update] [--base <branch>]. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
 user-invocable: true
-argument-hint: "[--draft] [--update] [--base <branch>] [--spec]"
+argument-hint: "[--draft] [--update] [--base <branch>]"
 ---
 
 # Creating Pull Requests
@@ -155,15 +155,14 @@ Key fields available (including `customTemplate` added for project-level PR temp
 
 Using data from `PR_CONTEXT_JSON`, draft all sections of the active PR template (custom sections if `customTemplate` is present, or the default 8 sections below).
 
-**OpenSpec enrichment (opt-in — requires `--spec` flag):**
+**OpenSpec enrichment (automatic when detected):**
 
-1. If `--spec` flag was not passed, skip this block entirely.
-2. Glob for `openspec/config.yaml`. If absent, skip this block entirely.
-3. Identify the active change: Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If one matches, use it. If multiple, match against `PR_CONTEXT_JSON.currentBranch`. If ambiguous, skip — do not ask during PR creation.
-4. If an active change is found, Read in parallel:
+1. Glob for `openspec/config.yaml`. If absent, skip this block entirely.
+2. Identify the active change: Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If one matches, use it. If multiple, match against `PR_CONTEXT_JSON.currentBranch`. If ambiguous, skip — do not ask during PR creation.
+3. If an active change is found, Read in parallel:
    - `proposal.md` — use intent and scope to pre-fill **Business Context** and **Business Benefits** (reduces need for AskUserQuestion clarification)
    - `design.md` (if exists) — use architectural approach for **Technical Design** section
-5. Add to the PR description, below the title: `**OpenSpec:** openspec/changes/<name>/`
+4. Add to the PR description, below the title: `**OpenSpec:** openspec/changes/<name>/`
 
 When OpenSpec context provides business rationale, use it directly instead of asking the user. Still ask if the proposal is too vague to fill Business Context/Benefits confidently.
 

@@ -31,7 +31,7 @@ When `openspec/` is absent, all skills behave identically to their non-OpenSpec 
 
 ### Detection vs Loading
 
-Detection (Tier 1) is always on — one Glob for `config.yaml`, zero file reads, negligible cost. Loading (Tier 2) is opt-in — triggered by the `--spec` flag or an explicit spec path. Without `--spec`, most skills detect OpenSpec presence and print a hint but do not read artifacts. The exception is `plan-sdlc`, which actively classifies the user's request: for functional changes (new features, behavior modifications, API changes), it proposes switching to the full OpenSpec spec-first workflow; for non-functional changes (refactoring, config, docs), it shows the passive hint.
+Detection (Tier 1) is always on — one Glob for `config.yaml`, zero file reads, negligible cost. Loading (Tier 2) varies by skill. Enrichment-only skills (`pr-sdlc`, `commit-sdlc`) auto-load when a unique active change is detected — they read a small number of artifacts to improve output quality without changing workflow. Workflow-altering skills (`plan-sdlc`) remain opt-in via `--spec` or an explicit spec path, because loading there triggers a different planning workflow, not just enrichment.
 
 ---
 
@@ -127,7 +127,7 @@ Executes the plan with wave-based parallel dispatch. When the plan's Source poin
 ```text
 /review-sdlc          # with spec-compliance-review dimension if installed
 /commit-sdlc          # scope hint from OpenSpec change name
-/pr-sdlc              # Business Context pre-filled from proposal.md
+/pr-sdlc              # auto-detects OpenSpec, pre-fills Business Context from proposal.md
 ```
 
 ### Step 6: Verify and Archive (OpenSpec)
@@ -145,7 +145,7 @@ Executes the plan with wave-based parallel dispatch. When the plan's Source poin
 | --- | --- | --- |
 | `/plan-sdlc` | Asks for requirements via conversation | Detects presence. For functional changes without a matching active change, proposes starting the OpenSpec flow. For non-functional changes, prints a passive hint. With `--spec` or matching active change: reads proposal, delta specs, design, and tasks |
 | `/execute-plan-sdlc` | Spec compliance checks task acceptance criteria only | Additionally checks implementations against delta spec requirements |
-| `/pr-sdlc` | Asks user for Business Context/Benefits | With `--spec`: pre-fills from `proposal.md` intent and scope. Without `--spec`: no change from base behavior |
+| `/pr-sdlc` | Asks user for Business Context/Benefits | Auto-detects active change and pre-fills Business Context/Benefits from `proposal.md` intent and scope. Silently skips if ambiguous |
 | `/commit-sdlc` | Infers scope from changed files | Uses change directory name as scope candidate |
 | `/review-init-sdlc` | Proposes dimensions based on tech stack | Additionally proposes `spec-compliance-review` dimension |
 | `/review-sdlc` | Reviews against installed dimensions | No change (spec awareness comes from the dimension) |
@@ -180,7 +180,7 @@ Choose the workflow that matches your situation:
 
 ### 1. Spec-First (recommended for non-trivial features)
 
-Start with `/opsx:propose "description"` to create a proposal, then `/opsx:continue` to develop delta specs and a design document. Once specs are ready, run `/plan-sdlc --spec` to create an implementation plan from the spec artifacts, then `/execute-plan-sdlc` to implement. Finish with `/review-sdlc`, `/commit-sdlc`, `/pr-sdlc --spec`, and close the loop with `/opsx:verify` and `/opsx:archive`. Best for features where requirements benefit from structured specification before implementation begins.
+Start with `/opsx:propose "description"` to create a proposal, then `/opsx:continue` to develop delta specs and a design document. Once specs are ready, run `/plan-sdlc --spec` to create an implementation plan from the spec artifacts, then `/execute-plan-sdlc` to implement. Finish with `/review-sdlc`, `/commit-sdlc`, `/pr-sdlc`, and close the loop with `/opsx:verify` and `/opsx:archive`. Best for features where requirements benefit from structured specification before implementation begins.
 
 ### 2. Plan-First with Spec Prompt
 
@@ -241,4 +241,4 @@ Check that `openspec/config.yaml` exists in your project root. If you've customi
 2. **Graceful degradation** — Every OpenSpec-aware code path has a "skip if absent" guard. No skill breaks without OpenSpec.
 3. **No CLI coupling** — Skills read OpenSpec's markdown artifacts directly. They never call `openspec validate`, `openspec status`, or any OpenSpec CLI command. This prevents version coupling.
 4. **No new scripts or hooks** — Detection uses inline Glob calls, not a dedicated detection script or session-start hook.
-5. **Opt-in context loading** — Skills detect OpenSpec presence (one failing Glob) but do not read artifacts unless the user opts in with `--spec` or provides an explicit spec path. This prevents context bloat on unrelated tasks.
+5. **Proportional context loading** — Enrichment-only skills (`pr-sdlc`, `commit-sdlc`) auto-load artifacts when a unique active change is detected — they read 1–2 files to improve output quality. Workflow-altering skills (`plan-sdlc`) remain opt-in via `--spec`, because loading there changes the planning workflow. When no active change can be uniquely identified, all skills silently skip — no context bloat on unrelated tasks.
