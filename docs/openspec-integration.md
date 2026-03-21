@@ -29,6 +29,10 @@ Every skill that supports OpenSpec runs the same lightweight detection:
 
 When `openspec/` is absent, all skills behave identically to their non-OpenSpec behavior. Detection adds one failing Glob call (~milliseconds) — no measurable overhead.
 
+### Detection vs Loading
+
+Detection (Tier 1) is always on — one Glob for `config.yaml`, zero file reads, negligible cost. Loading (Tier 2) is opt-in — triggered by the `--spec` flag or an explicit spec path. Without `--spec`, skills detect OpenSpec presence and print a hint but do not read artifacts.
+
 ---
 
 ## End-to-End Workflow
@@ -96,7 +100,9 @@ Work through delta specs (`specs/*.md`) with ADDED/MODIFIED/REMOVED sections, th
 ### Step 3: Create Implementation Plan (SDLC)
 
 ```text
-/plan-sdlc openspec/changes/add-user-notifications/
+/plan-sdlc --spec
+# or with explicit path (implicitly enables spec loading):
+# /plan-sdlc openspec/changes/add-user-notifications/
 ```
 
 plan-sdlc reads all OpenSpec artifacts:
@@ -137,9 +143,9 @@ Executes the plan with wave-based parallel dispatch. When the plan's Source poin
 
 | Skill | Without OpenSpec | With OpenSpec |
 | --- | --- | --- |
-| `/plan-sdlc` | Asks for requirements via conversation | Reads proposal, delta specs, design, and tasks from the active change |
+| `/plan-sdlc` | Asks for requirements via conversation | Detects presence, prints hint. With `--spec`: reads proposal, delta specs, design, and tasks from the active change |
 | `/execute-plan-sdlc` | Spec compliance checks task acceptance criteria only | Additionally checks implementations against delta spec requirements |
-| `/pr-sdlc` | Asks user for Business Context/Benefits | Pre-fills from `proposal.md` intent and scope |
+| `/pr-sdlc` | Asks user for Business Context/Benefits | With `--spec`: pre-fills from `proposal.md` intent and scope. Without `--spec`: no change from base behavior |
 | `/commit-sdlc` | Infers scope from changed files | Uses change directory name as scope candidate |
 | `/review-init-sdlc` | Proposes dimensions based on tech stack | Additionally proposes `spec-compliance-review` dimension |
 | `/review-sdlc` | Reviews against installed dimensions | No change (spec awareness comes from the dimension) |
@@ -213,3 +219,4 @@ Check that `openspec/config.yaml` exists in your project root. If you've customi
 2. **Graceful degradation** — Every OpenSpec-aware code path has a "skip if absent" guard. No skill breaks without OpenSpec.
 3. **No CLI coupling** — Skills read OpenSpec's markdown artifacts directly. They never call `openspec validate`, `openspec status`, or any OpenSpec CLI command. This prevents version coupling.
 4. **No new scripts or hooks** — Detection uses inline Glob calls, not a dedicated detection script or session-start hook.
+5. **Opt-in context loading** — Skills detect OpenSpec presence (one failing Glob) but do not read artifacts unless the user opts in with `--spec` or provides an explicit spec path. This prevents context bloat on unrelated tasks.

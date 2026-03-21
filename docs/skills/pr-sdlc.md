@@ -21,6 +21,7 @@ Analyzes all commits and the diff on the current branch, generates a structured 
 | `--draft` | Create the PR as a draft | — |
 | `--update` | Update the description of an existing PR on this branch | — |
 | `--base <branch>` | Target branch for the PR | repo default |
+| `--spec` | Enrich PR description with OpenSpec proposal and design context | — |
 
 ---
 
@@ -75,6 +76,14 @@ Create this PR? (yes / edit / cancel)
 ```text
 /pr-sdlc --update
 ```
+
+### Create a PR with OpenSpec context
+
+```text
+/pr-sdlc --spec
+```
+
+Reads the active OpenSpec change's proposal and design docs to pre-fill Business Context and Technical Design sections.
 
 ---
 

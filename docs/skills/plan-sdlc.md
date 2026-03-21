@@ -25,7 +25,11 @@ When Claude Code's plan mode is active, this skill activates automatically — n
 
 ## Flags
 
-No flags. The skill adapts behavior based on requirement scope.
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--spec` | Include OpenSpec artifacts (proposal, delta specs, design, tasks) in planning context. Without this flag, OpenSpec presence is detected but artifacts are not read. | Off |
+
+Providing an explicit `openspec/changes/<name>/` path as the spec-file-path argument implicitly enables spec context loading — `--spec` is not needed in that case.
 
 ---
 
@@ -87,6 +91,14 @@ Wave preview:
 
 Approve this plan, or describe changes?
 ```
+
+### Plan with OpenSpec context
+
+```text
+/plan-sdlc --spec
+```
+
+Reads OpenSpec artifacts from the active change and uses them as authoritative requirements for the plan.
 
 ### From a requirements file
 

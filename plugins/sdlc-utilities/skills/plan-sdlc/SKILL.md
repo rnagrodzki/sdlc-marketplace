@@ -2,7 +2,7 @@
 name: plan-sdlc
 description: "Use when writing an implementation plan from requirements, a spec, a design doc, or a user description. ALWAYS use when plan mode is active — this is the designated plan-mode skill. Analyzes scope, maps file structure, decomposes into classified tasks with dependencies, and produces a plan ready for execute-plan-sdlc. Triggers on: write plan, create plan, plan this, break this into tasks, implementation plan, plan mode."
 user-invocable: true
-argument-hint: "[spec-file-path]"
+argument-hint: "[--spec] [spec-file-path]"
 ---
 
 # Plan (SDLC)
@@ -18,19 +18,22 @@ Write an implementation plan from requirements, a spec, or a user description. P
 **Gather requirements:** If no spec or requirements document is in context, use AskUserQuestion:
 > What do you want to implement? (describe in free form, bullet points, or provide a file path)
 
-**OpenSpec integration (optional — skip if `openspec/` not found):**
+**OpenSpec integration (opt-in — requires `--spec` flag or explicit spec path):**
 
 1. Glob for `openspec/config.yaml`. If absent, skip this entire block — no OpenSpec in this project.
-2. If the user provided a spec file path pointing into `openspec/changes/<name>/`, extract `<name>` as the active change.
-3. Otherwise, Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If exactly one non-archived change exists, use it. If multiple, try matching change directory names against the current git branch name. If still ambiguous, use AskUserQuestion:
+2. **Gate check:** If `openspec/config.yaml` exists but neither `--spec` flag was passed NOR the user provided a path into `openspec/changes/`, print:
+   > OpenSpec detected — pass `--spec` to include spec context in planning.
+   Then skip the rest of this block. `openspecContext` remains empty.
+3. If the user provided a spec file path pointing into `openspec/changes/<name>/`, extract `<name>` as the active change.
+4. Otherwise, Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If exactly one non-archived change exists, use it. If multiple, try matching change directory names against the current git branch name. If still ambiguous, use AskUserQuestion:
    > Multiple active OpenSpec changes found. Which one are you working on?
    List the change names as options.
-4. Once the active change is identified, Read in parallel:
+5. Once the active change is identified, Read in parallel:
    - `openspec/changes/<name>/proposal.md` — intent and scope
    - `openspec/changes/<name>/design.md` — technical approach (may not exist yet; skip if absent)
    - All files matching `openspec/changes/<name>/specs/*.md` — delta specs (the requirements)
    - `openspec/changes/<name>/tasks.md` — OpenSpec's task checklist (may not exist; skip if absent)
-5. Store these as `openspecContext` for use in Steps 1–5. Update the plan file header `**Source:**` to `openspec/changes/<name>/`.
+6. Store these as `openspecContext` for use in Steps 1–5. Update the plan file header `**Source:**` to `openspec/changes/<name>/`.
 
 **Complexity routing:**
 
