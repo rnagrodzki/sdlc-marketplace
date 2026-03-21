@@ -100,6 +100,27 @@ Approve this plan, or describe changes?
 
 Reads OpenSpec artifacts from the active change and uses them as authoritative requirements for the plan.
 
+### OpenSpec flow proposal for functional changes
+
+When OpenSpec is detected and you describe a functional change without `--spec`:
+
+```text
+/plan-sdlc
+
+Add a webhook notification system for order events
+```
+
+Response:
+
+```
+This looks like a functional change. This project uses OpenSpec for spec-driven development.
+
+Options:
+  1. Start OpenSpec flow — run /opsx:propose to spec this out first
+  2. Continue planning directly — skip spec workflow
+  3. Use existing spec — if you already have an OpenSpec change for this
+```
+
 ### From a requirements file
 
 ```text
@@ -149,7 +170,7 @@ Invoke `/plan-sdlc` while Claude Code plan mode is active:
 3. After task decomposition, task blocks (and a Key Decisions section, if applicable) are appended to the plan file
 4. After self-critique (Step 3) and user approval (Step 4), the plan file is rewritten with all fixes applied
 5. The skill calls `ExitPlanMode` — Claude Code presents the finalized plan for your review
-6. After you approve, invoke `/execute-plan-sdlc` to begin execution
+6. After you approve, execution begins automatically — `/execute-plan-sdlc` is auto-invoked with the plan already in context
 
 The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads it without any adjustments.
 
@@ -185,6 +206,7 @@ When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this 
 - **Reads:** `proposal.md` (goal/scope), `specs/*.md` (delta specs as requirements), `design.md` (architecture), `tasks.md` (coarse decomposition reference)
 - **Behavior change:** Skips structured discovery questions when OpenSpec artifacts provide sufficient scope. Maps every ADDED/MODIFIED delta spec requirement to at least one task.
 - **Plan header:** Sets `**Source:**` to `openspec/changes/<name>/` instead of "conversation context"
+- **Functional change routing:** When OpenSpec is detected but `--spec` is not passed, the skill classifies the user's request. For functional changes (new features, behavior modifications, API changes), it checks for a matching active OpenSpec change — if found, it auto-loads the spec context. If no match exists, it proposes three options: start the OpenSpec flow with `/opsx:propose`, continue planning directly without specs, or load an existing spec. Non-functional changes (refactoring, config, docs) receive a passive hint only.
 
 See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
 

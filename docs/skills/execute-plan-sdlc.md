@@ -17,6 +17,8 @@ Provide the plan in one of two ways:
 - Discuss, write, or paste the plan in the conversation before invoking — Claude reuses it from context without re-reading from file
 - Have a plan file accessible — Claude reads it on invocation
 
+**Auto-trigger after plan mode:** When `/plan-sdlc` completes in plan mode, it proposes execution before calling ExitPlanMode. If you accept the plan, `/execute-plan-sdlc` is invoked automatically — no manual invocation needed. You can still invoke it standalone for plans created outside plan mode.
+
 The plan must contain at least 2 tasks with clear deliverables (files to create or modify, behavior to implement).
 
 ---

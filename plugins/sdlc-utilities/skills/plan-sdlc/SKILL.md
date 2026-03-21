@@ -21,9 +21,24 @@ Write an implementation plan from requirements, a spec, or a user description. P
 **OpenSpec integration (opt-in — requires `--spec` flag or explicit spec path):**
 
 1. Glob for `openspec/config.yaml`. If absent, skip this entire block — no OpenSpec in this project.
-2. **Gate check:** If `openspec/config.yaml` exists but neither `--spec` flag was passed NOR the user provided a path into `openspec/changes/`, print:
-   > OpenSpec detected — pass `--spec` to include spec context in planning.
-   Then skip the rest of this block. `openspecContext` remains empty.
+2. **Gate check:** If `openspec/config.yaml` exists but neither `--spec` flag was passed NOR the user provided a path into `openspec/changes/`:
+   a. **Classify the request:** Determine whether the user's task involves functional changes (new features, behavior modifications, API changes, new integrations, capability additions) vs non-functional changes (refactoring, config, docs, CI/CD, dependency updates, formatting, infrastructure).
+   b. **Non-functional changes:** Print:
+      > OpenSpec detected — pass `--spec` to include spec context in planning.
+      Then skip the rest of this block. `openspecContext` remains empty.
+   c. **Functional changes:** Check whether an active OpenSpec change already covers this work — Glob `openspec/changes/*/proposal.md` (exclude `archive/`), and if any exist, try matching against the current git branch name. If a match is found, treat it as if the user passed `--spec` and continue to step 3. If no match, use AskUserQuestion:
+      > This looks like a functional change. This project uses OpenSpec for spec-driven development.
+      >
+      > Options:
+      > 1. **Start OpenSpec flow** — run `/opsx:propose` to spec this out first (recommended for non-trivial features)
+      > 2. **Continue planning directly** — skip spec workflow, plan from conversation context
+      > 3. **Use existing spec** — pass `--spec` if you already have an OpenSpec change for this
+      >
+      > Select (1/2/3):
+
+      - On **1**: Stop plan-sdlc. Tell the user to run `/opsx:propose "<their description>"`. In plan mode, call ExitPlanMode first.
+      - On **2**: Skip the rest of the OpenSpec block. `openspecContext` remains empty. Continue with standard planning.
+      - On **3**: Re-run the OpenSpec loading logic (steps 3–6) to resolve and load the active change.
 3. If the user provided a spec file path pointing into `openspec/changes/<name>/`, extract `<name>` as the active change.
 4. Otherwise, Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If exactly one non-archived change exists, use it. If multiple, try matching change directory names against the current git branch name. If still ambiguous, use AskUserQuestion:
    > Multiple active OpenSpec changes found. Which one are you working on?
@@ -248,7 +263,12 @@ If this is the 3rd iteration, use AskUserQuestion to surface remaining issues in
 
 ## Step 7: Handoff
 
-**Plan mode:** Announce the plan path. Call ExitPlanMode. Do NOT present workflow continuation. Do NOT invoke execute-plan-sdlc.
+**Plan mode:** Announce the plan path and propose execution:
+
+> Plan written to `<path>`. On approval, I'll execute this plan using `/execute-plan-sdlc`.
+> To skip execution, decline or provide different instructions.
+
+Then call ExitPlanMode. Do NOT invoke execute-plan-sdlc in this turn — it runs after the user accepts in the next turn.
 
 **Normal mode:** Announce the plan path, then present the Workflow Continuation menu (see below).
 
@@ -266,7 +286,7 @@ If this is the 3rd iteration, use AskUserQuestion to surface remaining issues in
 
 - Write implementation code in the plan (code snippets for patterns are fine; full implementations are not)
 - Mandate TDD for every task — match verification to task type
-- Automatically invoke execute-plan-sdlc after writing
+- Invoke execute-plan-sdlc within the same turn as plan-sdlc (execution happens in the next turn after user acceptance)
 - Create plans with fewer than 2 tasks (just do the work directly)
 - Skip the plan review loop (unless lightweight routing applies)
 - Use absolute file paths that only work on one machine

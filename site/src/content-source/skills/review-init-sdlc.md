@@ -180,6 +180,13 @@ Proposes only dimensions not yet present in `.claude/review-dimensions/`. In `--
 
 - **Git repository** — the skill scans the project structure and git history.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| `argument-hint` | `[--add] [--no-copilot]` |
+| Plan mode | Not adapted (writes dimension files) |
+
 ---
 
 ## What It Creates or Modifies
@@ -308,6 +315,17 @@ Default severity: high
 - **Base branch**: Copilot uses instructions from the PR's base branch, not the feature branch.
 
 Use `--no-copilot` to skip this prompt if you manage Copilot instructions separately.
+
+## OpenSpec Integration
+
+When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this skill proposes a `spec-compliance-review` dimension (high severity) during the tech stack scan.
+
+- **Evidence:** `openspec/config.yaml` present with delta spec files in `openspec/changes/*/specs/`
+- **Dimension purpose:** Verifies that code changes satisfy delta spec requirements — checks ADDED, MODIFIED, and REMOVED requirements
+
+See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
 
 ## Related Skills
 

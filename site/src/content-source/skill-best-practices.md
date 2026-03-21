@@ -151,17 +151,17 @@ The VERBATIM pattern appears in `commit-sdlc`, `pr-sdlc`, `review-sdlc`, and `ve
 
 ## 6. User Consent Gates
 
-Never execute an externally-visible action — git push, PR creation, API mutations, file writes to the user's project — without explicit user approval. Show the full plan or output first, then prompt.
+Never execute an externally-visible action — git push, PR creation, API mutations, file writes to the user's project — without explicit user approval via the `AskUserQuestion` tool. Show the full plan or output first, then use `AskUserQuestion` to present the consent prompt. This ensures structured user interaction in VSCode and consistent UX across all skills.
 
-**Standard consent menu:**
-```
-Would you like to proceed?
-  yes    — execute as shown above
-  edit   — revise and re-present
-  cancel — stop here
+**Standard consent pattern (using AskUserQuestion):**
 
-Select:
-```
+Use AskUserQuestion to ask:
+> [Action-specific question, e.g. "Commit as shown?" or "Create this PR?"]
+
+Options:
+- **yes** — execute as shown above
+- **edit** — revise and re-present
+- **cancel** — stop here
 
 Rules:
 - Show the complete output *before* the consent prompt. The user approves what they see.
@@ -252,17 +252,17 @@ Reference in `SKILL.md`: `See ./plan-format-reference.md for the exact format sp
 - [`/pr-sdlc`](../pr-sdlc/SKILL.md) — create the pull request
 ```
 
-**Workflow Continuation:** After completing its task, a skill should offer the user logical next steps rather than ending abruptly:
-```
-What would you like to do next?
-  commit   — commit the changes (/commit-sdlc)
-  pr       — create a pull request (/pr-sdlc)
-  done     — stop here
+**What's Next:** After completing its task, a skill should show available follow-up skills as a passive hint — no prompt, no waiting, no `Select:`. The skill ends immediately after displaying the hint. The user invokes the next skill on their own terms.
 
-Select:
+```
+## What's Next
+
+After completing the commit, common follow-ups include:
+- `/pr-sdlc` — create a pull request
+- `/version-sdlc` — tag a release
 ```
 
-On selection, invoke the next skill via the `Skill` tool. The user should never need to remember the name of the next step in a workflow.
+No `Select:` prompt. No AskUserQuestion. No Skill tool invocation. Just a signpost, then the skill ends.
 
 **Critique checkpoint:**
 
@@ -270,7 +270,7 @@ On selection, invoke the next skill via the `Skill` tool. The user should never 
 |---|---|
 | Long reference content is in separate files, not inlined | SKILL.md stays focused |
 | See Also links use relative paths to SKILL.md files | Links work from the skill directory |
-| Workflow Continuation offers logical next steps | User is not stranded after completion |
+| What's Next section lists follow-up skills without prompting | User knows options without being forced to choose |
 
 ---
 
@@ -350,3 +350,64 @@ Each pass of execute-then-revise noticeably improves quality. Complex domains be
 |---|---|
 | Skill has been run against at least one real task | Not purely theoretical |
 | Execution trace reviewed, not just final output | Inefficiencies visible in trace are addressed |
+
+---
+
+## Harness Integration Patterns
+
+### Plan Mode Adaptation
+
+Skills that perform write operations must not break when invoked in plan mode. The harness enforces read-only constraints — if your skill tries to write files, run git commands, or call external APIs, it will fail confusingly.
+
+**Graceful refusal pattern** (add before the first workflow step in any skill that mutates state):
+
+```markdown
+## Step 0 — Plan Mode Check
+
+If the system context contains "Plan mode is active":
+
+1. Announce: "This skill requires write operations. Exit plan mode first, then re-invoke `/skill-name`."
+2. Stop. Do not proceed to subsequent steps.
+```
+
+**Which skills need this:**
+- Skills that run `git commit`, `git tag`, `git push` — always
+- Skills that create/update PRs or issues via `gh` CLI — always
+- Skills that write/edit project files as their primary action — always
+- Read-only analysis skills (review, plan) — no
+
+**Exception:** `plan-sdlc` is designed for plan mode and calls `ExitPlanMode` when done. Don't add the refusal pattern to it.
+
+**Canonical examples:** `commit-sdlc`, `pr-sdlc`, `version-sdlc`, `execute-plan-sdlc`, `received-review-sdlc` all implement this pattern.
+
+### Discoverability with `argument-hint`
+
+The `argument-hint` frontmatter field shows in the `/` autocomplete menu. Users see the hint before invoking the skill, which eliminates the need to check docs for common flags.
+
+**Guidelines:**
+- Show 2–4 most commonly used flags, not every option
+- Use `[--flag]` for optional, `<value>` for required
+- This is display-only — your skill must still parse and validate arguments from the user's input
+
+**Canonical examples:** `commit-sdlc` uses `"[--no-stash] [--scope <scope>]"`, `version-sdlc` uses `"[major|minor|patch] [--changelog]"`.
+
+### Preventing Auto-Triggering with `disable-model-invocation`
+
+Claude auto-loads skills when conversation content matches the skill's description. For internal skills dispatched only by other skills, this causes false activations.
+
+Set `disable-model-invocation: true` alongside `user-invocable: false` to fully lock down an internal skill. The `user-invocable: false` flag alone only hides the skill from the `/` menu — it does NOT prevent auto-triggering.
+
+**Canonical example:** `error-report-sdlc` uses both flags to ensure it only fires when another skill's error handler explicitly dispatches it.
+
+### Context Isolation via Agent Dispatch
+
+The harness does not support frontmatter-driven context forking for skills. To achieve context isolation (protecting the main conversation from intermediate output), use the `Agent` tool dispatch pattern in the skill body:
+
+1. Skill gathers user input and runs prepare scripts in the main context
+2. Skill dispatches a subagent via the `Agent` tool with the heavy computation
+3. Subagent returns a clean summary
+4. Skill handles interactive follow-up (consent gates, post actions) in the main context
+
+This split-phase pattern keeps the main context clean while preserving user interaction where needed.
+
+**Canonical example:** `review-sdlc` dispatches the `review-orchestrator` agent for parallel dimension review, then handles comment posting and self-fix offers in the main context.

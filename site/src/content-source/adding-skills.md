@@ -141,6 +141,53 @@ See `plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md` for a complete example.
 | `SKILL.md` content | Maximum 500 lines |
 | `user-invocable` field | Set to `true` to expose the skill in the `/` menu so users can invoke it directly (e.g., `/pr-sdlc`). Set to `false` (or omit) for internal skills invoked only by Claude automatically or by other skills. The skills-primary model favors `user-invocable: true` — skills own argument parsing and preparation directly. |
 
+## Harness Integration Fields
+
+Beyond the core `name`, `description`, and `user-invocable` fields, these optional frontmatter fields control how the Claude Code harness presents and triggers your skill.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `argument-hint` | string | none | Shown in `/` menu autocomplete to hint at expected arguments |
+| `disable-model-invocation` | boolean | `false` | Prevent Claude from auto-triggering this skill based on description matching |
+| `compatibility` | string | none | Version compatibility information |
+| `license` | string | none | License identifier |
+| `metadata` | object | none | Arbitrary metadata (not parsed by runtime for behavior) |
+
+### `argument-hint`
+
+Shows in the `/` autocomplete menu so users know what arguments a skill accepts before invoking it. Use standard flag notation: `[--flag]` for optional, `<value>` for required.
+
+```yaml
+argument-hint: "[--draft] [--update] [--base <branch>]"
+```
+
+Show the 2–4 most commonly used flags, not every option. This is display-only — it does not validate arguments.
+
+### `disable-model-invocation`
+
+When `true`, Claude will never auto-load this skill based on description matching. The skill can only be invoked explicitly by name (`/skill-name`) or by another skill via the Skill tool.
+
+Use for:
+- Internal skills dispatched only by other skills (e.g., `error-report-sdlc`)
+- Skills with descriptions that match too broadly and trigger on unrelated conversations
+
+**Gotcha:** `user-invocable: false` hides the skill from the `/` menu but does NOT prevent auto-triggering. You need BOTH `user-invocable: false` AND `disable-model-invocation: true` to fully lock down an internal skill.
+
+### Plan Mode Adaptation (Body Pattern)
+
+Skills that perform write operations (git commits, PR creation, file edits) should detect plan mode and refuse gracefully. This is implemented in the skill body, not frontmatter:
+
+```markdown
+## Step 0 — Plan Mode Check
+
+If the system context contains "Plan mode is active":
+
+1. Announce: "This skill requires write operations. Exit plan mode first, then re-invoke `/skill-name`."
+2. Stop. Do not proceed to subsequent steps.
+```
+
+Add this block before the skill's first workflow step. Read-only skills (review, plan) don't need it. Skills that already handle plan mode natively (like `plan-sdlc`, which calls `ExitPlanMode`) should keep their existing behavior.
+
 ## Writing Effective Descriptions
 
 The `description` field is how Claude decides when to activate your skill. Write it

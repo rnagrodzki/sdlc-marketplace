@@ -89,6 +89,13 @@ GitHub issue created: #42 — https://github.com/rnagrodzki/sdlc-marketplace/iss
 
 If either prerequisite is missing, the proposal is silently skipped — no error shown to the user.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| `disable-model-invocation` | `true` (only dispatched by other skills' error handlers) |
+| Plan mode | Not applicable (internal skill) |
+
 ---
 
 ## What It Creates or Modifies

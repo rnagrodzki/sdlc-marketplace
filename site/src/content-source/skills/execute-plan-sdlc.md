@@ -178,6 +178,12 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 - **Permission mode** — the skill always dispatches agents with `bypassPermissions`. The runtime caps child agent permissions to the parent session's level — if your session is not in bypassPermissions, agents will surface permission prompts to you automatically. The mode lock prevents any mode changes during execution based on plan content.
 - **An implementation plan** — either in the conversation context from the current session, or as a readable file. The plan must have at least 2 tasks; single-task plans don't need orchestration.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| Plan mode | Graceful refusal (Plan Mode Check) |
+
 ---
 
 ## What It Creates or Modifies
@@ -189,6 +195,17 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 | `$TMPDIR/claude-exec/<plan-name>-checkpoint.md` | Execution checkpoint written after each wave; enables session resume |
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.
+
+## OpenSpec Integration
+
+When executing a plan whose `**Source:**` header points to an OpenSpec change path, this skill loads the delta specs for enhanced compliance checking.
+
+- **Spec compliance reviewer** additionally checks implementations against OpenSpec delta spec requirements — not just task acceptance criteria
+- **Inter-wave critique** checks for contradictions between implementations and delta spec requirements not captured in task descriptions
+
+See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
 
 ## Related Skills
 

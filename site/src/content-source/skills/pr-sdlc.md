@@ -21,6 +21,7 @@ Analyzes all commits and the diff on the current branch, generates a structured 
 | `--draft` | Create the PR as a draft | — |
 | `--update` | Update the description of an existing PR on this branch | — |
 | `--base <branch>` | Target branch for the PR | repo default |
+| `--spec` | Enrich PR description with OpenSpec proposal and design context | — |
 
 ---
 
@@ -76,6 +77,14 @@ Create this PR? (yes / edit / cancel)
 /pr-sdlc --update
 ```
 
+### Create a PR with OpenSpec context
+
+```text
+/pr-sdlc --spec
+```
+
+Reads the active OpenSpec change's proposal and design docs to pre-fill Business Context and Technical Design sections.
+
 ---
 
 ## Custom PR Templates
@@ -122,6 +131,13 @@ To override manually: `gh auth switch --user <login>` before running the skill.
 - **`gh` CLI** — required to open or update the PR (`gh auth login`). Falls back to printing the description for manual use if unavailable. Multiple authenticated accounts are handled automatically.
 - **Active branch with commits** — the skill diffs against the target base branch.
 
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| `argument-hint` | `[--draft] [--update] [--base <branch>]` |
+| Plan mode | Graceful refusal (Step 0) |
+
 ---
 
 ## What It Creates or Modifies
@@ -129,6 +145,18 @@ To override manually: `gh auth switch --user <login>` before running the skill.
 | File / Artifact | Description |
 |-----------------|-------------|
 | GitHub PR | Opens a new PR or updates the description of an existing one |
+
+## OpenSpec Integration
+
+When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this skill pre-fills PR sections from the active change's proposal.
+
+- **Business Context / Benefits:** Pre-filled from `proposal.md` intent and scope, reducing clarification questions
+- **Technical Design:** References `design.md` architectural approach when available
+- **Header line:** Adds `**OpenSpec:** openspec/changes/<name>/` to the PR description
+
+See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
 
 ## Related Skills
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Writes an implementation plan from requirements, a spec, or a user description. Produces plans in the format consumed by `execute-plan-sdlc` — with per-task complexity, risk, and dependency metadata embedded. Follows a PCIDCI pipeline: analyzes requirements and codebase, decomposes into classified tasks, self-critiques, presents for user approval, saves to a temp file, and runs a cross-model plan review loop.
+Writes an implementation plan from requirements, a spec, or a user description. Operates primarily in Plan Mode — the plan file is the single source of truth, built incrementally: a skeleton header is written at the start, then filled with requirements, tasks, and critique fixes as the pipeline progresses. Produces plans in the format consumed by `execute-plan-sdlc` — with per-task complexity, risk, and dependency metadata embedded. Follows a PCIDCI pipeline: analyzes requirements and codebase, decomposes into classified tasks, self-critiques, presents for user approval, and runs a cross-model plan review loop.
 
 ---
 
@@ -17,11 +17,19 @@ Provide requirements in one of three ways:
 - Provide a path to a requirements or spec file
 - Invoke with nothing — the skill will ask for requirements
 
+### Auto-resolution in plan mode
+
+When Claude Code's plan mode is active, this skill activates automatically — no explicit `/plan-sdlc` invocation needed. Describe what you want to implement and the skill loads itself.
+
 ---
 
 ## Flags
 
-No flags. The skill adapts behavior based on requirement scope.
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--spec` | Include OpenSpec artifacts (proposal, delta specs, design, tasks) in planning context. Without this flag, OpenSpec presence is detected but artifacts are not read. | Off |
+
+Providing an explicit `openspec/changes/<name>/` path as the spec-file-path argument implicitly enables spec context loading — `--spec` is not needed in that case.
 
 ---
 
@@ -29,12 +37,12 @@ No flags. The skill adapts behavior based on requirement scope.
 
 Not every request needs a full planning pipeline:
 
-| Scope Signal | Behavior |
-|---|---|
-| 1 file, clear change | Stop — just do the work. Tells you: "This is a single-file change — no plan needed." |
-| 2–3 files, clear scope | Lightweight: skip codebase exploration and plan review loop; write plan directly and present for approval |
-| 4+ files or unclear scope | Full pipeline (Steps 1–7) |
-| Multiple independent subsystems | Flags the split, suggests one plan per subsystem, and waits for your decision |
+| Scope Signal | Normal Mode | Plan Mode |
+|---|---|---|
+| 1 file, clear change | Stop — just do the work | Lightweight plan (user explicitly chose to plan) |
+| 2–3 files, clear scope | Lightweight: skip exploration and review loop | Lightweight |
+| 4+ files or unclear scope | Full pipeline (Steps 1–7) | Full pipeline |
+| Multiple independent subsystems | Flags the split, suggests one plan per subsystem | Same |
 
 For plans with 5+ tasks, the skill also writes a `## Key Decisions` section — placed between the plan header and the first task — capturing architecture choices with rationale so executing agents understand *why* an approach was chosen, not just what to do.
 
@@ -44,11 +52,12 @@ For plans with 5+ tasks, the skill also writes a `## Key Decisions` section — 
 
 When Claude Code's [plan mode](https://docs.anthropic.com/en/docs/claude-code/plan-mode) is active, the skill adapts automatically:
 
-- **Path:** The plan is written to the plan mode designated file (the only writable file in plan mode) instead of the normal `plansDirectory` path.
-- **Handoff:** The skill calls `ExitPlanMode` at the end instead of presenting the execute/done prompt. No manual exit needed.
+- **Incremental plan file building:** The plan evolves in the designated file across the pipeline. Step 0 writes a skeleton header immediately. Step 1 fills in the header fields and appends a Requirements section. Step 2 appends tasks. Steps 4 and 6 rewrite the file with critique fixes applied.
+- **Session recovery:** If the plan file already has content when the skill starts, it uses `AskUserQuestion` to ask whether to resume from critique or restart — no scratchpad needed, the plan file itself is the checkpoint.
+- **All interaction via AskUserQuestion:** Requirements gathering, scope clarification, and approval prompts all go through `AskUserQuestion`, which is compatible with plan mode constraints.
+- **TodoWrite for progress tracking:** In full-pipeline runs, `TodoWrite` items are created for Steps 1–7 so you can see planning progress.
+- **Handoff:** The skill calls `ExitPlanMode` at the end — Claude Code presents the plan for your review. No manual exit needed.
 - **After approval:** Once you approve the plan in Claude Code's review UI, invoke `/execute-plan-sdlc` to start execution.
-
-Steps 0–4 (requirements gathering, codebase exploration, decomposition, self-critique, and user approval) run unchanged in plan mode — they are read-only and use `AskUserQuestion`, both compatible with plan mode constraints.
 
 ---
 
@@ -81,6 +90,35 @@ Wave preview:
   Wave 2:   Task 4 [Complex]
 
 Approve this plan, or describe changes?
+```
+
+### Plan with OpenSpec context
+
+```text
+/plan-sdlc --spec
+```
+
+Reads OpenSpec artifacts from the active change and uses them as authoritative requirements for the plan.
+
+### OpenSpec flow proposal for functional changes
+
+When OpenSpec is detected and you describe a functional change without `--spec`:
+
+```text
+/plan-sdlc
+
+Add a webhook notification system for order events
+```
+
+Response:
+
+```
+This looks like a functional change. This project uses OpenSpec for spec-driven development.
+
+Options:
+  1. Start OpenSpec flow — run /opsx:propose to spec this out first
+  2. Continue planning directly — skip spec workflow
+  3. Use existing spec — if you already have an OpenSpec change for this
 ```
 
 ### From a requirements file
@@ -127,10 +165,12 @@ To execute: /execute-plan-sdlc
 
 Invoke `/plan-sdlc` while Claude Code plan mode is active:
 
-1. The skill runs the full pipeline (requirements, exploration, decomposition, self-critique, user approval)
-2. On approval, the plan is written to the plan mode designated file (shown in the system banner)
-3. The skill calls `ExitPlanMode` — Claude Code presents the plan for your review
-4. After you approve, invoke `/execute-plan-sdlc` to begin execution
+1. The skill detects plan mode and writes a skeleton header to the designated plan file immediately — the file is initialized before any exploration begins
+2. After requirements discovery and codebase exploration, the plan file is updated: header fields (Goal, Architecture, Verification) are filled in and a Requirements section is appended
+3. After task decomposition, task blocks (and a Key Decisions section, if applicable) are appended to the plan file
+4. After self-critique (Step 3) and user approval (Step 4), the plan file is rewritten with all fixes applied
+5. The skill calls `ExitPlanMode` — Claude Code presents the finalized plan for your review
+6. After you approve, invoke `/execute-plan-sdlc` to begin execution
 
 The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads it without any adjustments.
 
@@ -140,9 +180,8 @@ The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads i
 
 | File / Artifact | Description |
 |-----------------|-------------|
-| `<plansDirectory>/YYYY-MM-DD-<feature-name>.md` | The written plan document (normal mode). Path resolved from: user-specified → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → `~/.claude/plans/` fallback. |
-| Plan mode designated file | When Claude Code plan mode is active, the plan is written to the system-designated file path instead of the above. The path appears in the plan mode system banner. |
-| `$TMPDIR/claude-plans/<feature-name>-exploration.md` | Temporary exploration scratchpad written during Step 1 (full pipeline only). Updated after every 2 exploration actions and re-read before Step 2 begins. Contains a checkpoint block for session recovery. |
+| `<plansDirectory>/YYYY-MM-DD-<feature-name>.md` | The written plan document (normal mode). Starts as a skeleton header at Step 0 and grows incrementally: header fields and Requirements section added at Step 1, task blocks at Step 2, critique fixes applied at Steps 4 and 6. Path resolved from: user-specified → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → `~/.claude/plans/` fallback. |
+| Plan mode designated file | When Claude Code plan mode is active, the plan is written to the system-designated file path instead of the above. Same incremental build process applies. The path appears in the plan mode system banner. |
 | `.claude/learnings/log.md` | Planning learnings appended after writing: scope decisions, clarification patterns, decomposition issues. |
 
 ---
@@ -153,6 +192,25 @@ The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads i
 - **Requirements or a description** — at minimum a sentence describing what to build; a spec file is accepted but not required
 
 No external tools, credentials, or config files are needed.
+
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| Plan mode | Native support (writes to plan file, calls `ExitPlanMode`) |
+
+## OpenSpec Integration
+
+When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this skill reads the active change's artifacts as requirements input.
+
+- **Reads:** `proposal.md` (goal/scope), `specs/*.md` (delta specs as requirements), `design.md` (architecture), `tasks.md` (coarse decomposition reference)
+- **Behavior change:** Skips structured discovery questions when OpenSpec artifacts provide sufficient scope. Maps every ADDED/MODIFIED delta spec requirement to at least one task.
+- **Plan header:** Sets `**Source:**` to `openspec/changes/<name>/` instead of "conversation context"
+- **Functional change routing:** When OpenSpec is detected but `--spec` is not passed, the skill classifies the user's request. For functional changes (new features, behavior modifications, API changes), it checks for a matching active OpenSpec change — if found, it auto-loads the spec context. If no match exists, it proposes three options: start the OpenSpec flow with `/opsx:propose`, continue planning directly without specs, or load an existing spec. Non-functional changes (refactoring, config, docs) receive a passive hint only.
+
+See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
 
 ## Related Skills
 
