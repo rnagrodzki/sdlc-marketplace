@@ -7,6 +7,9 @@ Explain the problem or gap this PR addresses and why it matters to users of the 
 ## Business Benefits
 List the concrete user-facing improvements: faster workflows, new automation capabilities, or bugs eliminated.
 
+## Github Issue
+{place link to issue if relevant}
+
 ## Technical Design
 Describe the approach taken — which skills/commands/hooks/scripts were added or modified, and the key design decisions.
 
