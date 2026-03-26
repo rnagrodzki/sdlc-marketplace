@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.5] - 2026-03-26
+
+### Added
+- Workspace isolation check in execute-plan-sdlc — detects when execution starts on the default branch and offers to create a feature branch or worktree before proceeding
+
+### Changed
+- Removed references to non-existent `plugin-check-sdlc` skill from consistency validation
+- Added Github Issue section to the PR description template
+
 ## [0.14.4] - 2026-03-22
 
 ### Changed
