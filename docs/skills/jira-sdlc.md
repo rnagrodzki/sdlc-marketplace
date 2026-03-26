@@ -119,6 +119,14 @@ Resolution order:
 
 Run `/jira-sdlc --init-templates` to export the skill defaults to `.claude/jira-templates/` as a starting point, then edit them to match your team's conventions.
 
+> **Tip:** On non-English Jira instances, `--init-templates` detects unmapped issue types and interactively asks which default template to use for each.
+
+### Non-English Jira Locales
+
+When Jira uses a non-English language, issue type names are localized (e.g., "Zadanie" for Task in Polish). Running `--init-templates` detects unmapped types and interactively asks which default template to use for each, with suggestions based on the Jira hierarchy level (Epic for top-level types, Task for standard types).
+
+After interactive setup, template files are created with your locale's names (e.g., `.claude/jira-templates/Zadanie.md`) containing the selected template content as a starting point. Edit them to match your team's conventions.
+
 **Example custom Bug template** (`.claude/jira-templates/Bug.md`):
 
 ```markdown
@@ -182,6 +190,7 @@ After initialization, most operations require a single MCP call instead of 4–8
 | File / Artifact | Description |
 |-----------------|-------------|
 | `.claude/jira-cache/<KEY>.json` | Project metadata cache: cloudId, issue types, field schemas, workflows, user mappings |
+| `.claude/jira-cache/.gitignore` | Git-ignore file preventing cache contents from being committed; created automatically on first use |
 | `.claude/jira-templates/<Type>.md` | Project-level issue description templates (created only when `--init-templates` is run, or manually) |
 | Jira issues | Created or updated via the Atlassian MCP |
 
