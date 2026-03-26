@@ -56,6 +56,35 @@ Options:
 
 If "yes", skip to the checkpoint's "Next" wave. If "restart", proceed normally from Step 2.
 
+**Workspace isolation check:** After plan validation, check whether execution should happen on a separate branch or in a worktree.
+
+1. Detect the current branch: `git branch --show-current`
+2. Determine the default branch: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'`. Fallback to `main` if the symbolic ref is not set.
+3. If the current branch matches the default branch:
+   - Derive a suggested branch name:
+     - **Type prefix** from plan nature:
+
+       | Plan nature | Prefix |
+       |---|---|
+       | New feature / capability | `feat/` |
+       | Bug fix | `fix/` |
+       | Refactor, cleanup, tooling, config | `chore/` |
+       | Documentation | `docs/` |
+
+     - **Slug** from plan title: lowercase, hyphenated, max 50 chars (e.g., "Add JWT Authentication" → `feat/add-jwt-authentication`)
+   - Use AskUserQuestion:
+     > You're on the default branch (`<branch>`). Working directly on it is not recommended.
+     >
+     > Suggested: `<type>/<slug>`
+     >
+     > 1. Create branch `<type>/<slug>` (or provide a custom name)
+     > 2. Create a worktree for isolated execution
+     > 3. Continue on `<branch>` anyway
+   - **Option 1:** Run `git checkout -b <name>`. If the user provides a custom name, use it instead of the suggestion.
+   - **Option 2:** Call `EnterWorktree` to create an isolated worktree. All subsequent execution happens in the worktree. Set a flag to call `ExitWorktree` after Step 7 completes.
+   - **Option 3:** Proceed without changes.
+4. If the current branch is NOT the default branch, skip this check entirely — no warning, no prompt.
+
 ## Step 2 (CLASSIFY): Classify Tasks and Build Waves
 
 For each task, determine three things:
@@ -347,7 +376,7 @@ Files changed:    N files (N added, N modified, N deleted)
 - Skip final verification
 - Reference the plan file inside an agent prompt — paste the full task text
 - Execute more than 2 retries on any single task
-- Automatically commit, push, or create branches
+- Automatically commit, push, or create branches — the workspace isolation check in Step 1 is user-prompted, not automatic
 - Reference external sub-skills by name — this skill is fully self-contained
 - Dispatch a separate agent per trivial task — execute a single trivial inline; batch 2+ trivials into one haiku agent using the Batched Trivial Tasks Prompt Template
 
@@ -401,6 +430,8 @@ After completing plan execution, common follow-ups include:
 - `/commit-sdlc` — commit the changes
 - `/pr-sdlc` — create a pull request
 - `/review-sdlc` — review the changes
+
+If execution started in a worktree (Step 1 workspace isolation), call `ExitWorktree` after completing follow-up actions, or keep the worktree for further work.
 
 ## See Also
 

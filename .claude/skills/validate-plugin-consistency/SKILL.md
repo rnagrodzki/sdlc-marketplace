@@ -94,7 +94,7 @@ user-invocable: true
 ```
 
 The 6 user-facing skills that must have this flag are: `pr-sdlc`, `pr-customize-sdlc`,
-`review-sdlc`, `review-init-sdlc`, `version-sdlc`, `plugin-check-sdlc`.
+`review-sdlc`, `review-init-sdlc`, `version-sdlc`, `jira-sdlc`.
 
 ## Step 3 — Re-run Validation
 

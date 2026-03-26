@@ -109,14 +109,13 @@ const SCRIPT_TO_SKILL = {
   'jira-prepare.js':   'jira-sdlc',
 };
 
-// All 7 skills that must declare user-invocable: true
+// All 6 skills that must declare user-invocable: true
 const USER_INVOCABLE_SKILLS = [
   'pr-sdlc',
   'pr-customize-sdlc',
   'review-sdlc',
   'review-init-sdlc',
   'version-sdlc',
-  'plugin-check-sdlc',
   'jira-sdlc',
 ];
 

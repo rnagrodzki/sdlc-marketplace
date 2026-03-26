@@ -31,6 +31,41 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 
 ---
 
+## Workspace Isolation
+
+When you invoke `/execute-plan-sdlc` while on the repository's default branch (typically `main`), the skill detects this and prompts before executing:
+
+```
+You're on the default branch (main). Working directly on it is not recommended.
+
+Suggested: feat/add-jwt-authentication
+
+  1. Create branch feat/add-jwt-authentication (or provide a custom name)
+  2. Create a worktree for isolated execution
+  3. Continue on main anyway
+```
+
+**Branch name derivation:** The type prefix is determined from the plan's nature:
+
+| Plan nature | Prefix |
+|---|---|
+| New feature / capability | `feat/` |
+| Bug fix | `fix/` |
+| Refactor, cleanup, tooling, config | `chore/` |
+| Documentation | `docs/` |
+
+The slug is derived from the plan title (lowercase, hyphenated, max 50 characters). You can override both the prefix and slug by providing a custom name.
+
+**Option 1 — Create branch:** Runs `git checkout -b <name>` and continues execution on the new branch. Lightweight and familiar.
+
+**Option 2 — Create worktree:** Calls `EnterWorktree` to create an isolated copy of the repository. All execution happens in the worktree. After execution and any follow-up actions (commit, PR), call `ExitWorktree` to return.
+
+**Option 3 — Continue:** Proceeds without changes. This is the user's decision — the check is a suggestion, not a block.
+
+The check is skipped entirely when you are already on a non-default branch.
+
+---
+
 ## Model Selection
 
 Each task is assigned a model based on its complexity class. Before executing, the skill presents 3 presets:
