@@ -64,6 +64,8 @@ The slug is derived from the plan title (lowercase, hyphenated, max 50 character
 
 The check is skipped entirely when you are already on a non-default branch.
 
+**Note:** Branch detection always runs `git branch --show-current` at execution time. It does not use the session-level `gitStatus` snapshot, which may be stale if you switched branches after starting the conversation.
+
 ---
 
 ## Model Selection
