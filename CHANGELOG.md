@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2026-03-26
+
+### Added
+- Final holistic spec completeness check (Step 8-bis) in execute-plan-sdlc — verifies cross-wave OpenSpec requirements coverage after all waves complete (#49)
+- OpenSpec completion handoff in execute-plan-sdlc — suggests `/opsx:verify` and `/opsx:archive` after plan execution (#49)
+- Post-merge OpenSpec guidance in pr-sdlc — suggests verification and archival steps in What's Next (#49)
+- `OpenSpec-Change` commit trailer in commit-sdlc for spec-to-commit traceability (#49)
+
 ## [0.15.0] - 2026-03-26
 
 ### Added
