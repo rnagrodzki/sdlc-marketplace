@@ -421,6 +421,10 @@ After creating or updating the PR, common follow-ups include:
 - `/review-sdlc` — review the branch
 - `/version-sdlc` — tag a release after merge
 
+If OpenSpec enrichment was applied in Step 2 (an active change was detected), also suggest:
+- `/opsx:verify` — validate implementation completeness against the spec (after merge)
+- `/opsx:archive` — merge delta specs into main specs (after verification passes)
+
 ## See Also
 
 - [`/commit-sdlc`](../commit-sdlc/SKILL.md) — commit changes before creating a PR

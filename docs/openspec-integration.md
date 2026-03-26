@@ -120,13 +120,13 @@ Produces an implementation plan with the `**Source:**` header pointing to the Op
 /execute-plan-sdlc
 ```
 
-Executes the plan with wave-based parallel dispatch. When the plan's Source points to an OpenSpec change, the spec compliance reviewer additionally checks implementations against the delta spec requirements — not just the task acceptance criteria.
+Executes the plan with wave-based parallel dispatch. When the plan's Source points to an OpenSpec change, the spec compliance reviewer additionally checks implementations against the delta spec requirements — not just the task acceptance criteria. After all waves complete, a final holistic spec completeness check (Step 8-bis) verifies that the union of all implementations covers every delta spec requirement. On completion, suggests `/opsx:verify` and `/opsx:archive` as next steps.
 
 ### Step 5: Review, Commit, and PR (SDLC)
 
 ```text
 /review-sdlc          # with spec-compliance-review dimension if installed
-/commit-sdlc          # scope hint from OpenSpec change name
+/commit-sdlc          # scope hint + OpenSpec-Change trailer from change name
 /pr-sdlc              # auto-detects OpenSpec, pre-fills Business Context from proposal.md
 ```
 
@@ -144,9 +144,9 @@ Executes the plan with wave-based parallel dispatch. When the plan's Source poin
 | Skill | Without OpenSpec | With OpenSpec |
 | --- | --- | --- |
 | `/plan-sdlc` | Asks for requirements via conversation | Detects presence. For functional changes without a matching active change, proposes starting the OpenSpec flow. For non-functional changes, prints a passive hint. With `--spec` or matching active change: reads proposal, delta specs, design, and tasks |
-| `/execute-plan-sdlc` | Spec compliance checks task acceptance criteria only | Additionally checks implementations against delta spec requirements |
-| `/pr-sdlc` | Asks user for Business Context/Benefits | Auto-detects active change and pre-fills Business Context/Benefits from `proposal.md` intent and scope. Silently skips if ambiguous |
-| `/commit-sdlc` | Infers scope from changed files | Uses change directory name as scope candidate |
+| `/execute-plan-sdlc` | Spec compliance checks task acceptance criteria only | Additionally checks implementations against delta spec requirements (per-wave in Step 5c-bis, holistic in Step 8-bis). Suggests `/opsx:verify` and `/opsx:archive` after completion |
+| `/pr-sdlc` | Asks user for Business Context/Benefits | Auto-detects active change and pre-fills Business Context/Benefits from `proposal.md` intent and scope. Suggests `/opsx:verify` and `/opsx:archive` in What's Next after merge. Silently skips if ambiguous |
+| `/commit-sdlc` | Infers scope from changed files | Uses change directory name as scope candidate. Adds `OpenSpec-Change` trailer to commit body when active change detected |
 | `/review-init-sdlc` | Proposes dimensions based on tech stack | Additionally proposes `spec-compliance-review` dimension |
 | `/review-sdlc` | Reviews against installed dimensions | No change (spec awareness comes from the dimension) |
 | `/version-sdlc` | No change | No change |

@@ -92,6 +92,7 @@ Extract these fields from `COMMIT_CONTEXT_JSON`:
 3. If `flags.type` is set, use it as the commit type. If not, infer from the nature of the change.
 4. If `flags.scope` is set, use it as the scope. If not, infer from the changed files or omit.
 4a. **OpenSpec scope hint (optional):** If `flags.scope` is not set, Glob for `openspec/config.yaml`. If found, Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If exactly one active change exists, or one matches the current branch name, use the change directory name as a candidate scope (e.g., change `add-dark-mode` → scope `add-dark-mode`). This is a hint only — the style detected from `recentCommits` in step 2 takes precedence. If recent commits don't use scopes, do not force one.
+4b. **OpenSpec change trailer (optional):** If step 4a identified an active OpenSpec change, add an `OpenSpec-Change: <change-directory-name>` trailer to the commit message body. Trailers go after a blank line at the end of the body, in git standard `Key: Value` format. If the commit has no body (trivial change where the subject line is sufficient), skip the trailer — do not add a body solely for the trailer.
 5. If `flags.amend` and `lastCommitMessage` is non-null, use it as the starting point — revise based on staged diff.
 6. Draft subject line (max 72 chars) and optional body:
    - Subject: imperative mood, concise, no trailing period
@@ -121,6 +122,8 @@ Staged:     3 files changed, +142, -12
   src/auth/pkce.ts
   src/auth/index.ts
   tests/auth/pkce.test.ts
+
+Trailer:    OpenSpec-Change: add-oauth2-pkce  (if applicable)
 
 Stash:      2 unstaged files will be stashed and restored
 ────────────────────────────────────────────

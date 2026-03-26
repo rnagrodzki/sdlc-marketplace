@@ -326,6 +326,25 @@ Fix any failures directly (no agent dispatch — final issues are typically smal
 
 Fix inline if possible; report to user otherwise.
 
+**8-bis. Final spec completeness check (when OpenSpec context available):**
+
+Skip this sub-step if `openspecSpecs` is empty (no OpenSpec context was loaded in Step 1) or if the Speed preset was selected.
+
+Also skip if ALL per-wave spec compliance reviews (Step 5c-bis) passed without issues AND the plan has 3 or fewer waves — the per-wave reviews already provided sufficient coverage in that case.
+
+Otherwise, dispatch a single spec compliance reviewer (sonnet). Read `./spec-compliance-reviewer.md` for the prompt template. Unlike the per-wave review in Step 5c-bis which provides only that wave's tasks, provide:
+
+- **ALL non-trivial tasks from ALL waves** — full specification text from the plan
+- **Complete `git diff --stat` output** for the entire execution (all waves combined)
+- In the `{OPENSPEC_DELTA_SPECS}` section, provide the full content of every file from `openspecSpecs`
+
+The reviewer's focus in this final check is **cross-wave coverage**:
+- Requirements partially implemented across multiple waves (no single wave owns the full requirement)
+- Requirements that no individual wave claimed (fell between waves)
+- Requirements where the sum of per-wave implementations still has gaps
+
+**Verdict handling:** Same as Step 5c-bis — fix inline for 1–2 minor issues, re-dispatch the original task's agent with specific fix instructions for major spec gaps (counts toward the 2-retry budget).
+
 ## Step 9 (REPORT): Summary
 
 ```
@@ -338,6 +357,11 @@ Verification:     tests ✓  build ✓  lint ✓
 
 Files changed:    N files (N added, N modified, N deleted)
 ────────────────────────────────────────────
+```
+
+If `openspecSpecs` was loaded in Step 1, append to the report:
+```
+OpenSpec:         openspec/changes/<name>/ — run /opsx:verify to validate
 ```
 
 
@@ -354,6 +378,7 @@ Files changed:    N files (N added, N modified, N deleted)
 | No drift | Tasks match their specifications |
 | No orphans | All created files are referenced/used |
 | Spec compliance reviewed | Non-trivial waves pass spec review (unless Speed preset selected) |
+| Final spec completeness | All delta spec requirements covered across all waves (when openspecSpecs available) |
 | Completion checklists valid | Each agent's COMPLETE/VERIFY/STATUS block is present and cross-checked |
 
 ## When to Ask the User
@@ -434,6 +459,10 @@ After completing plan execution, common follow-ups include:
 - `/commit-sdlc` — commit the changes
 - `/pr-sdlc` — create a pull request
 - `/review-sdlc` — review the changes
+
+If `openspecSpecs` was loaded in Step 1 (the plan was OpenSpec-sourced), also suggest:
+- `/opsx:verify` — validate implementation completeness against the spec
+- `/opsx:archive` — merge delta specs into main specs after verification passes
 
 If execution started in a worktree (Step 1 workspace isolation), call `ExitWorktree` after completing follow-up actions, or keep the worktree for further work.
 
