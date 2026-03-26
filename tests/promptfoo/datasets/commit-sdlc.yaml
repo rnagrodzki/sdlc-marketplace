@@ -15,6 +15,9 @@
     # Must offer version as a next action
     - type: icontains
       value: "/version-sdlc"
+    # Must offer review as a next action
+    - type: icontains
+      value: "/review-sdlc"
     # Must offer done as an option
     - type: icontains
       value: "done"
@@ -23,5 +26,29 @@
       value: >
         The response presents an interactive menu asking the user what to do next after
         committing, with specific skill options to choose from. The menu includes at minimum:
-        pr (/pr-sdlc), version (/version-sdlc), and done. The user is asked to select an
+        review (/review-sdlc), version (/version-sdlc), pr (/pr-sdlc), and done. The user is asked to select an
         option rather than being given a passive suggestion.
+
+- description: "commit-sdlc: --auto flag skips interactive approval prompt"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-staged-changes.md"
+    user_request: >
+      Run /commit-sdlc --auto. The commit-prepare.js output is provided in the project
+      context above with flags.auto set to true. The staged diff shows 3 files changed with
+      authentication-related changes. Generate the commit message and execute.
+  assert:
+    # Must NOT ask for approval (auto mode skips the prompt)
+    - type: not-icontains
+      value: "Commit as shown?"
+    # Must still show the commit message
+    - type: regex
+      value: '(feat|fix|chore|refactor|docs)(\(.+\))?:'
+    # Behavioral: commits without interactive approval
+    - type: llm-rubric
+      value: >
+        The response generates a commit message and proceeds to execute the commit without
+        asking for user confirmation. It does NOT present a "Commit as shown?" prompt or offer
+        yes/edit/cancel options. The commit message and plan are still displayed for visibility.
+        Critique gates run internally but the interactive approval step is skipped because
+        --auto was passed. The stash behavior is unchanged.

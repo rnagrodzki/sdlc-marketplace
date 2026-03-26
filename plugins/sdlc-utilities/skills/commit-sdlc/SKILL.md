@@ -1,8 +1,8 @@
 ---
 name: commit-sdlc
-description: "Use this skill when committing staged changes, creating a git commit, or generating a commit message. Analyzes staged diff and recent commit history to generate a message matching the project's style. Stashes unstaged changes to isolate the commit, commits after user confirmation, and auto-restores the stash. Arguments: [--no-stash] [--scope <scope>] [--type <type>] [--amend]. Triggers on: commit changes, create commit, write commit message, git commit, smart commit, commit staged, stage and commit."
+description: "Use this skill when committing staged changes, creating a git commit, or generating a commit message. Analyzes staged diff and recent commit history to generate a message matching the project's style. Stashes unstaged changes to isolate the commit, commits after user confirmation, and auto-restores the stash. Arguments: [--no-stash] [--scope <scope>] [--type <type>] [--amend] [--auto]. Use --auto to skip interactive approval. Triggers on: commit changes, create commit, write commit message, git commit, smart commit, commit staged, stage and commit."
 user-invocable: true
-argument-hint: "[--no-stash] [--scope <scope>] [--type <type>] [--amend]"
+argument-hint: "[--no-stash] [--scope <scope>] [--type <type>] [--amend] [--auto]"
 model: haiku
 ---
 
@@ -71,7 +71,7 @@ Extract these fields from `COMMIT_CONTEXT_JSON`:
 | Field | Description |
 | ----- | ----------- |
 | `currentBranch` | Active git branch |
-| `flags` | `{ noStash, scope, type, amend }` — parsed CLI flags |
+| `flags` | `{ noStash, scope, type, amend, auto }` — parsed CLI flags |
 | `staged.files` | List of staged file paths |
 | `staged.fileCount` | Number of staged files |
 | `staged.diff` | Full unified diff of staged changes |
@@ -109,6 +109,8 @@ Fix each issue found in Step 3. Max 2 iterations per gate.
 ### Step 5 (DO): Present and Execute
 
 Show the full commit plan to the user. **Do not execute any git commands before receiving explicit user approval via AskUserQuestion.**
+
+**Auto mode:** When `flags.auto` is true, skip the AskUserQuestion prompt entirely. Still display the full commit plan for visibility, then proceed directly to execution. Treat the response as an implicit `yes`. All critique gates (Steps 3–4) still run — only the interactive approval prompt is skipped.
 
 ```
 Commit
@@ -200,7 +202,7 @@ Omit the `Stash:` line if no stash was used.
 
 ## DO NOT
 
-- Execute any git command without explicit user approval (`yes`)
+- Execute any git command without explicit user approval (`yes`) (unless `--auto` was passed)
 - Fabricate changes not present in `staged.diff`
 - Skip the critique step (Step 3)
 - Include file paths in the subject line
@@ -251,10 +253,12 @@ After completing a commit, if the project's detected commit style was non-conven
 ## What's Next
 
 After completing the commit, common follow-ups include:
-- `/pr-sdlc` — create a pull request
+- `/review-sdlc` — review the changes
 - `/version-sdlc` — tag a release
+- `/pr-sdlc` — create a pull request
 
 ## See Also
 
+- [`/review-sdlc`](../review-sdlc/SKILL.md) — review changes after committing
 - [`/pr-sdlc`](../pr-sdlc/SKILL.md) — create a PR after committing
 - [`/version-sdlc`](../version-sdlc/SKILL.md) — tag a release after committing

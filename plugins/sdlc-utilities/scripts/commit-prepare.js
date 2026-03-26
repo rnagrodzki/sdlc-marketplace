@@ -13,6 +13,7 @@
  *   --scope <s>    Override conventional commit scope (passed through to output)
  *   --type <t>     Override conventional commit type (passed through to output)
  *   --amend        Amend last commit instead of creating new (passed through to output)
+ *   --auto         Skip interactive approval prompts (passed through to output)
  *
  * Exit codes:
  *   0 = success, JSON on stdout
@@ -36,6 +37,7 @@ function parseArgs(argv) {
   let scope   = null;
   let type    = null;
   let amend   = false;
+  let auto    = false;
   const warnings = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -48,10 +50,12 @@ function parseArgs(argv) {
       scope = args[++i];
     } else if (a === '--type' && args[i + 1]) {
       type = args[++i];
+    } else if (a === '--auto') {
+      auto = true;
     }
   }
 
-  return { noStash, scope, type, amend, warnings };
+  return { noStash, scope, type, amend, auto, warnings };
 }
 
 // ---------------------------------------------------------------------------
@@ -60,12 +64,12 @@ function parseArgs(argv) {
 
 function main() {
   const projectRoot = process.cwd();
-  const { noStash, scope, type, amend, warnings: parseWarnings } = parseArgs(process.argv);
+  const { noStash, scope, type, amend, auto, warnings: parseWarnings } = parseArgs(process.argv);
 
   const errors   = [];
   const warnings = [...parseWarnings];
 
-  const flags = { noStash, scope, type, amend };
+  const flags = { noStash, scope, type, amend, auto };
 
   // Step 3: Validate git repo and get current branch
   let gitState;

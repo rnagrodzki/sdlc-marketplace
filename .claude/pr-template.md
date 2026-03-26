@@ -17,7 +17,7 @@ Describe the approach taken — which skills/commands/hooks/scripts were added o
 Note any breaking changes to plugin manifests, skill interfaces, hook payloads, or script APIs. State "None" if not applicable.
 
 ## Changes Overview
-Bullet-point list of the files changed with a one-line description of each change (skills, commands, hooks, scripts, docs).
+High-level description of what changed, grouped by logical concern — describe concepts and behavior changes, not file paths.
 
 ## Testing
 Describe how the changes were tested — manual steps, plugin install verification, or skill invocation scenarios.

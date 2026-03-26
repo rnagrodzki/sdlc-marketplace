@@ -12,6 +12,7 @@
  *   --draft           Mark PR as draft (passed through to output)
  *   --update          Force update mode (error if no existing PR found)
  *   --base <branch>   Override base branch (auto-detected if omitted)
+ *   --auto            Skip interactive approval prompts (passed through to output)
  *
  * Exit codes:
  *   0 = success, JSON on stdout
@@ -50,6 +51,7 @@ function parseArgs(argv) {
   let isDraft = false;
   let forceUpdate = false;
   let baseBranchOverride = null;
+  let isAuto = false;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -59,10 +61,12 @@ function parseArgs(argv) {
       forceUpdate = true;
     } else if (a === '--base' && args[i + 1]) {
       baseBranchOverride = args[++i];
+    } else if (a === '--auto') {
+      isAuto = true;
     }
   }
 
-  return { isDraft, forceUpdate, baseBranchOverride };
+  return { isDraft, forceUpdate, baseBranchOverride, isAuto };
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +125,7 @@ function detectPrMode(forceUpdate, prMeta) {
 
 function main() {
   const projectRoot = process.cwd();
-  const { isDraft, forceUpdate, baseBranchOverride } = parseArgs(process.argv);
+  const { isDraft, forceUpdate, baseBranchOverride, isAuto } = parseArgs(process.argv);
 
   const errors   = [];
   const warnings = [];
@@ -246,6 +250,7 @@ function main() {
     baseBranch,
     currentBranch,
     isDraft,
+    isAuto,
     ghAuth: ghAuth.switched
       ? { switched: true, account: ghAuth.account, previousAccount: ghAuth.previousAccount }
       : null,

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.2] - 2026-03-27
+
+### Added
+- `--auto` flag for commit-sdlc — skips interactive approval prompt while retaining all critique gates (#58)
+- `--auto` flag for pr-sdlc — skips interactive approval prompt and auto-applies inferred labels (#59)
+
+### Changed
+- PR description "Changes Overview" section now requires concept-level bullets describing behavior changes instead of file-path listings (#62)
+- Auto-label inference in pr-sdlc applies labels directly without a separate approval prompt in auto mode (#61)
+- Reordered "What's Next" suggestions in commit-sdlc and execute-plan-sdlc to list review before PR creation
+
 ## [0.15.1] - 2026-03-26
 
 ### Added

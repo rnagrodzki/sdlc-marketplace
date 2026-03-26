@@ -1,8 +1,8 @@
 ---
 name: pr-sdlc
-description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Auto-labels PRs based on context signals (branch, commits, diff, Jira) with mandatory approval. Arguments: [--draft] [--update] [--base <branch>]. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
+description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Auto-labels PRs based on context signals (branch, commits, diff, Jira) with mandatory approval. Arguments: [--draft] [--update] [--base <branch>] [--auto]. Use --auto to skip interactive approval. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
 user-invocable: true
-argument-hint: "[--draft] [--update] [--base <branch>]"
+argument-hint: "[--draft] [--update] [--base <branch>] [--auto]"
 ---
 
 # Creating Pull Requests
@@ -65,8 +65,12 @@ Breaking changes, migration needs, performance implications.
 "N/A" if the change is fully isolated with no external impact.]
 
 ## Changes Overview
-[High-level description of what changed, grouped by logical concern.
-No file paths — focus on concepts and behavior changes.]
+[Bullet-point list grouped by logical concern (not by file).
+Each bullet describes a concept or behavior change — e.g.:
+- Webhook handler validates event ID before processing and records it after success
+- New migration adds processed_events table with TTL index
+- Retry deduplication test coverage added
+No file paths in this section.]
 
 ## Testing
 [How this was verified: manual steps, automated tests, edge cases.
@@ -148,6 +152,7 @@ Key fields available (including `customTemplate` added for project-level PR temp
 | `changedFiles` | `string[]` — relative file paths changed in this PR |
 | `repoLabels` | `[{ name, description }]` — labels defined in the repository; empty if unavailable |
 | `customTemplate` | Full content of `.claude/pr-template.md` or `null` if not present |
+| `isAuto` | Whether `--auto` was passed — skip interactive prompts |
 
 ### Step 2 (PLAN): Draft PR Description
 
@@ -175,7 +180,7 @@ For each section, apply the fill rules:
 - **Business Context / Benefits**: Infer from `context.commits` and `context.diffContent`. If insufficient evidence, **use AskUserQuestion** to ask the user before writing. Don't guess. Acceptable question: *"What business problem does this PR solve? Who benefits and how?"*
 - **Technical Design**: Infer from `context.diffContent` — architecture, patterns, key decisions
 - **Technical Impact**: Identify affected systems/APIs/services from the diff
-- **Changes Overview**: Group by logical concern, no file paths
+- **Changes Overview**: Group by logical concern — each bullet describes a concept or behavior change (e.g. "Added retry deduplication", "New database migration for event tracking"). Never list file paths. Think about what a reviewer needs to understand, not which files were touched.
 - **Testing**: Summarize test coverage from diff; if none, say so explicitly
 
 Also draft the PR title: under 72 characters, conventional commit style
@@ -205,6 +210,8 @@ Otherwise, analyze the PR context and fuzzy-match against `repoLabels` to produc
 4. **Update mode:** note `existingPr.labels` as already applied; only suggest new labels not already present in `existingPr.labels`
 
 **Output:** `suggestedLabels` — a list of label names for use in Steps 5 and 6. If no labels match, produce an empty list.
+
+**Auto mode:** When `PR_CONTEXT_JSON.isAuto` is true, apply `suggestedLabels` directly without presenting them for approval. Labels are still validated against `repoLabels` — no fabricated labels. The applied labels are shown in the Step 5 output for visibility.
 
 ### Step 3 (CRITIQUE): Self-review the Draft
 
@@ -246,6 +253,8 @@ Continue until all gates pass (max 2 iterations per gate).
 
 Show the complete title, labels (if any), and description. **Do not execute any `gh` command
 before receiving explicit user approval via AskUserQuestion.**
+
+**Auto mode:** When `PR_CONTEXT_JSON.isAuto` is true, skip the AskUserQuestion prompt entirely. Still display the full title, labels, and description for visibility, then proceed directly to Step 6 (execution). Treat the response as an implicit `yes`. All critique gates (Steps 3–4) still run — only the interactive approval prompt is skipped.
 
 **Create mode** (with `suggestedLabels` non-empty):
 
@@ -354,7 +363,7 @@ Title: <title>
 - Write generic descriptions ("various improvements", "code cleanup")
 - Fabricate a JIRA ticket, business reason, or technical claim
 - Include file paths in the Changes Overview section (this rule applies only if the active template includes a "Changes Overview" section)
-- Execute `gh pr create` or `gh pr edit` without explicit user approval
+- Execute `gh pr create` or `gh pr edit` without explicit user approval (unless `--auto` was passed)
 - Skip the plan-critique-improve-do-critique-improve cycle before presenting to the user
 - Run git or gh bash commands to gather data — all context comes from `PR_CONTEXT_JSON`
 
