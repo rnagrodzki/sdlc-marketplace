@@ -1,6 +1,6 @@
 ---
 name: pr-sdlc
-description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Arguments: [--draft] [--update] [--base <branch>]. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
+description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Auto-labels PRs based on context signals (branch, commits, diff, Jira) with mandatory approval. Arguments: [--draft] [--update] [--base <branch>]. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
 user-invocable: true
 argument-hint: "[--draft] [--update] [--base <branch>]"
 ---
@@ -138,13 +138,15 @@ Key fields available (including `customTemplate` added for project-level PR temp
 | `currentBranch` | The branch being PR'd |
 | `isDraft` | Whether to create a draft PR |
 | `ghAuth` | `{ switched, account, previousAccount }` or `null` — GitHub account switch result |
-| `existingPr` | `{ number, title, url, state }` or `null` |
+| `existingPr` | `{ number, title, url, state, labels }` or `null` |
 | `jiraTicket` | Detected ticket reference or `null` |
 | `commits` | `[{ hash, subject, body, coAuthors }]` — all commits on this branch |
 | `diffStat` | `{ filesChanged, insertions, deletions, summary }` |
 | `diffContent` | Full unified diff text |
 | `remoteState` | `{ pushed, remoteBranch, action }` |
 | `warnings` | Non-fatal notes already surfaced to the user by the command |
+| `changedFiles` | `string[]` — relative file paths changed in this PR |
+| `repoLabels` | `[{ name, description }]` — labels defined in the repository; empty if unavailable |
 | `customTemplate` | Full content of `.claude/pr-template.md` or `null` if not present |
 
 ### Step 2 (PLAN): Draft PR Description
@@ -179,6 +181,31 @@ For each section, apply the fill rules:
 Also draft the PR title: under 72 characters, conventional commit style
 (`feat:`, `fix:`, `refactor:`, etc.).
 
+#### Step 2b: Infer Labels
+
+If `PR_CONTEXT_JSON.repoLabels` is empty, skip this step entirely — produce no label suggestions.
+
+Otherwise, analyze the PR context and fuzzy-match against `repoLabels` to produce `suggestedLabels: string[]`.
+
+**Signals to match:**
+
+| Signal | Example match |
+| ------ | ------------- |
+| Branch prefix (`fix/`, `feat/`, `docs/`, `refactor/`, `chore/`) | `bug`/`bugfix`, `enhancement`/`feature`, `documentation`, `refactoring` |
+| Commit subject prefixes (conventional commits) | Same as branch prefix |
+| Changed file paths (`changedFiles`) | Only `.md` files → `documentation`; only test files → `tests`; CI config files → `ci`/`infrastructure` |
+| Diff size (`diffStat`) | Small diff (<50 lines changed) → `small`/`quick-review` |
+| Jira ticket type (if available) | Bug ticket → `bug`; Story → `feature`/`enhancement` |
+
+**Matching rules:**
+
+1. Fuzzy-match each signal against `repoLabels[].name` and `repoLabels[].description` — e.g., repo has `type:bug` and branch is `fix/...` → match
+2. Never suggest a label not in `repoLabels` — only exact names from the list are valid
+3. Keep suggestions conservative: 1–4 labels typical; deduplicate (multiple signals matching the same label count as one)
+4. **Update mode:** note `existingPr.labels` as already applied; only suggest new labels not already present in `existingPr.labels`
+
+**Output:** `suggestedLabels` — a list of label names for use in Steps 5 and 6. If no labels match, produce an empty list.
+
 ### Step 3 (CRITIQUE): Self-review the Draft
 
 Before presenting to the user, review the draft against every quality gate:
@@ -194,6 +221,7 @@ Before presenting to the user, review the draft against every quality gate:
 | JIRA accuracy | JIRA value matches evidence or is "Not detected" | No guessed ticket numbers |
 | Audience check | Readable by non-technical stakeholders | No unexplained jargon in Summary/Business sections |
 | Documentation sync | If diff adds new commands, changes structure, renames concepts, or adds new directories/scripts: check that at least one `docs:` commit exists on this branch OR ask the user to confirm docs are updated | PR does not silently ship structural changes without a corresponding docs update |
+| Label validity | Every label in `suggestedLabels` exists in `repoLabels` | Zero fabricated labels |
 
 > **Note**: When a custom template is active, the "No file paths in Changes Overview"
 > gate applies only if the custom template includes a section named "Changes Overview".
@@ -216,17 +244,38 @@ Continue until all gates pass (max 2 iterations per gate).
 
 ### Step 5 (DO): Present for Review
 
-Show the complete title and description. **Do not execute any `gh` command
+Show the complete title, labels (if any), and description. **Do not execute any `gh` command
 before receiving explicit user approval via AskUserQuestion.**
+
+**Create mode** (with `suggestedLabels` non-empty):
 
 ```text
 PR Title: <title>
+Labels: <label1>, <label2>
 
 PR Description:
 ─────────────────────────────────────────────
 <full description>
 ─────────────────────────────────────────────
+```
 
+**Update mode** (with existing labels and new suggestions):
+
+```text
+PR Title: <title>
+Existing labels (preserved): <existing1>, <existing2>
+New labels: <new1>, <new2>
+
+PR Description:
+─────────────────────────────────────────────
+<full description>
+─────────────────────────────────────────────
+```
+
+If no labels are suggested, omit the Labels line entirely — do not show "Labels: none".
+In update mode, if there are existing labels but no new suggestions, still show the "Existing labels (preserved)" line but omit "New labels".
+
+```text
 Use AskUserQuestion to ask (adapt question to mode):
 
 For create mode:
@@ -239,6 +288,7 @@ Options: **yes** — update the PR | **edit** — tell me what to change | **can
 ```
 
 If the user chooses `edit`, ask what to change, revise, and present again.
+During the edit flow, users can add or remove labels. Any added labels must be validated against `repoLabels` — reject labels not in the list.
 Loop until explicit `yes` or `cancel`.
 
 ### Step 6: Create or Update PR
@@ -248,14 +298,18 @@ Loop until explicit `yes` or `cancel`.
 **Create mode:**
 
 ```bash
-gh pr create --title "<title>" --body "<body>" [--draft]
+gh pr create --title "<title>" --body "<body>" [--draft] [--label "<l1>" --label "<l2>"]
 ```
+
+If no labels were approved, omit the `--label` flags entirely.
 
 **Update mode:**
 
 ```bash
-gh pr edit --title "<title>" --body "<body>"
+gh pr edit --title "<title>" --body "<body>" [--add-label "<l1>,<l2>"]
 ```
+
+If no new labels were approved, omit the `--add-label` flag entirely. Note: `--add-label` is additive — it never removes existing labels.
 
 After success, display the PR URL:
 

@@ -37,6 +37,8 @@ const {
   getDiffStat,
   getDiffContent,
   ensureGhAccount,
+  fetchRepoLabels,
+  getChangedFiles,
 } = require('./lib/git');
 
 // ---------------------------------------------------------------------------
@@ -225,8 +227,12 @@ function main() {
     warnings.push(`No diff found between "${baseBranch}" and HEAD.`);
   }
 
+  const changedFiles = getChangedFiles(baseBranch, projectRoot, 'committed');
+
   // Step 10: Extract JIRA ticket
   const jiraTicket = detectJiraTicket(currentBranch, commits);
+
+  const repoLabels = fetchRepoLabels();
 
   // Step 11: Read custom PR template
   const templatePath = path.join(projectRoot, '.claude', 'pr-template.md');
@@ -244,13 +250,15 @@ function main() {
       ? { switched: true, account: ghAuth.account, previousAccount: ghAuth.previousAccount }
       : null,
     existingPr: prMeta.exists
-      ? { number: prMeta.number, title: prMeta.title, url: prMeta.url, state: prMeta.state }
+      ? { number: prMeta.number, title: prMeta.title, url: prMeta.url, state: prMeta.state, labels: prMeta.labels || [] }
       : null,
     jiraTicket,
     customTemplate,
     commits,
+    changedFiles,
     diffStat,
     diffContent,
+    repoLabels,
     remoteState,
     warnings,
     errors,

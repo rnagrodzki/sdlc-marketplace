@@ -36,6 +36,7 @@ Generates and displays a structured description, then prompts:
 
 ```text
 PR Title: feat: add webhook retry with idempotency keys
+Labels: enhancement, api
 
 PR Description:
 ─────────────────────────────────────────────
@@ -99,6 +100,22 @@ A template is a plain markdown file with `## Section` headings. The text under e
 ```
 
 Run `/pr-customize-sdlc` to create or edit the template interactively.
+
+---
+
+## Auto-Labeling
+
+When creating or updating a PR, the skill analyzes the PR context — branch name, commit messages, changed file paths, diff content — and suggests repository labels that match.
+
+**How it works:**
+1. Available labels are fetched from the repository via `gh label list`
+2. PR signals (branch prefix, commit types, file paths, diff size) are fuzzy-matched against available labels
+3. Suggested labels are displayed in the approval prompt alongside the title and description
+4. Labels are applied only after explicit user approval
+
+**Update mode:** Existing labels on the PR are preserved. Only new labels are added — the skill never removes labels.
+
+**When labeling is skipped:** If the repository has no labels defined or `gh` is unavailable, the labeling step is silently skipped.
 
 ---
 

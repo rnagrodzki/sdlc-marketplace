@@ -5,7 +5,7 @@
  *
  * Exports (shared — used by review-prepare.js and pr-prepare.js):
  *   exec, checkGitState, detectBaseBranch, getChangedFiles,
- *   getCommitLog, getCommitCount, fetchPrMetadata,
+ *   getCommitLog, getCommitCount, fetchPrMetadata, fetchRepoLabels,
  *   parseRemoteOwner, getGhAccounts, ensureGhAccount
  *
  * Exports (PR-specific — used by pr-prepare.js only):
@@ -128,16 +128,32 @@ function getCommitCount(base, projectRoot) {
  * @returns {{ exists: boolean, number?: number, title?: string, url?: string, state?: string, owner?: string, repo?: string }}
  */
 function fetchPrMetadata() {
-  const prJson = exec('gh pr view --json number,title,url,state');
+  const prJson = exec('gh pr view --json number,title,url,state,labels');
   if (!prJson) return { exists: false };
   const repoJson = exec('gh repo view --json owner,name');
   if (!repoJson) return { exists: false };
   try {
     const pr   = JSON.parse(prJson);
     const repo = JSON.parse(repoJson);
-    return { exists: true, number: pr.number, title: pr.title, url: pr.url, state: pr.state, owner: repo.owner.login, repo: repo.name };
+    return { exists: true, number: pr.number, title: pr.title, url: pr.url, state: pr.state, labels: (pr.labels || []).map(l => l.name), owner: repo.owner.login, repo: repo.name };
   } catch (_) {
     return { exists: false };
+  }
+}
+
+/**
+ * Fetch all labels defined in the repository via `gh`.
+ * Returns an empty array if `gh` is unavailable or the command fails.
+ * @returns {Array<{ name: string, description: string }>}
+ */
+function fetchRepoLabels() {
+  const raw = exec('gh label list --json name,description --limit 100');
+  if (!raw) return [];
+  try {
+    const labels = JSON.parse(raw);
+    return labels.map(l => ({ name: l.name, description: l.description || '' }));
+  } catch (_) {
+    return [];
   }
 }
 
@@ -505,6 +521,7 @@ module.exports = {
   getCommitLog,
   getCommitCount,
   fetchPrMetadata,
+  fetchRepoLabels,
   parseRemoteOwner,
   getGhAccounts,
   ensureGhAccount,
