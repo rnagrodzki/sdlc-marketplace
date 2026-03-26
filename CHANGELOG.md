@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.8] - 2026-03-26
+
+### Added
+- Mandatory PR reply step in received-review-sdlc — after implementing fixes, offers to reply to all review threads and resolve addressed ones (#50)
+- Incremental re-run support in received-review-sdlc — on re-run, only outstanding (unresolved, unreplied) comments are processed (#50)
+- New `received-review-prepare.js` script for pre-computing review thread state via GitHub GraphQL API
+- New shared utilities: `getCurrentUser()` and `fetchPrReviewThreads()` in `scripts/lib/git.js`
+
 ## [0.14.7] - 2026-03-26
 
 ### Fixed

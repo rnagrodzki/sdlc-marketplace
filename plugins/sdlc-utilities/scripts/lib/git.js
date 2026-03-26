@@ -508,6 +508,135 @@ function getCommitsBetweenRefs(fromRef, toRef, projectRoot) {
 }
 
 // ---------------------------------------------------------------------------
+// Received-review-specific helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the authenticated GitHub username via `gh api user --jq .login`.
+ * Returns null if `gh` is unavailable or the command fails.
+ * @returns {string|null}
+ */
+function getCurrentUser() {
+  return exec('gh api user --jq .login');
+}
+
+/**
+ * Fetch all review threads for a PR via GitHub GraphQL API.
+ * Handles pagination automatically (100 threads per page).
+ * Returns an empty array on any failure (gh unavailable, API error, etc.).
+ *
+ * @param {string} owner      - Repository owner (org or user login)
+ * @param {string} repo       - Repository name
+ * @param {number} prNumber   - Pull request number
+ * @returns {Array<{
+ *   id: string,
+ *   isResolved: boolean,
+ *   isOutdated: boolean,
+ *   path: string,
+ *   line: number|null,
+ *   startLine: number|null,
+ *   comments: Array<{
+ *     id: string,
+ *     databaseId: number,
+ *     body: string,
+ *     authorLogin: string,
+ *     createdAt: string
+ *   }>
+ * }>}
+ */
+function fetchPrReviewThreads(owner, repo, prNumber) {
+  const query = `
+    query($owner: String!, $repo: String!, $prNumber: Int!, $after: String) {
+      repository(owner: $owner, name: $repo) {
+        pullRequest(number: $prNumber) {
+          reviewThreads(first: 100, after: $after) {
+            nodes {
+              id
+              isResolved
+              isOutdated
+              path
+              line
+              startLine
+              diffSide
+              comments(first: 100) {
+                nodes {
+                  id
+                  databaseId
+                  body
+                  author {
+                    login
+                  }
+                  createdAt
+                }
+              }
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const threads = [];
+  let cursor = null;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const cursorArg = cursor ? ` -F after=${cursor}` : '';
+    const raw = exec(
+      `gh api graphql -f query='${query.replace(/'/g, "'\\''")}' -F owner=${owner} -F repo=${repo} -F prNumber=${prNumber}${cursorArg}`
+    );
+
+    if (!raw) return [];
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_) {
+      return [];
+    }
+
+    const reviewThreads =
+      parsed &&
+      parsed.data &&
+      parsed.data.repository &&
+      parsed.data.repository.pullRequest &&
+      parsed.data.repository.pullRequest.reviewThreads;
+
+    if (!reviewThreads) return [];
+
+    for (const node of (reviewThreads.nodes || [])) {
+      const comments = (node.comments && node.comments.nodes || []).map(c => ({
+        id: c.id,
+        databaseId: c.databaseId,
+        body: c.body,
+        authorLogin: c.author ? c.author.login : null,
+        createdAt: c.createdAt,
+      }));
+
+      threads.push({
+        id: node.id,
+        isResolved: node.isResolved,
+        isOutdated: node.isOutdated,
+        path: node.path,
+        line: node.line,
+        startLine: node.startLine,
+        comments,
+      });
+    }
+
+    const pageInfo = reviewThreads.pageInfo;
+    if (!pageInfo || !pageInfo.hasNextPage) break;
+    cursor = pageInfo.endCursor;
+  }
+
+  return threads;
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -535,4 +664,7 @@ module.exports = {
   getTagList,
   getCommitsSinceRef,
   getCommitsBetweenRefs,
+  // Received-review-specific
+  getCurrentUser,
+  fetchPrReviewThreads,
 };

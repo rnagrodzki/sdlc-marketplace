@@ -21,7 +21,9 @@ Provide review feedback in one of three ways:
 
 ## Flags
 
-No flags. This is a behavioral skill with no configuration options.
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--pr <number>` | PR number to fetch review threads from. Enables thread-aware mode: pre-computes thread resolution state, filters to outstanding comments only on re-run. | Auto-detected from current branch |
 
 ---
 
@@ -84,6 +86,38 @@ How to proceed? (implement / edit / skip)
   skip      — discard, make no changes
 ```
 
+### Re-run on a partially addressed PR
+
+```text
+/received-review-sdlc --pr 42
+```
+
+On re-run, the prepare script detects already-addressed threads:
+
+```text
+Found 3 outstanding comments (2 resolved, 1 already replied — skipped).
+Processing only the 3 outstanding comments.
+```
+
+Only the outstanding comments proceed through the analysis pipeline.
+
+### Reply to review threads after fixing
+
+After implementing fixes, the skill presents a mandatory reply step:
+
+```text
+Review feedback processing complete:
+- 2 comments addressed (code changes implemented)
+- 1 comment pushed back (with technical reasoning)
+
+Should I reply to all addressed review comments on the PR and resolve the threads?
+  yes       — post replies and resolve threads
+  skip      — do not post replies (user will handle manually)
+  selective — let me choose which threads to reply to
+```
+
+Selecting "yes" posts in-thread replies and resolves addressed threads automatically.
+
 ---
 
 ## Prerequisites
@@ -105,6 +139,7 @@ How to proceed? (implement / edit / skip)
 |-----------------|-------------|
 | GitHub PR thread replies | In-thread responses posted to reviewer comment threads via `gh api` |
 | Source code changes | Edits implementing accepted review feedback, in priority order |
+| Resolved review threads | Threads for addressed comments are resolved via GraphQL mutation |
 
 ## Related Skills
 

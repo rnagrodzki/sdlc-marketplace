@@ -59,3 +59,62 @@
         after implementing review fixes. The menu includes at minimum: commit
         (/commit-sdlc) and done. The user is asked to select an option rather than
         being given a passive suggestion.
+
+- description: "received-review-sdlc: incremental mode filters already-addressed comments on re-run"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-incremental.md"
+    user_request: >
+      Run /received-review-sdlc --pr 42. The prepare script manifest is provided in
+      context showing 5 threads: 2 resolved, 1 self-replied, 2 outstanding. Process
+      only the outstanding comments.
+  assert:
+    # Must mention the incremental summary
+    - type: regex
+      value: "(outstanding|unresolved)"
+    # Must mention skipping resolved/replied threads
+    - type: regex
+      value: "(skip|already|resolved|addressed|replied)"
+    # Must NOT process the resolved comments (null check, rename)
+    - type: not-regex
+      value: "(null check.*will fix|rename.*res.*searchResults)"
+    # Behavioral: only processes outstanding threads
+    - type: llm-rubric
+      value: >
+        The response correctly identifies that only 2 of 5 threads are outstanding
+        and processes only those 2 (the limit parameter validation and the batch size
+        configurability). It acknowledges that 2 threads are resolved and 1 was
+        already replied to, skipping all 3. It does NOT re-analyze or re-evaluate
+        the resolved or self-replied threads.
+
+- description: "received-review-sdlc: presents mandatory PR reply step after implementing fixes"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-reply-step.md"
+    user_request: >
+      Run /received-review-sdlc. The review fixes have been implemented and verified
+      as shown in context. Now proceed to Step 12 — reply to PR threads and resolve
+      addressed ones.
+  assert:
+    # Must show summary of what was done
+    - type: regex
+      value: "(addressed|fixed|implemented)"
+    # Must offer to reply/resolve
+    - type: regex
+      value: "(reply|resolve|thread)"
+    # Must ask for consent before posting
+    - type: regex
+      value: "(yes|skip|selective|proceed|approve)"
+    # Must distinguish between resolved and left-open
+    - type: regex
+      value: "(push.?back|disagree|left open|reviewer)"
+    # Behavioral: presents Step 12 with consent gate
+    - type: llm-rubric
+      value: >
+        The response presents the mandatory PR reply step (Step 12). It summarizes
+        what was done: 2 comments addressed with code changes, 1 comment pushed back.
+        It asks the user for consent before posting any replies to the PR (using
+        AskUserQuestion or equivalent consent gate with options like yes/skip/selective).
+        For addressed comments, it plans to post a reply AND resolve the thread.
+        For the pushback comment, it plans to post the pushback response but NOT
+        resolve the thread (leaving it open for the reviewer).
