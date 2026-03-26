@@ -25,6 +25,45 @@ If the system context contains "Plan mode is active":
 
 ## Step 1 — READ: Gather Review Feedback
 
+### Step 1a — Run received-review-prepare.js (when PR number available)
+
+When a PR number or URL is provided (via arguments or user input), run the prepare script to pre-compute review thread state:
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "received-review-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && SCRIPT=$(find . -path "*/scripts/received-review-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && { echo "WARNING: Could not locate received-review-prepare.js" >&2; }
+
+if [ -n "$SCRIPT" ]; then
+  MANIFEST_FILE=$(mktemp /tmp/received-review-manifest-XXXXXX.json)
+  node "$SCRIPT" $ARGUMENTS --pr <PR_NUMBER> > "$MANIFEST_FILE"
+  EXIT_CODE=$?
+  echo "MANIFEST_FILE=$MANIFEST_FILE"
+  echo "EXIT_CODE=$EXIT_CODE"
+fi
+```
+
+**On exit code 0:** Read the manifest JSON. Display the incremental summary:
+
+```
+Found N outstanding comments (M resolved, K already replied, J stale — skipped).
+Processing only the N outstanding comments.
+```
+
+Use only threads with `status: "outstanding"` for Steps 2–11. Store the full manifest (including resolved/self-replied/stale threads) for use in Step 12 (PR Reply & Resolve).
+
+**On exit code 1:** No PR found or missing arguments. Fall back to Step 1b.
+
+**On exit code 2:** Script error. Invoke `error-report-sdlc` with:
+- **Skill:** received-review-sdlc
+- **Step:** Step 1 — READ
+- **Operation:** received-review-prepare.js execution
+- **Error:** stderr output from the script
+
+### Step 1b — Manual feedback gathering (fallback)
+
+When no PR number is available, the prepare script is not found, or Step 1a fails:
+
 Locate the review feedback from one of:
 - Findings already in conversation context (e.g. passed in from `/review-sdlc`)
 - User paste
@@ -269,6 +308,68 @@ State the correction factually and move on.
 
 ---
 
+## Step 12 — REPLY & RESOLVE: Post PR Thread Replies
+
+**Mandatory step — always presented after Step 11 completes.**
+
+1. **Summarize** what was done:
+
+```
+Review feedback processing complete:
+- N comments addressed (code changes implemented)
+- M comments pushed back (with technical reasoning)
+- K comments intentionally skipped (agree, won't fix)
+```
+
+2. **Consent gate** — Use AskUserQuestion:
+
+> Should I reply to all addressed review comments on the PR and resolve the threads?
+
+Options:
+- **yes** — post replies and resolve threads
+- **skip** — do not post replies (user will handle manually)
+- **selective** — let me choose which threads to reply to
+
+3. **If yes or selective:** For each comment in the action plan:
+
+   **For addressed comments (agree, will fix):**
+   - Post a reply describing what was changed:
+     ```bash
+     gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies \
+       -f body="Fixed — <brief description of what was changed>"
+     ```
+   - Resolve the thread via GraphQL mutation:
+     ```bash
+     gh api graphql -f query='mutation($threadId: ID!) { resolveReviewThread(input: {threadId: $threadId}) { thread { isResolved } } }' -F threadId="<thread_id>"
+     ```
+
+   **For pushback comments (disagree):**
+   - Post the drafted pushback response (from Step 7):
+     ```bash
+     gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies \
+       -f body="<pushback response>"
+     ```
+   - Do NOT resolve the thread — leave for reviewer to evaluate
+
+   **For intentionally skipped comments (agree, won't fix):**
+   - Post a reply explaining why it was skipped:
+     ```bash
+     gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies \
+       -f body="Acknowledged — not fixing in this PR because: <reason>"
+     ```
+   - Do NOT resolve — let the reviewer decide
+
+4. **Report results:**
+
+```
+Replied to N threads:
+- K resolved (fixed)
+- M replied with pushback (left open for reviewer)
+- J replied with skip reason (left open for reviewer)
+```
+
+---
+
 ## Best Practices
 
 1. Read ALL feedback before responding to any of it — items may be related
@@ -305,6 +406,9 @@ State the correction factually and move on.
 | Comment references file/line that no longer exists | Note the discrepancy; verify against current HEAD diff | No — expected with rebased PRs |
 | Cannot verify reviewer's claim (no runtime data/external context) | State limitation explicitly; ask user for direction | No — expected limitation |
 | `gh api` 5xx or unexpected server error when posting reply | Retry once; if still failing, show the drafted response for manual posting | Yes if second attempt also fails |
+| `received-review-prepare.js` exit 2 (script crash) | Show stderr output, invoke error-report-sdlc | Yes |
+| GraphQL resolve mutation fails | Retry once; if still failing, list which threads were not resolved | Yes if second attempt fails |
+| Thread ID not found during resolve | Skip that thread, warn user | No — expected with race conditions |
 
 When invoking `error-report-sdlc`, provide:
 - **Skill**: received-review-sdlc
@@ -325,6 +429,12 @@ When invoking `error-report-sdlc`, provide:
 - **Automated review tools:** Findings from `/review-sdlc` or similar automated tools should
   be treated as external reviewer feedback — verify each finding against actual code before
   accepting it.
+- **Re-running after partial reply:** If the skill previously posted replies but didn't
+  resolve threads (or vice versa), re-running with the prepare script will detect
+  self-replied threads and skip them, preventing duplicate replies.
+- **GraphQL thread IDs vs REST comment IDs:** The reply endpoint uses REST `databaseId`
+  (from `comment.databaseId`), while the resolve mutation uses the GraphQL thread `id`
+  (from `thread.id`). The prepare script provides both in its manifest output.
 
 ---
 
@@ -340,7 +450,7 @@ facts uncovered during verification.
 
 ## What's Next
 
-After implementing the accepted fixes, common follow-ups include:
+After replying to review threads, common follow-ups include:
 - `/commit-sdlc` — commit the fixes
 
 ## See Also

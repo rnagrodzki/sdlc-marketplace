@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-03-26
+
+### Added
+- PR thread reply and resolve workflow in received-review-sdlc — posts replies to addressed comments and resolves threads after user consent (#50)
+- Pre-compute script (`received-review-prepare.js`) for incremental review processing — skips resolved, self-replied, and stale threads (#50)
+- Shared git helper library (`scripts/lib/git.js`) for PR and review data retrieval (#50)
+- Interactive template suggestion in jira-sdlc `--init-templates` — proposes default templates for unmapped issue types based on Jira hierarchy level (#46)
+- Unit tests for jira-prepare.js (#47)
+
+### Changed
+- jira-sdlc now captures `hierarchyLevel` in issue type metadata for hierarchy-aware template matching (#46)
+- review-init-sdlc detects GitHub hosting before prompting for Copilot instructions — skips the prompt entirely for non-GitHub repos (#48)
+
 ## [0.14.7] - 2026-03-26
 
 ### Fixed

@@ -103,18 +103,23 @@ function discoverScripts(root) {
 
 // Maps prepare script filename → skill directory name
 const SCRIPT_TO_SKILL = {
-  'review-prepare.js': 'review-sdlc',
-  'pr-prepare.js':     'pr-sdlc',
-  'version-prepare.js': 'version-sdlc',
-  'jira-prepare.js':   'jira-sdlc',
+  'review-prepare.js':           'review-sdlc',
+  'pr-prepare.js':               'pr-sdlc',
+  'version-prepare.js':          'version-sdlc',
+  'jira-prepare.js':             'jira-sdlc',
+  'received-review-prepare.js':  'received-review-sdlc',
 };
 
-// All 6 skills that must declare user-invocable: true
+// All 10 skills that must declare user-invocable: true
 const USER_INVOCABLE_SKILLS = [
+  'plan-sdlc',
+  'execute-plan-sdlc',
   'pr-sdlc',
   'pr-customize-sdlc',
   'review-sdlc',
   'review-init-sdlc',
+  'received-review-sdlc',
+  'commit-sdlc',
   'version-sdlc',
   'jira-sdlc',
 ];
