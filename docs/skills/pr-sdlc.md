@@ -21,6 +21,7 @@ Analyzes all commits and the diff on the current branch, generates a structured 
 | `--draft` | Create the PR as a draft | — |
 | `--update` | Update the description of an existing PR on this branch | — |
 | `--base <branch>` | Target branch for the PR | repo default |
+| `--auto` | Skip interactive approval — create/update the PR immediately after generation | — |
 
 ---
 
@@ -76,6 +77,14 @@ Create this PR? (yes / edit / cancel)
 ```text
 /pr-sdlc --update
 ```
+
+### Create a PR without interactive approval
+
+```text
+/pr-sdlc --auto
+```
+
+Generates the description, runs critique/improve internally, and creates the PR without prompting for confirmation. Combine with `--draft` for a safety net: `/pr-sdlc --auto --draft`.
 
 ---
 
@@ -143,7 +152,7 @@ To override manually: `gh auth switch --user <login>` before running the skill.
 
 | Field | Value |
 |---|---|
-| `argument-hint` | `[--draft] [--update] [--base <branch>]` |
+| `argument-hint` | `[--draft] [--update] [--base <branch>] [--auto]` |
 | Plan mode | Graceful refusal (Step 0) |
 
 ---

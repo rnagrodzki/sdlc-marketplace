@@ -22,6 +22,7 @@ Inspects staged changes and recent commit history to generate a commit message t
 | `--scope <scope>` | Override the conventional commit scope | Auto-detected from diff |
 | `--type <type>` | Override the conventional commit type (`feat`, `fix`, `refactor`, etc.) | Auto-detected from diff |
 | `--amend` | Amend the last commit instead of creating a new one | Disabled |
+| `--auto` | Skip interactive approval — commit immediately after message generation | Disabled |
 
 ---
 
@@ -87,6 +88,14 @@ Use `--no-stash` when you intentionally want unstaged changes to remain in the w
 
 No stash entry is created or restored. The commit proceeds with only the staged changes, and the working tree is left exactly as-is.
 
+### Auto-commit without approval prompt
+
+```text
+/commit-sdlc --auto
+```
+
+Generates the commit message, runs the critique/improve cycle internally, and commits without prompting for confirmation. Stash behavior is unchanged — unstaged changes are still stashed and restored.
+
 ---
 
 ## Prerequisites
@@ -100,7 +109,7 @@ No external tools or configuration files are required beyond `git`.
 
 | Field | Value |
 |---|---|
-| `argument-hint` | `[--no-stash] [--scope <scope>] [--type <type>] [--amend]` |
+| `argument-hint` | `[--no-stash] [--scope <scope>] [--type <type>] [--amend] [--auto]` |
 | Plan mode | Graceful refusal (Step 0) |
 
 ---

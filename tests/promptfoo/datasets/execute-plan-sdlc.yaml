@@ -17,6 +17,9 @@
     # Must offer PR as a next action
     - type: icontains
       value: "/pr-sdlc"
+    # Must offer version as a next action
+    - type: icontains
+      value: "/version-sdlc"
     # Must offer done as an option
     - type: icontains
       value: "done"
@@ -25,8 +28,8 @@
       value: >
         The response presents an interactive menu asking the user what to do next after plan
         execution, with specific skill options to choose from. The menu includes at minimum:
-        commit (/commit-sdlc), pr (/pr-sdlc), review (/review-sdlc), and done. The user is
-        asked to select an option rather than being given a passive suggestion.
+        commit (/commit-sdlc), review (/review-sdlc), version (/version-sdlc), pr (/pr-sdlc),
+        and done. The user is asked to select an option rather than being given a passive suggestion.
 
 - description: "execute-plan-sdlc: skips preset selection when --preset B is provided"
   vars:

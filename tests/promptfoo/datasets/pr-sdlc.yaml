@@ -124,3 +124,29 @@
         because the current branch is "main" (a protected branch). It instructs the user to switch
         to a feature branch first. It does NOT generate any PR title or description sections.
         The refusal message is clear and actionable.
+
+- description: "pr-sdlc: --auto flag skips interactive approval prompt"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: "file://fixtures/feature-branch-with-commits.md"
+    user_request: >
+      Run /pr-sdlc --auto. The pr-prepare.js output is provided in the project context above
+      with isAuto set to true. Generate the PR and create it without prompting for confirmation.
+  assert:
+    # Must NOT ask for approval (auto mode skips the prompt)
+    - type: not-icontains
+      value: "Create this PR as shown?"
+    # Must still produce all sections (quality is not degraded)
+    - type: icontains
+      value: "## Summary"
+    # Must still produce a conventional commit title
+    - type: regex
+      value: '(feat|fix|chore|refactor|docs)(\(.+\))?:'
+    # Behavioral: creates PR without interactive approval
+    - type: llm-rubric
+      value: >
+        The response generates a complete PR description with all 8 sections and proceeds to
+        create the PR without asking for user confirmation. It does NOT present a "Create this
+        PR as shown?" prompt or offer yes/edit/cancel options. The PR title, labels (if any),
+        and description are still displayed for visibility. Critique gates are applied internally
+        — the description quality is not degraded by auto mode.

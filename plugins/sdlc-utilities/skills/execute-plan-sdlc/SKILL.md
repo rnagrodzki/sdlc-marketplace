@@ -457,8 +457,9 @@ Format:
 
 After completing plan execution, common follow-ups include:
 - `/commit-sdlc` — commit the changes
-- `/pr-sdlc` — create a pull request
 - `/review-sdlc` — review the changes
+- `/version-sdlc` — tag a release
+- `/pr-sdlc` — create a pull request
 
 If `openspecSpecs` was loaded in Step 1 (the plan was OpenSpec-sourced), also suggest:
 - `/opsx:verify` — validate implementation completeness against the spec
