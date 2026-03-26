@@ -19,7 +19,7 @@ Scans the project's tech stack, dependencies, and file structure, then proposes 
 | Flag           | Description                                                          | Default |
 |----------------|----------------------------------------------------------------------|---------|
 | `--add`        | Expansion mode — propose only dimensions not already installed       | —       |
-| `--no-copilot` | Skip the GitHub Copilot instructions prompt after dimension creation | —       |
+| `--no-copilot` | Skip GitHub Copilot instructions entirely (bypasses the GitHub hosting prompt) | —       |
 
 ---
 
@@ -35,6 +35,9 @@ Scans the project's tech stack, dependencies, and file structure, then proposes 
 Scanning project tech stack...
   ✓ Found: TypeScript, Express.js, Prisma ORM, Jest
   ✓ Directories: src/routes/ (12 files), src/middleware/ (4 files)
+
+This repository is hosted on GitHub. Would you like to initialize
+Copilot review dimensions? (Y/n): yes
 
 Proposed review dimensions:
 
@@ -61,11 +64,6 @@ Install which? (numbers comma-separated, or "all"): all
 ✓ Created .claude/review-dimensions/test-coverage-review.md
 
 Validation: 4/4 dimensions pass all checks.
-
-Would you also like to generate GitHub Copilot review instructions?
-These mirror your review dimensions so Copilot's automatic PR code review follows the same standards.
-Files will be created in .github/instructions/ (one per dimension, ~1-2 KB each).
-(yes/no): yes
 
 Generated Copilot instruction files:
   .github/instructions/code-quality-review.instructions.md  (1,180 chars)
@@ -261,7 +259,13 @@ max-files: 50
 
 ## GitHub Copilot Instructions
 
-After creating dimension files, `review-init` offers to generate matching GitHub Copilot
+For GitHub-hosted repositories, `review-init` automatically detects the hosting platform
+via `git remote -v` and prompts whether to include Copilot review dimensions. This prompt
+appears early in the flow (after the tech stack scan) so the decision is made upfront — it
+is a mandatory decision point for GitHub-hosted repos. For non-GitHub repositories, the
+Copilot step is skipped automatically. Use `--no-copilot` to bypass the prompt entirely.
+
+When Copilot dimensions are enabled, `review-init` generates matching GitHub Copilot
 instruction files in `.github/instructions/`. These instruct Copilot's automatic PR code
 review to follow the same standards as your Claude Code dimensions.
 

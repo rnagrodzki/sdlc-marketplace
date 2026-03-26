@@ -25,7 +25,7 @@ Glob with the default path (cwd). Use the same approach for EXAMPLES.md.
 ## Arguments
 
 - `--add` — expansion mode: propose only dimensions not already installed
-- `--no-copilot` — skip the GitHub Copilot instructions prompt after dimension creation
+- `--no-copilot` — skip GitHub Copilot instructions entirely (bypasses the GitHub hosting prompt)
 
 ---
 
@@ -77,6 +77,20 @@ codebases — read only manifests, config files, and directory listings.
 - `openspec/config.yaml` → OpenSpec spec-driven development; propose `spec-compliance-review` dimension
 
 From the scan, extract: primary language(s)/framework(s), key dependency categories, directory patterns with file counts, and infrastructure/tooling signals.
+
+**GitHub hosting detection:**
+
+```bash
+git remote -v 2>/dev/null | grep -q 'github\.com'
+```
+
+| Condition | Action |
+|---|---|
+| `--no-copilot` passed | `copilotEnabled = false`. No prompt. |
+| Not GitHub-hosted | `copilotEnabled = false`. No prompt. |
+| GitHub-hosted, no `--no-copilot` | Use AskUserQuestion: "This repository is hosted on GitHub. Would you like to initialize Copilot review dimensions? (Y/n)" — **Yes**: `copilotEnabled = true`; **No**: `copilotEnabled = false` |
+
+This is a mandatory decision point for GitHub-hosted repositories. The result carries forward to Step 8 — no second prompt is needed.
 
 ---
 
@@ -194,11 +208,7 @@ Present the markdown output table. If any file has errors, show the error detail
 
 ### Step 8 (COPILOT) — Propose GitHub Copilot Review Instructions
 
-**Skip this step if:** Step 7 reported any errors, or `--no-copilot` was passed.
-
-Use AskUserQuestion: "Generate GitHub Copilot review instructions? Files will be created in .github/instructions/ (~1-2 KB each)." Options: **yes** / **no**.
-
-If **no**, skip to Quality Gates.
+**Skip this step if:** Step 7 reported any errors, or `copilotEnabled` is false (determined during Step 1 GitHub hosting detection).
 
 **Check existing state:** Glob `.github/instructions/*.instructions.md`. If files exist with the same names as selected dimensions, confirm overwrite. In `--add` mode: only generate for newly added dimensions.
 
@@ -288,6 +298,7 @@ If **no**, skip to Quality Gates.
 - **Copilot step gated on gh auth.** Check `gh auth status` at the start of Step 8; skip gracefully if unauthenticated rather than failing mid-workflow.
 - **validate-dimensions.js YAML parser limitations.** The script uses a hand-rolled parser for simple key-value frontmatter only. Multi-line or nested YAML produces a misleading "malformed frontmatter" error. Use flat key-value frontmatter only.
 - **review-prepare.js not available at init time.** If not found via standard resolution in `--add` mode, skip the dimension matching step and proceed with manual scan.
+- **GitHub hosting detection uses remotes.** `git remote -v` may miss GitHub-hosted repos using custom SSH aliases or non-standard remote URLs (e.g., `gh:org/repo` instead of `github.com:org/repo`). If the Copilot prompt doesn't appear for a GitHub repo, check the remote URL format.
 
 ---
 
