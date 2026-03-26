@@ -60,6 +60,8 @@ If "yes", skip to the checkpoint's "Next" wave. If "restart", proceed normally f
 
 1. Detect the current branch: `git branch --show-current`
 2. Determine the default branch: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'`. Fallback to `main` if the symbolic ref is not set.
+
+   **Do NOT use the `gitStatus` snapshot from conversation context.** The `gitStatus` block in system-reminder tags is captured once at conversation start and is not updated during the session. If the user switched branches after the conversation began, `gitStatus` will report the old branch. Always run the `git branch --show-current` command above via Bash at execution time.
 3. If the current branch matches the default branch:
    - Derive a suggested branch name:
      - **Type prefix** from plan nature:
@@ -405,6 +407,8 @@ Files changed:    N files (N added, N modified, N deleted)
 **Model escalation is not a retry substitute.** Escalating from haiku to sonnet (or sonnet to opus) gives the agent more capability, but if the failure was caused by a bad prompt or insufficient context, a stronger model won't help. Always add failure context to the retry prompt regardless of model change. Escalation consumes one of the 2 allowed retries.
 
 **Agents may bypass the Edit tool.** Agents sometimes use bash `sed`, `awk`, Python scripts, or compiled programs in `/tmp` to modify files instead of the Edit tool. These approaches are fragile (wrong line numbers, regex mismatches, wrong working directory) and silently fail — the agent reports success, but the file is unchanged or corrupted. The Hard Constraints in the agent prompt forbid this, but the filesystem verification in Step 5c catches cases where the constraint was ignored.
+
+**Workspace isolation can use a stale branch.** The conversation-level `gitStatus` snapshot is frozen at session start. If the user switches branches mid-session, `gitStatus` still reports the original branch. The workspace isolation check in Step 1 must run `git branch --show-current` via Bash — never read the branch from `gitStatus` or any other cached context.
 
 ## Learning Capture
 
