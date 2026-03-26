@@ -47,6 +47,8 @@ function parseArgs(argv) {
   let templatesDir  = null;
   let subcommand    = 'check';
   let saveFieldName = null;
+  let copyType      = null;
+  let copyFrom      = null;
   const errors      = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -72,6 +74,12 @@ function parseArgs(argv) {
       subcommand = 'init-templates';
     } else if (a === '--clear') {
       subcommand = 'clear';
+    } else if (a === '--copy-template') {
+      subcommand = 'copy-template';
+    } else if (a === '--type' && args[i + 1]) {
+      copyType = args[++i];
+    } else if (a === '--from' && args[i + 1]) {
+      copyFrom = args[++i];
     }
   }
 
@@ -79,7 +87,7 @@ function parseArgs(argv) {
     errors.push('--project <KEY> is required');
   }
 
-  return { projectKey, cacheDir, templatesDir, subcommand, saveFieldName, errors };
+  return { projectKey, cacheDir, templatesDir, subcommand, saveFieldName, copyType, copyFrom, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +96,10 @@ function parseArgs(argv) {
 
 function getCachePath(projectKey, cacheDir) {
   fs.mkdirSync(cacheDir, { recursive: true });
+  const gitignorePath = path.join(cacheDir, '.gitignore');
+  if (!fs.existsSync(gitignorePath)) {
+    fs.writeFileSync(gitignorePath, '*\n', 'utf8');
+  }
   return path.join(cacheDir, `${projectKey}.json`);
 }
 
@@ -468,11 +480,34 @@ function clearCache(cachePath) {
 }
 
 // ---------------------------------------------------------------------------
+// Subcommand: --copy-template
+// ---------------------------------------------------------------------------
+
+function copyTemplate(copyType, copyFrom, templatesDir) {
+  const src = path.join(templatesDir, copyFrom + '.md');
+  if (!fs.existsSync(src)) {
+    output({ errors: [`Template source not found: ${src}`] }, 1);
+    return;
+  }
+
+  const dst = path.join(process.cwd(), '.claude', 'jira-templates', copyType + '.md');
+  fs.mkdirSync(path.dirname(dst), { recursive: true });
+
+  if (fs.existsSync(dst)) {
+    output({ copied: false, reason: 'exists', type: copyType, destination: dst }, 0);
+    return;
+  }
+
+  fs.copyFileSync(src, dst);
+  output({ copied: true, type: copyType, from: copyFrom, destination: dst }, 0);
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 function main() {
-  const { projectKey, cacheDir, templatesDir: templatesOverride, subcommand, saveFieldName, errors } = parseArgs(process.argv);
+  const { projectKey, cacheDir, templatesDir: templatesOverride, subcommand, saveFieldName, copyType, copyFrom, errors } = parseArgs(process.argv);
 
   if (errors.length > 0) {
     output({ errors }, 1);
@@ -504,6 +539,9 @@ function main() {
     case 'clear':
       clearCache(cachePath);
       break;
+    case 'copy-template':
+      copyTemplate(copyType, copyFrom, templatesDir);
+      break;
     default:
       output({ errors: [`Unknown subcommand: ${subcommand}`] }, 1);
   }
@@ -529,4 +567,5 @@ module.exports = {
   resolveTemplates,
   initTemplates,
   clearCache,
+  copyTemplate,
 };

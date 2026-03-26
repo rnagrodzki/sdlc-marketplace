@@ -102,12 +102,39 @@ node "$SCRIPT" --project "$PROJECT_KEY" --load > "$JIRA_CONTEXT_FILE"
 
 If `--init-templates` flag is present:
 
-```bash
-node "$SCRIPT" --project "$PROJECT_KEY" --init-templates
-```
+1. Run the init-templates script:
+   ```bash
+   INIT_RESULT=$(mktemp /tmp/jira-init-XXXXXX.json)
+   node "$SCRIPT" --project "$PROJECT_KEY" --init-templates > "$INIT_RESULT"
+   ```
 
-Report the result (how many copied, skipped, unavailable) and stop. Do not proceed
-with any Jira operation.
+2. Read and parse the output. Report: "N templates initialized (exact match), N skipped (already exist)."
+
+3. If `unavailable` array is non-empty AND the cache is loaded:
+   - Announce: "Found N issue types with no matching default template. I'll suggest a template for each based on its Jira hierarchy level."
+   - For each unavailable type, look up its metadata in `cache.issueTypes[typeName]`:
+     - Determine suggestion based on `hierarchyLevel`:
+       - `hierarchyLevel === 1` → suggest "Epic"
+       - `hierarchyLevel === 0` and `subtask === false` → suggest "Task"
+       - `subtask === true` → suggest "Skip (subtask)"
+       - No `hierarchyLevel` available → no suggestion, present all options equally
+     - Use AskUserQuestion:
+       > Issue type "[typeName]" (hierarchy level: [N]) has no matching template.
+       > Which default template should I use?
+
+       Options: [Suggested template (Recommended)], [other available default templates], [Skip — no template for this type]
+   - For each user selection (not "Skip"), copy the template:
+     ```bash
+     node "$SCRIPT" --project "$PROJECT_KEY" --copy-template --type "<typeName>" --from "<selectedTemplate>"
+     ```
+   - Report final results: "N additional templates created from user selections."
+
+4. Clean up:
+   ```bash
+   rm -f "$INIT_RESULT"
+   ```
+
+5. Stop. Do not proceed with any Jira operation.
 
 ---
 
@@ -146,8 +173,8 @@ mcp__atlassian__getIssueLinkTypes({ cloudId })
 
 ```
 mcp__atlassian__getJiraProjectIssueTypesMetadata({ cloudId, projectKey: PROJECT_KEY })
-→ Extract: for each issue type: name → key, id, subtask boolean
-→ Store as: issueTypes = { "Task": { "id": "10001", "subtask": false }, ... }
+→ Extract: for each issue type: name → key, id, subtask boolean, hierarchyLevel (integer)
+→ Store as: issueTypes = { "Task": { "id": "10001", "subtask": false, "hierarchyLevel": 0 }, ... }
 ```
 
 ### Phase 4 — Field schemas (one call per issue type, run ALL in parallel)
@@ -226,7 +253,7 @@ Assemble the full cache object:
   "siteUrl": "...",
   "currentUser": { "accountId": "...", "displayName": "...", "email": "..." },
   "project": { "key": "...", "name": "...", "id": "..." },
-  "issueTypes": { "Task": { "id": "10001", "subtask": false }, "..." : {} },
+  "issueTypes": { "Task": { "id": "10001", "subtask": false, "hierarchyLevel": 0 }, "Bug": { "id": "10002", "subtask": false, "hierarchyLevel": 0 }, "Epic": { "id": "10005", "subtask": false, "hierarchyLevel": 1 }, "Sub-task": { "id": "10004", "subtask": true, "hierarchyLevel": -1 } },
   "fieldSchemas": { "Task": { "summary": { "required": true, "type": "string" }, "...": {} } },
   "workflows": { "Task": { "transitions": { "To Do": [ { "id": "21", "name": "...", "to": "...", "requiredFields": {} } ] } } },
   "linkTypes": [ { "name": "Blocks", "inward": "is blocked by", "outward": "blocks" } ],

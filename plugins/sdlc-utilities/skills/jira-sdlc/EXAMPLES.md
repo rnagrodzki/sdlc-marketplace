@@ -55,10 +55,10 @@ mcp__atlassian__getJiraProjectIssueTypesMetadata({
   projectKey: "PROJ"
 })
 → Extract: issueTypes array → cache.issueTypes = {
-    "Task":     { "id": "10001", "subtask": false },
-    "Bug":      { "id": "10002", "subtask": false },
-    "Story":    { "id": "10003", "subtask": false },
-    "Sub-task": { "id": "10004", "subtask": true  }
+    "Task":     { "id": "10001", "subtask": false, "hierarchyLevel": 0  },
+    "Bug":      { "id": "10002", "subtask": false, "hierarchyLevel": 0  },
+    "Story":    { "id": "10003", "subtask": false, "hierarchyLevel": 0  },
+    "Sub-task": { "id": "10004", "subtask": true,  "hierarchyLevel": -1 }
   }
 ```
 

@@ -46,9 +46,16 @@ tasks:
         PATTERN=$(echo "$SELECTED" | tr ' \n' '|' | sed 's/|$//')
         promptfoo eval --env-file .env --filter-pattern "^($PATTERN):"
 
+  test:unit:
+    desc: Run Node.js unit tests (no LLM)
+    silent: true
+    cmds:
+      - node --test tests/unit/
+
   test:all:
     desc: Run both behavioral and exec tests
     silent: true
     cmds:
+      - task: test:unit
       - task: test
       - task: test:exec
