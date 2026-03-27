@@ -1,6 +1,6 @@
 ---
 interface Props {
-  category: 'planning' | 'review' | 'gitops' | 'integrations' | 'internal';
+  category: 'planning' | 'review' | 'gitops' | 'workflows' | 'integrations' | 'internal';
 }
 
 const { category } = Astro.props;
@@ -9,6 +9,7 @@ const colorMap: Record<string, string> = {
   planning: 'var(--color-planning)',
   review: 'var(--color-review)',
   gitops: 'var(--color-gitops)',
+  workflows: 'var(--color-workflows)',
   integrations: 'var(--color-integrations)',
   internal: 'var(--color-internal)',
 };

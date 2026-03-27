@@ -1,7 +1,7 @@
 export interface WorkflowNode {
   slug: string;
   command: string;
-  category: 'planning' | 'review' | 'gitops' | 'integrations';
+  category: 'planning' | 'review' | 'gitops' | 'workflows' | 'integrations';
   lane: 'plan' | 'review' | 'ship';
   col: number;
   tagline: string;
@@ -27,7 +27,7 @@ export const workflowNodes: WorkflowNode[] = [
   { slug: 'commit-sdlc', command: '/commit-sdlc', category: 'gitops', lane: 'ship', col: 0, tagline: 'Smart commit message generation' },
   { slug: 'pr-sdlc', command: '/pr-sdlc', category: 'gitops', lane: 'ship', col: 1, tagline: 'Create structured pull requests' },
   { slug: 'version-sdlc', command: '/version-sdlc', category: 'gitops', lane: 'ship', col: 2, tagline: 'Bump version and create release' },
-  { slug: 'ship-sdlc', command: '/ship-sdlc', category: 'gitops', lane: 'ship', col: 3, tagline: 'Full pipeline orchestrator' },
+  { slug: 'ship-sdlc', command: '/ship-sdlc', category: 'workflows', lane: 'ship', col: 3, tagline: 'Full pipeline orchestrator' },
 ];
 
 export const workflowEdges: WorkflowEdge[] = [

@@ -1,0 +1,840 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import WorkflowGraph from '../../components/WorkflowGraph.astro';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Full Orchestration Workflow" description="ship-sdlc orchestrates the full shipping pipeline: execute, commit, review, fix, version, and PR in one invocation.">
+  <section class="fo-hero">
+    <div class="fo-hero-inner">
+      <a href={`${base}/workflows/`} class="fo-back">&larr; All Workflows</a>
+      <span class="fo-overline">Orchestration</span>
+      <h1 class="fo-title">Full Orchestration</h1>
+      <p class="fo-subtitle">
+        <code class="fo-cmd">/ship-sdlc</code> chains every skill into a single automated pipeline.
+        Execute your plan, commit, review, fix findings, version, and open a PR — one command.
+      </p>
+    </div>
+  </section>
+
+  <section class="fo-graph-section">
+    <div class="fo-graph-container">
+      <WorkflowGraph highlightSlugs={['ship-sdlc', 'execute-plan-sdlc', 'commit-sdlc', 'review-sdlc', 'received-review-sdlc', 'version-sdlc', 'pr-sdlc']} />
+    </div>
+  </section>
+
+  <section class="fo-content">
+    <div class="fo-content-inner">
+
+      <!-- Pipeline Overview -->
+      <div class="fo-section">
+        <h2 class="fo-section-title">The Pipeline</h2>
+        <p class="fo-section-desc">
+          Each step delegates to a dedicated skill. The pipeline includes a conditional review-fix loop
+          that re-commits when critical findings are resolved.
+        </p>
+
+        <div class="fo-pipeline">
+          <div class="fo-pipe-step" style="--pipe-color: var(--color-planning);">
+            <div class="fo-pipe-num">1</div>
+            <a href={`${base}/skills/execute-plan-sdlc/`} class="fo-pipe-box">
+              <span class="fo-pipe-label">Execute Plan</span>
+              <code class="fo-pipe-skill">execute-plan-sdlc</code>
+            </a>
+          </div>
+
+          <div class="fo-pipe-connector"></div>
+
+          <div class="fo-pipe-step" style="--pipe-color: var(--color-gitops);">
+            <div class="fo-pipe-num">2</div>
+            <a href={`${base}/skills/commit-sdlc/`} class="fo-pipe-box">
+              <span class="fo-pipe-label">Commit Changes</span>
+              <code class="fo-pipe-skill">commit-sdlc</code>
+            </a>
+          </div>
+
+          <div class="fo-pipe-connector"></div>
+
+          <div class="fo-pipe-step" style="--pipe-color: var(--color-review);">
+            <div class="fo-pipe-num">3</div>
+            <a href={`${base}/skills/review-sdlc/`} class="fo-pipe-box">
+              <span class="fo-pipe-label">Code Review</span>
+              <code class="fo-pipe-skill">review-sdlc</code>
+            </a>
+          </div>
+
+          <div class="fo-pipe-connector"></div>
+
+          <!-- Review verdict gate -->
+          <div class="fo-gate">
+            <div class="fo-gate-box">
+              <span class="fo-gate-text">Critical / High findings?</span>
+            </div>
+            <div class="fo-gate-paths">
+              <div class="fo-gate-yes">
+                <span class="fo-gate-label fo-gate-label--yes">yes</span>
+                <div class="fo-pipe-connector fo-pipe-connector--short"></div>
+                <div class="fo-pipe-step fo-pipe-step--branch" style="--pipe-color: var(--color-review);">
+                  <div class="fo-pipe-num">4</div>
+                  <a href={`${base}/skills/received-review-sdlc/`} class="fo-pipe-box fo-pipe-box--dashed">
+                    <span class="fo-pipe-label">Fix Issues</span>
+                    <code class="fo-pipe-skill">received-review-sdlc</code>
+                    <span class="fo-badge fo-badge--pause">pauses</span>
+                  </a>
+                </div>
+              </div>
+              <div class="fo-gate-no">
+                <span class="fo-gate-label fo-gate-label--no">no</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="fo-pipe-connector"></div>
+
+          <div class="fo-pipe-step" style="--pipe-color: var(--color-gitops);">
+            <div class="fo-pipe-num">5</div>
+            <a href={`${base}/skills/commit-sdlc/`} class="fo-pipe-box fo-pipe-box--dashed">
+              <span class="fo-pipe-label">Commit Fixes</span>
+              <code class="fo-pipe-skill">commit-sdlc</code>
+              <span class="fo-badge fo-badge--cond">if fixes made</span>
+            </a>
+          </div>
+
+          <div class="fo-pipe-connector"></div>
+
+          <div class="fo-pipe-step" style="--pipe-color: var(--color-gitops);">
+            <div class="fo-pipe-num">6</div>
+            <a href={`${base}/skills/version-sdlc/`} class="fo-pipe-box">
+              <span class="fo-pipe-label">Version &amp; Tag</span>
+              <code class="fo-pipe-skill">version-sdlc</code>
+              <span class="fo-badge fo-badge--pause">pauses</span>
+            </a>
+          </div>
+
+          <div class="fo-pipe-connector"></div>
+
+          <div class="fo-pipe-step" style="--pipe-color: var(--color-gitops);">
+            <div class="fo-pipe-num">7</div>
+            <a href={`${base}/skills/pr-sdlc/`} class="fo-pipe-box">
+              <span class="fo-pipe-label">Open PR</span>
+              <code class="fo-pipe-skill">pr-sdlc</code>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Invocation Examples -->
+      <div class="fo-section">
+        <h2 class="fo-section-title">Invocation</h2>
+        <div class="fo-examples">
+          <div class="fo-example">
+            <span class="fo-example-label">Full pipeline</span>
+            <div class="fo-example-code">
+              <span class="fo-prompt">&rsaquo;</span>
+              <code>/ship-sdlc</code>
+            </div>
+          </div>
+          <div class="fo-example">
+            <span class="fo-example-label">Non-interactive mode</span>
+            <div class="fo-example-code">
+              <span class="fo-prompt">&rsaquo;</span>
+              <code>/ship-sdlc --auto --bump patch</code>
+            </div>
+          </div>
+          <div class="fo-example">
+            <span class="fo-example-label">Skip review step</span>
+            <div class="fo-example-code">
+              <span class="fo-prompt">&rsaquo;</span>
+              <code>/ship-sdlc --skip review</code>
+            </div>
+          </div>
+          <div class="fo-example">
+            <span class="fo-example-label">Resume after failure</span>
+            <div class="fo-example-code">
+              <span class="fo-prompt">&rsaquo;</span>
+              <code>/ship-sdlc --resume</code>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto Mode Table -->
+      <div class="fo-section">
+        <h2 class="fo-section-title">Auto Mode Behavior</h2>
+        <p class="fo-section-desc">
+          With <code>--auto</code>, the pipeline runs with minimal interaction.
+          Two steps always pause for human input.
+        </p>
+        <div class="fo-table-wrap">
+          <table class="fo-table">
+            <thead>
+              <tr>
+                <th>Step</th>
+                <th>Skill</th>
+                <th>Auto Behavior</th>
+                <th>Pauses?</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Execute</td>
+                <td><a href={`${base}/skills/execute-plan-sdlc/`}>execute-plan-sdlc</a></td>
+                <td><code>--preset</code> forwarded</td>
+                <td><span class="fo-auto-no">No</span></td>
+              </tr>
+              <tr>
+                <td>Commit</td>
+                <td><a href={`${base}/skills/commit-sdlc/`}>commit-sdlc</a></td>
+                <td><code>--auto</code> forwarded</td>
+                <td><span class="fo-auto-no">No</span></td>
+              </tr>
+              <tr>
+                <td>Review</td>
+                <td><a href={`${base}/skills/review-sdlc/`}>review-sdlc</a></td>
+                <td>Read-only</td>
+                <td><span class="fo-auto-no">No</span></td>
+              </tr>
+              <tr>
+                <td>Fix Issues</td>
+                <td><a href={`${base}/skills/received-review-sdlc/`}>received-review-sdlc</a></td>
+                <td>Always interactive</td>
+                <td><span class="fo-auto-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>Version</td>
+                <td><a href={`${base}/skills/version-sdlc/`}>version-sdlc</a></td>
+                <td>Bump type pre-set</td>
+                <td><span class="fo-auto-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>PR</td>
+                <td><a href={`${base}/skills/pr-sdlc/`}>pr-sdlc</a></td>
+                <td><code>--auto</code> forwarded</td>
+                <td><span class="fo-auto-no">No</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Configuration -->
+      <div class="fo-section">
+        <h2 class="fo-section-title">Configuration</h2>
+        <p class="fo-section-desc">
+          Run <code>/ship-sdlc --init-config</code> to generate <code>.sdlc/ship-config.json</code>.
+        </p>
+        <div class="fo-configs">
+          <div class="fo-config">
+            <span class="fo-config-label">Quick ship (skip review)</span>
+            <pre><code>{`{
+  "preset": "quick",
+  "skipReview": true,
+  "autoBumpType": "patch"
+}`}</code></pre>
+          </div>
+          <div class="fo-config">
+            <span class="fo-config-label">Full pipeline (default)</span>
+            <pre><code>{`{
+  "preset": "full",
+  "skipReview": false,
+  "autoFix": true
+}`}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Connections -->
+      <div class="fo-connections">
+        <h2 class="fo-connections-title">Skills It Orchestrates</h2>
+        <div class="fo-conn-grid">
+          <a href={`${base}/skills/execute-plan-sdlc/`} class="fo-conn-card" style="--conn-color: var(--color-planning);">
+            <code class="fo-conn-cmd">/execute-plan-sdlc</code>
+            <span class="fo-conn-desc">Runs the implementation plan with parallel waves</span>
+          </a>
+          <a href={`${base}/skills/commit-sdlc/`} class="fo-conn-card" style="--conn-color: var(--color-gitops);">
+            <code class="fo-conn-cmd">/commit-sdlc</code>
+            <span class="fo-conn-desc">Generates and executes project-style commits</span>
+          </a>
+          <a href={`${base}/skills/review-sdlc/`} class="fo-conn-card" style="--conn-color: var(--color-review);">
+            <code class="fo-conn-cmd">/review-sdlc</code>
+            <span class="fo-conn-desc">Multi-dimension parallel code review</span>
+          </a>
+          <a href={`${base}/skills/received-review-sdlc/`} class="fo-conn-card" style="--conn-color: var(--color-review);">
+            <code class="fo-conn-cmd">/received-review-sdlc</code>
+            <span class="fo-conn-desc">Processes and fixes review findings</span>
+          </a>
+          <a href={`${base}/skills/version-sdlc/`} class="fo-conn-card" style="--conn-color: var(--color-gitops);">
+            <code class="fo-conn-cmd">/version-sdlc</code>
+            <span class="fo-conn-desc">Semantic version bump, tag, and changelog</span>
+          </a>
+          <a href={`${base}/skills/pr-sdlc/`} class="fo-conn-card" style="--conn-color: var(--color-gitops);">
+            <code class="fo-conn-cmd">/pr-sdlc</code>
+            <span class="fo-conn-desc">Structured pull request creation</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  /* -- Hero -- */
+  .fo-hero {
+    padding: 3rem 1.5rem 1.5rem;
+  }
+
+  .fo-hero-inner {
+    max-width: 40rem;
+    margin: 0 auto;
+  }
+
+  .fo-back {
+    display: inline-block;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    margin-bottom: 1rem;
+    transition: color 0.12s ease;
+  }
+
+  .fo-back:hover {
+    color: var(--color-text);
+  }
+
+  .fo-overline {
+    display: inline-block;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-workflows);
+    margin-bottom: 0.75rem;
+    padding: 3px 10px;
+    border: 1px solid color-mix(in srgb, var(--color-workflows) 30%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-workflows) 8%, transparent);
+  }
+
+  .fo-title {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.01em;
+  }
+
+  .fo-subtitle {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  .fo-cmd {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.875rem;
+    color: var(--color-workflows);
+    background: color-mix(in srgb, var(--color-workflows) 10%, transparent);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  /* -- Graph -- */
+  .fo-graph-section {
+    padding: 1rem 1.5rem 2rem;
+  }
+
+  .fo-graph-container {
+    max-width: 72rem;
+    margin: 0 auto;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg);
+    padding: 1.5rem;
+    overflow: hidden;
+  }
+
+  /* -- Content -- */
+  .fo-content {
+    padding: 0 1.5rem 3rem;
+  }
+
+  .fo-content-inner {
+    max-width: 40rem;
+    margin: 0 auto;
+  }
+
+  /* -- Sections -- */
+  .fo-section {
+    margin-bottom: 3rem;
+  }
+
+  .fo-section-title {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 0.75rem;
+  }
+
+  .fo-section-desc {
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: var(--color-text-muted);
+    margin: 0 0 1.5rem;
+  }
+
+  .fo-section-desc code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    padding: 1px 5px;
+    background: var(--color-surface-2);
+    border-radius: 3px;
+    color: var(--color-text);
+  }
+
+  /* -- Pipeline -- */
+  .fo-pipeline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 1.5rem 0;
+  }
+
+  .fo-pipe-step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 22rem;
+  }
+
+  .fo-pipe-step--branch {
+    max-width: none;
+  }
+
+  .fo-pipe-num {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--pipe-color) 15%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--pipe-color) 40%, transparent);
+    color: var(--pipe-color);
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .fo-pipe-box {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.625rem;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid color-mix(in srgb, var(--pipe-color) 30%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--pipe-color) 6%, transparent);
+    text-decoration: none;
+    transition: border-color 0.12s ease, background 0.12s ease;
+  }
+
+  .fo-pipe-box:hover {
+    border-color: color-mix(in srgb, var(--pipe-color) 50%, transparent);
+    background: color-mix(in srgb, var(--pipe-color) 10%, transparent);
+  }
+
+  .fo-pipe-box--dashed {
+    border-style: dashed;
+  }
+
+  .fo-pipe-label {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .fo-pipe-skill {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+  }
+
+  /* -- Connectors -- */
+  .fo-pipe-connector {
+    width: 2px;
+    height: 1.25rem;
+    background: color-mix(in srgb, var(--color-workflows) 35%, transparent);
+    margin-left: calc(12px + 0.375rem);
+  }
+
+  .fo-pipe-connector--short {
+    height: 0.75rem;
+    margin-left: 0;
+    align-self: center;
+  }
+
+  /* -- Gate / Branch -- */
+  .fo-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 32rem;
+  }
+
+  .fo-gate-box {
+    padding: 0.5rem 1rem;
+    border: 1.5px solid color-mix(in srgb, var(--color-review) 50%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color-review) 8%, transparent);
+    text-align: center;
+    margin-left: calc(24px + 0.75rem);
+    max-width: 22rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .fo-gate-text {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-review);
+  }
+
+  .fo-gate-paths {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    width: 100%;
+    margin-top: 0.5rem;
+    margin-left: calc(24px + 0.75rem);
+    max-width: 22rem;
+    box-sizing: border-box;
+  }
+
+  .fo-gate-yes {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .fo-gate-no {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .fo-gate-label {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 3px;
+    margin-bottom: 0.25rem;
+  }
+
+  .fo-gate-label--yes {
+    color: var(--color-review);
+    background: color-mix(in srgb, var(--color-review) 12%, transparent);
+  }
+
+  .fo-gate-label--no {
+    color: var(--color-workflows);
+    background: color-mix(in srgb, var(--color-workflows) 12%, transparent);
+  }
+
+  .fo-pipe-step--branch .fo-pipe-box {
+    border-color: color-mix(in srgb, var(--color-review) 30%, transparent);
+    background: color-mix(in srgb, var(--color-review) 6%, transparent);
+  }
+
+  .fo-pipe-step--branch .fo-pipe-box:hover {
+    border-color: color-mix(in srgb, var(--color-review) 50%, transparent);
+    background: color-mix(in srgb, var(--color-review) 10%, transparent);
+  }
+
+  /* -- Badges -- */
+  .fo-badge {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.5625rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .fo-badge--pause {
+    color: var(--color-review);
+    background: color-mix(in srgb, var(--color-review) 15%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-review) 30%, transparent);
+  }
+
+  .fo-badge--cond {
+    color: var(--color-text-muted);
+    background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-text-muted) 20%, transparent);
+  }
+
+  /* -- Examples -- */
+  .fo-examples {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .fo-example {
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .fo-example-label {
+    display: block;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    padding: 0.375rem 0.75rem;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .fo-example-code {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .fo-prompt {
+    color: var(--color-workflows);
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .fo-example-code code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    color: var(--color-text);
+    word-break: break-all;
+  }
+
+  /* -- Table -- */
+  .fo-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+  }
+
+  .fo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+  }
+
+  .fo-table th {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .fo-table td {
+    padding: 0.5rem 0.75rem;
+    color: var(--color-text-muted);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+  }
+
+  .fo-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .fo-table td:first-child {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .fo-table a {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    color: var(--color-workflows);
+    text-decoration: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-workflows) 30%, transparent);
+    transition: border-color 0.12s ease;
+  }
+
+  .fo-table a:hover {
+    border-color: var(--color-workflows);
+  }
+
+  .fo-table code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    padding: 1px 4px;
+    background: var(--color-surface-2);
+    border-radius: 3px;
+    color: var(--color-text);
+  }
+
+  .fo-auto-no {
+    color: var(--color-workflows);
+    font-weight: 600;
+  }
+
+  .fo-auto-yes {
+    color: var(--color-review);
+    font-weight: 600;
+  }
+
+  /* -- Config blocks -- */
+  .fo-configs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .fo-config {
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .fo-config-label {
+    display: block;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    padding: 0.5rem 0.75rem;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .fo-config pre {
+    margin: 0;
+    padding: 0.75rem;
+    overflow-x: auto;
+  }
+
+  .fo-config code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+  }
+
+  /* -- Connections grid -- */
+  .fo-connections {
+    padding-top: 2rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .fo-connections-title {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin: 0 0 1rem;
+  }
+
+  .fo-conn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .fo-conn-card {
+    display: block;
+    padding: 0.75rem 0.75rem 0.75rem 1rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--conn-color);
+    border-radius: 6px;
+    text-decoration: none;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .fo-conn-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 12px -2px color-mix(in srgb, var(--conn-color) 15%, transparent);
+  }
+
+  .fo-conn-cmd {
+    display: block;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--conn-color);
+    margin-bottom: 0.25rem;
+  }
+
+  .fo-conn-desc {
+    display: block;
+    font-size: 0.6875rem;
+    line-height: 1.45;
+    color: var(--color-text-muted);
+  }
+
+  /* -- Mobile -- */
+  @media (max-width: 640px) {
+    .fo-hero {
+      padding: 2rem 1rem 1rem;
+    }
+
+    .fo-graph-section,
+    .fo-content {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .fo-graph-container {
+      padding: 1rem;
+    }
+
+    .fo-examples,
+    .fo-configs,
+    .fo-conn-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .fo-gate-paths {
+      grid-template-columns: 1fr;
+    }
+
+    .fo-gate-no {
+      display: none;
+    }
+
+    .fo-pipe-step,
+    .fo-gate-box,
+    .fo-gate-paths {
+      margin-left: 0;
+    }
+  }
+</style>

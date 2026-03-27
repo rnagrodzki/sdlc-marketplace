@@ -17,6 +17,8 @@ Provide the plan in one of two ways:
 - Discuss, write, or paste the plan in the conversation before invoking — Claude reuses it from context without re-reading from file
 - Have a plan file accessible — Claude reads it on invocation
 
+**Auto-trigger after plan mode:** When `/plan-sdlc` completes in plan mode, it proposes execution before calling ExitPlanMode. If you accept the plan, `/execute-plan-sdlc` is invoked automatically — no manual invocation needed. You can still invoke it standalone for plans created outside plan mode.
+
 The plan must contain at least 2 tasks with clear deliverables (files to create or modify, behavior to implement).
 
 ---
@@ -26,6 +28,43 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 | Flag | Description | Default |
 |---|---|---|
 | `--preset <A\|B\|C>` | Auto-select a model preset, skipping the interactive selection prompt. `A` = Speed, `B` = Balanced, `C` = Quality. Invalid values fall back to interactive selection. | Interactive prompt |
+
+---
+
+## Workspace Isolation
+
+When you invoke `/execute-plan-sdlc` while on the repository's default branch (typically `main`), the skill detects this and prompts before executing:
+
+```
+You're on the default branch (main). Working directly on it is not recommended.
+
+Suggested: feat/add-jwt-authentication
+
+  1. Create branch feat/add-jwt-authentication (or provide a custom name)
+  2. Create a worktree for isolated execution
+  3. Continue on main anyway
+```
+
+**Branch name derivation:** The type prefix is determined from the plan's nature:
+
+| Plan nature | Prefix |
+|---|---|
+| New feature / capability | `feat/` |
+| Bug fix | `fix/` |
+| Refactor, cleanup, tooling, config | `chore/` |
+| Documentation | `docs/` |
+
+The slug is derived from the plan title (lowercase, hyphenated, max 50 characters). You can override both the prefix and slug by providing a custom name.
+
+**Option 1 — Create branch:** Runs `git checkout -b <name>` and continues execution on the new branch. Lightweight and familiar.
+
+**Option 2 — Create worktree:** Calls `EnterWorktree` to create an isolated copy of the repository. All execution happens in the worktree. After execution and any follow-up actions (commit, PR), call `ExitWorktree` to return.
+
+**Option 3 — Continue:** Proceeds without changes. This is the user's decision — the check is a suggestion, not a block.
+
+The check is skipped entirely when you are already on a non-default branch.
+
+**Note:** Branch detection always runs `git branch --show-current` at execution time. It does not use the session-level `gitStatus` snapshot, which may be stale if you switched branches after starting the conversation.
 
 ---
 

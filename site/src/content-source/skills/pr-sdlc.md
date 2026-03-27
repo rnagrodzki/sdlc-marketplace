@@ -21,6 +21,7 @@ Analyzes all commits and the diff on the current branch, generates a structured 
 | `--draft` | Create the PR as a draft | — |
 | `--update` | Update the description of an existing PR on this branch | — |
 | `--base <branch>` | Target branch for the PR | repo default |
+| `--auto` | Skip interactive approval — create/update the PR immediately after generation | — |
 
 ---
 
@@ -36,6 +37,7 @@ Generates and displays a structured description, then prompts:
 
 ```text
 PR Title: feat: add webhook retry with idempotency keys
+Labels: enhancement, api
 
 PR Description:
 ─────────────────────────────────────────────
@@ -76,6 +78,14 @@ Create this PR? (yes / edit / cancel)
 /pr-sdlc --update
 ```
 
+### Create a PR without interactive approval
+
+```text
+/pr-sdlc --auto
+```
+
+Generates the description, runs critique/improve internally, and creates the PR without prompting for confirmation. Combine with `--draft` for a safety net: `/pr-sdlc --auto --draft`.
+
 ---
 
 ## Custom PR Templates
@@ -99,6 +109,22 @@ A template is a plain markdown file with `## Section` headings. The text under e
 ```
 
 Run `/pr-customize-sdlc` to create or edit the template interactively.
+
+---
+
+## Auto-Labeling
+
+When creating or updating a PR, the skill analyzes the PR context — branch name, commit messages, changed file paths, diff content — and suggests repository labels that match.
+
+**How it works:**
+1. Available labels are fetched from the repository via `gh label list`
+2. PR signals (branch prefix, commit types, file paths, diff size) are fuzzy-matched against available labels
+3. Suggested labels are displayed in the approval prompt alongside the title and description
+4. Labels are applied only after explicit user approval
+
+**Update mode:** Existing labels on the PR are preserved. Only new labels are added — the skill never removes labels.
+
+**When labeling is skipped:** If the repository has no labels defined or `gh` is unavailable, the labeling step is silently skipped.
 
 ---
 
@@ -126,7 +152,7 @@ To override manually: `gh auth switch --user <login>` before running the skill.
 
 | Field | Value |
 |---|---|
-| `argument-hint` | `[--draft] [--update] [--base <branch>]` |
+| `argument-hint` | `[--draft] [--update] [--base <branch>] [--auto]` |
 | Plan mode | Graceful refusal (Step 0) |
 
 ---

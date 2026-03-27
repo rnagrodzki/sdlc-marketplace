@@ -1,0 +1,513 @@
+# `/ship-sdlc` — Full Pipeline Orchestrator
+
+## Overview
+
+Chains six sub-skills into a single end-to-end shipping pipeline: execute the plan, commit, review, fix critical issues, version, and open a PR. Evaluates review findings against a configurable severity threshold and conditionally triggers a fix loop, keeping feature work and review fixes as separate commits. Persists pipeline state after each step so a crashed run can be resumed from where it left off.
+
+---
+
+## Who Should Use This
+
+This skill is for **expert users working on projects with established quality guardrails**. It trusts your project's automated gates — review dimensions, test suites, commit conventions — to make decisions on your behalf. Weak guardrails produce weak automated reviews, and issues slip through silently.
+
+**Before using `/ship-sdlc`, your project should have:**
+
+- **Review dimensions configured** via `/review-init-sdlc` — these drive the automated review step. Without dimensions, `/review-sdlc` has nothing to evaluate against.
+- **A passing test suite** — the pipeline does not run tests itself. It assumes your CI or pre-commit hooks catch regressions.
+- **Commit conventions** — `/commit-sdlc` detects and follows your project's commit style. If you have no conventions, it still works, but the generated messages will be generic.
+
+**If your project isn't there yet:**
+
+- No review dimensions? Start with `/review-init-sdlc` to scaffold them.
+- No commit conventions? `/commit-sdlc` works standalone and will establish a style from your existing history.
+- Want to ship a single step? Each sub-skill (`/commit-sdlc`, `/pr-sdlc`, etc.) works independently. `/ship-sdlc` is the orchestrator, not a prerequisite.
+
+**The philosophy:** this skill automates the sequencing and decision-making between steps. It does not replace the quality of each step. A pipeline is only as strong as the review dimensions, test coverage, and conventions behind it.
+
+---
+
+## Usage
+
+```text
+/ship-sdlc [--auto] [--skip <steps>] [--preset A|B|C] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]
+```
+
+---
+
+## Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc and version-sdlc. | Off |
+| `--skip <steps>` | Comma-separated list of steps to skip: `execute`, `commit`, `review`, `version`. PR cannot be skipped. | None |
+| `--preset A\|B\|C` | Execution preset forwarded to execute-plan-sdlc. A = Speed, B = Balanced, C = Quality. | `B` |
+| `--bump patch\|minor\|major` | Version bump type forwarded to version-sdlc. | `patch` |
+| `--draft` | Create the PR as a draft. | Off |
+| `--dry-run` | Display the full pipeline plan and stop. No steps are executed. | Off |
+| `--resume` | Resume from the most recent state file for the current branch. Completed steps are skipped; in-progress steps are retried. | Off |
+| `--init-config` | Launch interactive config creation for `.sdlc/ship-config.json`, then stop. No pipeline execution. | Off |
+
+---
+
+## How the Pipeline Works
+
+The pipeline runs 7 steps sequentially. Two steps are conditional on the review verdict, and two steps pause even in `--auto` mode because they require human sign-off.
+
+```
+                          /ship-sdlc
+                              |
+                    Step 1: Load Config
+                    Parse Flags, Detect Context
+                              |
+                    Step 2: Build Pipeline Plan
+                    (auto-skip logic applied)
+                              |
+                    Step 3: Validate Pipeline
+                    (gh auth, branch checks)
+                              |
+                    Step 4: Confirm
+                    (dry-run stops here)
+                              |
+               +--------------+--------------+
+               |              |              |
+           [skipped?]    [skipped?]     [always]
+               |              |              |
+   +-----------+    +---------+    +---------+
+   |                |              |
+   v                v              v
+Step 5a:       Step 5b:       Step 5c:
+execute-       commit-sdlc    review-sdlc
+plan-sdlc      (--auto if     (--committed)
+(--preset X)    auto mode)          |
+   |                |              |
+   | git add -A     |    +---------+---------+
+   +------->--------+    |                   |
+                         v                   v
+                   [critical/high       [medium/low/info
+                    findings?]           or no findings]
+                         |                   |
+                         v                   |
+                    Step 5d:                 |
+                    received-review-sdlc     |
+                    >>> ALWAYS PAUSES <<<    |
+                    (human fix approval)     |
+                         |                   |
+                    [changes made?]          |
+                    yes  |  no               |
+                         v                   |
+                    Step 5e:                 |
+                    commit-sdlc              |
+                    (fix commit)             |
+                         |                   |
+                         +----->-----+<------+
+                                     |
+                                     v
+                   [skipped?]   Step 5f:
+                        +-----> version-sdlc
+                        |       >>> ALWAYS PAUSES <<<
+                        |       (release approval)
+                        |            |
+                        +-----<------+
+                                     |
+                                     v
+                                Step 5g:
+                                pr-sdlc
+                                (--auto, --draft
+                                 if applicable)
+                                     |
+                                     v
+                              Step 6: Summary
+                              (decisions log,
+                               deferred findings,
+                               state file cleanup)
+```
+
+**Key points:**
+
+- **Double-commit pattern**: The feature commit (step 5b) and the review fix commit (step 5e) are separate. This keeps feature work and review fixes distinct in git history.
+- **Two mandatory pause points in `--auto` mode**: received-review-sdlc (automated code changes need human sign-off) and version-sdlc (release plan needs consent).
+- **Staging gap**: execute-plan-sdlc creates files but does not stage them. The pipeline runs `git add -A` between execute and commit.
+- **Review threshold**: The severity that triggers the fix loop is configurable via `reviewThreshold` in config (default: `high`). At `high`, critical and high findings trigger fixes; medium and below are deferred to the summary.
+
+---
+
+## What Gets Printed
+
+The pipeline prints every decision and state change. Here is a realistic full output for a run with `--auto --preset B`:
+
+```
+I'm using the ship-sdlc skill.
+
+Ship config loaded from .sdlc/ship-config.json
+  preset: B, skip: [version], draft: false, bump: patch
+  reviewThreshold: high
+
+Flag resolution (CLI overrides config):
+  auto:    true  (from CLI --auto)
+  preset:  B     (from config)
+  skip:    [version]  (from config)
+  bump:    patch (from config default)
+  draft:   false (from built-in default)
+
+Context detection:
+  Plan in context:     yes (from conversation)
+  Uncommitted changes: 0 files modified
+  Current branch:      feat/user-auth
+  Default branch:      main
+  gh CLI:              authenticated as myuser
+  OpenSpec:            not detected
+
+Auto-skip decisions:
+  execute: WILL RUN — plan detected in context
+  commit:  WILL RUN — pending (will check after execute)
+  review:  WILL RUN — not in skip set
+  version: SKIPPED — in skip set (from config)
+  pr:      WILL RUN — not in skip set
+
+Pipeline validation:
+  [pass] gh CLI authenticated
+  [pass] Not on default branch (feat/user-auth)
+  [pass] 4 of 7 steps will run
+  [pass] All skip values recognized
+  [warn] If review finds critical/high issues, pipeline will pause for fix approval
+
+Ship Pipeline
+--------------------------------------------------------------------
+Step  Skill                 Status       Args           Pause?
+--------------------------------------------------------------------
+1     execute-plan-sdlc     will run     --preset B     no
+2     commit-sdlc           will run     --auto         no
+3     review-sdlc           will run     --committed    no
+4     received-review-sdlc  conditional  (if crit/high) YES
+5     commit-sdlc (fixes)   conditional  --auto         no
+6     version-sdlc          skipped      ---            ---
+7     pr-sdlc               will run     --auto         no
+--------------------------------------------------------------------
+Review threshold: critical or high findings trigger fix loop
+Interactive pauses: received-review (if triggered)
+
+Auto mode — proceeding without confirmation.
+
+━━━ Ship Pipeline — Step 1/7: Execute ━━━
+  Invoking: /execute-plan-sdlc --preset B
+  Reason: plan detected in context, preset B from config
+  Expectation: execute all plan tasks in waves
+
+  [done] Step 1 complete: 6 tasks, 2 waves completed
+  State saved to .sdlc/execution/ship-feat-user-auth-20260327T143000Z.json
+
+Staging changes from execution:
+  A  src/auth/oauth.ts
+  A  src/auth/oauth.test.ts
+  A  src/middleware/session.ts
+  M  src/routes/index.ts
+  M  src/config.ts
+  M  package.json
+  Total: 6 files staged
+  Reason: execute-plan-sdlc creates files but does not stage them
+
+━━━ Ship Pipeline — Step 2/7: Commit ━━━
+  Invoking: /commit-sdlc --auto
+  Reason: --auto forwarded from ship --auto mode
+  Expectation: stage all changes, generate commit message, commit without approval prompt
+
+  [done] Step 2 complete: a1b2c3d feat(auth): add OAuth2 PKCE flow
+  State saved to .sdlc/execution/ship-feat-user-auth-20260327T143000Z.json
+
+━━━ Ship Pipeline — Step 3/7: Review ━━━
+  Invoking: /review-sdlc --committed
+  Reason: reviewing committed changes on branch
+  Expectation: load review dimensions, dispatch review agents, produce verdict
+
+  [done] Step 3 complete: APPROVED WITH NOTES (2 medium, 1 low)
+  State saved to .sdlc/execution/ship-feat-user-auth-20260327T143000Z.json
+
+Review verdict: APPROVED WITH NOTES (2 medium, 1 low)
+  Decision: CONTINUING — no critical/high issues found
+  Deferred findings (2 medium, 1 low) will be shown in pipeline summary
+
+━━━ Ship Pipeline — Step 4/7: Received Review ━━━
+  Status: not triggered (no critical/high findings)
+
+━━━ Ship Pipeline — Step 5/7: Commit Fixes ━━━
+  Status: not triggered (no review fixes applied)
+
+━━━ Ship Pipeline — Step 6/7: Version ━━━
+  Status: skipped (in skip set from config)
+
+━━━ Ship Pipeline — Step 7/7: PR ━━━
+  Invoking: /pr-sdlc --auto
+  Reason: --auto forwarded from ship --auto mode
+  Expectation: generate PR description, create PR without approval prompt
+
+  [done] Step 7 complete: https://github.com/myuser/myrepo/pull/42
+  State saved to .sdlc/execution/ship-feat-user-auth-20260327T143000Z.json
+
+Ship Pipeline Complete
+================================================================
+Step  Skill                 Result
+================================================================
+1     execute-plan-sdlc     [done] 6 tasks, 2 waves completed
+2     commit-sdlc           [done] a1b2c3d feat(auth): add OAuth2 PKCE
+3     review-sdlc           [done] APPROVED WITH NOTES (2 medium, 1 low)
+4     received-review-sdlc  --- not triggered (no critical/high)
+5     commit-sdlc (fixes)   --- not triggered
+6     version-sdlc          --- skipped (config default)
+7     pr-sdlc               [done] https://github.com/myuser/myrepo/pull/42
+================================================================
+
+Decisions log:
+  - Preset B selected (from config default)
+  - Version step skipped (from config default, bump type: patch)
+  - Review found 2 medium, 1 low issues — below threshold, deferred
+  - PR created (from --auto flag)
+
+Deferred review findings (2 medium, 1 low):
+  1. [medium] src/auth/oauth.ts:42 — Consider extracting token validation to a shared utility
+  2. [medium] src/middleware/session.ts:18 — Missing rate limit on new session endpoint
+  3. [low] src/config.ts:7 — Magic number for token expiry; extract to named constant
+  -> Run /received-review-sdlc to address these
+
+State file cleaned up: .sdlc/execution/ship-feat-user-auth-20260327T143000Z.json deleted
+```
+
+---
+
+## Examples
+
+### Basic usage (interactive)
+
+```text
+/ship-sdlc
+```
+
+Loads config (if present), detects context, presents the pipeline plan, and asks for confirmation before each major step.
+
+### Full auto mode with preset
+
+```text
+/ship-sdlc --auto --preset C
+```
+
+Runs the quality preset with no confirmation prompts except at received-review-sdlc (if triggered) and version-sdlc.
+
+### Dry run to preview the pipeline
+
+```text
+/ship-sdlc --dry-run --skip version
+```
+
+Displays the full pipeline table showing which steps will run, which are skipped, and which flags are forwarded. No steps are executed.
+
+### Skip execute and version
+
+```text
+/ship-sdlc --skip execute,version
+```
+
+Useful when you've already implemented the changes manually and want to commit, review, and open a PR.
+
+### Draft PR with auto mode
+
+```text
+/ship-sdlc --auto --draft
+```
+
+Ships end-to-end and opens the PR as a draft for team review.
+
+### Resume after a failure
+
+```text
+/ship-sdlc --resume
+```
+
+Finds the most recent state file for the current branch, skips completed steps, and retries from the point of failure.
+
+### Set up project config
+
+```text
+/ship-sdlc --init-config
+```
+
+Walks through an interactive questionnaire and writes `.sdlc/ship-config.json`. Does not run the pipeline.
+
+---
+
+## Configuration
+
+Pipeline behavior is configured via `.sdlc/ship-config.json`. Create it manually or run `/ship-sdlc --init-config` for guided setup.
+
+### Config fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `preset` | `"A"` \| `"B"` \| `"C"` | `"B"` | Execution preset forwarded to execute-plan-sdlc. |
+| `skip` | `string[]` | `[]` | Steps to skip by default on every run. |
+| `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type. |
+| `draft` | `boolean` | `false` | Create PRs as drafts by default. |
+| `auto` | `boolean` | `false` | Run in non-interactive mode by default. |
+| `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` | `"high"` | Minimum severity that triggers the fix loop. |
+
+### Merge precedence
+
+```
+CLI flag  >  .sdlc/ship-config.json  >  built-in defaults
+```
+
+### Team-specific examples
+
+**Solo developer — move fast:**
+
+Skip version management, auto-commit, only pause on critical findings.
+
+```json
+{
+  "$schema": "ship-config",
+  "version": 1,
+  "preset": "A",
+  "skip": ["version"],
+  "auto": true,
+  "bump": "patch",
+  "draft": false,
+  "reviewThreshold": "critical"
+}
+```
+
+**Team with guardrails — balanced review:**
+
+Full pipeline with high-severity review threshold. PRs open as drafts for team review. Version step runs with manual approval.
+
+```json
+{
+  "$schema": "ship-config",
+  "version": 1,
+  "preset": "B",
+  "skip": [],
+  "auto": false,
+  "bump": "minor",
+  "draft": true,
+  "reviewThreshold": "high"
+}
+```
+
+**CI-adjacent — maximum confidence:**
+
+Quality preset catches medium-severity findings. Suitable for regulated environments or release branches.
+
+```json
+{
+  "$schema": "ship-config",
+  "version": 1,
+  "preset": "C",
+  "skip": [],
+  "auto": false,
+  "bump": "patch",
+  "draft": false,
+  "reviewThreshold": "medium"
+}
+```
+
+**Quick iteration — skip execute and review:**
+
+For when you've already implemented and reviewed manually, and just need to commit, version, and open a PR.
+
+```json
+{
+  "$schema": "ship-config",
+  "version": 1,
+  "preset": "B",
+  "skip": ["execute", "review"],
+  "auto": true,
+  "bump": "patch",
+  "draft": true,
+  "reviewThreshold": "high"
+}
+```
+
+---
+
+## Resuming After Failure
+
+When the pipeline fails or is interrupted, the state file is preserved at:
+
+```
+.sdlc/execution/ship-<branch>-<timestamp>.json
+```
+
+To resume:
+
+```text
+/ship-sdlc --resume
+```
+
+**What happens on resume:**
+
+1. The skill finds the most recent state file for the current branch (matched by branch name in the filename).
+2. Steps with status `completed` or `skipped` are skipped.
+3. Steps with status `in_progress` are retried from the beginning.
+4. Steps with status `pending` run normally.
+5. The same flags from the original run are restored from the state file.
+
+**If multiple state files exist** for the same branch (from multiple failed attempts), the one with the most recent timestamp is used.
+
+**Manual cleanup:** If a state file is corrupt or you want to start fresh, delete it manually:
+
+```bash
+rm .sdlc/execution/ship-<branch>-<timestamp>.json
+```
+
+Or delete all state files:
+
+```bash
+rm -rf .sdlc/execution/
+```
+
+Then run `/ship-sdlc` without `--resume` to start a new pipeline.
+
+---
+
+## Prerequisites
+
+- **`gh` CLI** — required for PR creation. Must be authenticated (`gh auth login`). The pipeline validates this before execution and stops with a clear error if authentication fails.
+- **git** — must be run inside a git repository on a feature branch (not the default branch).
+- **Review dimensions** — `.claude/review-dimensions/` must contain at least one dimension file for the review step. Run `/review-init-sdlc` to create them. If review is in the skip set, this is not required.
+- **Plan in context** — for the execute step, a plan must be present in the conversation. If no plan is found and execute is not skipped, the step is auto-skipped.
+
+### Harness Configuration
+
+| Field | Value |
+|---|---|
+| `argument-hint` | `[--auto] [--skip <steps>] [--preset A\|B\|C] [--draft] [--dry-run]` |
+| Plan mode | Graceful refusal (Step 0) |
+
+---
+
+## What It Creates or Modifies
+
+| File / Artifact | Description |
+|-----------------|-------------|
+| `.sdlc/ship-config.json` | Project config (created by `--init-config`). Committed to the repo. |
+| `.sdlc/execution/ship-*.json` | Pipeline state file. Created at start, deleted on successful completion, retained on failure for `--resume`. |
+| Git commits | Feature commit (step 2) and optionally a review fix commit (step 5). |
+| Git tag | Created by version-sdlc if the version step runs. |
+| GitHub PR | Opened or updated by pr-sdlc as the final step. |
+
+---
+
+## Related Skills
+
+- [`/execute-plan-sdlc`](execute-plan-sdlc.md) — plan execution with wave-based parallel dispatch
+- [`/commit-sdlc`](commit-sdlc.md) — smart commit with style detection
+- [`/review-sdlc`](review-sdlc.md) — multi-dimension code review
+- [`/received-review-sdlc`](received-review-sdlc.md) — process and fix review findings
+- [`/version-sdlc`](version-sdlc.md) — semantic versioning and release tags
+- [`/pr-sdlc`](pr-sdlc.md) — pull request creation
+- [`/review-init-sdlc`](review-init-sdlc.md) — scaffold review dimensions for a new project
+
+<!--
+NOTE: This section is for GitHub markdown browsing only.
+On the site (rnagrodzki.github.io/sdlc-marketplace), Related Skills are rendered
+as styled SkillCard tiles auto-generated from `site/src/data/skills-meta.ts` connections.
+The remark-strip-related-skills plugin removes this section before site rendering.
+To add/update related skills on the site, edit the `connections` array in skills-meta.ts.
+-->

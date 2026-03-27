@@ -1,0 +1,562 @@
+---
+/**
+ * Visual orchestration flow for /ship-sdlc.
+ * Shows how sub-skills are chained with conditional branching,
+ * pause points, and skip indicators.
+ */
+const base = import.meta.env.BASE_URL;
+
+interface PipeStep {
+  num: number;
+  skill: string;
+  slug: string;
+  label: string;
+  color: string;       // CSS variable
+  colorHex: string;
+  pauses?: boolean;
+  skippable?: boolean;
+  conditional?: string; // text for conditional badge
+}
+
+const steps: PipeStep[] = [
+  { num: 1, skill: 'execute-plan-sdlc', slug: 'execute-plan-sdlc', label: 'Execute Plan', color: 'var(--color-planning)', colorHex: '#3b82f6', skippable: true },
+  { num: 2, skill: 'commit-sdlc', slug: 'commit-sdlc', label: 'Commit Changes', color: 'var(--color-gitops)', colorHex: '#22c55e' },
+  { num: 3, skill: 'review-sdlc', slug: 'review-sdlc', label: 'Code Review', color: 'var(--color-review)', colorHex: '#f59e0b', skippable: true },
+];
+
+const gateStep: PipeStep = { num: 4, skill: 'received-review-sdlc', slug: 'received-review-sdlc', label: 'Fix Issues', color: 'var(--color-review)', colorHex: '#f59e0b', pauses: true, conditional: 'if critical/high' };
+
+const postGateSteps: PipeStep[] = [
+  { num: 5, skill: 'commit-sdlc', slug: 'commit-sdlc', label: 'Commit Fixes', color: 'var(--color-gitops)', colorHex: '#22c55e', conditional: 'if fixes made' },
+  { num: 6, skill: 'version-sdlc', slug: 'version-sdlc', label: 'Version & Tag', color: 'var(--color-gitops)', colorHex: '#22c55e', pauses: true, skippable: true },
+  { num: 7, skill: 'pr-sdlc', slug: 'pr-sdlc', label: 'Open PR', color: 'var(--color-gitops)', colorHex: '#22c55e' },
+];
+---
+
+<div class="spv" role="img" aria-label="ship-sdlc orchestration pipeline: 7 steps from execute to PR with conditional review loop">
+
+  <!-- Header -->
+  <div class="spv-header">
+    <div class="spv-header-label">Orchestration Flow</div>
+    <div class="spv-header-badges">
+      <span class="spv-legend spv-legend--pause">
+        <span class="spv-legend-dot spv-legend-dot--pause"></span>
+        pauses in --auto
+      </span>
+      <span class="spv-legend spv-legend--skip">
+        <span class="spv-legend-dot spv-legend-dot--skip"></span>
+        skippable
+      </span>
+    </div>
+  </div>
+
+  <!-- Pipeline body -->
+  <div class="spv-flow">
+
+    <!-- Pre-gate steps -->
+    {steps.map((s) => (
+      <Fragment>
+        <a href={`${base}/skills/${s.slug}/`} class="spv-step" style={`--step-c: ${s.color}; --step-hex: ${s.colorHex};`}>
+          <div class="spv-step-num">{s.num}</div>
+          <div class="spv-step-body">
+            <span class="spv-step-label">{s.label}</span>
+            <code class="spv-step-skill">{s.skill}</code>
+          </div>
+          <div class="spv-step-badges">
+            {s.pauses && <span class="spv-badge spv-badge--pause">pauses</span>}
+            {s.skippable && <span class="spv-badge spv-badge--skip">skippable</span>}
+            {s.conditional && <span class="spv-badge spv-badge--cond">{s.conditional}</span>}
+          </div>
+        </a>
+        <div class="spv-connector">
+          <div class="spv-connector-line"></div>
+          <div class="spv-connector-dot" style={`--dot-c: ${s.colorHex};`}></div>
+        </div>
+      </Fragment>
+    ))}
+
+    <!-- Gate: Review verdict -->
+    <div class="spv-gate">
+      <div class="spv-gate-diamond">
+        <svg class="spv-gate-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M7 1L13 7L7 13L1 7Z" stroke="var(--color-review)" stroke-width="1.5" fill="none" />
+        </svg>
+        <span class="spv-gate-text">Critical / High findings?</span>
+      </div>
+
+      <div class="spv-gate-branches">
+        <!-- YES branch -->
+        <div class="spv-gate-branch spv-gate-branch--yes">
+          <span class="spv-gate-answer spv-gate-answer--yes">yes</span>
+          <div class="spv-connector spv-connector--short">
+            <div class="spv-connector-line"></div>
+          </div>
+          <a href={`${base}/skills/${gateStep.slug}/`} class="spv-step spv-step--branch" style={`--step-c: ${gateStep.color}; --step-hex: ${gateStep.colorHex};`}>
+            <div class="spv-step-num">{gateStep.num}</div>
+            <div class="spv-step-body">
+              <span class="spv-step-label">{gateStep.label}</span>
+              <code class="spv-step-skill">{gateStep.skill}</code>
+            </div>
+            <div class="spv-step-badges">
+              <span class="spv-badge spv-badge--pause">pauses</span>
+              <span class="spv-badge spv-badge--cond">{gateStep.conditional}</span>
+            </div>
+          </a>
+        </div>
+
+        <!-- NO branch -->
+        <div class="spv-gate-branch spv-gate-branch--no">
+          <span class="spv-gate-answer spv-gate-answer--no">no</span>
+          <div class="spv-gate-skip-line"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Post-gate merge connector -->
+    <div class="spv-connector">
+      <div class="spv-connector-line"></div>
+    </div>
+
+    <!-- Post-gate steps -->
+    {postGateSteps.map((s, i) => (
+      <Fragment>
+        <a href={`${base}/skills/${s.slug}/`} class="spv-step" style={`--step-c: ${s.color}; --step-hex: ${s.colorHex};`}>
+          <div class="spv-step-num">{s.num}</div>
+          <div class="spv-step-body">
+            <span class="spv-step-label">{s.label}</span>
+            <code class="spv-step-skill">{s.skill}</code>
+          </div>
+          <div class="spv-step-badges">
+            {s.pauses && <span class="spv-badge spv-badge--pause">pauses</span>}
+            {s.skippable && <span class="spv-badge spv-badge--skip">skippable</span>}
+            {s.conditional && <span class="spv-badge spv-badge--cond">{s.conditional}</span>}
+          </div>
+        </a>
+        {i < postGateSteps.length - 1 && (
+          <div class="spv-connector">
+            <div class="spv-connector-line"></div>
+            <div class="spv-connector-dot" style={`--dot-c: ${s.colorHex};`}></div>
+          </div>
+        )}
+      </Fragment>
+    ))}
+
+  </div>
+
+  <!-- Footer: key points -->
+  <div class="spv-footer">
+    <div class="spv-key">
+      <div class="spv-key-item">
+        <span class="spv-key-marker" style="background: var(--color-gitops);"></span>
+        <span>Feature commit and review-fix commit are kept as <strong>separate commits</strong></span>
+      </div>
+      <div class="spv-key-item">
+        <span class="spv-key-marker" style="background: var(--color-review);"></span>
+        <span>Review threshold configurable via <code>reviewThreshold</code> in ship config</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+  /* -- Container -- */
+  .spv {
+    margin: 2rem 0;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg);
+    overflow: hidden;
+  }
+
+  /* -- Header -- */
+  .spv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+
+  .spv-header-label {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-workflows);
+  }
+
+  .spv-header-badges {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .spv-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.5625rem;
+    letter-spacing: 0.03em;
+    color: var(--color-text-muted);
+  }
+
+  .spv-legend-dot {
+    display: block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+
+  .spv-legend-dot--pause {
+    background: var(--color-review);
+    box-shadow: 0 0 4px var(--color-review);
+  }
+
+  .spv-legend-dot--skip {
+    background: none;
+    border: 1.5px dashed var(--color-text-muted);
+  }
+
+  /* -- Flow body -- */
+  .spv-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem 1rem;
+    position: relative;
+  }
+
+  /* Subtle dot grid bg */
+  .spv-flow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, #334155 0.5px, transparent 0.5px);
+    background-size: 16px 16px;
+    opacity: 0.25;
+    pointer-events: none;
+  }
+
+  /* -- Step card -- */
+  .spv-step {
+    position: relative;
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    max-width: 24rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--step-c) 30%, transparent);
+    border-left: 3px solid var(--step-c);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--step-c) 5%, var(--color-surface));
+    text-decoration: none;
+    color: var(--color-text);
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+    z-index: 1;
+  }
+
+  .spv-step:hover {
+    border-color: color-mix(in srgb, var(--step-c) 60%, transparent);
+    background: color-mix(in srgb, var(--step-c) 10%, var(--color-surface));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--step-hex) 25%, transparent);
+  }
+
+  .spv-step--branch {
+    max-width: none;
+    width: 100%;
+  }
+
+  .spv-step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--step-c) 15%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--step-c) 40%, transparent);
+    color: var(--step-c);
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .spv-step-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  .spv-step-label {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .spv-step-skill {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.625rem;
+    color: var(--color-text-muted);
+    background: none;
+    padding: 0;
+    border: none;
+  }
+
+  .spv-step-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+
+  /* -- Badges -- */
+  .spv-badge {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.5625rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .spv-badge--pause {
+    color: var(--color-review);
+    background: color-mix(in srgb, var(--color-review) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-review) 25%, transparent);
+    animation: badge-pulse 3s ease-in-out infinite;
+  }
+
+  .spv-badge--skip {
+    color: var(--color-text-muted);
+    background: none;
+    border: 1px dashed color-mix(in srgb, var(--color-text-muted) 35%, transparent);
+  }
+
+  .spv-badge--cond {
+    color: var(--color-text-muted);
+    background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-text-muted) 20%, transparent);
+  }
+
+  @keyframes badge-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  /* -- Connectors -- */
+  .spv-connector {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 1.75rem;
+    width: 2px;
+    z-index: 0;
+  }
+
+  .spv-connector--short {
+    height: 1rem;
+  }
+
+  .spv-connector-line {
+    width: 2px;
+    height: 100%;
+    background: color-mix(in srgb, var(--color-workflows) 30%, transparent);
+  }
+
+  .spv-connector-dot {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--dot-c, var(--color-workflows));
+    opacity: 0.8;
+    animation: dot-travel 2s ease-in-out infinite;
+  }
+
+  @keyframes dot-travel {
+    0% { top: 0; opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { top: 100%; opacity: 0.4; }
+  }
+
+  /* -- Gate -- */
+  .spv-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 28rem;
+    z-index: 1;
+  }
+
+  .spv-gate-diamond {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 1.5px solid color-mix(in srgb, var(--color-review) 45%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color-review) 6%, var(--color-bg));
+    width: 100%;
+    max-width: 24rem;
+    box-sizing: border-box;
+  }
+
+  .spv-gate-icon {
+    flex-shrink: 0;
+  }
+
+  .spv-gate-text {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-review);
+  }
+
+  .spv-gate-branches {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 24rem;
+    margin-top: 0.5rem;
+  }
+
+  .spv-gate-branch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .spv-gate-answer {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.625rem;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 3px;
+    margin-bottom: 0.25rem;
+  }
+
+  .spv-gate-answer--yes {
+    color: var(--color-review);
+    background: color-mix(in srgb, var(--color-review) 12%, transparent);
+  }
+
+  .spv-gate-answer--no {
+    color: var(--color-workflows);
+    background: color-mix(in srgb, var(--color-workflows) 12%, transparent);
+  }
+
+  .spv-gate-branch--no {
+    justify-content: center;
+    padding: 0.25rem 0;
+  }
+
+  .spv-gate-skip-line {
+    width: 1px;
+    height: 2rem;
+    background: color-mix(in srgb, var(--color-workflows) 25%, transparent);
+    border-left: 1.5px dashed color-mix(in srgb, var(--color-workflows) 30%, transparent);
+  }
+
+  /* -- Footer -- */
+  .spv-footer {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+
+  .spv-key {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .spv-key-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    color: var(--color-text-muted);
+  }
+
+  .spv-key-item strong {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  .spv-key-item code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.625rem;
+    padding: 0 3px;
+    background: var(--color-surface-2);
+    border-radius: 2px;
+    color: var(--color-text);
+    border: none;
+  }
+
+  .spv-key-marker {
+    display: block;
+    width: 3px;
+    height: 12px;
+    border-radius: 1.5px;
+    flex-shrink: 0;
+  }
+
+  /* -- Mobile -- */
+  @media (max-width: 640px) {
+    .spv-step {
+      grid-template-columns: 24px 1fr;
+      gap: 0.5rem;
+    }
+
+    .spv-step-badges {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      align-items: flex-start;
+      padding-left: calc(24px + 0.5rem);
+    }
+
+    .spv-gate-branches {
+      grid-template-columns: 1fr;
+    }
+
+    .spv-gate-branch--no {
+      display: none;
+    }
+
+    .spv-header-badges {
+      gap: 0.5rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spv-connector-dot {
+      display: none;
+    }
+    .spv-badge--pause {
+      animation: none;
+    }
+  }
+</style>

@@ -1,5 +1,5 @@
 export type StepType = 'script' | 'llm' | 'critique' | 'user' | 'dispatch' | 'verify';
-export type SkillCategory = 'planning' | 'review' | 'gitops' | 'integrations';
+export type SkillCategory = 'planning' | 'review' | 'gitops' | 'workflows' | 'integrations';
 
 export interface PipelineStep {
   id: string;
@@ -74,7 +74,7 @@ export const skillsMeta: SkillMeta[] = [
   {
     slug: 'ship-sdlc',
     command: '/ship-sdlc',
-    category: 'gitops',
+    category: 'workflows',
     userInvocable: true,
     tagline: 'Orchestrates the full shipping pipeline: execute, commit, review, fix, version, and PR in one invocation.',
     pipeline: [

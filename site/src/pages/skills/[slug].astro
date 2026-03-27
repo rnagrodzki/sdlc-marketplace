@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import SkillLayout from '../../layouts/SkillLayout.astro';
 import PipelineFlow from '../../components/PipelineFlow.astro';
+import ShipPipelineViz from '../../components/ShipPipelineViz.astro';
 import SkillCard from '../../components/SkillCard.astro';
 import { getSkillMeta } from '../../data/skills-meta';
 
@@ -16,6 +17,7 @@ export async function getStaticPaths() {
 const { entry } = Astro.props;
 const { Content } = await render(entry);
 const meta = getSkillMeta(entry.id);
+const isShip = entry.id === 'ship-sdlc';
 const relatedSkills = meta?.connections
   .map(c => ({ ...c, meta: getSkillMeta(c.to) }))
   .filter(c => c.meta) ?? [];
@@ -27,7 +29,11 @@ const relatedSkills = meta?.connections
   command={meta?.command}
   category={meta?.category}
 >
-  <Content />
+  <div class:list={{ 'ship-content': isShip }}>
+    <Content />
+  </div>
+
+  {isShip && <ShipPipelineViz />}
 
   {relatedSkills.length > 0 && (
     <section class="related-skills">
@@ -82,5 +88,4 @@ const relatedSkills = meta?.connections
     font-style: italic;
     display: block;
     margin-bottom: 0.25rem;
-  }
-</style>
+  }</style>
