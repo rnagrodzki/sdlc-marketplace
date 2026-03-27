@@ -1,0 +1,144 @@
+# ship-sdlc Configuration Reference
+
+This document describes `.sdlc/ship-config.json`, the persistent configuration file for ship-sdlc. Settings here apply to every `ship-sdlc` invocation in the repository unless overridden by a CLI flag.
+
+---
+
+## File Location
+
+```
+<repo-root>/.sdlc/ship-config.json
+```
+
+Create it manually or run `ship-sdlc --init-config` to walk through an interactive setup.
+
+---
+
+## Full Example
+
+```json
+{
+  "$schema": "ship-config",
+  "version": 1,
+  "preset": "B",
+  "skip": ["version"],
+  "bump": "patch",
+  "draft": false,
+  "auto": false,
+  "reviewThreshold": "high"
+}
+```
+
+---
+
+## Field Reference
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `preset` | `"A"` \| `"B"` \| `"C"` | `"B"` | Execution preset passed to execute-plan-sdlc. `"A"` = Speed (fewer steps, parallel), `"B"` = Balanced, `"C"` = Quality (full gates). |
+| `skip` | `string[]` | `[]` | Step names to skip by default on every run (e.g. `["version"]` to never bump version). Equivalent to passing `--skip` on the CLI. |
+| `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type applied when the `version` step runs. Overridden by `--bump` on the CLI. |
+| `draft` | `boolean` | `false` | When `true`, PRs are created as drafts. Equivalent to `--draft`. |
+| `auto` | `boolean` | `false` | When `true`, run in non-interactive auto mode (no confirmation prompts). Equivalent to `--auto`. |
+| `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` | `"high"` | Minimum review-finding severity that triggers the received-review fix loop. See table below. |
+
+### reviewThreshold Levels
+
+| Value | Which severities trigger the fix loop |
+|-------|---------------------------------------|
+| `"critical"` | Critical only |
+| `"high"` | Critical + High |
+| `"medium"` | Critical + High + Medium |
+
+At `"high"` (the default), findings rated Medium or lower are reported but do not block the ship pipeline.
+
+---
+
+## Merge Precedence
+
+When the same setting is specified in multiple places, the order of precedence is:
+
+```
+CLI flag  >  .sdlc/ship-config.json  >  built-in defaults
+```
+
+A flag passed directly on the command line always wins. If no flag is given, the config file value is used. If the config file is absent or does not specify a field, the built-in default applies.
+
+---
+
+## --init-config Walkthrough
+
+Running `ship-sdlc --init-config` launches an interactive sequence that writes `.sdlc/ship-config.json`. The steps are:
+
+1. **Preset preference** — Choose an execution preset:
+   - `A` = Speed (minimal gates, maximise parallelism)
+   - `B` = Balanced (default)
+   - `C` = Quality (full critique and review gates)
+
+2. **Steps to skip by default** — Enter a comma-separated list of step names to always skip (leave blank for none). Common choices: `version`, `review`.
+
+3. **Default bump type** — Choose the default version increment: `patch`, `minor`, or `major`.
+
+4. **Draft PR preference** — Should PRs be opened as drafts by default? (`yes` / `no`)
+
+5. **Review threshold** — Choose the minimum severity that triggers a fix loop:
+   - `critical` = only blockers
+   - `high` = blockers + high-severity findings (recommended)
+   - `medium` = blockers + high + medium-severity findings
+
+6. **Write and confirm** — The tool displays the resulting JSON and asks for confirmation before writing `.sdlc/ship-config.json`. If the file already exists you are asked whether to overwrite it.
+
+---
+
+## Team Configuration Examples
+
+### Solo developer — move fast
+
+Minimises prompts and skips the version step to manage it manually.
+
+```json
+{
+  "$schema": "ship-config",
+  "version": 1,
+  "preset": "A",
+  "skip": ["version"],
+  "bump": "patch",
+  "draft": false,
+  "auto": true,
+  "reviewThreshold": "critical"
+}
+```
+
+### Team with guardrails
+
+Balanced preset, review threshold set to catch high-severity findings, PRs always open as drafts for team review.
+
+```json
+{
+  "$schema": "ship-config",
+  "version": 1,
+  "preset": "B",
+  "skip": [],
+  "bump": "minor",
+  "draft": true,
+  "auto": false,
+  "reviewThreshold": "high"
+}
+```
+
+### CI-adjacent — maximum confidence
+
+Quality preset with the widest review threshold. Suitable for regulated environments or release branches where medium-severity findings must be resolved before merging.
+
+```json
+{
+  "$schema": "ship-config",
+  "version": 1,
+  "preset": "C",
+  "skip": [],
+  "bump": "patch",
+  "draft": false,
+  "auto": false,
+  "reviewThreshold": "medium"
+}
+```

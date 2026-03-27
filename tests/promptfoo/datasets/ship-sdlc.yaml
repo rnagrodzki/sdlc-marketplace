@@ -1,0 +1,243 @@
+# Fixture appropriateness:
+#   ship-pipeline-ready    -- CORRECT: feature branch with plan executed and changes committed, no ship config
+#   ship-review-critical   -- CORRECT: review completed with CHANGES REQUESTED verdict and 1 critical finding
+#   ship-config-present    -- CORRECT: project with .sdlc/ship-config.json (preset B, skip version, bump patch)
+
+- description: "ship-sdlc: dry-run shows pipeline table without executing any steps"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --dry-run. The project context is provided above. Load config,
+      parse flags, detect context, run auto-skip logic, build the pipeline plan, and
+      display the dry-run pipeline table. Do not invoke any sub-skills.
+  assert:
+    # Must announce dry run
+    - type: icontains
+      value: "dry run"
+    # Must show pipeline table header or step numbering
+    - type: icontains
+      value: "execute-plan-sdlc"
+    # Must show pr-sdlc in the pipeline table
+    - type: icontains
+      value: "pr-sdlc"
+    # Must show commit-sdlc in the pipeline table
+    - type: icontains
+      value: "commit-sdlc"
+    # Behavioral: shows table and stops — does not invoke sub-skills
+    - type: llm-rubric
+      value: >
+        The response displays a pipeline table showing all steps (execute-plan-sdlc,
+        commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, pr-sdlc) with
+        their status (will run, conditional, or skipped) and args. It does NOT proceed
+        to actually invoke any sub-skills — no "Invoking:" progress lines appear.
+        The word "dry run" appears in the output. Config loading, flag resolution,
+        context detection, and auto-skip decisions are printed before the table.
+
+- description: "ship-sdlc: --auto mode proceeds without asking 'Run this pipeline?'"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --auto --skip version. Show the pipeline plan and demonstrate
+      that --auto mode skips the interactive approval prompt. Stop after displaying
+      the pipeline table (do not actually invoke sub-skills — treat this as context
+      setup only, not full execution).
+  assert:
+    # Must forward --auto in the pipeline plan for commit-sdlc
+    - type: icontains
+      value: "--auto"
+    # Must show version step is skipped
+    - type: icontains
+      value: "skipped"
+    # Behavioral: no interactive "Run this pipeline?" prompt in auto mode
+    - type: llm-rubric
+      value: >
+        The response shows the pipeline table and proceeds without presenting an
+        interactive "Run this pipeline?" question to the user. The --auto flag is
+        shown as forwarded to commit-sdlc and pr-sdlc (the sub-skills that support it).
+        The version step is shown as skipped because of --skip version. The response
+        does NOT ask the user to choose yes/edit/cancel before running.
+
+- description: "ship-sdlc: config file loaded and CLI --preset flag overrides config preset"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-config-present.md"
+    user_request: >
+      Run /ship-sdlc --preset C --dry-run. The project has a .sdlc/ship-config.json
+      with preset: B, skip: [version], bump: patch. The CLI flag --preset C should
+      override the config preset B. Show the flag resolution and dry-run pipeline table.
+  assert:
+    # Must show config was loaded
+    - type: icontains
+      value: "ship-config.json"
+    # Must show flag resolution section
+    - type: icontains
+      value: "Flag resolution"
+    # Must show preset C (CLI override wins)
+    - type: icontains
+      value: "preset"
+    # Must show version step is skipped (from config)
+    - type: icontains
+      value: "skipped"
+    # Behavioral: CLI flag overrides config, both sources shown in resolution
+    - type: llm-rubric
+      value: >
+        The response shows the ship config was loaded from .sdlc/ship-config.json
+        with preset B and skip [version]. It then prints a Flag resolution section
+        showing that --preset C (from CLI) overrides the config value of B. The
+        final resolved preset is C, not B. The version step remains skipped because
+        the config skip list is honored. The output clearly distinguishes between
+        values from config and values from CLI flags.
+
+- description: "ship-sdlc: critical review finding pauses pipeline and invokes received-review-sdlc"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-review-critical.md"
+    user_request: >
+      Run /ship-sdlc. The review step has completed with verdict CHANGES REQUESTED
+      (1 critical finding: SQL injection in auth handler, 2 medium findings). The
+      pipeline is at Step 4. Show the verdict decision and what happens next.
+  assert:
+    # Must show the pipeline is pausing
+    - type: icontains
+      value: "PAUSING PIPELINE"
+    # Must reference received-review-sdlc
+    - type: icontains
+      value: "received-review-sdlc"
+    # Must acknowledge the critical finding
+    - type: icontains
+      value: "critical"
+    # Behavioral: correct verdict parsing and pipeline pause behavior
+    - type: llm-rubric
+      value: >
+        The response parses the review verdict as CHANGES REQUESTED with 1 critical
+        finding. It announces that the pipeline is pausing (PAUSING PIPELINE or
+        equivalent language) because critical or high issues were found. It states
+        it is invoking received-review-sdlc for interactive fix approval. The SQL
+        injection finding is mentioned. The response does NOT silently continue to
+        version-sdlc or pr-sdlc — it stops for human approval.
+
+- description: "ship-sdlc: medium/low review findings continue pipeline without invoking received-review-sdlc"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc. The review step has just completed. The review verdict was
+      APPROVED WITH NOTES with 3 medium findings and 1 low finding — no critical or
+      high findings. Show the verdict decision and whether the pipeline continues or pauses.
+  assert:
+    # Must show pipeline is continuing
+    - type: regex
+      value: "(CONTINUING|Deferred|continuing)"
+    # Must mention the deferred findings
+    - type: regex
+      value: "(medium|deferred|below threshold)"
+    # Behavioral: no received-review-sdlc invocation for medium/low only
+    - type: llm-rubric
+      value: >
+        The response shows the review verdict is APPROVED WITH NOTES with only medium
+        and low findings — no critical or high findings. It announces the pipeline is
+        CONTINUING (not pausing). The medium and low findings are collected as deferred
+        to the final summary report. The response does NOT invoke received-review-sdlc.
+        It proceeds toward the next pipeline step (version-sdlc or pr-sdlc).
+
+- description: "ship-sdlc: --skip flag excludes specified steps from pipeline"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --skip execute,review,version --dry-run. Show the pipeline
+      table reflecting that execute, review, and version steps are skipped, while
+      commit and pr steps will run.
+  assert:
+    # All three skipped steps must appear as skipped
+    - type: icontains
+      value: "execute-plan-sdlc"
+    - type: icontains
+      value: "review-sdlc"
+    - type: icontains
+      value: "version-sdlc"
+    # PR step should show as will run
+    - type: icontains
+      value: "pr-sdlc"
+    # Behavioral: correct skip set applied to pipeline table
+    - type: llm-rubric
+      value: >
+        The response displays a dry-run pipeline table where execute-plan-sdlc,
+        review-sdlc, and version-sdlc all show "skipped" status. commit-sdlc and
+        pr-sdlc show "will run" status. received-review-sdlc shows "conditional"
+        (or skipped because review is skipped). The table accurately reflects all
+        three --skip values. The response stops after displaying the table (dry-run).
+
+- description: "ship-sdlc: dry-run shows config loading, flag resolution, context detection, and auto-skip reasoning"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --dry-run. Show the full Step 1 output: config loading result,
+      flag resolution, context detection, and auto-skip decisions with reasoning.
+      Then show the dry-run pipeline table.
+  assert:
+    # Must print context detection section
+    - type: icontains
+      value: "Context detection"
+    # Must print auto-skip decisions
+    - type: icontains
+      value: "Auto-skip"
+    # Behavioral: full transparency output before the pipeline table
+    - type: llm-rubric
+      value: >
+        The response prints every Step 1 section in order: (1) config loading result
+        (no config found, using built-in defaults), (2) flag resolution table showing
+        source of each resolved value, (3) context detection with individual check
+        results (plan in context, uncommitted changes, current branch, gh CLI status),
+        (4) auto-skip decisions listing each step with WILL RUN or SKIPPED and a
+        one-line reason. All four sections appear before the pipeline table. No
+        section is omitted.
+
+- description: "ship-sdlc: plan mode active causes immediate refusal with instructions to exit"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Plan mode is active. Run /ship-sdlc. The system context indicates plan mode
+      is currently enabled.
+  assert:
+    # Must mention plan mode
+    - type: icontains
+      value: "plan mode"
+    # Must tell user to exit plan mode
+    - type: regex
+      value: "(Exit plan mode|exit plan mode|exit Plan Mode)"
+    # Behavioral: stops immediately, does not proceed to pipeline
+    - type: llm-rubric
+      value: >
+        The response detects plan mode is active and immediately stops. It announces
+        that ship-sdlc requires write operations (git commit, gh pr create, git tag)
+        and cannot run in plan mode. It instructs the user to exit plan mode first,
+        then re-invoke /ship-sdlc. It does NOT proceed to Step 1 config loading or
+        any pipeline activity.
+
+- description: "ship-sdlc: --bump minor forwarded to version-sdlc in pipeline plan"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --bump minor --dry-run. Show the pipeline table and confirm
+      that the version-sdlc step shows "minor" as the bump type in its args column.
+  assert:
+    # Must show minor in the pipeline table
+    - type: icontains
+      value: "minor"
+    # Must show version-sdlc step
+    - type: icontains
+      value: "version-sdlc"
+    # Behavioral: bump type appears in version step args
+    - type: llm-rubric
+      value: >
+        The response shows a dry-run pipeline table where the version-sdlc step
+        displays "minor" as its argument or bump type. The --bump minor flag is
+        correctly attributed in the flag resolution output (from CLI). The pipeline
+        table clearly shows the version step will receive the minor bump type.
+        The response stops after the table (dry-run — no sub-skills invoked).

@@ -27,6 +27,7 @@ export const workflowNodes: WorkflowNode[] = [
   { slug: 'commit-sdlc', command: '/commit-sdlc', category: 'gitops', lane: 'ship', col: 0, tagline: 'Smart commit message generation' },
   { slug: 'pr-sdlc', command: '/pr-sdlc', category: 'gitops', lane: 'ship', col: 1, tagline: 'Create structured pull requests' },
   { slug: 'version-sdlc', command: '/version-sdlc', category: 'gitops', lane: 'ship', col: 2, tagline: 'Bump version and create release' },
+  { slug: 'ship-sdlc', command: '/ship-sdlc', category: 'gitops', lane: 'ship', col: 3, tagline: 'Full pipeline orchestrator' },
 ];
 
 export const workflowEdges: WorkflowEdge[] = [
@@ -45,6 +46,13 @@ export const workflowEdges: WorkflowEdge[] = [
   { from: 'execute-plan-sdlc', to: 'commit-sdlc', label: 'or ship directly', style: 'cross-lane' },
   { from: 'execute-plan-sdlc', to: 'version-sdlc', label: 'release after', style: 'cross-lane' },
   { from: 'review-sdlc', to: 'commit-sdlc', label: 'approved, then', style: 'cross-lane' },
+  // Ship-sdlc orchestrator
+  { from: 'ship-sdlc', to: 'execute-plan-sdlc', label: 'invokes', style: 'dashed' },
+  { from: 'ship-sdlc', to: 'commit-sdlc', label: 'invokes', style: 'dashed' },
+  { from: 'ship-sdlc', to: 'review-sdlc', label: 'invokes', style: 'dashed' },
+  { from: 'ship-sdlc', to: 'received-review-sdlc', label: 'invokes conditionally', style: 'dashed' },
+  { from: 'ship-sdlc', to: 'version-sdlc', label: 'invokes', style: 'dashed' },
+  { from: 'ship-sdlc', to: 'pr-sdlc', label: 'invokes', style: 'dashed' },
 ];
 
 export const laneLabels: Record<string, string> = {
