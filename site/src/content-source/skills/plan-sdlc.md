@@ -170,7 +170,7 @@ Invoke `/plan-sdlc` while Claude Code plan mode is active:
 3. After task decomposition, task blocks (and a Key Decisions section, if applicable) are appended to the plan file
 4. After self-critique (Step 3) and user approval (Step 4), the plan file is rewritten with all fixes applied
 5. The skill calls `ExitPlanMode` — Claude Code presents the finalized plan for your review
-6. After you approve, invoke `/execute-plan-sdlc` to begin execution
+6. After you approve, execution begins automatically — `/execute-plan-sdlc` is auto-invoked with the plan already in context
 
 The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads it without any adjustments.
 

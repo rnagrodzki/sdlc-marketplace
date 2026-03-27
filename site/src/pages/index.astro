@@ -6,11 +6,12 @@ import { skillsMeta, getSkillsByCategory } from '../data/skills-meta';
 
 const base = import.meta.env.BASE_URL;
 
-const categoryOrder = ['planning', 'review', 'gitops', 'integrations'] as const;
+const categoryOrder = ['planning', 'review', 'gitops', 'workflows', 'integrations'] as const;
 const categoryLabels = {
   planning: 'Planning & Execution',
   review: 'Code Review',
   gitops: 'Git Operations',
+  workflows: 'Full Orchestration',
   integrations: 'Integrations',
 };
 
@@ -38,6 +39,14 @@ const featureCards = [
     href: `${base}/workflows/ship/`,
     body: 'From /commit-sdlc to /pr-sdlc to /version-sdlc — a complete git workflow with structured descriptions and semantic versioning.',
     icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2l2.5 5H17l-4 3 1.5 5L10 12l-4.5 3L7 10 3 7h4.5L10 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+  },
+  {
+    title: 'Full Orchestration',
+    color: 'var(--color-workflows)',
+    colorHex: '#06b6d4',
+    href: `${base}/workflows/full-orchestration/`,
+    body: '/ship-sdlc chains execute, commit, review, fix, version, and PR into a single automated pipeline with conditional review loops.',
+    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h2m10 0h2M10 3v2m0 10v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   },
 ];
 

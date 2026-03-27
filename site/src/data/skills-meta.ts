@@ -1,5 +1,5 @@
 export type StepType = 'script' | 'llm' | 'critique' | 'user' | 'dispatch' | 'verify';
-export type SkillCategory = 'planning' | 'review' | 'gitops' | 'integrations';
+export type SkillCategory = 'planning' | 'review' | 'gitops' | 'workflows' | 'integrations';
 
 export interface PipelineStep {
   id: string;
@@ -69,6 +69,30 @@ export const skillsMeta: SkillMeta[] = [
       { to: 'pr-sdlc', label: 'open PR after' },
       { to: 'commit-sdlc', label: 'commit changes after' },
       { to: 'version-sdlc', label: 'release after' },
+    ],
+  },
+  {
+    slug: 'ship-sdlc',
+    command: '/ship-sdlc',
+    category: 'workflows',
+    userInvocable: true,
+    tagline: 'Orchestrates the full shipping pipeline: execute, commit, review, fix, version, and PR in one invocation.',
+    pipeline: [
+      { id: 'load-config', label: 'Load config and flags', type: 'script', description: 'Reads .sdlc/ship-config.json, merges CLI flags, detects context' },
+      { id: 'build-pipeline', label: 'Build pipeline plan', type: 'llm', description: 'Determines which steps run, builds routing table with conditions' },
+      { id: 'validate', label: 'Validate pipeline', type: 'critique', description: 'Checks prerequisites, warns about interactive pauses' },
+      { id: 'confirm', label: 'Present and confirm', type: 'user', description: 'Shows full pipeline table; proceeds automatically in --auto mode' },
+      { id: 'execute-steps', label: 'Execute pipeline steps', type: 'dispatch', description: 'Invokes sub-skills sequentially with flag forwarding' },
+      { id: 'review-gate', label: 'Review verdict gate', type: 'llm', description: 'Evaluates review findings; triggers fix loop for critical/high' },
+      { id: 'report', label: 'Pipeline summary', type: 'verify', description: 'Prints results, decisions log, deferred findings, cleanup' },
+    ],
+    connections: [
+      { to: 'execute-plan-sdlc', label: 'invokes' },
+      { to: 'commit-sdlc', label: 'invokes' },
+      { to: 'review-sdlc', label: 'invokes' },
+      { to: 'received-review-sdlc', label: 'invokes conditionally' },
+      { to: 'version-sdlc', label: 'invokes' },
+      { to: 'pr-sdlc', label: 'invokes' },
     ],
   },
   {

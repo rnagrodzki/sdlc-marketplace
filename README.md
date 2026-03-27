@@ -49,6 +49,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | [`/commit-sdlc`](docs/skills/commit-sdlc.md) | Analyze staged changes, generate a commit message matching project style, stash unstaged changes, and commit |
 | [`/plan-sdlc`](docs/skills/plan-sdlc.md) | Write an implementation plan from requirements, a spec, or a user description — produces plans optimized for execute-plan-sdlc |
 | [`/execute-plan-sdlc`](docs/skills/execute-plan-sdlc.md) | Execute an implementation plan with adaptive task classification, wave-based parallel dispatch, and automatic error recovery |
+| [`/ship-sdlc`](docs/skills/ship-sdlc.md) | Chain execute, commit, review, version, and PR into a single shipping pipeline with conditional review-fix loop |
 | [`/jira-sdlc`](docs/skills/jira-sdlc.md) | Create, edit, search, and transition Jira issues with cached project metadata |
 
 ---

@@ -5,109 +5,125 @@ import WorkflowGraph from '../../components/WorkflowGraph.astro';
 const base = import.meta.env.BASE_URL;
 ---
 
-<BaseLayout title="Ship Workflow" description="How commit-sdlc, pr-sdlc, and version-sdlc form the shipping pipeline.">
+<BaseLayout title="Ship Workflow" description="Automated shipping pipeline: execute, commit, review, fix, version, and PR — orchestrated by ship-sdlc or invoked individually.">
   <section class="wd-hero">
     <div class="wd-hero-inner">
       <a href={`${base}/workflows/`} class="wd-back">&larr; All Workflows</a>
       <span class="wd-overline" style="--lane-color: var(--color-gitops);">Ship Lane</span>
       <h1 class="wd-title">Ship with Confidence</h1>
       <p class="wd-subtitle">
-        From smart commits to structured PRs to semantic releases. Every artifact is consistent and traceable.
+        Individual git operations skills: smart commits, structured PRs with custom templates,
+        and semantic versioning with changelogs. Or use
+        <a href={`${base}/workflows/full-orchestration/`} class="wd-skill-link" style="--step-color: var(--color-workflows);">/ship-sdlc</a>
+        to run the full pipeline in one command.
       </p>
     </div>
   </section>
 
   <section class="wd-graph-section">
     <div class="wd-graph-container">
-      <WorkflowGraph highlightSlugs={['commit-sdlc', 'pr-sdlc', 'version-sdlc']} />
+      <WorkflowGraph highlightSlugs={['commit-sdlc', 'pr-sdlc', 'version-sdlc', 'pr-customize-sdlc']} />
     </div>
   </section>
 
   <section class="wd-content">
     <div class="wd-content-inner">
-      <div class="wd-steps">
-        <div class="wd-step" style="--step-color: var(--color-gitops);">
-          <div class="wd-step-marker">1</div>
-          <div class="wd-step-body">
-            <h2 class="wd-step-title">
-              Commit with
-              <a href={`${base}/skills/commit-sdlc/`} class="wd-skill-link">/commit-sdlc</a>
-            </h2>
-            <p>
-              Stashes unstaged changes, analyzes the staged diff alongside recent commit history
-              to detect the project's commit style, then generates a matching commit message.
-              You review and approve before the commit executes. The stash is restored after.
-            </p>
-            <p>
-              This is the entry point from other lanes. Both execute-plan-sdlc and received-review-sdlc
-              flow their output here when changes are ready to be packaged.
-            </p>
-          </div>
-        </div>
 
-        <div class="wd-step" style="--step-color: var(--color-gitops);">
-          <div class="wd-step-marker">2</div>
-          <div class="wd-step-body">
-            <h2 class="wd-step-title">
-              Open PR with
-              <a href={`${base}/skills/pr-sdlc/`} class="wd-skill-link">/pr-sdlc</a>
-            </h2>
-            <p>
-              Analyzes all branch commits and the full diff to generate a structured PR description.
-              Uses an 8-section default template or your custom template from
-              <a href={`${base}/skills/pr-customize-sdlc/`} class="wd-skill-link">/pr-customize-sdlc</a>.
-              Handles multi-account GitHub setups automatically.
-            </p>
-            <p>
-              You review the title and description before the PR is created. The skill can also
-              update an existing PR when the branch has changed. Reviews from review-sdlc are
-              connected to PRs opened by this skill.
-            </p>
-          </div>
+      <!-- Orchestration callout -->
+      <div class="sp-callout">
+        <div class="sp-callout-inner">
+          <span class="sp-callout-badge">Full Pipeline</span>
+          <p class="sp-callout-text">
+            Want to run commit, review, version, and PR as one automated flow?
+            See <a href={`${base}/workflows/full-orchestration/`} class="wd-skill-link" style="--step-color: var(--color-workflows);">/ship-sdlc</a> —
+            the full orchestration workflow.
+          </p>
         </div>
+      </div>
 
-        <div class="wd-step" style="--step-color: var(--color-gitops);">
-          <div class="wd-step-marker">3</div>
-          <div class="wd-step-body">
-            <h2 class="wd-step-title">
-              Release with
-              <a href={`${base}/skills/version-sdlc/`} class="wd-skill-link">/version-sdlc</a>
-            </h2>
-            <p>
-              The final step in the shipping pipeline. Detects the version source file, analyzes
-              conventional commits since the last tag to infer the bump type (major/minor/patch),
-              and presents a release plan for approval.
-            </p>
-            <p>
-              On approval: bumps the version file, optionally generates a Keep a Changelog entry,
-              creates an annotated git tag, and pushes everything to origin. The entire release
-              is a single atomic operation.
-            </p>
+      <!-- Individual Skills -->
+      <div class="sp-section">
+        <h2 class="sp-section-title">Individual Skills</h2>
+        <p class="sp-section-desc">
+          Each pipeline step is a standalone skill. Use them independently when you don't need the full pipeline.
+        </p>
+
+        <div class="wd-steps">
+          <div class="wd-step" style="--step-color: var(--color-gitops);">
+            <div class="wd-step-marker">1</div>
+            <div class="wd-step-body">
+              <h3 class="wd-step-title">
+                Commit with
+                <a href={`${base}/skills/commit-sdlc/`} class="wd-skill-link">/commit-sdlc</a>
+              </h3>
+              <p>
+                Stashes unstaged changes, analyzes the staged diff alongside recent commit history
+                to detect the project's commit style, then generates a matching commit message.
+                You review and approve before the commit executes. The stash is restored after.
+              </p>
+            </div>
+          </div>
+
+          <div class="wd-step" style="--step-color: var(--color-gitops);">
+            <div class="wd-step-marker">2</div>
+            <div class="wd-step-body">
+              <h3 class="wd-step-title">
+                Open PR with
+                <a href={`${base}/skills/pr-sdlc/`} class="wd-skill-link">/pr-sdlc</a>
+              </h3>
+              <p>
+                Analyzes all branch commits and the full diff to generate a structured PR description.
+                Uses an 8-section default template or your custom template from
+                <a href={`${base}/skills/pr-customize-sdlc/`} class="wd-skill-link">/pr-customize-sdlc</a>.
+                Handles multi-account GitHub setups automatically.
+              </p>
+            </div>
+          </div>
+
+          <div class="wd-step" style="--step-color: var(--color-gitops);">
+            <div class="wd-step-marker">3</div>
+            <div class="wd-step-body">
+              <h3 class="wd-step-title">
+                Release with
+                <a href={`${base}/skills/version-sdlc/`} class="wd-skill-link">/version-sdlc</a>
+              </h3>
+              <p>
+                Detects the version source file, analyzes conventional commits since the last tag
+                to infer the bump type (major/minor/patch), and presents a release plan for approval.
+                On approval: bumps the version file, creates an annotated git tag, and pushes to origin.
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
+      <!-- One-Time Setup -->
       <div class="wd-setup">
         <h2 class="wd-setup-title">One-Time Setup</h2>
         <p class="wd-setup-body">
-          Run <a href={`${base}/skills/pr-customize-sdlc/`} class="wd-skill-link">/pr-customize-sdlc</a> once per
+          Run <a href={`${base}/skills/pr-customize-sdlc/`} class="wd-skill-link" style="--step-color: var(--color-gitops);">/pr-customize-sdlc</a> once per
           project to create a custom PR description template at <code>.claude/pr-template.md</code>.
           It scans your existing PR conventions, proposes a tailored template, and lets you refine it
-          interactively. Once saved, <a href={`${base}/skills/pr-sdlc/`} class="wd-skill-link">/pr-sdlc</a> uses
-          it automatically for all future PRs. Re-run it any time to update the template.
+          interactively. Once saved, <a href={`${base}/skills/pr-sdlc/`} class="wd-skill-link" style="--step-color: var(--color-gitops);">/pr-sdlc</a> uses
+          it automatically for all future PRs.
         </p>
       </div>
 
+      <!-- Where does it connect? -->
       <div class="wd-after">
         <h2 class="wd-after-title">Where does it connect?</h2>
         <div class="wd-after-paths">
           <a href={`${base}/workflows/plan-execute/`} class="wd-after-path" style="--path-color: var(--color-planning);">
             <span class="wd-path-label">From Plan & Execute</span>
-            <span class="wd-path-desc">execute-plan-sdlc feeds completed work into commit-sdlc</span>
+            <span class="wd-path-desc">execute-plan-sdlc feeds completed work into the ship pipeline</span>
           </a>
           <a href={`${base}/workflows/review-cycle/`} class="wd-after-path" style="--path-color: var(--color-review);">
             <span class="wd-path-label">From Review Cycle</span>
             <span class="wd-path-desc">received-review-sdlc flows accepted fixes into commit-sdlc</span>
+          </a>
+          <a href={`${base}/workflows/full-orchestration/`} class="wd-after-path" style="--path-color: var(--color-workflows);">
+            <span class="wd-path-label">Full Orchestration</span>
+            <span class="wd-path-desc">ship-sdlc chains all these skills into a single automated pipeline</span>
           </a>
         </div>
       </div>
@@ -116,6 +132,7 @@ const base = import.meta.env.BASE_URL;
 </BaseLayout>
 
 <style>
+  /* ── Hero ── */
   .wd-hero {
     padding: 3rem 1.5rem 1.5rem;
   }
@@ -169,6 +186,7 @@ const base = import.meta.env.BASE_URL;
     margin: 0;
   }
 
+  /* ── Graph ── */
   .wd-graph-section {
     padding: 1rem 1.5rem 2rem;
   }
@@ -183,6 +201,7 @@ const base = import.meta.env.BASE_URL;
     overflow: hidden;
   }
 
+  /* ── Content ── */
   .wd-content {
     padding: 0 1.5rem 3rem;
   }
@@ -192,11 +211,81 @@ const base = import.meta.env.BASE_URL;
     margin: 0 auto;
   }
 
+  /* ── Sections ── */
+  .sp-section {
+    margin-bottom: 3rem;
+  }
+
+  .sp-section-title {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .sp-section-desc {
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: var(--color-text-muted);
+    margin: 0 0 1.5rem;
+  }
+
+  .sp-section-desc code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    padding: 1px 5px;
+    background: var(--color-surface-2);
+    border-radius: 3px;
+    color: var(--color-text);
+  }
+
+  /* ── Orchestration Callout ── */
+  .sp-callout {
+    margin-bottom: 2.5rem;
+    padding: 1rem 1.25rem;
+    background: color-mix(in srgb, var(--color-workflows) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-workflows) 25%, transparent);
+    border-left: 3px solid var(--color-workflows);
+    border-radius: 6px;
+  }
+
+  .sp-callout-inner {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .sp-callout-badge {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-workflows);
+    background: color-mix(in srgb, var(--color-workflows) 12%, transparent);
+    padding: 2px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  .sp-callout-text {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  /* ── Individual Skills (reused wd-step patterns) ── */
   .wd-steps {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
-    margin-bottom: 3rem;
+    gap: 1.5rem;
   }
 
   .wd-step {
@@ -237,14 +326,14 @@ const base = import.meta.env.BASE_URL;
   .wd-skill-link {
     font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
     font-size: 0.9375rem;
-    color: var(--step-color);
+    color: var(--step-color, var(--color-gitops));
     text-decoration: none;
-    border-bottom: 1px solid color-mix(in srgb, var(--step-color) 30%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--step-color, var(--color-gitops)) 30%, transparent);
     transition: border-color 0.12s ease;
   }
 
   .wd-skill-link:hover {
-    border-color: var(--step-color);
+    border-color: var(--step-color, var(--color-gitops));
   }
 
   .wd-step-body p {
@@ -267,8 +356,9 @@ const base = import.meta.env.BASE_URL;
     color: var(--color-text);
   }
 
+  /* ── Setup ── */
   .wd-setup {
-    margin-top: 2rem;
+    margin-top: 0;
     padding: 1.25rem 1.5rem;
     background: color-mix(in srgb, var(--color-gitops) 6%, transparent);
     border: 1px solid color-mix(in srgb, var(--color-gitops) 20%, transparent);
@@ -302,6 +392,7 @@ const base = import.meta.env.BASE_URL;
     color: var(--color-text);
   }
 
+  /* ── Connections ── */
   .wd-after-title {
     font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
     font-size: 0.75rem;
@@ -351,6 +442,7 @@ const base = import.meta.env.BASE_URL;
     color: var(--color-text-muted);
   }
 
+  /* ── Mobile ── */
   @media (max-width: 640px) {
     .wd-hero {
       padding: 2rem 1rem 1rem;

@@ -4,6 +4,7 @@ import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
 import remarkRewriteLinks from './plugins/remark-rewrite-links.mjs';
 import remarkStripRelatedSkills from './plugins/remark-strip-related-skills.mjs';
+import remarkStripAsciiPipeline from './plugins/remark-strip-ascii-pipeline.mjs';
 
 export default defineConfig({
   site: 'https://rnagrodzki.github.io',
@@ -14,7 +15,7 @@ export default defineConfig({
     sitemap(),
   ],
   markdown: {
-    remarkPlugins: [remarkRewriteLinks, remarkStripRelatedSkills],
+    remarkPlugins: [remarkRewriteLinks, remarkStripRelatedSkills, remarkStripAsciiPipeline],
   },
   vite: {
     plugins: [

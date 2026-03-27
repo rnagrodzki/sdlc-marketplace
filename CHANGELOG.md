@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-03-27
+
+### Added
+- `ship-sdlc` skill for end-to-end feature shipping — chains execute, commit, review, fix, version, and PR creation in a single pipeline (#60)
+- Full orchestration workflow page on the documentation site
+- Ship pipeline visualization component for the docs site
+
+### Changed
+- Redesigned documentation site skill pages and workflow navigation
+
 ## [0.15.2] - 2026-03-27
 
 ### Added
