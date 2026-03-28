@@ -27,11 +27,19 @@ If the system context contains "Plan mode is active":
 If `--init-config` was passed:
 
 1. Read `./config-format.md` and run the interactive walkthrough to collect the user's answers (preset, skip set, bump type, auto, threshold, workspace isolation).
-2. Call `ship-init.js` via Bash with the collected answers:
+2. Locate and call `ship-init.js` via Bash with the collected answers:
 ```bash
-node plugins/sdlc-utilities/scripts/ship-init.js --preset B --skip version --bump patch --auto --threshold high --workspace prompt
+SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-init.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
+
+INIT_OUTPUT_FILE=$(mktemp /tmp/ship-init-XXXXXX.json)
+node "$SCRIPT" --preset B --skip version --bump patch --auto --threshold high --workspace prompt > "$INIT_OUTPUT_FILE"
+EXIT_CODE=$?
+echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
+echo "EXIT_CODE=$EXIT_CODE"
 ```
-3. Parse the output JSON:
+3. Parse the output JSON from `$INIT_OUTPUT_FILE`:
    - If `errors` is non-empty, display them and stop.
    - Otherwise display the `created` files list and `config` JSON for user confirmation.
 4. Stop. No pipeline execution.
@@ -48,12 +56,20 @@ If not found: `No ship config found — using built-in defaults. Run --init-conf
 
 ### 1c. Prepare pipeline context
 
-Run `ship-prepare.js` with all CLI flags to pre-compute flags, context, and step statuses:
+Locate and run `ship-prepare.js` with all CLI flags to pre-compute flags, context, and step statuses:
 ```bash
-node plugins/sdlc-utilities/scripts/ship-prepare.js --has-plan --auto --skip version --preset B --bump patch --workspace branch
+SCRIPT=$(find ~/.claude/plugins -name "ship-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-prepare.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+
+PREPARE_OUTPUT_FILE=$(mktemp /tmp/ship-prepare-XXXXXX.json)
+node "$SCRIPT" --has-plan --auto --skip version --preset B --bump patch --workspace branch > "$PREPARE_OUTPUT_FILE"
+EXIT_CODE=$?
+echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
+echo "EXIT_CODE=$EXIT_CODE"
 ```
 
-Parse the output JSON. If `errors` is non-empty, display them and stop. The parsed output replaces manual computation in subsequent sub-steps (1d–1g).
+Parse the output JSON from `$PREPARE_OUTPUT_FILE`. If `errors` is non-empty, display them and stop. The parsed output replaces manual computation in subsequent sub-steps (1d–1g).
 
 **Gitignore warning:** If `context.sdlcGitignored` is `false` in the output, print:
 ```
