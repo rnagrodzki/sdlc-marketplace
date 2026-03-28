@@ -6,7 +6,6 @@ triggers:
   - "**/skills/**/SKILL.md"
   - "**/scripts/*.js"
 skip-when:
-  - "**/scripts/lib/**"
   - "**/node_modules/**"
   - "docs/**"
 severity: high

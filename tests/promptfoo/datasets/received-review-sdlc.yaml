@@ -118,3 +118,73 @@
         For addressed comments, it plans to post a reply AND resolve the thread.
         For the pushback comment, it plans to post the pushback response but NOT
         resolve the thread (leaving it open for the reviewer).
+
+- description: "received-review-sdlc: all threads resolved reports zero outstanding and skips processing"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-all-resolved.md"
+    user_request: >
+      Run /received-review-sdlc --pr 42 on this project. The received-review-prepare.js
+      output is in the project context.
+  assert:
+    - type: regex
+      value: "(0 outstanding|no outstanding|all.*resolved|nothing.*process)"
+    - type: regex
+      value: "(4 resolved|all 4|4.*skipped)"
+    - type: not-regex
+      value: "(implement.*fix|applying.*change|modifying|editing.*file)"
+    - type: llm-rubric
+      value: >
+        The response reads the prepare script output showing 4 threads, all resolved.
+        It reports 0 outstanding comments and that all 4 were skipped (already resolved).
+        It does NOT attempt to process, re-evaluate, or re-analyze any resolved threads.
+        It does NOT start implementing fixes or editing files. It may suggest re-running
+        if new feedback arrives on the PR.
+
+- description: "received-review-sdlc: missing PR context asks user for PR information"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-no-pr.md"
+    user_request: >
+      Run /received-review-sdlc on this project. No --pr flag was provided.
+  assert:
+    - type: regex
+      value: "(PR.*number|pull request|--pr|provide.*PR|which.*PR)"
+    - type: not-regex
+      value: "(processing.*comment|analyzing.*feedback|implementing.*fix)"
+    - type: llm-rubric
+      value: >
+        The response recognizes that no PR number or review findings are available.
+        It falls back to asking the user for the PR URL, PR number, or to paste review
+        comments directly. It does NOT crash, fabricate feedback to process, or start
+        analyzing non-existent comments. The response is clear about what information
+        is needed to proceed.
+
+- description: "received-review-sdlc: mixed batch handles all verdict types with correct actions"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-mixed-batch.md"
+    user_request: >
+      Run /received-review-sdlc --pr 42 on this project. The received-review-prepare.js
+      output and review comments are in the project context. Process all 4 outstanding
+      comments.
+  assert:
+    - type: regex
+      value: "(pagination|offset|empty array)"
+    - type: regex
+      value: "(request.?ID|correlation|log)"
+    - type: regex
+      value: "(disagree|push.?back|intentional|recall)"
+    - type: regex
+      value: "(out.of.scope|separate.*PR|won.t.fix|acknowledge)"
+    - type: llm-rubric
+      value: >
+        The response processes all 4 comments with correct verdict types:
+        1. Pagination bug (will fix) — acknowledges the bug, plans to fix the offset handling
+        2. Request ID logging (will fix) — agrees to add correlation IDs
+        3. Stemming algorithm (disagree/pushback) — pushes back with evidence that aggressive
+           stemming is intentional for recall, proper nouns handled by exact-match fallback
+        4. Retry logic duplication (acknowledge, won't fix) — acknowledges the observation but
+           flags it as out of scope for this PR, suggests a separate refactoring PR
+        The response groups comments by action type and presents a consent gate before
+        posting replies. Pushback comments are left open for the reviewer (not auto-resolved).

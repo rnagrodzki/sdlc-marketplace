@@ -105,3 +105,123 @@
         and clearly reports that no review dimensions are installed. It recommends running
         /review-init-sdlc to create tailored dimensions for this Python/FastAPI project. It does
         NOT fabricate a review without dimensions. The message is clear and actionable.
+
+- description: "review-sdlc: --dimensions filter shows only selected dimension as active"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-filtered-dimensions.md"
+    user_request: >
+      Run /review-sdlc --dimensions security-review on this project. The review-prepare.js
+      manifest is in the project context. Show the review plan.
+  assert:
+    - type: icontains
+      value: "security-review"
+    - type: regex
+      value: "(filter|--dimensions|selected|only)"
+    - type: regex
+      value: "(ACTIVE|active)"
+    - type: llm-rubric
+      value: >
+        The response shows only security-review as an active dimension because --dimensions
+        was used to filter. It acknowledges that the filter was applied (mentioning 3 total
+        dimensions but only 1 active after filtering). It does not show the other dimensions
+        (code-quality-review, api-review) as active.
+
+- description: "review-sdlc: committed scope shows branch changes only"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-committed-scope.md"
+    user_request: >
+      Run /review-sdlc --committed on this project. The review-prepare.js manifest is in
+      the project context. Show the review plan.
+  assert:
+    - type: regex
+      value: "(committed|branch changes|branch.only)"
+    - type: regex
+      value: "(main|base.branch)"
+    - type: not-regex
+      value: "(staged changes|unstaged|staging area|git add)"
+    - type: llm-rubric
+      value: >
+        The response shows the review plan for committed scope, meaning only branch changes
+        (committed vs base branch). It references the base branch. It does NOT mention staged
+        or unstaged changes since the scope is committed-only.
+
+- description: "review-sdlc: truncated dimension shows warning about file cap"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-truncated-dimension.md"
+    user_request: >
+      Run /review-sdlc on this project. The review-prepare.js manifest is in the project
+      context. Show the review plan including any warnings.
+  assert:
+    - type: regex
+      value: "(TRUNCATED|truncated|truncat)"
+    - type: regex
+      value: "(150|max.files|100|cap|limit)"
+    - type: llm-rubric
+      value: >
+        The response shows the review plan with code-quality-review in TRUNCATED status.
+        It warns that this dimension matched 150 files but was capped to the max-files
+        limit of 100. The review still proceeds with the truncated file list. Security-review
+        is shown as ACTIVE normally.
+
+- description: "review-sdlc: queued dimensions shown when cap applied"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-queued-dimensions.md"
+    user_request: >
+      Run /review-sdlc on this project. The review-prepare.js manifest is in the project
+      context. Show the review plan including all dimension statuses.
+  assert:
+    - type: regex
+      value: "(QUEUED|queued)"
+    - type: regex
+      value: "(8|eight).*(active|ACTIVE)"
+    - type: regex
+      value: "(accessibility|internationalization)"
+    - type: llm-rubric
+      value: >
+        The response shows 8 active dimensions and 2 queued dimensions (accessibility
+        and internationalization). It explains that the dimension cap was applied. It
+        suggests re-running to process the queued dimensions or using --dimensions to
+        select them specifically.
+
+- description: "review-sdlc: over-broad dimension warning surfaced in plan"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-overbroad-warning.md"
+    user_request: >
+      Run /review-sdlc on this project. The review-prepare.js manifest is in the project
+      context. Show the review plan with any warnings about dimension quality.
+  assert:
+    - type: regex
+      value: "(over.broad|overbroad|too.broad|broad.coverage|covers.*80)"
+    - type: icontains
+      value: "code-quality-review"
+    - type: llm-rubric
+      value: >
+        The response flags code-quality-review as over-broad (it covers 9 out of 10
+        changed files, over 80%). It suggests tightening the dimension's trigger patterns
+        to be more specific. The review plan still shows it as active, but with a warning.
+
+- description: "review-sdlc: approved verdict completes cleanly without fix offer"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/review-verdict-approved.md"
+    user_request: >
+      The review-orchestrator has completed. The results are in the project context.
+      Present the final review summary and next steps.
+  assert:
+    - type: regex
+      value: "(APPROVED|approved)"
+    - type: not-regex
+      value: "(CHANGES REQUESTED|changes requested|please revise)"
+    - type: llm-rubric
+      value: >
+        The response acknowledges the review verdict as APPROVED. It presents the
+        summary showing 2 low findings across 2 dimensions. It does NOT offer to
+        fix findings via received-review-sdlc as a primary action (since no critical
+        or high findings exist). The tone is positive — the review passed cleanly.
+        Mentioning received-review-sdlc in a general "available commands" context
+        is acceptable, but it should not be presented as a recommended next action.
