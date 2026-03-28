@@ -126,7 +126,8 @@ plan-sdlc      (--auto if     (--committed)
 
 - **Double-commit pattern**: The feature commit (step 5b) and the review fix commit (step 5e) are separate. This keeps feature work and review fixes distinct in git history.
 - **Two mandatory pause points in `--auto` mode**: received-review-sdlc (automated code changes need human sign-off) and version-sdlc (release plan needs consent).
-- **Staging gap**: execute-plan-sdlc creates files but does not stage them. The pipeline runs `git add -A` between execute and commit.
+- **Staging gap**: execute-plan-sdlc creates files but does not stage them. The pipeline runs `git add -A -- ':!.sdlc/'` between execute and commit, excluding the `.sdlc/` runtime directory.
+- **Pipeline plan is binding**: Steps marked "will run" in the pipeline table must execute. Step statuses are computed by `ship-prepare.js` — the LLM follows them mechanically and cannot unilaterally skip planned steps.
 - **Review threshold**: The severity that triggers the fix loop is configurable via `reviewThreshold` in config (default: `high`). At `high`, critical and high findings trigger fixes; medium and below are deferred to the summary.
 
 ---
@@ -347,6 +348,7 @@ Pipeline behavior is configured via `.sdlc/ship-config.json`. Create it manually
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |
 | `auto` | `boolean` | `false` | Run in non-interactive mode by default. |
 | `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` | `"high"` | Minimum severity that triggers the fix loop. |
+| `workspace` | `"branch"` \| `"worktree"` \| `"prompt"` | `"prompt"` | Workspace isolation strategy forwarded to execute-plan-sdlc. |
 
 ### Merge precedence
 
@@ -486,7 +488,8 @@ Then run `/ship-sdlc` without `--resume` to start a new pipeline.
 
 | File / Artifact | Description |
 |-----------------|-------------|
-| `.sdlc/ship-config.json` | Project config (created by `--init-config`). Committed to the repo. |
+| `.sdlc/ship-config.json` | Developer-local config. Gitignored by `.sdlc/.gitignore` (created by `--init-config` via `ship-init.js`). |
+| `.sdlc/.gitignore` | Internal gitignore that prevents `.sdlc/` contents from being committed. Created by `--init-config` via `ship-init.js`. |
 | `.sdlc/execution/ship-*.json` | Pipeline state file. Created at start, deleted on successful completion, retained on failure for `--resume`. |
 | Git commits | Feature commit (step 2) and optionally a review fix commit (step 5). |
 | Git tag | Created by version-sdlc if the version step runs. |
