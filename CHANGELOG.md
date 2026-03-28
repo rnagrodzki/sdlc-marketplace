@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2026-03-28
+
+### Added
+- Pause/resume support for `execute-plan-sdlc` — writes execution state to `.sdlc/execution/` after each wave, enabling cross-session resume via `--resume` flag (#67)
+- `ship-sdlc` forwards `--resume` to `execute-plan-sdlc` when resuming a pipeline with an in-progress execute step
+
 ## [0.16.0] - 2026-03-27
 
 ### Added

@@ -2,7 +2,7 @@
 name: execute-plan-sdlc
 description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan. Also auto-triggered when the user accepts a plan from plan-sdlc (plan content is already in conversation context)."
 user-invocable: true
-argument-hint: "[plan-file-path] [--preset A|B|C]"
+argument-hint: "[plan-file-path] [--preset A|B|C] [--resume]"
 ---
 
 # Execute Plan (SDLC)
@@ -46,15 +46,25 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
 
 **OpenSpec context loading (optional):** After the plan is loaded, check the plan header's `**Source:**` field. If it points to an `openspec/changes/<name>/` path, Read all markdown files matching `openspec/changes/<name>/specs/*.md` (the delta specs). Store these as `openspecSpecs` for use in Step 5c-bis. If the path does not exist or yields no files, proceed without OpenSpec context — this is not a blocking error.
 
-**Checkpoint detection:** Before reading the plan content, check for an existing checkpoint file at `$TMPDIR/claude-exec/<plan-name>-checkpoint.md` (where `<plan-name>` is derived from the plan filename or first 20 characters of the plan title). If found, display:
-Use AskUserQuestion to ask:
-> Found execution checkpoint from <timestamp>. Resume from Wave <N>?
+**Resume detection:** Before reading the plan content, resolve the main working tree path: run `git worktree list --porcelain` and extract the path from the first `worktree <path>` line. All state file operations use `<main-worktree>/.sdlc/execution/`. Then check if `--resume` was passed or if a state file exists at `<main-worktree>/.sdlc/execution/execute-<branch>-*.json` (where `<branch>` is the current branch name with `/` replaced by `-`).
 
-Options:
-- **yes** — resume from where execution left off
-- **restart** — discard checkpoint and start from the beginning
+- If `--resume` was passed:
+  1. Find the most recent state file for the current branch in `<main-worktree>/.sdlc/execution/`. If none found, warn: "No state file found for branch `<branch>`. Starting fresh." and proceed to plan loading below.
+  2. Read `./state-format.md` for the schema reference.
+  3. Read the state file. Load `planPath` and read the plan file. If `planPath` is null (plan was from conversation context), use AskUserQuestion to request the plan file path.
+  4. Compute the SHA-256 hash of the plan content and compare against `planHash`. If mismatch, use AskUserQuestion:
+     > Plan content has changed since execution started. Resume with the existing wave structure, or restart from scratch?
+     Options: **resume** | **restart**
+     If "restart", delete the state file and proceed to plan loading below.
+  5. Load the `context` object: use `completedTaskIds` to identify remaining tasks, `filesAdded`/`filesModified` for filesystem awareness, `interfacesCreated` and `decisionsFromPriorWaves` for agent prompt context.
+  6. Load the `preset` from the state file (CLI `--preset` overrides if provided).
+  7. Skip to Step 5, resuming from the first wave with status `in_progress` or `pending`. Use the context object to construct inter-wave context for the next wave's agent prompts.
 
-If "yes", skip to the checkpoint's "Next" wave. If "restart", proceed normally from Step 2.
+- If `--resume` was NOT passed but a state file exists for the current branch:
+  Use AskUserQuestion:
+  > Found execution state from <startedAt> with <N> of <total> waves completed. Resume from Wave <next>?
+  Options: **yes** — resume | **restart** — discard state file and start fresh
+  If "yes", follow the resume flow above (steps 2-7). If "restart", delete the state file and proceed normally.
 
 **Workspace isolation check:** After plan validation, check whether execution should happen on a separate branch or in a worktree.
 
@@ -121,11 +131,11 @@ After classifying tasks, apply complexity routing before wave building:
 **If total tasks ≤ 3 AND all tasks are Trivial or Standard AND no high-risk tasks:**
 Print: `Small plan — executing directly without wave orchestration.`
 
-Execute each task sequentially in the main context (no agent dispatch). Run verification after each task. Skip Steps 3–4 (wave critique and confirmation). Apply the 2-retry budget and Step 6 recovery if a task fails.
+Execute each task sequentially in the main context (no agent dispatch). Run verification after each task. Skip Steps 3–4 (wave critique and confirmation). Apply the 2-retry budget and Step 6 recovery if a task fails. **No state file is written** — small plans are fast enough to re-run from scratch.
 
-**If total tasks 4–8:** Standard wave execution — proceed to Step 3.
+**If total tasks 4–8:** Standard wave execution with state persistence after every wave — proceed to Step 3.
 
-**If total tasks 9+:** Standard wave execution with mandatory inter-wave checkpoint persistence after every wave — proceed to Step 3.
+**If total tasks 9+:** Standard wave execution with mandatory inter-wave state persistence after every wave — proceed to Step 3.
 
 ## Step 3 (CRITIQUE): Critique Wave Structure
 
@@ -259,23 +269,17 @@ Running verification... [status]
 Proceeding to Wave N+1 (N tasks)
 ```
 
-**Checkpoint write:** After each wave completes, write (or overwrite) a checkpoint file at `$TMPDIR/claude-exec/<plan-name>-checkpoint.md`. Create the directory if it does not exist. Format:
-```markdown
-# Execution Checkpoint
-Plan: <plan file path or description>
-Updated: <ISO timestamp>
-Mode: bypassPermissions
-Preset: <selected preset>
+**State persistence:** After each wave completes, write (or overwrite) the execution state file at `<main-worktree>/.sdlc/execution/execute-<branch>-<timestamp>.json`. Resolve the main working tree path as described in Step 1 (Resume detection). Create the directory if it does not exist (`mkdir -p <main-worktree>/.sdlc/execution`). Read `./state-format.md` for the full schema.
 
-## Completed
-<list of completed waves with task names and status>
+The `<timestamp>` is set once at the start of execution (Step 2 or when loading a plan) and remains stable across all waves — the same file is overwritten after each wave.
 
-## Next
-<next wave tasks and model assignments>
+Update the state file with:
+- Set the completed wave's `status` to `completed` and record its `completedAt`
+- For each task in the wave: record `status` (completed/failed/skipped) and `filesChanged` (from `git diff --stat` scoped to this wave)
+- Set the next wave's `status` to `pending`
+- Update the `context` object: append new entries to `filesAdded`, `filesModified`, `interfacesCreated`, and `decisionsFromPriorWaves` based on the wave's outputs
 
-## Context for Next Wave
-<key outputs: interfaces created, files added, decisions made>
-```
+On the very first wave dispatch, create the state file with all waves initialized to `pending`, the current wave set to `in_progress`, and the `context` object populated with `planSummary` and empty arrays.
 
 **5e. Inter-wave critique** — Before next wave:
 - Did any task's actual output differ from what upcoming tasks assumed as input?
@@ -364,6 +368,11 @@ If `openspecSpecs` was loaded in Step 1, append to the report:
 OpenSpec:         openspec/changes/<name>/ — run /opsx:verify to validate
 ```
 
+**State file cleanup:** On successful completion (all tasks completed), delete the execution state file. Print:
+`State file cleaned up.`
+
+On failure or interruption (not all tasks completed), preserve the state file. Print:
+`Execution state preserved at <main-worktree>/.sdlc/execution/execute-<branch>-<timestamp>.json — use --resume to continue.`
 
 ## Quality Gates
 
@@ -406,6 +415,8 @@ OpenSpec:         openspec/changes/<name>/ — run /opsx:verify to validate
 - Automatically commit, push, or create branches — the workspace isolation check in Step 1 is user-prompted, not automatic
 - Reference external sub-skills by name — this skill is fully self-contained
 - Dispatch a separate agent per trivial task — execute a single trivial inline; batch 2+ trivials into one haiku agent using the Batched Trivial Tasks Prompt Template
+- Delete the execution state file on failure or interruption — it is needed for `--resume`
+- Write state files for small-plan direct execution (≤3 tasks) — they execute without waves and are fast enough to re-run
 
 ## Gotchas
 
@@ -434,6 +445,12 @@ OpenSpec:         openspec/changes/<name>/ — run /opsx:verify to validate
 **Agents may bypass the Edit tool.** Agents sometimes use bash `sed`, `awk`, Python scripts, or compiled programs in `/tmp` to modify files instead of the Edit tool. These approaches are fragile (wrong line numbers, regex mismatches, wrong working directory) and silently fail — the agent reports success, but the file is unchanged or corrupted. The Hard Constraints in the agent prompt forbid this, but the filesystem verification in Step 5c catches cases where the constraint was ignored.
 
 **Workspace isolation can use a stale branch.** The conversation-level `gitStatus` snapshot is frozen at session start. If the user switches branches mid-session, `gitStatus` still reports the original branch. The workspace isolation check in Step 1 must run `git branch --show-current` via Bash — never read the branch from `gitStatus` or any other cached context.
+
+**State file timestamp is set once at execution start.** The `<timestamp>` in the filename is established when execution begins and does not change across waves. The same file is overwritten after each wave. This keeps the filename stable for resume detection and ship-sdlc integration.
+
+**Resume context object enables fresh-session resume.** The `context` object in the state file exists for cross-session resume where the new session has no conversation history. It must contain enough information (plan summary, completed task IDs, file manifests, interface names, key decisions) for the orchestrator to construct meaningful agent prompts for remaining waves. Omitting context fields degrades agent output quality on resume.
+
+**State file and ship-sdlc coexistence.** Both `execute-plan-sdlc` and `ship-sdlc` write state files to `.sdlc/execution/`. They are distinguished by filename prefix (`execute-` vs `ship-`). Each skill manages its own state file lifecycle — execute-plan-sdlc never reads or writes ship-sdlc state files, and vice versa.
 
 ## Learning Capture
 
@@ -469,6 +486,7 @@ If execution started in a worktree (Step 1 workspace isolation), call `ExitWorkt
 
 ## See Also
 
+- `./state-format.md` — execution state file schema for pause/resume
 - `./classifying-and-waving-tasks.md` — task classification heuristics, wave algorithm, agent prompt template
 - `./recovering-from-failures.md` — full error recovery playbook and escalation protocol
 - [`/commit-sdlc`](../commit-sdlc/SKILL.md) — commit changes after plan execution

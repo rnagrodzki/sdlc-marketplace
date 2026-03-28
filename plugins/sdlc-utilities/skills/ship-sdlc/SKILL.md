@@ -95,7 +95,7 @@ Rules:
 
 | Step | Skill | Condition | Args forwarded |
 |------|-------|-----------|----------------|
-| 1 | execute-plan-sdlc | Plan in context AND not skipped | `--preset <X>` |
+| 1 | execute-plan-sdlc | Plan in context AND not skipped | `--preset <X> [--resume on pipeline resume if execute was in_progress]` |
 | 2 | commit-sdlc | Not skipped AND changes exist | `--auto` (when auto) |
 | 3 | review-sdlc | Not skipped | `--committed` |
 | 4 | received-review-sdlc | Verdict has critical OR high findings | (always interactive) |
@@ -223,6 +223,14 @@ For each step that will run, print verbose progress:
 
 Invoke each sub-skill using the Skill tool:
 - `skill: "execute-plan-sdlc", args: "--preset B"` (example)
+
+**Execute step resume:** When the pipeline is resuming (`--resume` active) and the execute step's status in the ship state file is `in_progress`:
+1. Check for `<main-worktree>/.sdlc/execution/execute-<branch>-*.json` (an execute-plan-sdlc state file for the current branch). Resolve `<main-worktree>` via `git worktree list --porcelain` (first `worktree` line).
+2. If found, invoke: `skill: "execute-plan-sdlc", args: "--preset <X> --resume"`
+3. If not found, invoke normally: `skill: "execute-plan-sdlc", args: "--preset <X>"` (execute restarts from scratch)
+
+ship-sdlc does not manage execute-plan-sdlc's state file — execute-plan-sdlc handles its own creation, updates, and cleanup.
+
 - `skill: "commit-sdlc", args: "--auto"` (example)
 - `skill: "review-sdlc", args: "--committed"` (example)
 - `skill: "received-review-sdlc"` (no args — always interactive)
