@@ -25,7 +25,8 @@ Create it manually or run `ship-sdlc --init-config` to walk through an interacti
   "bump": "patch",
   "draft": false,
   "auto": false,
-  "reviewThreshold": "high"
+  "reviewThreshold": "high",
+  "workspace": "prompt"
 }
 ```
 
@@ -41,6 +42,7 @@ Create it manually or run `ship-sdlc --init-config` to walk through an interacti
 | `draft` | `boolean` | `false` | When `true`, PRs are created as drafts. Equivalent to `--draft`. |
 | `auto` | `boolean` | `false` | When `true`, run in non-interactive auto mode (no confirmation prompts). Equivalent to `--auto`. |
 | `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` | `"high"` | Minimum review-finding severity that triggers the received-review fix loop. See table below. |
+| `workspace` | `"branch"` \| `"worktree"` \| `"prompt"` | `"prompt"` | Workspace isolation strategy for execute-plan-sdlc. `"branch"` = use a feature branch, `"worktree"` = use a git worktree, `"prompt"` = ask each time. Forwarded to execute-plan-sdlc as a hint. |
 
 ### reviewThreshold Levels
 
@@ -81,12 +83,19 @@ Running `ship-sdlc --init-config` launches an interactive sequence that writes `
 
 4. **Draft PR preference** — Should PRs be opened as drafts by default? (`yes` / `no`)
 
-5. **Review threshold** — Choose the minimum severity that triggers a fix loop:
+5. **Auto mode** — Should the pipeline run without confirmation prompts where supported? (`yes` / `no`). Default: `no`.
+
+6. **Workspace isolation** — How should the execute step isolate work? (`branch` / `worktree` / `prompt`). Default: `prompt`.
+   - `branch` = create or use a feature branch (simpler, most common)
+   - `worktree` = create a git worktree (parallel work, isolated filesystem)
+   - `prompt` = ask each time (current default behavior)
+
+7. **Review threshold** — Choose the minimum severity that triggers a fix loop:
    - `critical` = only blockers
    - `high` = blockers + high-severity findings (recommended)
    - `medium` = blockers + high + medium-severity findings
 
-6. **Write and confirm** — The tool displays the resulting JSON and asks for confirmation before writing `.sdlc/ship-config.json`. If the file already exists you are asked whether to overwrite it.
+8. **Write and confirm** — The tool runs `ship-init.js` with the collected answers to create `.sdlc/ship-config.json` and `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the config file already exists, you are asked whether to overwrite it.
 
 ---
 
@@ -105,7 +114,8 @@ Minimises prompts and skips the version step to manage it manually.
   "bump": "patch",
   "draft": false,
   "auto": true,
-  "reviewThreshold": "critical"
+  "reviewThreshold": "critical",
+  "workspace": "branch"
 }
 ```
 
@@ -122,7 +132,8 @@ Balanced preset, review threshold set to catch high-severity findings, PRs alway
   "bump": "minor",
   "draft": true,
   "auto": false,
-  "reviewThreshold": "high"
+  "reviewThreshold": "high",
+  "workspace": "prompt"
 }
 ```
 
@@ -139,6 +150,7 @@ Quality preset with the widest review threshold. Suitable for regulated environm
   "bump": "patch",
   "draft": false,
   "auto": false,
-  "reviewThreshold": "medium"
+  "reviewThreshold": "medium",
+  "workspace": "worktree"
 }
 ```

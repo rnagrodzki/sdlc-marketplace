@@ -116,3 +116,93 @@
         review dimension setup, with specific skill options to choose from. The menu
         includes at minimum: review (/review-sdlc), commit (/commit-sdlc), and done.
         The user is asked to select an option rather than being given a passive suggestion.
+
+- description: "review-init-sdlc: --add mode proposes only new dimensions, acknowledges existing"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-dimensions-add-mode.md"
+    user_request: >
+      Run /review-init-sdlc --add on this project. The project already has code-quality-review
+      and security-review dimensions installed. Propose additional dimensions based on the
+      project's tech stack.
+  assert:
+    - type: regex
+      value: "(existing|installed|already)"
+    - type: regex
+      value: "(code-quality-review|security-review)"
+    - type: not-regex
+      value: "(propose.*code-quality-review|propose.*security-review|create.*code-quality-review|create.*security-review|add.*code-quality-review.*dimension|add.*security-review.*dimension)"
+    - type: llm-rubric
+      value: >
+        The response acknowledges the 2 existing dimensions (code-quality-review and
+        security-review) that are already installed. It proposes only NEW dimensions
+        based on project evidence — likely test-coverage (evidence: __tests__ directory
+        with 25+ test files) and ci-cd-pipeline-review (evidence: .github/workflows/).
+        It does NOT re-propose the already-installed dimensions. Each new proposal
+        cites specific evidence from the project.
+
+- description: "review-init-sdlc: validation failure shows errors and offers to fix"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-invalid-dimension.md"
+    user_request: >
+      I ran /review-init-sdlc and the dimensions were created, but validation failed.
+      The validation output is in the project context. Help me fix the issues.
+  assert:
+    - type: regex
+      value: "(D4|trigger|empty)"
+    - type: regex
+      value: "(error|fail|issue|problem)"
+    - type: regex
+      value: "(fix|repair|correct|update)"
+    - type: llm-rubric
+      value: >
+        The response reads the validation output showing code-quality-review failed D4
+        (empty triggers). It clearly reports the error and offers to fix it automatically.
+        It may also mention the D11 warning on api-review (typo in field name). It does
+        NOT invoke error-report-sdlc (this is exit code 1, not exit code 2). The response
+        is actionable — it either fixes the dimension directly or asks for confirmation
+        before fixing.
+
+- description: "review-init-sdlc: minimal project still gets baseline dimension proposal"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-empty-signals.md"
+    user_request: >
+      Run /review-init-sdlc on this project. It's a very minimal project with just a
+      README and a single Python file.
+  assert:
+    - type: regex
+      value: "(code-quality|baseline|default)"
+    - type: regex
+      value: "(limited|minimal|few|little|no.+signal)"
+    - type: not-regex
+      value: "(security-review|api-review|data-integrity|test-coverage|monorepo|ci-cd)"
+    - type: llm-rubric
+      value: >
+        The response acknowledges the minimal project with very few tech signals.
+        It still proposes code-quality-review as the baseline dimension (it is always
+        proposed regardless of signals). It does NOT fabricate dimensions without
+        evidence — no security-review, api-review, data-integrity, test-coverage, or
+        ci-cd-pipeline-review since there is no evidence for any of these. It may
+        suggest the user add more project structure before re-running.
+
+- description: "review-init-sdlc: --no-copilot skips GitHub Copilot instructions step"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-tech-stack.md"
+    user_request: >
+      Run /review-init-sdlc --no-copilot on this project. Scan the tech stack and
+      propose dimensions, but skip the GitHub Copilot instructions generation step.
+  assert:
+    - type: not-regex
+      value: '(copilot instruction|\.github/instructions|instructions\.md)'
+    - type: regex
+      value: "(dimension|code-quality)"
+    - type: llm-rubric
+      value: >
+        The response scans the project tech stack and proposes dimensions normally
+        (code-quality-review baseline plus evidence-based proposals). It explicitly
+        skips or does not mention the GitHub Copilot instructions generation step
+        (Step 8 in the skill). It does NOT create .github/instructions/ files. The
+        dimension creation and validation proceed as normal despite --no-copilot.

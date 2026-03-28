@@ -20,7 +20,7 @@ Review Node.js scripts for clarity, correctness, and maintainability. This proje
 - [ ] Functions and variables use clear, intention-revealing names
 - [ ] Functions have single responsibility — not doing too many things
 - [ ] Error cases are handled explicitly — no silent `catch {}` blocks that swallow errors
-- [ ] CLI scripts use correct exit codes: `process.exit(0)` for success, `process.exit(1)` for user errors, `process.exit(2)` for script errors
+- [ ] Scripts use correct exit codes: `process.exit(0)` for success, `process.exit(1)` for user errors, `process.exit(2)` for script errors — both plugin scripts (`scripts/*.js`) and CI scripts (`.github/scripts/*.js`) follow this convention
 - [ ] Error messages go to `stderr` (`process.stderr.write` or `console.error`), normal output to `stdout`
 - [ ] File paths use `path.join()` or `path.resolve()` — no string concatenation for paths
 - [ ] `child_process` calls (execSync, spawnSync) handle errors and check exit codes

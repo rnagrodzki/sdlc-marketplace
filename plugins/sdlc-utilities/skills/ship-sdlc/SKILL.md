@@ -24,7 +24,25 @@ If the system context contains "Plan mode is active":
 
 ### 1a. --init-config handler
 
-If `--init-config` was passed, Read `./config-format.md` and run interactive config creation, then stop. No pipeline execution.
+If `--init-config` was passed:
+
+1. Read `./config-format.md` and run the interactive walkthrough to collect the user's answers (preset, skip set, bump type, auto, threshold, workspace isolation).
+2. Locate and call `ship-init.js` via Bash with the collected answers:
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-init.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
+
+INIT_OUTPUT_FILE=$(mktemp /tmp/ship-init-XXXXXX.json)
+node "$SCRIPT" --preset B --skip version --bump patch --auto --threshold high --workspace prompt > "$INIT_OUTPUT_FILE"
+EXIT_CODE=$?
+echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
+echo "EXIT_CODE=$EXIT_CODE"
+```
+3. Parse the output JSON from `$INIT_OUTPUT_FILE`:
+   - If `errors` is non-empty, display them and stop.
+   - Otherwise display the `created` files list and `config` JSON for user confirmation.
+4. Stop. No pipeline execution.
 
 ### 1b. Load ship config
 
@@ -36,72 +54,97 @@ Ship config loaded from .sdlc/ship-config.json
 ```
 If not found: `No ship config found — using built-in defaults. Run --init-config to create one.`
 
-### 1c. Parse flags
+### 1c. Prepare pipeline context
 
-Parse: `--auto`, `--skip <csv>`, `--preset A|B|C`, `--bump patch|minor|major`, `--draft`, `--dry-run`, `--resume`. CLI flags override config values. Print the merge result:
+Locate and run `ship-prepare.js` with all CLI flags to pre-compute flags, context, and step statuses:
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "ship-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-prepare.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+
+PREPARE_OUTPUT_FILE=$(mktemp /tmp/ship-prepare-XXXXXX.json)
+node "$SCRIPT" --has-plan --auto --skip version --preset B --bump patch --workspace branch > "$PREPARE_OUTPUT_FILE"
+EXIT_CODE=$?
+echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
+echo "EXIT_CODE=$EXIT_CODE"
 ```
-Flag resolution (CLI overrides config):
-  auto:    true  (from CLI --auto)
-  preset:  C     (from CLI --preset C, overrides config B)
-  skip:    [version]  (from config)
-  bump:    patch (from config default)
-  draft:   false (from built-in default)
+
+Parse the output JSON from `$PREPARE_OUTPUT_FILE`. If `errors` is non-empty, display them and stop. The parsed output replaces manual computation in subsequent sub-steps (1d–1g).
+
+**Gitignore warning:** If `context.sdlcGitignored` is `false` in the output, print:
+```
+⚠ Warning: .sdlc/ is not gitignored. Run --init-config to fix, or manually create .sdlc/.gitignore:
+  printf '*\n!.gitignore\n' > .sdlc/.gitignore
 ```
 
-### 1d. Resume check
+### 1d. Parse flags
 
-If `--resume`, look for state file in `.sdlc/execution/`. Print what was found and resume point. If not found, warn and start fresh.
+Print the `flags` object from the `ship-prepare.js` output, including the `sources` map showing where each value came from (CLI, config, or default):
+```
+Flag resolution (from ship-prepare.js):
+  auto:    true  (source: cli)
+  preset:  C     (source: cli, overrides config B)
+  skip:    [version]  (source: config)
+  bump:    patch (source: default)
+  draft:   false (source: default)
+```
+
+### 1e. Resume check
+
+Print `resume.found` and `resume.stateFile` from the `ship-prepare.js` output. If `resume.found` is `true`, print the state file path and resume point. If `false`, print that no state file was found and the pipeline will start fresh.
 
 Read `./state-format.md` when resuming from a state file.
 
-### 1e. Context detection
+### 1f. Context detection
 
-Print every check:
+Print the `context` object values from the `ship-prepare.js` output:
 ```
-Context detection:
-  Plan in context:     yes (from conversation)
+Context detection (from ship-prepare.js):
+  Plan in context:     yes
   Uncommitted changes: 14 files modified
   Current branch:      feat/ship-sdlc
   Default branch:      main
   gh CLI:              authenticated as <user>
   OpenSpec:            not detected
+  .sdlc/ gitignored:   yes
 ```
 
-Run these checks via Bash: `git status --porcelain`, `git branch --show-current`, `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'`, `gh auth status`.
+### 1g. Auto-skip logic
 
-### 1f. Auto-skip logic
-
-Print each decision with reasoning:
+Print each step from the `steps` array in the `ship-prepare.js` output with its `status` and `reason`:
 ```
-Auto-skip decisions:
-  execute: WILL RUN — plan detected in context
-  commit:  WILL RUN — uncommitted changes detected
-  review:  WILL RUN — not in skip set
-  version: SKIPPED — in skip set (from config)
-  pr:      WILL RUN — not in skip set
+Auto-skip decisions (from ship-prepare.js):
+  execute: will_run — plan detected in context
+  commit:  will_run — uncommitted changes detected
+  review:  will_run — not in skip set
+  received-review: conditional — depends on review verdict
+  commit (fixes): conditional — depends on received-review changes
+  version: skipped — in skip set (from config)
+  pr:      will_run — not in skip set
 ```
 
-Rules:
-- **execute**: skip if no plan in context or conversation, or if `--skip execute`
-- **commit**: skip if no uncommitted changes after execute, or if `--skip commit`
-- **review**: skip only if `--skip review`
-- **received-review**: always conditional on review verdict (never in skip set)
-- **version**: skip if `--skip version`
-- **pr**: skip only if `--skip pr`
+The LLM does not compute these statuses — `ship-prepare.js` is the source of truth.
 
 ---
 
 ## Step 2 (PLAN): Build Pipeline Plan
 
-| Step | Skill | Condition | Args forwarded |
-|------|-------|-----------|----------------|
-| 1 | execute-plan-sdlc | Plan in context AND not skipped | `--preset <X> [--resume on pipeline resume if execute was in_progress]` |
-| 2 | commit-sdlc | Not skipped AND changes exist | `--auto` (when auto) |
-| 3 | review-sdlc | Not skipped | `--committed` |
-| 4 | received-review-sdlc | Verdict has critical OR high findings | (always interactive) |
-| 5 | commit-sdlc (fixes) | received-review made changes | `--auto` (when auto) |
-| 6 | version-sdlc | Not skipped | `<bump-type>` (default: patch) |
-| 7 | pr-sdlc | Always (unless skipped) | `--auto` (when auto), `--draft` (when draft) |
+The pipeline table is generated from the `steps` array in the `ship-prepare.js` output. Each row maps:
+- Step number: array index + 1
+- Skill: `step.skill`
+- Status: `step.status`
+- Args: `step.args`
+- Pause: `step.pause ? 'YES' : 'no'`
+
+| Step | Skill | Status | Args | Pause |
+|------|-------|--------|------|-------|
+| 1 | execute-plan-sdlc | will_run | `--preset B` | no |
+| 2 | commit-sdlc | will_run | `--auto` | no |
+| 3 | review-sdlc | will_run | `--committed` | no |
+| 4 | received-review-sdlc | conditional | (if crit/high) | YES |
+| 5 | commit-sdlc (fixes) | conditional | `--auto` | no |
+| 6 | version-sdlc | skipped | — | — |
+| 7 | pr-sdlc | will_run | `--auto --draft` | no |
 
 ### --auto Mode Audit
 
@@ -211,6 +254,15 @@ On **edit**: ask what to change, update flags, rebuild the pipeline table, and r
 
 ## Step 5 (EXECUTE): Run Pipeline Steps Sequentially
 
+### Pre-step validation
+
+Before invoking each step, read its `status` from the ship-prepare.js output:
+1. `"will_run"` → invoke via Skill tool. No exceptions. This is non-negotiable.
+2. `"conditional"` → evaluate the runtime condition (e.g., review verdict). If condition met → invoke. If not → print why with the specific condition that was not met.
+3. `"skipped"` → print "skipped" with the `reason` from the script output.
+
+A step with `status: "will_run"` MUST be invoked via the Skill tool. The LLM does not have authority to override this status. Printing a skip message for a "will_run" step is a pipeline violation.
+
 ### Execution loop
 
 For each step that will run, print verbose progress:
@@ -245,14 +297,14 @@ After each step, print the result and save state:
 
 ### Between execute and commit
 
-execute-plan-sdlc does not stage files. Run `git add -A` with verbose output:
+execute-plan-sdlc does not stage files. Run `git add -A -- ':!.sdlc/'` with verbose output:
 ```
 Staging changes from execution:
   A  src/middleware/auth.ts
   A  src/middleware/auth.test.ts
   M  src/routes/index.ts
   Total: 14 files staged
-  Reason: execute-plan-sdlc creates files but does not stage them
+  Reason: execute-plan-sdlc creates files but does not stage them. .sdlc/ excluded to prevent committing runtime state.
 ```
 
 ### Between review and received-review
@@ -308,7 +360,7 @@ Deferred review findings (2 medium):
 State file cleaned up: .sdlc/execution/ship-<branch>-<epoch>.json deleted
 ```
 
-If OpenSpec was detected in Step 1e, append: `→ Run /opsx:verify to validate implementation completeness against the spec`
+If OpenSpec was detected in Step 1f, append: `→ Run /opsx:verify to validate implementation completeness against the spec`
 
 ---
 
@@ -320,7 +372,7 @@ If OpenSpec was detected in Step 1e, append: `→ Run /opsx:verify to validate i
 |-------|----------|---------------------------|
 | Sub-skill fails (script crash) | Show error from sub-skill, stop pipeline, save state for `--resume` | Delegated — sub-skill handles its own error reporting |
 | `gh auth status` fails | Stop at validation (Step 3). Tell user to run `gh auth login` | No — user setup |
-| `git add -A` fails | Show error, stop pipeline | No — user action needed |
+| `git add -A -- ':!.sdlc/'` fails | Show error, stop pipeline | No — user action needed |
 | State file write fails | Warn and continue — state persistence is best-effort | No |
 | Resume state file corrupt | Warn, start fresh | No |
 | Review verdict unparseable | Treat as APPROVED WITH NOTES, warn user, defer all findings | No |
@@ -339,12 +391,13 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Run pipeline steps in parallel — the pipeline is strictly sequential
 - Delete the state file on failure — it is needed for `--resume`
 - Proceed past a failed sub-skill — stop, save state, inform user
+- Skip pipeline steps that were marked "will run" in the pipeline plan. The pipeline plan is a contract with the user. If a step was planned to run and the user confirmed the pipeline, it MUST run. The LLM does not have authority to skip planned steps based on its own assessment of change complexity or risk. Only the skip set and auto-skip rules (computed by ship-prepare.js) control which steps run.
 
 ---
 
 ## Gotchas
 
-**Staging gap after execute.** execute-plan-sdlc creates and modifies files but does not stage them. ship-sdlc must run `git add -A` between execute and commit. Missing this produces an empty commit.
+**Staging gap after execute.** execute-plan-sdlc creates and modifies files but does not stage them. ship-sdlc must run `git add -A -- ':!.sdlc/'` between execute and commit. Missing this produces an empty commit.
 
 **Verdict detection is text-based.** Parse the conversation for a line matching `Verdict: <VERDICT>`. The review-sdlc orchestrator always emits this. If the conversation is compacted between review and verdict parsing, the verdict may be lost — treat missing verdict as APPROVED WITH NOTES and warn the user.
 
@@ -357,6 +410,10 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 **Config file is optional.** The pipeline runs with built-in defaults when no `.sdlc/ship-config.json` exists. Do not error on missing config.
 
 **Skip set validation matters.** Unrecognized values in `--skip` (e.g., `--skip reviw`) should warn, not silently ignore. Typos in skip values cause steps to run when the user expected them skipped.
+
+**.sdlc/ must be gitignored.** The `.sdlc/` directory contains developer-local config (`ship-config.json`) and ephemeral pipeline state (`execution/`). `--init-config` creates `.sdlc/.gitignore` automatically via `ship-init.js`. If `.sdlc/` is not gitignored, the staging command (`git add -A -- ':!.sdlc/'`) provides a fallback exclusion, but the gitignore is the primary defense.
+
+**Pipeline plan is binding.** The pipeline table displayed in Step 4 and confirmed by the user is a contract. Step statuses (`will_run`, `skipped`, `conditional`) are computed by `ship-prepare.js` — the LLM follows them, it does not override them. Steps with `status: "will_run"` must be invoked via the Skill tool. This was added after an incident where the review step was skipped because the LLM judged the changes to be "just docs/config" (issue #68). The pipeline's value is precisely in catching cases where the developer thinks changes are low-risk but the review disagrees.
 
 ---
 
