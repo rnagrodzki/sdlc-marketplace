@@ -78,10 +78,23 @@ codebases — read only manifests, config files, and directory listings.
 
 From the scan, extract: primary language(s)/framework(s), key dependency categories, directory patterns with file counts, and infrastructure/tooling signals.
 
-**GitHub hosting detection:**
+**GitHub hosting detection (multi-signal cascade):**
 
 ```bash
-git remote -v 2>/dev/null | grep -q 'github\.com'
+GITHUB_HOSTED=false
+
+# Signal 1: standard GitHub remote URL (fast path)
+git remote -v 2>/dev/null | grep -q 'github\.com' && GITHUB_HOSTED=true
+
+# Signal 2: gh CLI resolves to GitHub (handles custom SSH aliases, HTTPS variants)
+if [ "$GITHUB_HOSTED" != "true" ]; then
+  gh repo view --json url 2>/dev/null | grep -q 'github\.com' && GITHUB_HOSTED=true
+fi
+
+# Signal 3: .github/ directory exists (weak heuristic fallback)
+if [ "$GITHUB_HOSTED" != "true" ] && [ -d ".github" ]; then
+  GITHUB_HOSTED=true
+fi
 ```
 
 | Condition | Action |
@@ -298,7 +311,7 @@ Present the markdown output table. If any file has errors, show the error detail
 - **Copilot step gated on gh auth.** Check `gh auth status` at the start of Step 8; skip gracefully if unauthenticated rather than failing mid-workflow.
 - **validate-dimensions.js YAML parser limitations.** The script uses a hand-rolled parser for simple key-value frontmatter only. Multi-line or nested YAML produces a misleading "malformed frontmatter" error. Use flat key-value frontmatter only.
 - **review-prepare.js not available at init time.** If not found via standard resolution in `--add` mode, skip the dimension matching step and proceed with manual scan.
-- **GitHub hosting detection uses remotes.** `git remote -v` may miss GitHub-hosted repos using custom SSH aliases or non-standard remote URLs (e.g., `gh:org/repo` instead of `github.com:org/repo`). If the Copilot prompt doesn't appear for a GitHub repo, check the remote URL format.
+- **GitHub hosting detection is multi-signal.** The primary `git remote -v` check may miss custom SSH aliases (e.g., `github-rn:org/repo`), but `gh repo view` (Signal 2) resolves the actual remote URL regardless of local SSH config. The `.github/` directory fallback (Signal 3) is a weak heuristic — it can false-positive for repos that have GitHub Actions config but are hosted elsewhere. If all three signals fail, use `--no-copilot` to bypass.
 
 ---
 

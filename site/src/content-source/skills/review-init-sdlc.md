@@ -259,11 +259,13 @@ max-files: 50
 
 ## GitHub Copilot Instructions
 
-For GitHub-hosted repositories, `review-init` automatically detects the hosting platform
-via `git remote -v` and prompts whether to include Copilot review dimensions. This prompt
-appears early in the flow (after the tech stack scan) so the decision is made upfront — it
-is a mandatory decision point for GitHub-hosted repos. For non-GitHub repositories, the
-Copilot step is skipped automatically. Use `--no-copilot` to bypass the prompt entirely.
+For GitHub-hosted repositories, `review-init` detects the hosting platform using a
+multi-signal cascade: (1) `git remote -v` URL matching, (2) `gh repo view` resolution
+(handles custom SSH aliases), and (3) `.github/` directory presence as a fallback. The
+skill then prompts whether to include Copilot review dimensions. This prompt appears early
+in the flow (after the tech stack scan) so the decision is made upfront — it is a mandatory
+decision point for GitHub-hosted repos. For non-GitHub repositories, the Copilot step is
+skipped automatically. Use `--no-copilot` to bypass the prompt entirely.
 
 When Copilot dimensions are enabled, `review-init` generates matching GitHub Copilot
 instruction files in `.github/instructions/`. These instruct Copilot's automatic PR code
