@@ -84,11 +84,13 @@ function findStateFile(prefix, branchSlug) {
     return null;
   }
 
+  // Match files like: <prefix>-<branchSlug>-<timestamp>.json
+  // Use delimiter-aware matching to avoid "main" matching "fix-maintain-feature"
+  const slugPattern = `${prefix}-${branchSlug}-`;
   const matching = entries
     .filter(f =>
-      f.startsWith(`${prefix}-`) &&
-      f.endsWith('.json') &&
-      f.includes(branchSlug)
+      f.startsWith(slugPattern) &&
+      f.endsWith('.json')
     )
     .map(f => {
       const fullPath = path.join(stateDir, f);

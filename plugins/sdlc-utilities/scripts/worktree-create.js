@@ -38,6 +38,17 @@ function slugify(name) {
 }
 
 /**
+ * Validate that a branch name contains only safe characters for git refs.
+ * Rejects shell metacharacters to prevent command injection via exec().
+ * Allowed: alphanumeric, forward slash, hyphen, underscore, dot.
+ * @param {string} name
+ * @returns {boolean}
+ */
+function isValidBranchName(name) {
+  return /^[a-zA-Z0-9/_.\-]+$/.test(name) && !/\.\./.test(name) && !name.endsWith('.lock');
+}
+
+/**
  * Check whether a local git branch already exists.
  * @param {string} branchName
  * @returns {boolean}
@@ -120,6 +131,11 @@ function main() {
     return;
   }
 
+  if (!isValidBranchName(name)) {
+    fail(`Invalid branch name "${name}". Only alphanumeric, /, -, _, and . characters are allowed.`);
+    return;
+  }
+
   // Resolve a unique branch name / worktree path
   let finalName, sluggedPath;
   try {
@@ -139,13 +155,13 @@ function main() {
   }
 
   // Create the worktree (git creates the worktree directory itself)
-  const addResult = exec(
-    `git worktree add ${sluggedPath} -b ${finalName}`,
-    { throwOnError: true }
-  );
-
-  if (addResult === null) {
-    fail(`git worktree add failed for branch "${finalName}" at path "${sluggedPath}"`);
+  try {
+    exec(
+      `git worktree add ${sluggedPath} -b ${finalName}`,
+      { throwOnError: true }
+    );
+  } catch (err) {
+    fail(`git worktree add failed for branch "${finalName}" at path "${sluggedPath}": ${err.message}`);
     return;
   }
 
