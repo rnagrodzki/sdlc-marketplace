@@ -30,6 +30,8 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 |---|---|---|
 | `--preset <A\|B\|C>` | Auto-select a model preset, skipping the interactive selection prompt. `A` = Speed, `B` = Balanced, `C` = Quality. Invalid values fall back to interactive selection. | Interactive prompt |
 | `--resume` | Resume from the most recent execution state file for the current branch. Completed waves are skipped; in-progress waves are retried. If the plan has changed since execution started, you are prompted to resume or restart. | Off |
+| `--workspace <branch\|worktree\|prompt>` | Workspace isolation mode when on the default branch. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. | `prompt` |
+| `--rebase <auto\|skip\|prompt>` | Rebase onto the default branch before execution. `auto` rebases silently (aborts on conflict), `skip` skips, `prompt` asks. | Skip |
 
 ---
 
@@ -58,13 +60,15 @@ Suggested: feat/add-jwt-authentication
 
 The slug is derived from the plan title (lowercase, hyphenated, max 50 characters). You can override both the prefix and slug by providing a custom name.
 
-**Option 1 — Create branch:** Runs `git checkout -b <name>` and continues execution on the new branch. Lightweight and familiar.
+**Option 1 — Create branch:** Runs `git checkout -b <name>` and continues execution on the new branch. Lightweight and familiar. When `--workspace branch` is passed, this option is selected automatically without prompting.
 
-**Option 2 — Create worktree:** Calls `EnterWorktree` to create an isolated copy of the repository. All execution happens in the worktree. After execution and any follow-up actions (commit, PR), call `ExitWorktree` to return.
+**Option 2 — Create worktree:** Creates an isolated copy of the repository using `worktree-create.js`. All execution happens in the worktree. After execution and any follow-up actions (commit, PR), clean up with `git worktree remove <path>` from the main worktree. When `--workspace worktree` is passed, this option is selected automatically without prompting.
 
 **Option 3 — Continue:** Proceeds without changes. This is the user's decision — the check is a suggestion, not a block.
 
 The check is skipped entirely when you are already on a non-default branch.
+
+Pass `--workspace branch` or `--workspace worktree` to bypass the interactive prompt and have the skill act immediately. Pass `--workspace prompt` (the default) to always be asked.
 
 **Note:** Branch detection always runs `git branch --show-current` at execution time. It does not use the session-level `gitStatus` snapshot, which may be stale if you switched branches after starting the conversation.
 

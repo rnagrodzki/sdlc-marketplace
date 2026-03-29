@@ -40,7 +40,8 @@ f4a9e12 feat(auth): add session management and token storage
   "skip": ["version"],
   "bump": "patch",
   "draft": false,
-  "reviewThreshold": "high"
+  "reviewThreshold": "high",
+  "workspace": "worktree"
 }
 ```
 

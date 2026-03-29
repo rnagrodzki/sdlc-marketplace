@@ -26,7 +26,8 @@ Create it manually or run `ship-sdlc --init-config` to walk through an interacti
   "draft": false,
   "auto": false,
   "reviewThreshold": "high",
-  "workspace": "prompt"
+  "workspace": "prompt",
+  "rebase": true
 }
 ```
 
@@ -43,6 +44,7 @@ Create it manually or run `ship-sdlc --init-config` to walk through an interacti
 | `auto` | `boolean` | `false` | When `true`, run in non-interactive auto mode (no confirmation prompts). Equivalent to `--auto`. |
 | `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` | `"high"` | Minimum review-finding severity that triggers the received-review fix loop. See table below. |
 | `workspace` | `"branch"` \| `"worktree"` \| `"prompt"` | `"prompt"` | Workspace isolation strategy for execute-plan-sdlc. `"branch"` = use a feature branch, `"worktree"` = use a git worktree, `"prompt"` = ask each time. Forwarded to execute-plan-sdlc as a hint. |
+| `rebase` | `true` \| `false` \| `"prompt"` | `true` | When `true`, auto-rebase onto the default branch before execution (execute-plan-sdlc) and before versioning (ship-sdlc). When `false`, skip rebase. When `"prompt"`, ask each time. |
 
 ### reviewThreshold Levels
 
@@ -90,12 +92,17 @@ Running `ship-sdlc --init-config` launches an interactive sequence that writes `
    - `worktree` = create a git worktree (parallel work, isolated filesystem)
    - `prompt` = ask each time (current default behavior)
 
-7. **Review threshold** — Choose the minimum severity that triggers a fix loop:
+7. **Rebase strategy** — Should the pipeline rebase onto the default branch before execution and versioning? (`yes` / `no` / `prompt`). Default: `yes` (maps to `true`).
+   - `yes` = always rebase automatically (`true` in config)
+   - `no` = never rebase (`false` in config)
+   - `prompt` = ask each time (`"prompt"` in config)
+
+8. **Review threshold** — Choose the minimum severity that triggers a fix loop:
    - `critical` = only blockers
    - `high` = blockers + high-severity findings (recommended)
    - `medium` = blockers + high + medium-severity findings
 
-8. **Write and confirm** — The tool runs `ship-init.js` with the collected answers to create `.sdlc/ship-config.json` and `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the config file already exists, you are asked whether to overwrite it.
+9. **Write and confirm** — The tool runs `ship-init.js` with the collected answers to create `.sdlc/ship-config.json` and `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the config file already exists, you are asked whether to overwrite it.
 
 ---
 

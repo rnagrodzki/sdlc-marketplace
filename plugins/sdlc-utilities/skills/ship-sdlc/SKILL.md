@@ -2,7 +2,7 @@
 name: ship-sdlc
 description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Chains execute-plan-sdlc, commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, and pr-sdlc with conditional review-fix loop. Arguments: [--auto] [--skip <steps>] [--preset A|B|C] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
-argument-hint: "[--auto] [--skip <steps>] [--preset A|B|C] [--draft] [--dry-run]"
+argument-hint: "[--auto] [--skip <steps>] [--preset A|B|C] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--init-config]"
 ---
 
 # Ship Pipeline
@@ -283,6 +283,14 @@ Invoke each sub-skill using the Skill tool:
 
 ship-sdlc does not manage execute-plan-sdlc's state file — execute-plan-sdlc handles its own creation, updates, and cleanup.
 
+**Worktree re-entry on resume:** Check `context.worktree.inLinkedWorktree` from the ship-prepare.js output. If true, already in the worktree — proceed normally.
+
+If false (resuming from the main worktree but the pipeline originally ran in a worktree), find the worktree for the resume branch:
+```bash
+git worktree list --porcelain
+```
+Match the branch from the ship state file against worktree entries. If found and directory exists, `cd <path>` before continuing. If the worktree directory is gone, warn and fall back to running on the current branch.
+
 - `skill: "commit-sdlc", args: "--auto"` (example)
 - `skill: "review-sdlc", args: "--committed"` (example)
 - `skill: "received-review-sdlc"` (no args — always interactive)
@@ -319,14 +327,78 @@ Review fixes applied: 3 files modified
 ```
 Then invoke commit-sdlc (step 5) for the fix commit.
 
-### State persistence
+### Between last commit and version — rebase on default branch
 
-After each step, write state to `.sdlc/execution/ship-<branch>-<epoch>.json`. Create the directory if needed:
+After all commits are done (feature commit + optional review-fix commit), rebase onto the latest default branch to ensure a clean merge:
+
 ```bash
-mkdir -p .sdlc/execution
+git fetch origin <defaultBranch>
 ```
 
-On pipeline completion (success), delete the state file.
+Check if rebase is needed:
+```bash
+git merge-base --is-ancestor origin/<defaultBranch> HEAD
+```
+If main is already an ancestor of HEAD, no rebase needed — print "Already up to date with `<defaultBranch>`" and skip.
+
+Otherwise, attempt rebase:
+```bash
+git rebase origin/<defaultBranch>
+```
+
+**If rebase succeeds:** Print summary and continue.
+```
+Rebase: clean — <N> commits replayed on origin/<defaultBranch>
+```
+
+**If rebase fails (conflicts):** Abort and handle:
+```bash
+git rebase --abort
+```
+List conflicting files from the failed output. Then:
+
+**Auto mode:** Stop pipeline, save state for `--resume`. Print:
+```
+Rebase: CONFLICTS detected with origin/<defaultBranch>
+  Conflicting files:
+    - src/foo.ts
+    - src/bar.ts
+  Pipeline paused. Resolve conflicts manually, then --resume.
+```
+
+**Interactive mode:** Use AskUserQuestion:
+> Rebase onto `<defaultBranch>` has conflicts in <N> files:
+> - `src/foo.ts`
+> - `src/bar.ts`
+>
+> 1. **Pause pipeline** — resolve manually, then `--resume`
+> 2. **Skip rebase** — create PR with conflicts (GitHub will show merge conflicts)
+> 3. **Merge instead** — try `git merge origin/<defaultBranch>` (creates merge commit)
+
+Option 3 fallback: run `git merge origin/<defaultBranch>`. If that also conflicts, abort and fall back to option 1.
+
+Note: in a worktree, all of this is safe — main working tree is untouched.
+
+### State persistence
+
+After each step, update pipeline state via `ship-state.js`. Locate the script:
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "ship-state.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-state.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-state.js"
+```
+
+At pipeline start (after Step 1 completes), initialize the state file:
+```bash
+node "$SCRIPT" init --branch <branch> --flags '<flags JSON>'
+```
+
+Before each step: `node "$SCRIPT" start --step <name>`
+After each step: `node "$SCRIPT" complete --step <name> --result "<summary>"` (or `skip --step <name> --reason "<reason>"` or `fail --step <name> --error "<error>"`)
+Record decisions: `node "$SCRIPT" decide --step <name> --text "<decision>"`
+Defer findings: `node "$SCRIPT" defer --severity <s> --file <f> --title "<t>"`
+
+On successful completion: `node "$SCRIPT" cleanup`
+On failure: preserve the state file for `--resume`.
 
 ---
 
@@ -361,6 +433,38 @@ State file cleaned up: .sdlc/execution/ship-<branch>-<epoch>.json deleted
 ```
 
 If OpenSpec was detected in Step 1f, append: `→ Run /opsx:verify to validate implementation completeness against the spec`
+
+### Worktree cleanup
+
+Detect if running in a linked worktree:
+```bash
+main_wt=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
+current=$(git rev-parse --show-toplevel)
+```
+If `$main_wt != $current`, a worktree is active.
+
+**Auto mode:** keep (default). Print path and action:
+```
+Worktree kept: <current path>
+  Branch: <branch name>
+  To remove later: cd <main_wt> && git worktree remove <current>
+```
+
+**Interactive mode:** Use AskUserQuestion — keep or remove.
+If remove: `cd "$main_wt" && git worktree remove "$current"`
+
+If `git worktree remove` fails, warn but don't fail the pipeline.
+
+### Post-pipeline advisory (when version was auto-skipped)
+
+If the version step status is `skipped` and the reason contains "worktree", print a next-step hint after the summary table:
+
+```
+Note: Version step was skipped (worktree mode — tags are repo-global).
+After merging this PR, run on main:
+  /version-sdlc <patch|minor|major>
+This will tag the release and generate the changelog from all merged commits.
+```
 
 ---
 
@@ -414,6 +518,20 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 **.sdlc/ must be gitignored.** The `.sdlc/` directory contains developer-local config (`ship-config.json`) and ephemeral pipeline state (`execution/`). `--init-config` creates `.sdlc/.gitignore` automatically via `ship-init.js`. If `.sdlc/` is not gitignored, the staging command (`git add -A -- ':!.sdlc/'`) provides a fallback exclusion, but the gitignore is the primary defense.
 
 **Pipeline plan is binding.** The pipeline table displayed in Step 4 and confirmed by the user is a contract. Step statuses (`will_run`, `skipped`, `conditional`) are computed by `ship-prepare.js` — the LLM follows them, it does not override them. Steps with `status: "will_run"` must be invoked via the Skill tool. This was added after an incident where the review step was skipped because the LLM judged the changes to be "just docs/config" (issue #68). The pipeline's value is precisely in catching cases where the developer thinks changes are low-risk but the review disagrees.
+
+**State files are script-managed.** Use ship-state.js / execute-state.js for all state operations. Don't hand-write JSON to `.sdlc/execution/`.
+
+**Worktree lifecycle uses git commands.** `git worktree add` to create (via worktree-create.js), `git worktree remove` to clean up. No EnterWorktree/ExitWorktree. No session-scoping issues.
+
+**Worktree state is not persisted.** Git is the source of truth. Branch name + `git worktree list --porcelain` = worktree path. No worktree fields in state files.
+
+**Resume re-enters via `cd`.** Match branch from state file against `git worktree list --porcelain`.
+
+**Rebase happens after all commits, before version.** This ensures the tag is placed on a commit that can merge cleanly. If rebase conflicts, the pipeline pauses — the user resolves in the worktree (main tree untouched) and resumes.
+
+**Rebase is skipped when main is already an ancestor.** `git merge-base --is-ancestor` is a fast check. No fetch + rebase overhead when the branch is already up to date.
+
+**Version step is auto-skipped in worktree mode.** `computeSteps` in ship-prepare.js skips the version step when `workspace === 'worktree'`. Tags are repo-global — creating them from an isolated worktree risks collisions with parallel pipelines. The pipeline prints a post-merge advisory: run `/version-sdlc` on main after the PR merges. This also handles changelog — `version-sdlc` generates changelog from `previousTag..HEAD`, capturing all commits from all merged branches regardless of their source worktree.
 
 ---
 

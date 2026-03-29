@@ -2,7 +2,7 @@
 name: execute-plan-sdlc
 description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan. Also auto-triggered when the user accepts a plan from plan-sdlc (plan content is already in conversation context)."
 user-invocable: true
-argument-hint: "[plan-file-path] [--preset A|B|C] [--resume]"
+argument-hint: "[plan-file-path] [--preset A|B|C] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt]"
 ---
 
 # Execute Plan (SDLC)
@@ -51,7 +51,7 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
 - If `--resume` was passed:
   1. Find the most recent state file for the current branch in `<main-worktree>/.sdlc/execution/`. If none found, warn: "No state file found for branch `<branch>`. Starting fresh." and proceed to plan loading below.
   2. Read `./state-format.md` for the schema reference.
-  3. Read the state file. Load `planPath` and read the plan file. If `planPath` is null (plan was from conversation context), use AskUserQuestion to request the plan file path.
+  3. Read the state file using `node "$SCRIPT" read` (locate `execute-state.js` as described in the State persistence section). Load `planPath` and read the plan file. If `planPath` is null (plan was from conversation context), use AskUserQuestion to request the plan file path.
   4. Compute the SHA-256 hash of the plan content and compare against `planHash`. If mismatch, use AskUserQuestion:
      > Plan content has changed since execution started. Resume with the existing wave structure, or restart from scratch?
      Options: **resume** | **restart**
@@ -65,6 +65,8 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
   > Found execution state from <startedAt> with <N> of <total> waves completed. Resume from Wave <next>?
   Options: **yes** — resume | **restart** — discard state file and start fresh
   If "yes", follow the resume flow above (steps 2-7). If "restart", delete the state file and proceed normally.
+
+**Parse `--workspace`:** If `--workspace branch|worktree|prompt` was passed as an argument, store the mode. If absent, default to `prompt`. When `--workspace` is explicitly set to `branch` or `worktree`, the corresponding action is taken automatically without prompting (steps 3a-3c below).
 
 **Workspace isolation check:** After plan validation, check whether execution should happen on a separate branch or in a worktree.
 
@@ -84,7 +86,19 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
        | Documentation | `docs/` |
 
      - **Slug** from plan title: lowercase, hyphenated, max 50 chars (e.g., "Add JWT Authentication" → `feat/add-jwt-authentication`)
-   - Use AskUserQuestion:
+
+   - **If `--workspace branch`:** Run `git checkout -b <derived-name>` directly without prompting. Print the branch name.
+
+   - **If `--workspace worktree`:** Create worktree without prompting:
+     ```bash
+     SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" 2>/dev/null | head -1)
+     [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/worktree-create.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/worktree-create.js"
+     result=$(node "$SCRIPT" --name <derived-name>)
+     cd $(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
+     ```
+     Print the branch and path from the script output. The branch may differ from the derived name if a collision suffix was added.
+
+   - **If `--workspace prompt` or absent:** Use AskUserQuestion:
      > You're on the default branch (`<branch>`). Working directly on it is not recommended.
      >
      > Suggested: `<type>/<slug>`
@@ -93,9 +107,25 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
      > 2. Create a worktree for isolated execution
      > 3. Continue on `<branch>` anyway
    - **Option 1:** Run `git checkout -b <name>`. If the user provides a custom name, use it instead of the suggestion.
-   - **Option 2:** Call `EnterWorktree` to create an isolated worktree. All subsequent execution happens in the worktree. Set a flag to call `ExitWorktree` after Step 7 completes.
+   - **Option 2:** Create worktree using `worktree-create.js` as shown above.
    - **Option 3:** Proceed without changes.
 4. If the current branch is NOT the default branch, skip this check entirely — no warning, no prompt.
+
+**Pre-execution rebase:** If `--rebase auto` was passed, rebase onto the default branch before executing the plan. This ensures tasks run against the latest code.
+
+```bash
+git fetch origin <defaultBranch>
+```
+
+Check if needed: `git merge-base --is-ancestor origin/<defaultBranch> HEAD` — if the exit code is 0, the branch is already up to date. Skip rebase.
+
+If `--rebase auto` and not up to date: attempt `git rebase origin/<defaultBranch>`. On conflict, run `git rebase --abort`, warn, and continue execution on the current base — the plan may still succeed.
+
+If `--rebase prompt`: Use AskUserQuestion — rebase onto default branch or skip.
+
+If `--rebase skip` or absent: skip entirely.
+
+Note: for a freshly created worktree from main, HEAD is already on main — `merge-base --is-ancestor` passes and rebase is skipped. This step only matters for resumed executions or worktrees created earlier.
 
 ## Step 2 (CLASSIFY): Classify Tasks and Build Waves
 
@@ -269,17 +299,24 @@ Running verification... [status]
 Proceeding to Wave N+1 (N tasks)
 ```
 
-**State persistence:** After each wave completes, write (or overwrite) the execution state file at `<main-worktree>/.sdlc/execution/execute-<branch>-<timestamp>.json`. Resolve the main working tree path as described in Step 1 (Resume detection). Create the directory if it does not exist (`mkdir -p <main-worktree>/.sdlc/execution`). Read `./state-format.md` for the full schema.
+**State persistence:** After each wave completes, update the execution state via `execute-state.js`. Locate the script:
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "execute-state.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/execute-state.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/execute-state.js"
+```
 
-The `<timestamp>` is set once at the start of execution (Step 2 or when loading a plan) and remains stable across all waves — the same file is overwritten after each wave.
+On the very first wave dispatch, initialize the state file:
+```bash
+node "$SCRIPT" init --branch <branch> --preset <X> --total-tasks <N>
+```
 
-Update the state file with:
-- Set the completed wave's `status` to `completed` and record its `completedAt`
-- For each task in the wave: record `status` (completed/failed/skipped) and `filesChanged` (from `git diff --stat` scoped to this wave)
-- Set the next wave's `status` to `pending`
-- Update the `context` object: append new entries to `filesAdded`, `filesModified`, `interfacesCreated`, and `decisionsFromPriorWaves` based on the wave's outputs
+Before each wave: `node "$SCRIPT" wave-start --wave <N>`
+After each task: `node "$SCRIPT" task-done --wave <N> --task <id> --name "<name>" --complexity <c> --risk <r> --files-changed '<json>'` (or `task-fail` on failure)
+After each wave: `node "$SCRIPT" wave-done --wave <N>` (or `wave-fail`)
+Update context: `node "$SCRIPT" context --data '<json>'`
 
-On the very first wave dispatch, create the state file with all waves initialized to `pending`, the current wave set to `in_progress`, and the `context` object populated with `planSummary` and empty arrays.
+On successful completion: `node "$SCRIPT" cleanup`
+On failure: preserve the state file for `--resume`.
 
 **5e. Inter-wave critique** — Before next wave:
 - Did any task's actual output differ from what upcoming tasks assumed as input?
@@ -412,7 +449,7 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 - Skip final verification
 - Reference the plan file inside an agent prompt — paste the full task text
 - Execute more than 2 retries on any single task
-- Automatically commit, push, or create branches — the workspace isolation check in Step 1 is user-prompted, not automatic
+- Automatically commit or push — workspace isolation (branching/worktree) is controlled by the `--workspace` flag, not ad-hoc decisions
 - Reference external sub-skills by name — this skill is fully self-contained
 - Dispatch a separate agent per trivial task — execute a single trivial inline; batch 2+ trivials into one haiku agent using the Batched Trivial Tasks Prompt Template
 - Delete the execution state file on failure or interruption — it is needed for `--resume`
@@ -445,6 +482,10 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 **Agents may bypass the Edit tool.** Agents sometimes use bash `sed`, `awk`, Python scripts, or compiled programs in `/tmp` to modify files instead of the Edit tool. These approaches are fragile (wrong line numbers, regex mismatches, wrong working directory) and silently fail — the agent reports success, but the file is unchanged or corrupted. The Hard Constraints in the agent prompt forbid this, but the filesystem verification in Step 5c catches cases where the constraint was ignored.
 
 **Workspace isolation can use a stale branch.** The conversation-level `gitStatus` snapshot is frozen at session start. If the user switches branches mid-session, `gitStatus` still reports the original branch. The workspace isolation check in Step 1 must run `git branch --show-current` via Bash — never read the branch from `gitStatus` or any other cached context.
+
+**Worktree lifecycle uses git commands, not harness tools.** `worktree-create.js` for creation (handles branch collision), `git worktree remove` for cleanup. No EnterWorktree/ExitWorktree. When invoked from ship-sdlc, skip cleanup — ship-sdlc owns the worktree lifecycle.
+
+**State files are script-managed.** Use execute-state.js for all state operations. Don't hand-write JSON to `.sdlc/execution/`.
 
 **State file timestamp is set once at execution start.** The `<timestamp>` in the filename is established when execution begins and does not change across waves. The same file is overwritten after each wave. This keeps the filename stable for resume detection and ship-sdlc integration.
 
@@ -482,7 +523,7 @@ If `openspecSpecs` was loaded in Step 1 (the plan was OpenSpec-sourced), also su
 - `/opsx:verify` — validate implementation completeness against the spec
 - `/opsx:archive` — merge delta specs into main specs after verification passes
 
-If execution started in a worktree (Step 1 workspace isolation), call `ExitWorktree` after completing follow-up actions, or keep the worktree for further work.
+If execution started in a worktree (Step 1 workspace isolation) and running standalone (not invoked from ship-sdlc), clean up with `git worktree remove <path>` from the main worktree. When invoked from ship-sdlc, skip cleanup — ship-sdlc owns the worktree lifecycle.
 
 ## See Also
 
