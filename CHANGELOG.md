@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.5] - 2026-03-29
+
+### Fixed
+- `--workspace worktree` flag now creates actual git worktrees via `worktree-create.js` instead of falling back to branch checkout (#78)
+- State file I/O moved from LLM instructions to deterministic scripts (`ship-state.js`, `execute-state.js`, `lib/state.js`)
+- Branch name validation in worktree creation prevents command injection via shell metacharacters
+- State file slug matching uses delimiter-aware patterns to prevent partial branch name collisions
+- Missing flags restored in argument-hint frontmatter: ship-sdlc (`--resume`, `--bump`, `--workspace`, `--init-config`) and execute-plan-sdlc (`--workspace`, `--rebase`)
+
 ## [0.16.4] - 2026-03-29
 
 ### Added
