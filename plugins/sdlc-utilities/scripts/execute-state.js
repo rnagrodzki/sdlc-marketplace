@@ -23,8 +23,7 @@
 
 'use strict';
 
-const { slugifyBranch, readState, writeState, initState, deleteState } = require('./lib/state');
-const { exec } = require('./lib/git');
+const { slugifyBranch, readState, writeState, initState, deleteState, resolveBranch } = require('./lib/state');
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -41,13 +40,17 @@ function parseArgs(argv) {
     } else if (a === '--preset' && args[i + 1]) {
       result.preset = args[++i];
     } else if (a === '--total-tasks' && args[i + 1]) {
-      result.totalTasks = parseInt(args[++i], 10);
+      const val = parseInt(args[++i], 10);
+      if (isNaN(val)) { process.stderr.write(`Error: --total-tasks requires a number, got "${args[i]}"\n`); process.exit(2); }
+      result.totalTasks = val;
     } else if (a === '--plan-path' && args[i + 1]) {
       result.planPath = args[++i];
     } else if (a === '--plan-hash' && args[i + 1]) {
       result.planHash = args[++i];
     } else if (a === '--wave' && args[i + 1]) {
-      result.wave = parseInt(args[++i], 10);
+      const val = parseInt(args[++i], 10);
+      if (isNaN(val)) { process.stderr.write(`Error: --wave requires a number, got "${args[i]}"\n`); process.exit(2); }
+      result.wave = val;
     } else if (a === '--task' && args[i + 1]) {
       result.task = args[++i];
     } else if (a === '--name' && args[i + 1]) {
@@ -72,14 +75,13 @@ function parseArgs(argv) {
 // Branch resolution
 // ---------------------------------------------------------------------------
 
-function resolveBranch(argBranch) {
-  if (argBranch) return argBranch;
-  const branch = exec('git branch --show-current');
-  if (!branch) {
-    process.stderr.write('Error: could not determine current branch\n');
+function resolveBranchOrExit(argBranch) {
+  try {
+    return resolveBranch(argBranch);
+  } catch (e) {
+    process.stderr.write(`Error: ${e.message}\n`);
     process.exit(2);
   }
-  return branch;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +175,7 @@ function cmdWaveStart(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('execute', slug);
   if (!found) {
@@ -207,7 +209,7 @@ function cmdWaveDone(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('execute', slug);
   if (!found) {
@@ -232,7 +234,7 @@ function cmdWaveFail(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('execute', slug);
   if (!found) {
@@ -269,7 +271,7 @@ function cmdTaskDone(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('execute', slug);
   if (!found) {
@@ -313,7 +315,7 @@ function cmdTaskFail(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('execute', slug);
   if (!found) {
@@ -362,7 +364,7 @@ function cmdContext(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('execute', slug);
   if (!found) {
@@ -379,7 +381,7 @@ function cmdContext(opts) {
 }
 
 function cmdRead(opts) {
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('execute', slug);
   if (!found) {
@@ -392,7 +394,7 @@ function cmdRead(opts) {
 }
 
 function cmdCleanup(opts) {
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('execute', slug);
   if (!found) {

@@ -23,8 +23,7 @@
 
 'use strict';
 
-const { slugifyBranch, readState, writeState, initState, deleteState } = require('./lib/state');
-const { exec } = require('./lib/git');
+const { slugifyBranch, readState, writeState, initState, deleteState, resolveBranch } = require('./lib/state');
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -68,14 +67,13 @@ function parseArgs(argv) {
 // Branch resolution
 // ---------------------------------------------------------------------------
 
-function resolveBranch(argBranch) {
-  if (argBranch) return argBranch;
-  const branch = exec('git branch --show-current');
-  if (!branch) {
-    process.stderr.write('Error: could not determine current branch\n');
+function resolveBranchOrExit(argBranch) {
+  try {
+    return resolveBranch(argBranch);
+  } catch (e) {
+    process.stderr.write(`Error: ${e.message}\n`);
     process.exit(2);
   }
-  return branch;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +128,7 @@ function cmdStart(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('ship', slug);
   if (!found) {
@@ -158,7 +156,7 @@ function cmdComplete(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('ship', slug);
   if (!found) {
@@ -187,7 +185,7 @@ function cmdSkip(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('ship', slug);
   if (!found) {
@@ -216,7 +214,7 @@ function cmdFail(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('ship', slug);
   if (!found) {
@@ -244,7 +242,7 @@ function cmdDecide(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('ship', slug);
   if (!found) {
@@ -266,7 +264,7 @@ function cmdDefer(opts) {
     process.exit(2);
   }
 
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('ship', slug);
   if (!found) {
@@ -288,7 +286,7 @@ function cmdDefer(opts) {
 }
 
 function cmdRead(opts) {
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('ship', slug);
   if (!found) {
@@ -301,7 +299,7 @@ function cmdRead(opts) {
 }
 
 function cmdCleanup(opts) {
-  const branch = resolveBranch(opts.branch);
+  const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('ship', slug);
   if (!found) {

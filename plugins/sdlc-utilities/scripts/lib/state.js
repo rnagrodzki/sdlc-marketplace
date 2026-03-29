@@ -179,6 +179,25 @@ function deleteState(filePath) {
 }
 
 // ---------------------------------------------------------------------------
+// Branch resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the current git branch name. Uses the provided argument if given,
+ * otherwise detects via `git branch --show-current`.
+ * @param {string|undefined} argBranch  Explicit branch name from CLI args
+ * @returns {string}
+ */
+function resolveBranch(argBranch) {
+  if (argBranch) return argBranch;
+  const branch = exec('git branch --show-current');
+  if (!branch) {
+    throw new Error('Could not determine current branch');
+  }
+  return branch;
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -191,4 +210,5 @@ module.exports = {
   writeState,
   initState,
   deleteState,
+  resolveBranch,
 };
