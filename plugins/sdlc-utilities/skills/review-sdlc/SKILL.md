@@ -10,6 +10,8 @@ argument-hint: "[--base <branch>] [--committed] [--staged] [--dimensions <name,.
 Thin dispatcher — runs the prepare script, then delegates everything to the
 `review-orchestrator` agent (which spawns dimension subagents in parallel).
 
+**Announce at start:** "I'm using review-sdlc (sdlc v{version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+
 ---
 
 ## Step 0 — Resolve and Run review-prepare.js

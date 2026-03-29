@@ -9,7 +9,7 @@ argument-hint: "[--auto] [--skip <steps>] [--preset A|B|C] [--bump patch|minor|m
 
 End-to-end feature shipping: execute plan, commit, review, fix critical issues, version, and open a PR. Chains six sub-skills sequentially with a conditional review-fix loop.
 
-**Announce at start:** "I'm using the ship-sdlc skill."
+**Announce at start:** "I'm using ship-sdlc (sdlc v{version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
 
 ## Step 0 — Plan Mode Check
 
