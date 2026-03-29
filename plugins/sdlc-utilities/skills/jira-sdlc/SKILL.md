@@ -11,6 +11,8 @@ Cache Jira project metadata on first use, then execute any Jira operation — cr
 edit, search, transition, comment, link, assign, worklog — using only cached values.
 Eliminate all redundant discovery calls after initialization.
 
+**Announce at start:** "I'm using jira-sdlc (sdlc v{version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+
 ## When to Use This Skill
 
 - Creating, editing, or viewing Jira issues

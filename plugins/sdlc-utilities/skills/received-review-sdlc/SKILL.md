@@ -12,6 +12,8 @@ codebase context — not just the change diff — before any response is drafted
 self-critique gates ensure quality. No changes are made until the user explicitly approves
 the proposed action plan.
 
+**Announce at start:** "I'm using received-review-sdlc (sdlc v{version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+
 ---
 
 ## Step 0 — Plan Mode Check

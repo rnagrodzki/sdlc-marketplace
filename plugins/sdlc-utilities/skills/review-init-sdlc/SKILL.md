@@ -10,6 +10,8 @@ argument-hint: "[--add] [--no-copilot]"
 Project-aware dimension creator: scan tech stack, propose tailored dimensions with evidence,
 let the user select, write files, and validate with the validation script.
 
+**Announce at start:** "I'm using review-init-sdlc (sdlc v{version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+
 > **CRITICAL — Inline output only.** Always produce dimension proposals, evidence citations,
 > and trigger patterns directly in your current response. Never write "the simulated output is
 > complete above", "see my previous response", or any similar deferral. If no files can be

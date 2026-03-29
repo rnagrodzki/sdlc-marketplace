@@ -21,7 +21,7 @@ plugins/
         REFERENCE.md      ← exists (referenced in SKILL.md)
         EXAMPLES.md       ← exists (referenced in SKILL.md)
     hooks/
-      hooks.json          ← {"hooks": {}} valid JSON
+      hooks.json          ← SessionStart hook registered, valid JSON
     scripts/
       pr-prepare.js
       review-prepare.js
