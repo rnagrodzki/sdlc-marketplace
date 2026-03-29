@@ -33,6 +33,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { exec, checkGitState, detectBaseBranch } = require('./lib/git');
+const { resolveMainWorktree } = require('./lib/state');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -48,6 +49,7 @@ const BUILT_IN_DEFAULTS = {
   auto: false,
   reviewThreshold: 'high',
   workspace: 'prompt',
+  rebase: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -65,6 +67,7 @@ function parseArgs(argv) {
   let dryRun    = false;
   let resume    = false;
   let workspace = null;
+  let rebase    = null;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -86,10 +89,12 @@ function parseArgs(argv) {
       resume = true;
     } else if (a === '--workspace' && args[i + 1]) {
       workspace = args[++i];
+    } else if (a === '--rebase' && args[i + 1]) {
+      rebase = args[++i]; // 'auto' | 'skip' | 'prompt'
     }
   }
 
-  return { hasPlan, auto, skip, preset, bump, draft, dryRun, resume, workspace };
+  return { hasPlan, auto, skip, preset, bump, draft, dryRun, resume, workspace, rebase };
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +183,27 @@ function mergeFlags(cli, config) {
     sources.reviewThreshold = 'default';
   }
 
+  // rebase: CLI non-null string wins; otherwise map config boolean/string to
+  // 'auto' | 'skip' | 'prompt'; otherwise default (true → 'auto').
+  if (cli.rebase !== null && cli.rebase !== undefined) {
+    merged.rebase  = cli.rebase; // already a string: 'auto' | 'skip' | 'prompt'
+    sources.rebase = 'cli';
+  } else if (cfg.rebase !== undefined) {
+    // Config may store true/false booleans or the string "prompt"
+    if (cfg.rebase === true) {
+      merged.rebase = 'auto';
+    } else if (cfg.rebase === false) {
+      merged.rebase = 'skip';
+    } else {
+      merged.rebase = cfg.rebase; // "prompt" or any future string value
+    }
+    sources.rebase = 'config';
+  } else {
+    // Default is true → 'auto'
+    merged.rebase  = 'auto';
+    sources.rebase = 'default';
+  }
+
   // Pass-through flags that don't come from config.
   merged.hasPlan = cli.hasPlan;
   merged.dryRun  = cli.dryRun;
@@ -201,6 +227,7 @@ function computeSteps(flags) {
       args: [
         flags.preset ? `--preset ${flags.preset}` : '',
         flags.workspace !== 'prompt' ? `--workspace ${flags.workspace}` : '',
+        flags.rebase !== 'prompt' ? `--rebase ${flags.rebase}` : '',
       ].filter(Boolean).join(' '),
       reason: !flags.hasPlan
         ? 'no plan in context'
@@ -244,12 +271,16 @@ function computeSteps(flags) {
     {
       name: 'version',
       skill: 'version-sdlc',
-      status: skipSet.has('version') ? 'skipped' : 'will_run',
+      status: (skipSet.has('version') || flags.workspace === 'worktree') ? 'skipped' : 'will_run',
       args: [
         flags.bump || 'patch',
         flags.auto ? '--auto' : '',
       ].filter(Boolean).join(' '),
-      reason: skipSet.has('version') ? 'in skip set' : 'not in skip set',
+      reason: skipSet.has('version')
+        ? 'in skip set'
+        : flags.workspace === 'worktree'
+          ? 'auto-skipped — tags are repo-global, not safe from worktrees'
+          : 'not in skip set',
       pause: true,
     },
     {
@@ -266,6 +297,39 @@ function computeSteps(flags) {
   ];
 
   return steps;
+}
+
+// ---------------------------------------------------------------------------
+// Worktree detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect whether the current process is running inside a linked (non-main) git worktree.
+ * @param {string} projectRoot  The working directory to inspect (typically process.cwd())
+ * @returns {{
+ *   inLinkedWorktree: boolean,
+ *   currentPath: string|null,
+ *   mainWorktreePath: string
+ * }}
+ */
+function detectWorktree(projectRoot) {
+  let mainPath;
+  try {
+    mainPath = resolveMainWorktree();
+  } catch (_) {
+    // If git worktree list fails (e.g. very old git), assume we are in the main worktree.
+    const cwd = fs.realpathSync(projectRoot);
+    return { inLinkedWorktree: false, currentPath: null, mainWorktreePath: cwd };
+  }
+
+  const cwd         = fs.realpathSync(projectRoot);
+  const mainResolved = fs.realpathSync(mainPath);
+
+  return {
+    inLinkedWorktree: cwd !== mainResolved,
+    currentPath: cwd !== mainResolved ? cwd : null,
+    mainWorktreePath: mainResolved,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -434,6 +498,9 @@ function main() {
   // git check-ignore returns non-null (empty string) if ignored, null if not ignored
   const sdlcGitignored = exec('git check-ignore -q .sdlc/', { cwd: projectRoot }) !== null;
 
+  // Detect worktree context
+  const worktreeInfo = detectWorktree(projectRoot);
+
   // Build context
   const context = {
     currentBranch: gitState.currentBranch,
@@ -444,6 +511,7 @@ function main() {
     ghUser,
     openspecDetected,
     sdlcGitignored,
+    worktree: worktreeInfo,
   };
 
   // Compute steps
@@ -482,6 +550,7 @@ function main() {
       resume: flags.resume,
       hasPlan: flags.hasPlan,
       workspace: flags.workspace,
+      rebase: flags.rebase,
       sources: flagSources,
     },
     context,
@@ -516,4 +585,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { parseArgs, computeSteps, mergeFlags, loadConfig };
+module.exports = { parseArgs, computeSteps, mergeFlags, loadConfig, detectWorktree };

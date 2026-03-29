@@ -219,6 +219,28 @@
         then re-invoke /ship-sdlc. It does NOT proceed to Step 1 config loading or
         any pipeline activity.
 
+- description: "ship-sdlc: --workspace worktree uses git worktree add/remove lifecycle"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-config-present.md"
+    user_request: >
+      Run /ship-sdlc --workspace worktree --dry-run. .sdlc/ship-config.json has
+      workspace: worktree. Current branch is main. A plan is in context.
+  assert:
+    - type: icontains
+      value: "git worktree add"
+    - type: icontains
+      value: ".claude/worktrees/"
+    - type: not-icontains
+      value: "EnterWorktree"
+    - type: llm-rubric
+      value: >
+        execute-plan-sdlc auto-selects worktree via git worktree add (no prompt).
+        State managed via scripts (ship-state.js / execute-state.js). At pipeline
+        end, cleanup via git worktree remove. The version step is auto-skipped
+        because workspace is worktree (tags are repo-global). A post-pipeline
+        advisory mentions running /version-sdlc on main after PR merge.
+
 - description: "ship-sdlc: --bump minor forwarded to version-sdlc in pipeline plan"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
