@@ -245,7 +245,10 @@ function computeSteps(flags) {
       name: 'version',
       skill: 'version-sdlc',
       status: skipSet.has('version') ? 'skipped' : 'will_run',
-      args: flags.bump || 'patch',
+      args: [
+        flags.bump || 'patch',
+        flags.auto ? '--auto' : '',
+      ].filter(Boolean).join(' '),
       reason: skipSet.has('version') ? 'in skip set' : 'not in skip set',
       pause: true,
     },

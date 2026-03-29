@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.4] - 2026-03-29
+
+### Added
+- `--auto` flag for version-sdlc — skips interactive release approval prompt while retaining critique gates and pre-condition checks (#73)
+- `ship-sdlc` now forwards `--auto` to version-sdlc, removing the last mandatory pause point in fully automated pipelines
+
 ## [0.16.3] - 2026-03-29
 
 ### Fixed

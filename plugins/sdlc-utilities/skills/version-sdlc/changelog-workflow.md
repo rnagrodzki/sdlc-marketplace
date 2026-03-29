@@ -20,6 +20,7 @@ Read `VERSION_CONTEXT_JSON`. Extract:
 | `changelog.currentContent` | Current content of the changelog (truncated to 5000 chars) |
 | `config.ticketPrefix` | Optional ticket prefix for filtering ticket IDs |
 | `flags.noPush` | Whether to skip pushing |
+| `flags.auto` | Whether `--auto` was passed — skip interactive approval |
 
 ### Step 2 (CHECK): Validate Preconditions
 
@@ -73,6 +74,8 @@ Options:
 - **cancel** — abort
 
 If the user chooses **edit**, ask what to change, revise, and present again. Loop until explicit **yes** or **cancel**.
+
+**Auto mode:** When `flags.auto` is true, skip the AskUserQuestion prompt entirely. Still display the existing vs. updated changelog comparison for visibility, then proceed directly to Step 7. Treat the response as an implicit `yes`.
 
 ### Step 7 (EXECUTE): Apply the Update
 

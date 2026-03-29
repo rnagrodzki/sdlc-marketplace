@@ -38,7 +38,7 @@ This skill is for **expert users working on projects with established quality gu
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc and version-sdlc. | Off |
+| `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
 | `--skip <steps>` | Comma-separated list of steps to skip: `execute`, `commit`, `review`, `version`. PR cannot be skipped. | None |
 | `--preset A\|B\|C` | Execution preset forwarded to execute-plan-sdlc. A = Speed, B = Balanced, C = Quality. | `B` |
 | `--bump patch\|minor\|major` | Version bump type forwarded to version-sdlc. | `patch` |
@@ -125,7 +125,7 @@ plan-sdlc      (--auto if     (--committed)
 **Key points:**
 
 - **Double-commit pattern**: The feature commit (step 5b) and the review fix commit (step 5e) are separate. This keeps feature work and review fixes distinct in git history.
-- **Two mandatory pause points in `--auto` mode**: received-review-sdlc (automated code changes need human sign-off) and version-sdlc (release plan needs consent).
+- **One mandatory pause point in `--auto` mode**: received-review-sdlc (automated code changes need human sign-off). version-sdlc skips the release approval prompt when `--auto` is forwarded.
 - **Staging gap**: execute-plan-sdlc creates files but does not stage them. The pipeline runs `git add -A -- ':!.sdlc/'` between execute and commit, excluding the `.sdlc/` runtime directory.
 - **Pipeline plan is binding**: Steps marked "will run" in the pipeline table must execute. Step statuses are computed by `ship-prepare.js` — the LLM follows them mechanically and cannot unilaterally skip planned steps.
 - **Review threshold**: The severity that triggers the fix loop is configurable via `reviewThreshold` in config (default: `high`). At `high`, critical and high findings trigger fixes; medium and below are deferred to the summary.

@@ -156,7 +156,7 @@ Not all sub-skills support `--auto`. This table is the source of truth:
 | commit-sdlc | Yes | `--auto` forwarded. Skips commit approval prompt. |
 | review-sdlc | No | No interactive prompts to skip — runs fully automatically already. |
 | received-review-sdlc | No | Always interactive. Pipeline pauses for human fix approval. Deliberate — automated code changes need sign-off. |
-| version-sdlc | No | Always shows release plan for approval. Pipeline pauses. Even with bump type pre-answered, consent gate still fires. |
+| version-sdlc | Yes | `--auto` forwarded. Skips release plan approval prompt. Pre-condition checks and critique gates still run. |
 | pr-sdlc | Yes | `--auto` forwarded. Skips PR approval prompt. |
 
 ### Review verdict conditional logic
@@ -197,7 +197,7 @@ Pipeline validation:
   [pass] Not on default branch (feat/ship-sdlc)
   [pass] 5 of 7 steps will run
   [pass] All skip values recognized
-  [warn] Version step will pause for release approval (no --auto support in version-sdlc)
+  [pass] Version step supports --auto (release approval prompt skipped in auto mode)
   [warn] If review finds critical/high issues, pipeline will pause for fix approval
 ```
 
@@ -229,7 +229,7 @@ Step  Skill                 Status       Args              Pause?
 7     pr-sdlc               will run     --auto --draft    no
 ────────────────────────────────────────────────────────────────
 Review threshold: critical or high findings trigger fix loop
-Interactive pauses: received-review (if triggered), version (if not skipped)
+Interactive pauses: received-review (if triggered)
 ```
 
 ### Auto mode
@@ -405,7 +405,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Double commit is intentional.** Feature commit (step 2) and review fix commit (step 5) are separate. This keeps feature work and review fixes distinct in git history. Do not squash them.
 
-**Version consent gate.** version-sdlc has no `--auto` support. Even with `--bump patch` pre-answered, it still shows the release plan for approval. The pipeline pauses here.
+**Version consent gate.** version-sdlc supports `--auto`. When forwarded, the release plan approval prompt is skipped but the plan is still displayed. Pre-condition checks (Steps 6–7) and critique gates (Steps 3–4) still run.
 
 **Config file is optional.** The pipeline runs with built-in defaults when no `.sdlc/ship-config.json` exists. Do not error on missing config.
 

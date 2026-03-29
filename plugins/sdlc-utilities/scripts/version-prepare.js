@@ -53,6 +53,7 @@ const {
  *   noPush: boolean,
  *   changelog: boolean,
  *   hotfix: boolean,
+ *   auto: boolean,
  *   fileOverride: string|null,
  *   warnings: string[],
  * }}
@@ -66,6 +67,7 @@ function parseArgs(argv) {
   let noPush         = false;
   let changelog      = false;
   let hotfix         = false;
+  let auto           = false;
   let fileOverride   = null;
   const warnings     = [];
 
@@ -86,6 +88,8 @@ function parseArgs(argv) {
       changelog = true;
     } else if (a === '--hotfix') {
       hotfix = true;
+    } else if (a === '--auto') {
+      auto = true;
     } else if (a === '--file' && args[i + 1]) {
       fileOverride = args[++i];
     } else if (a.startsWith('-')) {
@@ -93,7 +97,7 @@ function parseArgs(argv) {
     }
   }
 
-  return { init, requestedBump, preLabel, noPush, changelog, hotfix, fileOverride, warnings };
+  return { init, requestedBump, preLabel, noPush, changelog, hotfix, auto, fileOverride, warnings };
 }
 
 // ---------------------------------------------------------------------------
@@ -348,6 +352,7 @@ async function main() {
       commits,
       flags: {
         noPush: args.noPush,
+        auto:   args.auto,
       },
       changelog: {
         exists:         changelogExists,
@@ -597,6 +602,7 @@ async function main() {
       changelog: args.changelog,
       preLabel:  args.preLabel,
       hotfix:    args.hotfix,
+      auto:      args.auto,
     },
     tags:               tagsOutput,
     commits,
