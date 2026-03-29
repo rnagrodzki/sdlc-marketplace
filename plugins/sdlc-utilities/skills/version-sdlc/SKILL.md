@@ -1,8 +1,8 @@
 ---
 name: version-sdlc
-description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow, updating an existing changelog entry for the current version. Consumes pre-computed context from version-prepare.js and handles the complete release process. Use --changelog without a bump type to update the changelog for the already-tagged current version. Arguments: [major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix]. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate."
+description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow, updating an existing changelog entry for the current version. Consumes pre-computed context from version-prepare.js and handles the complete release process. Use --changelog without a bump type to update the changelog for the already-tagged current version. Arguments: [major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix] [--auto]. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate. Use --auto to skip interactive approval prompts (release plan is still displayed)."
 user-invocable: true
-argument-hint: "[major|minor|patch] [--pre <label>] [--changelog] [--hotfix]"
+argument-hint: "[major|minor|patch] [--pre <label>] [--changelog] [--hotfix] [--auto]"
 ---
 
 # Versioning Releases Skill
@@ -101,8 +101,9 @@ Read `VERSION_CONTEXT_JSON`. Key fields to extract:
 | `bumpOptions` | `{ major, minor, patch, preRelease }` — pre-computed next versions |
 | `tags.latest` | Most recent tag |
 | `commits` | Array of commits since last tag |
-| `flags` | `{ preLabel, noPush, changelog, hotfix }` — parsed CLI flags |
+| `flags` | `{ preLabel, noPush, changelog, hotfix, auto }` — parsed CLI flags |
 | `flags.hotfix` | Whether this release is a hotfix (for DORA metrics tracking) |
+| `flags.auto` | Whether `--auto` was passed — skip interactive approval prompts |
 | `config.ticketPrefix` | Optional Jira/project key prefix (e.g. `"PROJ"`). When set, ticket IDs matching this prefix are extracted from commits. |
 | `commits[].ticketIds` | Array of extracted ticket IDs (e.g. `["PROJ-123"]`) found in the commit subject and body. Empty array if none. |
 | `conflictsWithNext` | `{ major, minor, patch }` — whether each tag already exists |
@@ -146,6 +147,8 @@ Review the planned version and CHANGELOG draft against every quality gate in the
 Fix each issue found in Step 3. Continue until all gates pass (max 2 iterations per gate).
 
 ### Step 5 (DO): Present Release Plan for Approval
+
+**Auto mode:** When `flags.auto` is true, skip the AskUserQuestion prompt entirely. Still display the full release plan for visibility, then proceed directly to Step 6 (pre-condition verification). Treat the response as an implicit `yes`. All critique gates (Steps 3–4) still run — only the interactive approval prompt is skipped. Breaking change warnings are still displayed.
 
 Show the full release plan to the user. **Do not execute any git commands before receiving explicit user approval via AskUserQuestion.**
 
@@ -202,6 +205,7 @@ This ensures projects that ran `--init` in a prior session get notified about im
 3. If any scripts are outdated or missing (and `config.changelog === true` for the check-changelog check):
    - Show what changed and which files would be updated
    - Use AskUserQuestion to ask: "Update CI scripts? (yes / no) — this does not block the release."
+   - **Auto mode:** When `flags.auto` is true, skip the AskUserQuestion and treat the response as `yes` — update outdated CI scripts automatically.
    - On `yes`: scaffold/overwrite the outdated files
    - On `no`: warn and continue with the release
 
@@ -209,7 +213,7 @@ The release proceeds regardless of the user's answer. This is informational, not
 
 ### Step 8 (EXECUTE): Execute the Release
 
-**Only execute after explicit `yes` from Step 5.**
+**Only execute after explicit `yes` from Step 5, or when `flags.auto` is true (implicit approval).**
 
 1. **Update version file** (only if `config.mode === "file"`): Use the Edit tool to replace the old version string with the new version in the version file. For TOML/YAML files, use targeted string replacement rather than a full file rewrite.
 2. **Update CHANGELOG** (only if changelog is enabled): Use the Edit or Write tool to prepend the new entry after the `## [Unreleased]` section if present, or after the file header if not. Create `CHANGELOG.md` if it does not exist.
@@ -277,7 +281,7 @@ If `flags.hotfix === true`, show instead:
 
 ## DO NOT
 
-- Execute any git commands without explicit user approval (`yes`)
+- Execute any git commands without explicit user approval (`yes`) or auto-mode implicit approval (`flags.auto === true`)
 - Fabricate commit descriptions or changelog entries not backed by real commits
 - Skip the CRITIQUE step even if the plan looks obviously correct
 - Push to remote without checking `flags.noPush`
