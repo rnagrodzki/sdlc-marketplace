@@ -24,6 +24,7 @@ Manages the full semantic release workflow: detects the version source, bumps th
 | `--no-push` | Commit and tag locally, skip `git push`. | — |
 | `--changelog` | With a bump type: generate a CHANGELOG entry as part of the release. Without a bump type: update the changelog for the already-tagged current version (no new tag created). | off |
 | `--hotfix` | Mark this release as a hotfix for DORA metrics tracking. Annotates the commit message with `[hotfix]` and the tag message body with `Type: hotfix`. | off |
+| `--auto` | Skip interactive approval prompts. Release plan is still displayed for visibility; critique gates and pre-condition checks still run. | off |
 
 ---
 

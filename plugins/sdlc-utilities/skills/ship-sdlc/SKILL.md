@@ -197,7 +197,7 @@ Pipeline validation:
   [pass] Not on default branch (feat/ship-sdlc)
   [pass] 5 of 7 steps will run
   [pass] All skip values recognized
-  [warn] Version step will pause for release approval (no --auto support in version-sdlc)
+  [pass] Version step supports --auto (release approval prompt skipped in auto mode)
   [warn] If review finds critical/high issues, pipeline will pause for fix approval
 ```
 
@@ -229,7 +229,7 @@ Step  Skill                 Status       Args              Pause?
 7     pr-sdlc               will run     --auto --draft    no
 ────────────────────────────────────────────────────────────────
 Review threshold: critical or high findings trigger fix loop
-Interactive pauses: received-review (if triggered), version (if not skipped)
+Interactive pauses: received-review (if triggered)
 ```
 
 ### Auto mode
