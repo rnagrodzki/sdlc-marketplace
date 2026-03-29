@@ -1,6 +1,6 @@
 ---
 name: validate-plugin-consistency
-description: "Use after modifying any file under plugins/sdlc-utilities/ (skills/*/SKILL.md, scripts/*.js). Runs the consistency validation script to catch structural issues before they reach users: wrong script resolution order, skills missing prepare-script execution, missing mktemp or exit-code handling, missing frontmatter fields, missing user-invocable flags."
+description: "Use after modifying any file under plugins/sdlc-utilities/ (skills/*/SKILL.md, scripts/*.js). Runs the consistency validation script to catch structural issues before they reach users: wrong script resolution order, skills missing prepare-script execution, missing mktemp or exit-code handling, missing frontmatter fields, missing user-invocable flags, missing docs/skills/ documentation, missing skills-meta.ts entries, missing README table rows, temp file cleanup gaps."
 user-invocable: true
 ---
 
@@ -93,8 +93,32 @@ user-invocable: true
 ---
 ```
 
-The 6 user-facing skills that must have this flag are: `pr-sdlc`, `pr-customize-sdlc`,
-`review-sdlc`, `review-init-sdlc`, `version-sdlc`, `jira-sdlc`.
+The 11 user-facing skills that must have this flag are: `plan-sdlc`, `execute-plan-sdlc`,
+`pr-sdlc`, `pr-customize-sdlc`, `review-sdlc`, `review-init-sdlc`, `received-review-sdlc`,
+`commit-sdlc`, `version-sdlc`, `jira-sdlc`, `ship-sdlc`.
+
+### `docs-skill-existence` (error)
+
+A skill directory exists under `plugins/sdlc-utilities/skills/<name>/` but has no matching
+documentation file at `docs/skills/<name>.md`. Create the doc file using `docs/skill-doc-template.md`
+as the starting point.
+
+### `skills-meta-existence` (error)
+
+A user-invocable skill has no matching `slug` entry in `site/src/data/skills-meta.ts`. Add an
+entry to the `skillsMeta` array with the correct slug, command, category, tagline, pipeline,
+and connections. See existing entries for the format.
+
+### `readme-skills-table` (warning)
+
+A user-invocable skill is not listed in the README.md skills table. Add a row following the
+format: `| [\`/<name>\`](docs/skills/<name>.md) | description |`
+
+### `temp-file-cleanup` (warning)
+
+A skill uses `mktemp` to create a temp file but has no cleanup reference (`rm -f`, `rm -rf`,
+or "clean" in narrative). Add cleanup instructions to the skill, ensuring temp files are removed
+on all exit paths (success, error, cancellation).
 
 ## Step 3 — Re-run Validation
 

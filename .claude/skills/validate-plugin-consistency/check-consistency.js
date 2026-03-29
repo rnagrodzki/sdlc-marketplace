@@ -20,11 +20,18 @@
  *                                 in the node "$SCRIPT" $ARGUMENTS call
  *   6. frontmatter-field-names  — all skills must use user-invocable (not user-invokable)
  *   7. user-invocable-flag      — the 6 user-facing skills must have user-invocable: true
+ *   8. docs-skill-existence     — every skill directory must have a matching docs/skills/<name>.md
+ *   9. skills-meta-existence    — every user-invocable skill must have a slug entry in
+ *                                 site/src/data/skills-meta.ts
+ *  10. readme-skills-table      — every user-invocable skill must appear in README.md's
+ *                                 skills table (warning)
+ *  11. temp-file-cleanup        — skills that use mktemp must also contain a cleanup
+ *                                 reference (rm -f / rm -rf / clean) (warning)
  *
  * Usage:
  *   node check-consistency.js [--project-root <path>] [--json]
  *
- * Exit codes: 0 = all pass, 1 = issues found, 2 = script error
+ * Exit codes: 0 = all pass (or warnings only), 1 = errors found, 2 = script error
  * Output: human-readable report (default) or JSON array of findings
  */
 
@@ -108,9 +115,11 @@ const SCRIPT_TO_SKILL = {
   'version-prepare.js':          'version-sdlc',
   'jira-prepare.js':             'jira-sdlc',
   'received-review-prepare.js':  'received-review-sdlc',
+  'commit-prepare.js':           'commit-sdlc',
+  'ship-prepare.js':             'ship-sdlc',
 };
 
-// All 10 skills that must declare user-invocable: true
+// All 11 skills that must declare user-invocable: true
 const USER_INVOCABLE_SKILLS = [
   'plan-sdlc',
   'execute-plan-sdlc',
@@ -122,6 +131,7 @@ const USER_INVOCABLE_SKILLS = [
   'commit-sdlc',
   'version-sdlc',
   'jira-sdlc',
+  'ship-sdlc',
 ];
 
 // ---------------------------------------------------------------------------
@@ -353,6 +363,120 @@ function checkUserInvocableFlag(skills, findings) {
   }
 }
 
+/**
+ * Rule 8 — docs-skill-existence
+ * Every skill directory must have a matching docs/skills/<name>.md file.
+ */
+function checkDocsSkillExistence(skills, projectRoot, findings) {
+  for (const skill of skills) {
+    const docPath = path.join(projectRoot, 'docs/skills', skill.name + '.md');
+    if (!isFile(docPath)) {
+      findings.push({
+        rule: 'docs-skill-existence',
+        severity: 'error',
+        file: `docs/skills/${skill.name}.md`,
+        message: `Missing documentation file for skill '${skill.name}'. Expected: docs/skills/${skill.name}.md`,
+      });
+    }
+  }
+}
+
+/**
+ * Rule 9 — skills-meta-existence
+ * Every user-invocable skill must have a matching slug entry in site/src/data/skills-meta.ts.
+ */
+function checkSkillsMetaExistence(projectRoot, findings) {
+  const metaPath = path.join(projectRoot, 'site/src/data/skills-meta.ts');
+  const content  = readFile(metaPath);
+  if (!content) {
+    findings.push({
+      rule: 'skills-meta-existence',
+      severity: 'error',
+      file: 'site/src/data/skills-meta.ts',
+      message: 'Could not read site/src/data/skills-meta.ts. File missing or unreadable.',
+    });
+    return;
+  }
+
+  const slugs = new Set();
+  const slugRe = /slug:\s*'([^']+)'/g;
+  let m;
+  while ((m = slugRe.exec(content)) !== null) {
+    slugs.add(m[1]);
+  }
+
+  for (const skillName of USER_INVOCABLE_SKILLS) {
+    if (!slugs.has(skillName)) {
+      findings.push({
+        rule: 'skills-meta-existence',
+        severity: 'error',
+        file: 'site/src/data/skills-meta.ts',
+        message: `No slug entry found for user-invocable skill '${skillName}'. Add: slug: '${skillName}'`,
+      });
+    }
+  }
+}
+
+/**
+ * Rule 10 — readme-skills-table
+ * Every user-invocable skill must appear in the README.md skills table.
+ */
+function checkReadmeSkillsTable(projectRoot, findings) {
+  const readmePath = path.join(projectRoot, 'README.md');
+  const content    = readFile(readmePath);
+  if (!content) {
+    findings.push({
+      rule: 'readme-skills-table',
+      severity: 'warning',
+      file: 'README.md',
+      message: 'Could not read README.md. File missing or unreadable.',
+    });
+    return;
+  }
+
+  const tableLines = content.split('\n').filter(l => l.trimStart().startsWith('|'));
+
+  for (const skillName of USER_INVOCABLE_SKILLS) {
+    const present = tableLines.some(l => l.includes(`/${skillName}`));
+    if (!present) {
+      findings.push({
+        rule: 'readme-skills-table',
+        severity: 'warning',
+        file: 'README.md',
+        message: `Skill '${skillName}' not found in README.md skills table. Add a row referencing /${skillName}.`,
+      });
+    }
+  }
+}
+
+/**
+ * Rule 11 — temp-file-cleanup
+ * Skills that use mktemp must also contain a cleanup reference (rm -f, rm -rf, or clean).
+ */
+function checkTempFileCleanup(skills, scriptNames, findings) {
+  for (const [scriptName, skillName] of Object.entries(SCRIPT_TO_SKILL)) {
+    if (!scriptNames.includes(scriptName)) continue;
+
+    const skill = skills.find(s => s.name === skillName);
+    if (!skill) continue;
+
+    const content = readFile(skill.file);
+    if (!content) continue;
+
+    if (!content.includes('mktemp')) continue;
+
+    const hasCleanup = /rm\s+-[rf]f?/.test(content) || /clean/i.test(content);
+    if (!hasCleanup) {
+      findings.push({
+        rule: 'temp-file-cleanup',
+        severity: 'warning',
+        file: path.relative(process.cwd(), skill.file),
+        message: `Skill '${skillName}' uses mktemp but has no cleanup reference (rm -f, rm -rf, or clean). Temp files should be cleaned up after use.`,
+      });
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -379,16 +503,20 @@ function main() {
   checkSkillPassesArguments(skills, scriptNames, findings);
   checkFrontmatterFieldNames(skills, findings);
   checkUserInvocableFlag(skills, findings);
+  checkDocsSkillExistence(skills, projectRoot, findings);
+  checkSkillsMetaExistence(projectRoot, findings);
+  checkReadmeSkillsTable(projectRoot, findings);
+  checkTempFileCleanup(skills, scriptNames, findings);
 
-  if (jsonOutput) {
-    process.stdout.write(JSON.stringify(findings, null, 2) + '\n');
-    process.exit(findings.length > 0 ? 1 : 0);
-  }
-
-  // Human-readable output
   const errors   = findings.filter(f => f.severity === 'error');
   const warnings = findings.filter(f => f.severity === 'warning');
 
+  if (jsonOutput) {
+    process.stdout.write(JSON.stringify(findings, null, 2) + '\n');
+    process.exit(errors.length > 0 ? 1 : 0);
+  }
+
+  // Human-readable output
   if (findings.length === 0) {
     process.stdout.write('✓ All consistency checks passed.\n');
     process.exit(0);
@@ -402,7 +530,7 @@ function main() {
     process.stdout.write(`${icon} [${f.rule}] ${f.file}${loc}\n  ${f.message}\n\n`);
   }
 
-  process.exit(findings.length > 0 ? 1 : 0);
+  process.exit(errors.length > 0 ? 1 : 0);
 }
 
 main();
