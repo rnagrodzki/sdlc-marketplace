@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 /**
  * session-start.js
- * SessionStart hook — outputs plugin version and user-invocable skill count
+ * SessionStart hook — outputs plugin version, skill count, and project
+ * context (pipeline resume, OpenSpec, git status, Jira cache, ship config)
  * into the system-reminder context.
  *
- * Output format (stdout → system-reminder):
- *   sdlc: v0.16.5 (11 skills loaded)
- *   Plan mode routing: always invoke plan-sdlc via the Skill tool when plan mode is active.
- *
- * Uses only Node.js built-in modules. No npm install required.
+ * Lazy-loads ../scripts/lib/state.js and ../scripts/lib/git.js for project
+ * context phases. Falls back gracefully if unavailable.
  *
  * Exit codes:
  *   0 = success (always — graceful degradation on errors)
@@ -201,14 +199,17 @@ try {
       const designLabel = change.hasDesign ? 'design.md present' : 'no design.md';
       resumeLines.push(`OpenSpec active: change "${change.name}" (${specLabel}, ${designLabel})`);
 
-      // Attempt branch matching
+      // Attempt branch matching — use slug comparison to avoid false positives
       try {
         const { exec } = require('../scripts/lib/git');
         const branch = exec('git branch --show-current');
         if (branch) {
-          const branchLower = branch.toLowerCase();
-          const nameLower = change.name.toLowerCase();
-          if (branchLower.includes(nameLower) || nameLower.includes(branchLower.replace(/^(feat|fix|chore|refactor)\//, ''))) {
+          const branchSlug = branch.toLowerCase().replace(/^(feat|fix|chore|refactor|docs)\//, '');
+          const nameSlug = change.name.toLowerCase();
+          // Match when the branch slug equals the change name, or one is a
+          // prefix of the other followed by a separator (-, /)
+          const slugRe = new RegExp(`(^|[/-])${nameSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[/-])`);
+          if (branchSlug === nameSlug || slugRe.test(branchSlug)) {
             resumeLines.push(`  Branch match: ${branch} -> auto-linked`);
           }
         }
