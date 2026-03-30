@@ -260,6 +260,27 @@ export const skillsMeta: SkillMeta[] = [
       { to: 'plan-sdlc', label: 'informs planning in' },
     ],
   },
+  {
+    slug: 'setup-sdlc',
+    command: '/setup-sdlc',
+    category: 'gitops',
+    userInvocable: true,
+    tagline: 'Unified project setup — configures version, ship, review, and jira settings in one interactive flow.',
+    pipeline: [
+      { id: 'detect', label: 'Detect current state', type: 'script', description: 'Runs setup-prepare.js to find existing configs and legacy files' },
+      { id: 'migrate', label: 'Migrate legacy configs', type: 'llm', description: 'Consolidates legacy files into unified .claude/sdlc.json' },
+      { id: 'configure', label: 'Interactive config builder', type: 'user', description: 'Walks through version, ship, jira, and review settings' },
+      { id: 'validate', label: 'Validate written config', type: 'verify', description: 'Re-runs setup-prepare.js to confirm config is readable' },
+      { id: 'delegate-content', label: 'Delegate content setup', type: 'dispatch', description: 'Invokes review-init-sdlc and pr-customize-sdlc as needed' },
+      { id: 'summary', label: 'Show summary', type: 'llm', description: 'Reports what was created, migrated, and configured' },
+    ],
+    connections: [
+      { to: 'version-sdlc', label: 'configures versioning for' },
+      { to: 'ship-sdlc', label: 'configures pipeline for' },
+      { to: 'review-init-sdlc', label: 'delegates dimensions to' },
+      { to: 'jira-sdlc', label: 'configures project key for' },
+    ],
+  },
 ];
 
 export function getSkillMeta(slug: string): SkillMeta | undefined {

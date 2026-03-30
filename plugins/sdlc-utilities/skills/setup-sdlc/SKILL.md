@@ -295,6 +295,20 @@ console.log('Wrote .sdlc/local.json');
 
 Replace the placeholder values with the actual collected answers. The `writeProjectConfig` and `writeLocalConfig` functions handle read-merge-write, so existing sections are preserved.
 
+### Step 3b -- Validate Written Config
+
+Re-run `setup-prepare.js` to verify the config files were written correctly:
+
+```bash
+node "$SCRIPT" > "$PREPARE_OUTPUT_FILE"
+```
+
+Parse the output and confirm:
+- `projectConfig.exists` is `true` and `projectConfig.sections` includes the sections just written
+- `localConfig.exists` is `true` (if review scope was configured)
+
+If validation fails (sections missing or file unreadable), warn the user and offer to retry the config write. Do not proceed to content setup with invalid config.
+
 ---
 
 ### Step 4 -- Content Setup

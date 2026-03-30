@@ -275,8 +275,8 @@ function migrateConfig(projectRoot) {
       conflicts.push(LEGACY.version);
     } else {
       projectConfig.version = section;
+      migrated.push(LEGACY.version);
     }
-    migrated.push(LEGACY.version);
   }
 
   // ship
@@ -288,8 +288,8 @@ function migrateConfig(projectRoot) {
       conflicts.push(LEGACY.ship);
     } else {
       projectConfig.ship = section;
+      migrated.push(LEGACY.ship);
     }
-    migrated.push(LEGACY.ship);
   }
 
   // jira
@@ -301,8 +301,8 @@ function migrateConfig(projectRoot) {
       conflicts.push(LEGACY.jira);
     } else {
       projectConfig.jira = section;
+      migrated.push(LEGACY.jira);
     }
-    migrated.push(LEGACY.jira);
   }
 
   if (Object.keys(projectConfig).length > 0) {
@@ -337,8 +337,8 @@ function migrateConfig(projectRoot) {
       conflicts.push(reviewSource);
     } else {
       writeLocalConfig(projectRoot, { review });
+      migrated.push(reviewSource);
     }
-    migrated.push(reviewSource);
   }
 
   return { migrated, conflicts };

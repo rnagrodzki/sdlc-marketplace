@@ -29,7 +29,7 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { writeSection } = require('./lib/config');
+const { readSection, writeSection } = require('./lib/config');
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -152,11 +152,11 @@ function main() {
     workspace,
   };
 
-  // Write ship section via unified config — warn if overwriting
-  const configPath = path.join(projectRoot, '.claude', 'sdlc.json');
+  // Write ship section via unified config — warn if overwriting existing ship section
+  const existingShip = readSection(projectRoot, 'ship');
   let configAction;
-  if (fs.existsSync(configPath)) {
-    warnings.push('Overwriting existing config');
+  if (existingShip) {
+    warnings.push('Overwriting existing ship config');
     configAction = 'overwritten';
   } else {
     configAction = 'created';

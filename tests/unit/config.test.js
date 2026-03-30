@@ -524,7 +524,8 @@ describe('migrateConfig', () => {
 
       const { migrated, conflicts } = migrateConfig(tmp);
 
-      assert.ok(migrated.includes(LEGACY.version));
+      // Conflicting files go to conflicts only, not migrated
+      assert.ok(!migrated.includes(LEGACY.version));
       assert.ok(migrated.includes(LEGACY.ship));
       assert.ok(conflicts.includes(LEGACY.version));
       assert.ok(!conflicts.includes(LEGACY.ship));
@@ -550,7 +551,8 @@ describe('migrateConfig', () => {
 
       const { migrated, conflicts } = migrateConfig(tmp);
 
-      assert.ok(migrated.includes(LEGACY.reviewSdlc));
+      // Conflicting files go to conflicts only, not migrated
+      assert.ok(!migrated.includes(LEGACY.reviewSdlc));
       assert.ok(conflicts.includes(LEGACY.reviewSdlc));
 
       // Review should NOT be overwritten
