@@ -166,6 +166,8 @@ Using data from `PR_CONTEXT_JSON`, draft all sections of the active PR template 
 
 **OpenSpec enrichment (automatic when detected):**
 
+**Hook context fast-path:** If the session-start system-reminder contains an `OpenSpec active:` line, use its data (change name, branch match status, delta spec count) to skip the `Glob for openspec/config.yaml` and change directory scanning. If the line is absent or the user switched branches since session start, fall back to the existing Glob-based detection. The hook context is a session-start snapshot — treat it as a hint, not as authoritative.
+
 1. Glob for `openspec/config.yaml`. If absent, skip this block entirely.
 2. Identify the active change: Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If one matches, use it. If multiple, match against `PR_CONTEXT_JSON.currentBranch`. If ambiguous, skip — do not ask during PR creation.
 3. If an active change is found, Read in parallel:

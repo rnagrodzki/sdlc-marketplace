@@ -46,6 +46,8 @@ echo "EXIT_CODE=$EXIT_CODE"
 
 ### 1b. Load ship config
 
+**Hook context fast-path:** If the session-start system-reminder contains a `Ship config:` line, note it for display. The prepare script (`ship-prepare.js`) remains the authoritative source for config values — the hook line is a user-facing heads-up, not a data source.
+
 Check for `.sdlc/ship-config.json`. If it exists, read and merge. Print loaded config verbosely:
 ```
 Ship config loaded from .sdlc/ship-config.json
@@ -90,6 +92,8 @@ Flag resolution (from ship-prepare.js):
 ```
 
 ### 1e. Resume check
+
+**Hook context fast-path:** If the session-start system-reminder contains an `Active pipeline:` line, note the state file path and resume point. When the user does not pass `--resume` explicitly but the hook reported an active pipeline, use this to inform the resume prompt — skip the filesystem scan since the hook already found the state file. The hook context is a session-start snapshot.
 
 Print `resume.found` and `resume.stateFile` from the `ship-prepare.js` output. If `resume.found` is `true`, print the state file path and resume point. If `false`, print that no state file was found and the pipeline will start fresh.
 
