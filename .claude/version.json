@@ -1,9 +1,0 @@
-{
-  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/version-config.schema.json",
-  "mode": "file",
-  "versionFile": "plugins/sdlc-utilities/.claude-plugin/plugin.json",
-  "fileType": "plugin.json",
-  "tagPrefix": "v",
-  "changelog": true,
-  "changelogFile": "CHANGELOG.md"
-}

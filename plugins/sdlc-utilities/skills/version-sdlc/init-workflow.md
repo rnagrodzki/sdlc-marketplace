@@ -8,7 +8,7 @@ Read `VERSION_CONTEXT_JSON`. Extract:
 - `currentVersion` — version string found in that file or from git tags
 - `existingTags` — list of existing git release tags
 - `tagConvention` — detected tag prefix (e.g. `v`, `release/`, or empty)
-- `suggestedConfig` — the config object that will be written to `.claude/version.json`
+- `suggestedConfig` — the config object that will be written to `.claude/sdlc.json → version section`
 
 ### Step 2 (PRESENT): Show Detected Setup
 
@@ -23,7 +23,7 @@ Detected setup:
   Changelog:    no (use --changelog flag to enable per release)
 
 Suggested config:
-  .claude/version.json — will be written
+  .claude/sdlc.json → version section — will be written
 ```
 
 ### Step 3 (CONFIRM): Ask User to Confirm
@@ -32,14 +32,14 @@ Use AskUserQuestion to present the detected setup and ask:
 > Does this look right?
 
 Options:
-- **yes** — write .claude/version.json as shown
+- **yes** — write version section to .claude/sdlc.json
 - **tag-only** — use git tags as version source (no version file)
 - **changelog** — same as yes, but enable changelog by default
 - **cancel** — abort setup
 
 ### Step 4 (WRITE): Write Config on Confirmation
 
-On `yes` or `changelog`, write `.claude/version.json` using the Write tool with
+On `yes` or `changelog`, write the version section to `.claude/sdlc.json` using `writeSection` from lib/config.js with
 the content from `suggestedConfig` (adjusted if `changelog` was chosen).
 
 Then scaffold the retag workflow into the project:
@@ -59,7 +59,7 @@ If either target file already exists, skip copying it (do not overwrite).
 Display:
 
 ```
-✓ .claude/version.json written.
+✓ .claude/sdlc.json → version section written.
 ✓ .github/workflows/retag-release.yml added (auto-fixes tags after squash merge to main).
 ✓ .github/scripts/retag-release.js added.
 ✓ .github/workflows/check-changelog.yml added (validates changelog entry exists after each push to main).

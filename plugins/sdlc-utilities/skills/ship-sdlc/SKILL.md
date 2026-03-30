@@ -26,6 +26,8 @@ If the system context contains "Plan mode is active":
 
 If `--init-config` was passed:
 
+**Redirect:** Suggest running `/setup-sdlc` instead for unified configuration. If user insists on `--init-config`, proceed with the existing walkthrough.
+
 1. Read `./config-format.md` and run the interactive walkthrough to collect the user's answers (preset, skip set, bump type, auto, threshold, workspace isolation).
 2. Locate and call `ship-init.js` via Bash with the collected answers:
 ```bash
@@ -46,13 +48,13 @@ echo "EXIT_CODE=$EXIT_CODE"
 
 ### 1b. Load ship config
 
-Check for `.sdlc/ship-config.json`. If it exists, read and merge. Print loaded config verbosely:
+Check for ship config via ship-prepare.js output (reads from `.claude/sdlc.json` → `ship` section, with legacy `.sdlc/ship-config.json` fallback). If found, read and merge. Print loaded config verbosely:
 ```
-Ship config loaded from .sdlc/ship-config.json
+Ship config loaded from .claude/sdlc.json
   preset: B, skip: [version], draft: false, bump: patch
   reviewThreshold: high
 ```
-If not found: `No ship config found — using built-in defaults. Run --init-config to create one.`
+If not found: `No ship config found — using built-in defaults. Run /setup-sdlc to configure.`
 
 ### 1c. Prepare pipeline context
 
@@ -511,11 +513,11 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Version consent gate.** version-sdlc supports `--auto`. When forwarded, the release plan approval prompt is skipped but the plan is still displayed. Pre-condition checks (Steps 6–7) and critique gates (Steps 3–4) still run.
 
-**Config file is optional.** The pipeline runs with built-in defaults when no `.sdlc/ship-config.json` exists. Do not error on missing config.
+**Config file is optional.** The pipeline runs with built-in defaults when no ship config exists in `.claude/sdlc.json`. Do not error on missing config.
 
 **Skip set validation matters.** Unrecognized values in `--skip` (e.g., `--skip reviw`) should warn, not silently ignore. Typos in skip values cause steps to run when the user expected them skipped.
 
-**.sdlc/ must be gitignored.** The `.sdlc/` directory contains developer-local config (`ship-config.json`) and ephemeral pipeline state (`execution/`). `--init-config` creates `.sdlc/.gitignore` automatically via `ship-init.js`. If `.sdlc/` is not gitignored, the staging command (`git add -A -- ':!.sdlc/'`) provides a fallback exclusion, but the gitignore is the primary defense.
+**.sdlc/ must be gitignored.** The `.sdlc/` directory contains developer-local config (`local.json`) and ephemeral pipeline state (`execution/`). `--init-config` creates `.sdlc/.gitignore` automatically via `ship-init.js`. If `.sdlc/` is not gitignored, the staging command (`git add -A -- ':!.sdlc/'`) provides a fallback exclusion, but the gitignore is the primary defense.
 
 **Pipeline plan is binding.** The pipeline table displayed in Step 4 and confirmed by the user is a contract. Step statuses (`will_run`, `skipped`, `conditional`) are computed by `ship-prepare.js` — the LLM follows them, it does not override them. Steps with `status: "will_run"` must be invoked via the Skill tool. This was added after an incident where the review step was skipped because the LLM judged the changes to be "just docs/config" (issue #68). The pipeline's value is precisely in catching cases where the developer thinks changes are low-risk but the review disagrees.
 

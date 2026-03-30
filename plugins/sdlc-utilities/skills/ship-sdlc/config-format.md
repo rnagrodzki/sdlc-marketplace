@@ -1,18 +1,18 @@
 # ship-sdlc Configuration Reference
 
-This document describes `.sdlc/ship-config.json`, the persistent configuration file for ship-sdlc. Settings here apply to every `ship-sdlc` invocation in the repository unless overridden by a CLI flag.
+This document describes the `.claude/sdlc.json → ship section`, the persistent configuration for ship-sdlc. Settings here apply to every `ship-sdlc` invocation in the repository unless overridden by a CLI flag.
 
 ---
 
 ## File Location
 
 ```
-<repo-root>/.sdlc/ship-config.json
+<repo-root>/.claude/sdlc.json
 ```
 
-Create it manually or run `ship-sdlc --init-config` to walk through an interactive setup.
+The ship configuration lives in the `ship` section of the unified `.claude/sdlc.json` config file. Create it manually or run `/setup-sdlc` to walk through an interactive setup.
 
-A JSON Schema is available at `schemas/ship-config.schema.json` for IDE autocompletion. Set the `$schema` field in your config to enable it.
+A JSON Schema is available at `schemas/sdlc-config.schema.json` for IDE autocompletion. Set the `$schema` field in your config to enable it.
 
 ---
 
@@ -20,16 +20,17 @@ A JSON Schema is available at `schemas/ship-config.schema.json` for IDE autocomp
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/ship-config.schema.json",
-  "version": 1,
-  "preset": "B",
-  "skip": ["version"],
-  "bump": "patch",
-  "draft": false,
-  "auto": false,
-  "reviewThreshold": "high",
-  "workspace": "prompt",
-  "rebase": true
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
+  "ship": {
+    "preset": "B",
+    "skip": ["version"],
+    "bump": "patch",
+    "draft": false,
+    "auto": false,
+    "reviewThreshold": "high",
+    "workspace": "prompt",
+    "rebase": true
+  }
 }
 ```
 
@@ -65,7 +66,7 @@ At `"high"` (the default), findings rated Medium or lower are reported but do no
 When the same setting is specified in multiple places, the order of precedence is:
 
 ```
-CLI flag  >  .sdlc/ship-config.json  >  built-in defaults
+CLI flag  >  .claude/sdlc.json (ship section)  >  built-in defaults
 ```
 
 A flag passed directly on the command line always wins. If no flag is given, the config file value is used. If the config file is absent or does not specify a field, the built-in default applies.
@@ -74,7 +75,7 @@ A flag passed directly on the command line always wins. If no flag is given, the
 
 ## --init-config Walkthrough
 
-Running `ship-sdlc --init-config` launches an interactive sequence that writes `.sdlc/ship-config.json`. The steps are:
+Running `ship-sdlc --init-config` launches an interactive sequence that writes the `ship` section to `.claude/sdlc.json`. The steps are:
 
 1. **Preset preference** — Choose an execution preset:
    - `A` = Speed (minimal gates, maximise parallelism)
@@ -104,7 +105,7 @@ Running `ship-sdlc --init-config` launches an interactive sequence that writes `
    - `high` = blockers + high-severity findings (recommended)
    - `medium` = blockers + high + medium-severity findings
 
-9. **Write and confirm** — The tool runs `ship-init.js` with the collected answers to create `.sdlc/ship-config.json` and `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the config file already exists, you are asked whether to overwrite it.
+9. **Write and confirm** — The tool runs `ship-init.js` with the collected answers to write the `ship` section to `.claude/sdlc.json` and create `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the ship section already exists, you are asked whether to overwrite it.
 
 ---
 
@@ -116,15 +117,16 @@ Minimises prompts and skips the version step to manage it manually.
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/ship-config.schema.json",
-  "version": 1,
-  "preset": "A",
-  "skip": ["version"],
-  "bump": "patch",
-  "draft": false,
-  "auto": true,
-  "reviewThreshold": "critical",
-  "workspace": "branch"
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
+  "ship": {
+    "preset": "A",
+    "skip": ["version"],
+    "bump": "patch",
+    "draft": false,
+    "auto": true,
+    "reviewThreshold": "critical",
+    "workspace": "branch"
+  }
 }
 ```
 
@@ -134,15 +136,16 @@ Balanced preset, review threshold set to catch high-severity findings, PRs alway
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/ship-config.schema.json",
-  "version": 1,
-  "preset": "B",
-  "skip": [],
-  "bump": "minor",
-  "draft": true,
-  "auto": false,
-  "reviewThreshold": "high",
-  "workspace": "prompt"
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
+  "ship": {
+    "preset": "B",
+    "skip": [],
+    "bump": "minor",
+    "draft": true,
+    "auto": false,
+    "reviewThreshold": "high",
+    "workspace": "prompt"
+  }
 }
 ```
 
@@ -152,14 +155,15 @@ Quality preset with the widest review threshold. Suitable for regulated environm
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/ship-config.schema.json",
-  "version": 1,
-  "preset": "C",
-  "skip": [],
-  "bump": "patch",
-  "draft": false,
-  "auto": false,
-  "reviewThreshold": "medium",
-  "workspace": "worktree"
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
+  "ship": {
+    "preset": "C",
+    "skip": [],
+    "bump": "patch",
+    "draft": false,
+    "auto": false,
+    "reviewThreshold": "medium",
+    "workspace": "worktree"
+  }
 }
 ```

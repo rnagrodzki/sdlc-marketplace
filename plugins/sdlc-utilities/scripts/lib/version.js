@@ -13,6 +13,7 @@
 
 const fs   = require('node:fs');
 const path = require('node:path');
+const { readSection, writeSection } = require('./config');
 
 // ---------------------------------------------------------------------------
 // Version file detection
@@ -333,36 +334,17 @@ function parseConventionalCommit(subject, body = '', ticketPrefix = null) {
  * @returns {object|null}
  */
 function readConfig(projectRoot) {
-  const configPath = path.join(projectRoot, '.claude', 'version.json');
-
-  if (!fs.existsSync(configPath)) return null;
-
-  const raw = fs.readFileSync(configPath, 'utf8');
-  try {
-    return JSON.parse(raw);
-  } catch (err) {
-    throw new Error(
-      `readConfig: invalid JSON in "${configPath}": ${err.message}`
-    );
-  }
+  return readSection(projectRoot, 'version');
 }
 
 /**
- * Write config as pretty-printed JSON to `.claude/version.json`.
- * Creates the `.claude/` directory if it does not already exist.
+ * Write config to the unified `.claude/sdlc.json` under the `version` section.
  * @param {string} projectRoot
  * @param {object} config
  * @returns {void}
  */
 function writeConfig(projectRoot, config) {
-  const claudeDir  = path.join(projectRoot, '.claude');
-  const configPath = path.join(claudeDir, 'version.json');
-
-  if (!fs.existsSync(claudeDir)) {
-    fs.mkdirSync(claudeDir, { recursive: true });
-  }
-
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+  writeSection(projectRoot, 'version', config);
 }
 
 // ---------------------------------------------------------------------------

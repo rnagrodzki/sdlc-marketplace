@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/jira-config.schema.json",
   "title": "Jira Config",
-  "description": "Validates .sdlc/jira-config.json — controls Jira integration behaviour.",
+  "description": "DEPRECATED: Use sdlc-config.schema.json instead. Validates .sdlc/jira-config.json — controls Jira integration behaviour.",
   "type": "object",
   "properties": {
     "$schema": {

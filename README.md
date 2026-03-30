@@ -51,6 +51,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | [`/execute-plan-sdlc`](docs/skills/execute-plan-sdlc.md) | Execute an implementation plan with adaptive task classification, wave-based parallel dispatch, and automatic error recovery |
 | [`/ship-sdlc`](docs/skills/ship-sdlc.md) | Chain execute, commit, review, version, and PR into a single shipping pipeline with conditional review-fix loop |
 | [`/jira-sdlc`](docs/skills/jira-sdlc.md) | Create, edit, search, and transition Jira issues with cached project metadata |
+| [`/setup-sdlc`](docs/skills/setup-sdlc.md) | Unified project setup — configure version, ship, review, and jira settings in one flow |
 
 ---
 

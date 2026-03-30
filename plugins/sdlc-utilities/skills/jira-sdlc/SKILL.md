@@ -56,7 +56,7 @@ removed entirely — the API call is never made with raw placeholder text.
 
 1. `--project <KEY>` argument
 2. Parse current git branch for `[A-Z]{2,10}-\d+` pattern (e.g., `feat/PROJ-123-fix` → `PROJ`)
-3. Read `.sdlc/jira-config.json` → `defaultProject`
+3. Read `.claude/sdlc.json` → `jira.defaultProject`
 4. Use AskUserQuestion to ask: "Which Jira project key should I use? (e.g., PROJ, TEAM)"
 
 ### Script Resolution Block

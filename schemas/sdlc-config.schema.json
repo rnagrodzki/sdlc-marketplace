@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
+  "title": "SDLC Config",
+  "description": "Validates .claude/sdlc.json — unified project-level configuration for sdlc-utilities skills.",
+  "type": "object",
+  "$defs": {
+    "versionSection": {
+      "type": "object",
+      "description": "Controls the version-sdlc skill behaviour.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["file", "tag"],
+          "description": "Whether the version is tracked in a file or via git tags."
+        },
+        "versionFile": {
+          "type": "string",
+          "description": "Path to the file that stores the version number."
+        },
+        "fileType": {
+          "type": "string",
+          "enum": ["package.json", "cargo.toml", "pyproject.toml", "pubspec.yaml", "plugin.json", "version-file"],
+          "description": "Format of the version file."
+        },
+        "tagPrefix": {
+          "type": "string",
+          "description": "Prefix prepended to git version tags (e.g. \"v\")."
+        },
+        "changelog": {
+          "type": "boolean",
+          "description": "Whether to generate or update a changelog on release."
+        },
+        "changelogFile": {
+          "type": "string",
+          "description": "Path to the changelog file."
+        },
+        "ticketPrefix": {
+          "type": "string",
+          "description": "Jira ticket prefix used to filter commit messages for the changelog (e.g. \"PROJ\")."
+        }
+      },
+      "required": ["mode"],
+      "additionalProperties": false
+    },
+    "shipSection": {
+      "type": "object",
+      "description": "Controls the ship-sdlc skill behaviour.",
+      "properties": {
+        "preset": {
+          "type": "string",
+          "enum": ["A", "B", "C"],
+          "description": "Preset pipeline variant."
+        },
+        "skip": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["execute", "commit", "review", "received-review", "commit-fixes", "version", "pr"]
+          },
+          "description": "Pipeline steps to skip."
+        },
+        "bump": {
+          "type": "string",
+          "enum": ["patch", "minor", "major"],
+          "description": "Version bump level."
+        },
+        "draft": {
+          "type": "boolean",
+          "description": "Open the pull request as a draft."
+        },
+        "auto": {
+          "type": "boolean",
+          "description": "Run the pipeline non-interactively."
+        },
+        "reviewThreshold": {
+          "type": "string",
+          "enum": ["critical", "high", "medium"],
+          "description": "Minimum severity level that blocks the pipeline."
+        },
+        "workspace": {
+          "type": "string",
+          "enum": ["branch", "worktree", "prompt"],
+          "description": "How to set up the working environment for the ship run."
+        },
+        "rebase": {
+          "description": "Whether to rebase before shipping, or prompt the user.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "const": "prompt"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "jiraSection": {
+      "type": "object",
+      "description": "Controls Jira integration behaviour.",
+      "properties": {
+        "defaultProject": {
+          "type": "string",
+          "pattern": "^[A-Z]{2,10}$",
+          "description": "Default Jira project key (2–10 uppercase letters)."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "URL pointing to this schema."
+    },
+    "version": {
+      "$ref": "#/$defs/versionSection"
+    },
+    "ship": {
+      "$ref": "#/$defs/shipSection"
+    },
+    "jira": {
+      "$ref": "#/$defs/jiraSection"
+    }
+  },
+  "additionalProperties": false
+}

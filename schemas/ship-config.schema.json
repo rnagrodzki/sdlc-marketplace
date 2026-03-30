@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/ship-config.schema.json",
   "title": "Ship Config",
-  "description": "Validates .sdlc/ship-config.json — controls the ship-sdlc skill behaviour.",
+  "description": "DEPRECATED: Use sdlc-config.schema.json instead. Validates .sdlc/ship-config.json — controls the ship-sdlc skill behaviour.",
   "type": "object",
   "properties": {
     "$schema": {

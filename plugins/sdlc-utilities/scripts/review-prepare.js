@@ -40,6 +40,7 @@ const {
   fetchPrMetadata,
   ensureGhAccount,
 } = require('./lib/git');
+const { readSection, writeLocalConfig } = require('./lib/config');
 
 // ---------------------------------------------------------------------------
 // Review config (.sdlc/review.json)
@@ -48,47 +49,31 @@ const {
 const VALID_SCOPES = ['all', 'committed', 'staged', 'working', 'worktree'];
 
 function readReviewConfig(projectRoot) {
-  const sdlcConfigPath   = path.join(projectRoot, '.sdlc', 'review.json');
-  const legacyConfigPath = path.join(projectRoot, '.claude', 'review.json');
-
-  let configPath;
-  if (fs.existsSync(sdlcConfigPath)) {
-    configPath = sdlcConfigPath;
-  } else if (fs.existsSync(legacyConfigPath)) {
-    process.stderr.write(
-      'Warning: .claude/review.json is deprecated. Run /review-sdlc --set-default to migrate to .sdlc/review.json.\n'
-    );
-    configPath = legacyConfigPath;
-  } else {
-    return null;
-  }
-
+  let review;
   try {
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    if (config?.defaults?.scope && !VALID_SCOPES.includes(config.defaults.scope)) {
-      process.stderr.write(
-        `Warning: invalid scope "${config.defaults.scope}" in ${configPath}. ` +
-        `Valid: ${VALID_SCOPES.join(', ')}. Using default "all".\n`
-      );
-      config.defaults.scope = 'all';
-    }
-    return config;
+    review = readSection(projectRoot, 'review');
   } catch (err) {
-    process.stderr.write(`Warning: invalid review config at ${configPath}: ${err.message}\n`);
+    process.stderr.write(`Warning: invalid review config: ${err.message}\n`);
     return null;
   }
+  if (!review) return null;
+
+  // Wrap into the shape the rest of review-prepare.js expects: { defaults: { scope, ... } }
+  const config = { defaults: review };
+  if (config.defaults.scope && !VALID_SCOPES.includes(config.defaults.scope)) {
+    process.stderr.write(
+      `Warning: invalid scope "${config.defaults.scope}" in review config. ` +
+      `Valid: ${VALID_SCOPES.join(', ')}. Using default "all".\n`
+    );
+    config.defaults.scope = 'all';
+  }
+  return config;
 }
 
 function writeReviewConfig(projectRoot, updates) {
-  const sdlcDir    = path.join(projectRoot, '.sdlc');
-  const configPath = path.join(sdlcDir, 'review.json');
-  if (!fs.existsSync(sdlcDir)) fs.mkdirSync(sdlcDir, { recursive: true });
-  let existing = {};
-  if (fs.existsSync(configPath)) {
-    try { existing = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch (_) {}
-  }
-  const merged = { ...existing, ...updates, defaults: { ...(existing.defaults || {}), ...(updates.defaults || {}) } };
-  fs.writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf8');
+  // updates has shape { defaults: { scope, ... } } — map to local config shape { review: { scope, ... } }
+  const review = { ...(updates.defaults || {}) };
+  writeLocalConfig(projectRoot, { review });
 }
 
 // ---------------------------------------------------------------------------

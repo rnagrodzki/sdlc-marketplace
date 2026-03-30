@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
+  "title": "SDLC Local Config",
+  "description": "Validates .sdlc/local.json — user-local (gitignored) configuration for sdlc-utilities skills.",
+  "type": "object",
+  "$defs": {
+    "reviewSection": {
+      "type": "object",
+      "description": "User-local defaults for the review-sdlc skill.",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["all", "committed", "staged", "working", "worktree"],
+          "description": "Which changes to include in the review."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "URL pointing to this schema."
+    },
+    "review": {
+      "$ref": "#/$defs/reviewSection"
+    }
+  },
+  "additionalProperties": false
+}

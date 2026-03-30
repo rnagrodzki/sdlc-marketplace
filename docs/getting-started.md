@@ -41,39 +41,29 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 
 ## First Use
 
-### Code review setup
-
-The plugin provides a project-customizable multi-dimension code review system.
-
-**Step 1 — Create review dimensions** (one-time per project):
+Run the unified setup skill to configure the plugin for your project:
 
 ```text
-/review-init-sdlc
+/setup-sdlc
 ```
 
-Scans your tech stack and proposes tailored dimension files (security, API contracts, test coverage, etc.) in `.claude/review-dimensions/`. Run with `--add` to expand an existing set.
+This walks you through:
+- **Version config** — version source, tag prefix, changelog
+- **Ship config** — pipeline preset, bump type, review threshold
+- **Review dimensions** — project-tailored code review criteria
+- **PR template** — customized PR descriptions
 
-**Step 2 — Run reviews** (on any feature branch):
-
-```text
-/review-sdlc
-```
-
-Matches dimensions to your changed files, dispatches parallel review subagents, deduplicates findings, and posts a consolidated comment to the PR.
-
-### Creating a pull request
-
-```text
-/pr-sdlc
-```
-
-Generates a structured PR description from your commits and diffs, then opens the PR via `gh`.
+Individual skills can also be configured independently:
+- `/review-init-sdlc` — create review dimensions
+- `/pr-customize-sdlc` — create PR template
+- `/version-sdlc --init` — configure versioning
 
 ## What Gets Created
 
 | File / Directory | Purpose |
 | --- | --- |
+| `.claude/sdlc.json` | Unified project config — version, ship, jira settings (created by `/setup-sdlc`) |
+| `.sdlc/local.json` | User-local config — review scope preferences (created by `/setup-sdlc`) |
 | `.claude/review-dimensions/` | Per-project code review dimension files (created by `/review-init-sdlc`) |
 | `.claude/pr-template.md` | Project PR template (created by `/pr-customize-sdlc`) |
-| `.claude/version.json` | Release configuration (created by `/version-sdlc --init`) |
 

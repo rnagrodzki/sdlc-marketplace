@@ -34,6 +34,7 @@ const fs   = require('fs');
 const path = require('path');
 const { exec, checkGitState, detectBaseBranch } = require('./lib/git');
 const { resolveMainWorktree } = require('./lib/state');
+const { readSection } = require('./lib/config');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -107,16 +108,10 @@ function parseArgs(argv) {
  * @returns {{ config: object|null, source: string }}
  */
 function loadConfig(projectRoot) {
-  const configPath = path.join(projectRoot, '.sdlc', 'ship-config.json');
-  if (!fs.existsSync(configPath)) {
-    return { config: null, source: 'defaults' };
-  }
-  try {
-    const raw = fs.readFileSync(configPath, 'utf8');
-    return { config: JSON.parse(raw), source: '.sdlc/ship-config.json' };
-  } catch (_) {
-    return { config: null, source: 'defaults' };
-  }
+  const result = readSection(projectRoot, 'ship');
+  return result
+    ? { config: result, source: '.claude/sdlc.json' }
+    : { config: null, source: 'defaults' };
 }
 
 // ---------------------------------------------------------------------------

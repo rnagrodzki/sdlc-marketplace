@@ -29,6 +29,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { writeSection } = require('./lib/config');
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -140,10 +141,8 @@ function main() {
     gitignoreAction = 'created';
   }
 
-  // Build config object
+  // Build config object (no $schema or version — handled by unified config system)
   const config = {
-    '$schema':        'ship-config',
-    version:          1,
     preset,
     skip,
     bump,
@@ -153,8 +152,8 @@ function main() {
     workspace,
   };
 
-  // Write .sdlc/ship-config.json — warn if overwriting
-  const configPath = path.join(sdlcDir, 'ship-config.json');
+  // Write ship section via unified config — warn if overwriting
+  const configPath = path.join(projectRoot, '.claude', 'sdlc.json');
   let configAction;
   if (fs.existsSync(configPath)) {
     warnings.push('Overwriting existing config');
@@ -163,7 +162,7 @@ function main() {
     configAction = 'created';
   }
 
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+  writeSection(projectRoot, 'ship', config);
 
   const result = {
     errors,
@@ -171,7 +170,7 @@ function main() {
     created: {
       directory: '.sdlc/',
       gitignore: { path: '.sdlc/.gitignore', action: gitignoreAction },
-      config:    { path: '.sdlc/ship-config.json', action: configAction },
+      config:    { path: '.claude/sdlc.json', action: configAction },
     },
     config,
   };
