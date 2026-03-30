@@ -11,7 +11,7 @@ Consume pre-computed version context from `version-prepare.js` and execute eithe
 the one-time init setup or a full semantic release: version bump, annotated git tag,
 optional CHANGELOG entry, release commit, and push to origin.
 
-**Announce at start:** "I'm using version-sdlc (sdlc v{version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+**Announce at start:** "I'm using version-sdlc (sdlc v{sdlc_version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
 
 ## When to Use This Skill
 

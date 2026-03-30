@@ -10,7 +10,7 @@ argument-hint: "[--draft] [--update] [--base <branch>] [--auto]"
 Consume pre-computed git context from `pr-prepare.js` and generate an 8-section
 PR description readable by both technical and non-technical stakeholders.
 
-**Announce at start:** "I'm using pr-sdlc (sdlc v{version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+**Announce at start:** "I'm using pr-sdlc (sdlc v{sdlc_version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
 
 ## Step 0 — Plan Mode Check
 

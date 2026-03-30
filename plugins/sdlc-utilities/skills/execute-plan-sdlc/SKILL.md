@@ -9,7 +9,7 @@ argument-hint: "[plan-file-path] [--preset A|B|C] [--resume] [--workspace branch
 
 Orchestrate plan execution with adaptive task classification, wave-based parallel dispatch, PCIDCI critique loops, and automatic error recovery. No external sub-skills required.
 
-**Announce at start:** "I'm using execute-plan-sdlc (sdlc v{version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+**Announce at start:** "I'm using execute-plan-sdlc (sdlc v{sdlc_version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
 
 ## Plan Mode Check
 

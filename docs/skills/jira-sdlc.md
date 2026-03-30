@@ -18,7 +18,7 @@ Manages Jira issues via the Atlassian MCP with a project metadata cache that eli
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--project <KEY>` | Jira project key to use (e.g., `PROJ`). Auto-detected from git branch or `.claude/jira-config.json` | Auto |
+| `--project <KEY>` | Jira project key to use (e.g., `PROJ`). Auto-detected from git branch or `.sdlc/jira-config.json` | Auto |
 | `--force-refresh` | Rebuild the project cache from scratch (cache is permanent by default; use when project metadata has changed) | — |
 | `--init-templates` | Copy the skill's default issue type templates to `.claude/jira-templates/` for customization | — |
 
@@ -156,7 +156,7 @@ After interactive setup, template files are created with your locale's names (e.
 
 ## How the Cache Works
 
-The cache is stored at `.claude/jira-cache/<PROJECT_KEY>.json` and is permanent by default — it does not expire on a timer. It is refreshed when `--force-refresh` is passed or when an operation fails due to stale cached data (e.g., invalid transition IDs or changed field schemas), triggering an automatic rebuild and retry.
+The cache is stored at `.sdlc/jira-cache/<PROJECT_KEY>.json` and is permanent by default — it does not expire on a timer. It is refreshed when `--force-refresh` is passed or when an operation fails due to stale cached data (e.g., invalid transition IDs or changed field schemas), triggering an automatic rebuild and retry.
 
 The cache contains:
 
@@ -189,8 +189,8 @@ After initialization, most operations require a single MCP call instead of 4–8
 
 | File / Artifact | Description |
 |-----------------|-------------|
-| `.claude/jira-cache/<KEY>.json` | Project metadata cache: cloudId, issue types, field schemas, workflows, user mappings |
-| `.claude/jira-cache/.gitignore` | Git-ignore file preventing cache contents from being committed; created automatically on first use |
+| `.sdlc/jira-cache/<KEY>.json` | Project metadata cache: cloudId, issue types, field schemas, workflows, user mappings |
+| `.sdlc/jira-cache/.gitignore` | Git-ignore file preventing cache contents from being committed; created automatically on first use |
 | `.claude/jira-templates/<Type>.md` | Project-level issue description templates (created only when `--init-templates` is run, or manually) |
 | Jira issues | Created or updated via the Atlassian MCP |
 

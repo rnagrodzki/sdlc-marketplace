@@ -13,7 +13,7 @@ Consume pre-computed commit context from `commit-prepare.js`, generate a commit 
 matching the project's style, optionally stash unstaged changes, commit after user
 confirmation, and auto-restore the stash.
 
-**Announce at start:** "I'm using commit-sdlc (sdlc v{version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+**Announce at start:** "I'm using commit-sdlc (sdlc v{sdlc_version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
 
 ## When to Use This Skill
 

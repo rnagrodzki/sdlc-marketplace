@@ -2,6 +2,8 @@
 
 The `execute-plan-sdlc` skill writes a JSON state file to `.sdlc/execution/` at execution start and updates it after each wave and task. This file enables crash recovery via `--resume` and provides a transparent record of every wave and task executed during the run.
 
+JSON Schemas are available at `schemas/execute-state.schema.json` and `schemas/ship-state.schema.json` for validation and IDE autocompletion.
+
 ---
 
 ## File Location

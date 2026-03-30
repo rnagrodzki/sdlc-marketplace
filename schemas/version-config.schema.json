@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/version-config.schema.json",
+  "title": "Version Config",
+  "description": "Validates .claude/version.json — controls the version-sdlc skill behaviour.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "URL pointing to this schema."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["file", "tag"],
+      "description": "Whether the version is tracked in a file or via git tags."
+    },
+    "versionFile": {
+      "type": "string",
+      "description": "Path to the file that stores the version number."
+    },
+    "fileType": {
+      "type": "string",
+      "enum": ["package.json", "cargo.toml", "pyproject.toml", "pubspec.yaml", "plugin.json", "version-file"],
+      "description": "Format of the version file."
+    },
+    "tagPrefix": {
+      "type": "string",
+      "description": "Prefix prepended to git version tags (e.g. \"v\")."
+    },
+    "changelog": {
+      "type": "boolean",
+      "description": "Whether to generate or update a changelog on release."
+    },
+    "changelogFile": {
+      "type": "string",
+      "description": "Path to the changelog file."
+    },
+    "ticketPrefix": {
+      "type": "string",
+      "description": "Jira ticket prefix used to filter commit messages for the changelog (e.g. \"PROJ\")."
+    }
+  },
+  "required": ["mode"],
+  "additionalProperties": false
+}

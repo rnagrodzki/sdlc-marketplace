@@ -126,7 +126,7 @@ mcp__atlassian__getTransitionsForJiraIssue({
 
 ```bash
 # Write assembled cache JSON to disk
-cat > .claude/jira-cache/PROJ.json << 'EOF'
+cat > .sdlc/jira-cache/PROJ.json << 'EOF'
 {
   "cloudId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "siteUrl": "mycompany.atlassian.net",

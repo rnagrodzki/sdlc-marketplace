@@ -81,7 +81,7 @@ Loads project review dimensions from `.claude/review-dimensions/`, matches them 
 /review-sdlc --set-default --worktree
 ```
 
-Saves `worktree` to `.claude/review.json` and runs the review. Subsequent `/review-sdlc` calls will use `worktree` automatically.
+Saves `worktree` to `.sdlc/review.json` and runs the review. Subsequent `/review-sdlc` calls will use `worktree` automatically.
 
 ### Preview what would be reviewed without running
 
@@ -93,7 +93,7 @@ Saves `worktree` to `.claude/review.json` and runs the review. Subsequent `/revi
 
 ## Configuration
 
-The default scope can be persisted in `.claude/review.json`:
+The default scope can be persisted in `.sdlc/review.json`:
 
 ```json
 {
@@ -103,7 +103,7 @@ The default scope can be persisted in `.claude/review.json`:
 }
 ```
 
-**Scope resolution order:** CLI flag → `.claude/review.json` → `all` (hardcoded default)
+**Scope resolution order:** CLI flag → `.sdlc/review.json` → `all` (hardcoded default)
 
 Use `--set-default` to create or update this file without editing it manually:
 

@@ -248,7 +248,7 @@ export const skillsMeta: SkillMeta[] = [
     userInvocable: true,
     tagline: 'Manages Jira issues via Atlassian MCP with a project metadata cache that reduces most operations to a single MCP call.',
     pipeline: [
-      { id: 'resolve-project', label: 'Resolve project key', type: 'script', description: 'Auto-detects from git branch or .claude/jira-config.json' },
+      { id: 'resolve-project', label: 'Resolve project key', type: 'script', description: 'Auto-detects from git branch or .sdlc/jira-config.json' },
       { id: 'load-cache', label: 'Initialize or load cache', type: 'script', description: 'Builds cache on first use; reads cached metadata after' },
       { id: 'parse-intent', label: 'Classify operation', type: 'llm', description: 'Interprets request into create/edit/search/transition/etc.' },
       { id: 'execute-op', label: 'Execute Jira operation', type: 'script', description: 'Calls Atlassian MCP with cached field IDs and schemas' },

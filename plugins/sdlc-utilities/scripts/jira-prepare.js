@@ -43,7 +43,7 @@ function output(data, exitCode) {
 function parseArgs(argv) {
   const args = argv.slice(2);
   let projectKey    = null;
-  let cacheDir      = path.join(process.cwd(), '.claude', 'jira-cache');
+  let cacheDir      = path.join(process.cwd(), '.sdlc', 'jira-cache');
   let templatesDir  = null;
   let subcommand    = 'check';
   let saveFieldName = null;
@@ -207,16 +207,22 @@ function resolveTemplateStatus(projectKey, cachePath, templatesDir) {
 
 function checkCache(cachePath, templatesDir, projectKey) {
   if (!fs.existsSync(cachePath)) {
-    output({
-      exists:     false,
-      fresh:      false,
-      projectKey,
-      cachePath,
-      missing:    ['all'],
-      errors:     [],
-      warnings:   [],
-    }, 0);
-    return;
+    const legacyPath = path.join(process.cwd(), '.claude', 'jira-cache', `${projectKey}.json`);
+    if (fs.existsSync(legacyPath)) {
+      process.stderr.write('Warning: .claude/jira-cache/ is deprecated. Cache will be written to .sdlc/jira-cache/ on next refresh.\n');
+      cachePath = legacyPath;
+    } else {
+      output({
+        exists:     false,
+        fresh:      false,
+        projectKey,
+        cachePath,
+        missing:    ['all'],
+        errors:     [],
+        warnings:   [],
+      }, 0);
+      return;
+    }
   }
 
   let cache;
@@ -346,10 +352,16 @@ function checkCache(cachePath, templatesDir, projectKey) {
 // Subcommand: --load
 // ---------------------------------------------------------------------------
 
-function loadCache(cachePath) {
+function loadCache(cachePath, projectKey) {
   if (!fs.existsSync(cachePath)) {
-    output({ errors: ['No cache found for project. Run cache initialization first.'] }, 1);
-    return;
+    const legacyPath = path.join(process.cwd(), '.claude', 'jira-cache', `${projectKey}.json`);
+    if (fs.existsSync(legacyPath)) {
+      process.stderr.write('Warning: .claude/jira-cache/ is deprecated. Cache will be written to .sdlc/jira-cache/ on next refresh.\n');
+      cachePath = legacyPath;
+    } else {
+      output({ errors: ['No cache found for project. Run cache initialization first.'] }, 1);
+      return;
+    }
   }
   const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
   output(cache, 0);
@@ -522,7 +534,7 @@ function main() {
       checkCache(cachePath, templatesDir, projectKey);
       break;
     case 'load':
-      loadCache(cachePath);
+      loadCache(cachePath, projectKey);
       break;
     case 'save':
       saveCache(cachePath);

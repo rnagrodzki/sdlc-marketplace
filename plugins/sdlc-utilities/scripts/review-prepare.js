@@ -42,14 +42,27 @@ const {
 } = require('./lib/git');
 
 // ---------------------------------------------------------------------------
-// Review config (.claude/review.json)
+// Review config (.sdlc/review.json)
 // ---------------------------------------------------------------------------
 
 const VALID_SCOPES = ['all', 'committed', 'staged', 'working', 'worktree'];
 
 function readReviewConfig(projectRoot) {
-  const configPath = path.join(projectRoot, '.claude', 'review.json');
-  if (!fs.existsSync(configPath)) return null;
+  const sdlcConfigPath   = path.join(projectRoot, '.sdlc', 'review.json');
+  const legacyConfigPath = path.join(projectRoot, '.claude', 'review.json');
+
+  let configPath;
+  if (fs.existsSync(sdlcConfigPath)) {
+    configPath = sdlcConfigPath;
+  } else if (fs.existsSync(legacyConfigPath)) {
+    process.stderr.write(
+      'Warning: .claude/review.json is deprecated. Run /review-sdlc --set-default to migrate to .sdlc/review.json.\n'
+    );
+    configPath = legacyConfigPath;
+  } else {
+    return null;
+  }
+
   try {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     if (config?.defaults?.scope && !VALID_SCOPES.includes(config.defaults.scope)) {
@@ -67,9 +80,9 @@ function readReviewConfig(projectRoot) {
 }
 
 function writeReviewConfig(projectRoot, updates) {
-  const claudeDir  = path.join(projectRoot, '.claude');
-  const configPath = path.join(claudeDir, 'review.json');
-  if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true });
+  const sdlcDir    = path.join(projectRoot, '.sdlc');
+  const configPath = path.join(sdlcDir, 'review.json');
+  if (!fs.existsSync(sdlcDir)) fs.mkdirSync(sdlcDir, { recursive: true });
   let existing = {};
   if (fs.existsSync(configPath)) {
     try { existing = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch (_) {}
@@ -459,7 +472,7 @@ function main() {
   // Persist default if --set-default was passed
   if (setDefault) {
     writeReviewConfig(projectRoot, { defaults: { scope } });
-    process.stderr.write(`Saved default scope "${scope}" to .claude/review.json\n`);
+    process.stderr.write(`Saved default scope "${scope}" to .sdlc/review.json\n`);
   }
 
   // Validate mutual exclusivity

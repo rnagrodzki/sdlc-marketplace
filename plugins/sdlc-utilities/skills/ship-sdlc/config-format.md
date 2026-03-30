@@ -12,13 +12,15 @@ This document describes `.sdlc/ship-config.json`, the persistent configuration f
 
 Create it manually or run `ship-sdlc --init-config` to walk through an interactive setup.
 
+A JSON Schema is available at `schemas/ship-config.schema.json` for IDE autocompletion. Set the `$schema` field in your config to enable it.
+
 ---
 
 ## Full Example
 
 ```json
 {
-  "$schema": "ship-config",
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/ship-config.schema.json",
   "version": 1,
   "preset": "B",
   "skip": ["version"],
@@ -114,7 +116,7 @@ Minimises prompts and skips the version step to manage it manually.
 
 ```json
 {
-  "$schema": "ship-config",
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/ship-config.schema.json",
   "version": 1,
   "preset": "A",
   "skip": ["version"],
@@ -132,7 +134,7 @@ Balanced preset, review threshold set to catch high-severity findings, PRs alway
 
 ```json
 {
-  "$schema": "ship-config",
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/ship-config.schema.json",
   "version": 1,
   "preset": "B",
   "skip": [],
@@ -150,7 +152,7 @@ Quality preset with the widest review threshold. Suitable for regulated environm
 
 ```json
 {
-  "$schema": "ship-config",
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/ship-config.schema.json",
   "version": 1,
   "preset": "C",
   "skip": [],

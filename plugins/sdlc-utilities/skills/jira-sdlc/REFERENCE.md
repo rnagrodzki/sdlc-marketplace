@@ -9,7 +9,7 @@ call — it eliminates guesswork and prevents the most common API errors.
 
 ## Section 0: Cache Schema
 
-The cache lives at `.claude/jira-cache/<PROJECT_KEY>.json`. It is created on first
+The cache lives at `.sdlc/jira-cache/<PROJECT_KEY>.json`. It is created on first
 `--check`, permanent by default (`maxAgeHours: 0`), and read before every MCP call to
 avoid redundant API round-trips. Refreshed only on `--force-refresh`, when required
 sections are missing, or when an operation fails due to stale cached data.

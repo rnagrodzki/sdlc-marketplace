@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/review-config.schema.json",
+  "title": "Review Config",
+  "description": "Validates .sdlc/review.json — controls the review-sdlc skill behaviour.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "URL pointing to this schema."
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Default options applied to every review run.",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["all", "committed", "staged", "working", "worktree"],
+          "description": "Which changes to include in the review."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

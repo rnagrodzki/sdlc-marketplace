@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/jira-config.schema.json",
+  "title": "Jira Config",
+  "description": "Validates .sdlc/jira-config.json — controls Jira integration behaviour.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "URL pointing to this schema."
+    },
+    "defaultProject": {
+      "type": "string",
+      "pattern": "^[A-Z]{2,10}$",
+      "description": "Default Jira project key (2–10 uppercase letters)."
+    }
+  },
+  "additionalProperties": false
+}

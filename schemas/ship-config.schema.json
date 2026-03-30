@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/ship-config.schema.json",
+  "title": "Ship Config",
+  "description": "Validates .sdlc/ship-config.json — controls the ship-sdlc skill behaviour.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "URL pointing to this schema."
+    },
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version. Must be 1."
+    },
+    "preset": {
+      "type": "string",
+      "enum": ["A", "B", "C"],
+      "description": "Preset pipeline variant."
+    },
+    "skip": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["execute", "commit", "review", "received-review", "commit-fixes", "version", "pr"]
+      },
+      "description": "Pipeline steps to skip."
+    },
+    "bump": {
+      "type": "string",
+      "enum": ["patch", "minor", "major"],
+      "description": "Version bump level."
+    },
+    "draft": {
+      "type": "boolean",
+      "description": "Open the pull request as a draft."
+    },
+    "auto": {
+      "type": "boolean",
+      "description": "Run the pipeline non-interactively."
+    },
+    "reviewThreshold": {
+      "type": "string",
+      "enum": ["critical", "high", "medium"],
+      "description": "Minimum severity level that blocks the pipeline."
+    },
+    "workspace": {
+      "type": "string",
+      "enum": ["branch", "worktree", "prompt"],
+      "description": "How to set up the working environment for the ship run."
+    },
+    "rebase": {
+      "description": "Whether to rebase before shipping, or prompt the user.",
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "const": "prompt"
+        }
+      ]
+    }
+  },
+  "required": ["version"],
+  "additionalProperties": false
+}

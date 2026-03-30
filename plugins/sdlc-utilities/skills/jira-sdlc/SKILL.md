@@ -11,7 +11,7 @@ Cache Jira project metadata on first use, then execute any Jira operation — cr
 edit, search, transition, comment, link, assign, worklog — using only cached values.
 Eliminate all redundant discovery calls after initialization.
 
-**Announce at start:** "I'm using jira-sdlc (sdlc v{version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+**Announce at start:** "I'm using jira-sdlc (sdlc v{sdlc_version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
 
 ## When to Use This Skill
 
@@ -27,7 +27,7 @@ Eliminate all redundant discovery calls after initialization.
 
 ## How This Skill Works
 
-On first use, this skill initializes a cache at `.claude/jira-cache/<PROJECT_KEY>.json`
+On first use, this skill initializes a cache at `.sdlc/jira-cache/<PROJECT_KEY>.json`
 containing the site's `cloudId`, issue type definitions, field schemas, workflow graphs,
 link types, and user mappings. The cache is permanent by default — it does not expire
 on a timer. After initialization, every subsequent operation reads exclusively from the
@@ -56,7 +56,7 @@ removed entirely — the API call is never made with raw placeholder text.
 
 1. `--project <KEY>` argument
 2. Parse current git branch for `[A-Z]{2,10}-\d+` pattern (e.g., `feat/PROJ-123-fix` → `PROJ`)
-3. Read `.claude/jira-config.json` → `defaultProject`
+3. Read `.sdlc/jira-config.json` → `defaultProject`
 4. Use AskUserQuestion to ask: "Which Jira project key should I use? (e.g., PROJ, TEAM)"
 
 ### Script Resolution Block

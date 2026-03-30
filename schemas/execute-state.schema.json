@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/execute-state.schema.json",
+  "title": "Execute State",
+  "description": "Validates .sdlc/execution/execute-*.json",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "skill": {
+      "const": "execute-plan-sdlc"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "branch": {
+      "type": "string"
+    },
+    "planPath": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "planHash": {
+      "type": "string"
+    },
+    "preset": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["A", "B", "C"]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "totalTasks": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "waves": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "failed"]
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": "string"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "complexity": {
+                  "type": "string",
+                  "enum": ["Trivial", "Standard", "Complex"]
+                },
+                "risk": {
+                  "type": "string",
+                  "enum": ["Low", "Medium", "High"]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["completed", "failed", "skipped", "pending", "in_progress"]
+                },
+                "filesChanged": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": ["id", "name", "complexity", "risk", "status", "filesChanged"]
+            }
+          }
+        },
+        "required": ["number", "status", "tasks"]
+      }
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "planSummary": {
+          "type": "string"
+        },
+        "completedTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "filesAdded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "filesModified": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "interfacesCreated": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "decisionsFromPriorWaves": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": ["version", "skill", "startedAt", "branch", "planHash", "totalTasks", "waves", "context"],
+  "additionalProperties": false
+}
