@@ -86,6 +86,8 @@ rm -f "$JIRA_CONTEXT_FILE"
 
 ### Cache Status Evaluation
 
+**Hook context fast-path:** If the session-start system-reminder contains a `Jira cache:` line with `stale`, use it to skip the `jira-prepare.js --check` cache status check and immediately prompt for `--force-refresh`. If the line shows the cache as current, proceed with `jira-prepare.js` as normal — the prepare script validates more deeply than the hook's age check. The hook context is a session-start snapshot.
+
 Read the check output:
 
 - If `exists: false` → cache not initialized. Proceed to **Step 1**.

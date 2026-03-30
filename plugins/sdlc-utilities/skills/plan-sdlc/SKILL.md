@@ -20,6 +20,8 @@ Write an implementation plan from requirements, a spec, or a user description. P
 
 **OpenSpec integration (opt-in — requires `--spec` flag or explicit spec path):**
 
+**Hook context fast-path:** If the session-start system-reminder contains an `OpenSpec active:` line, use its data (change name, branch match status, delta spec count) to skip the initial `Glob for openspec/config.yaml` and change directory scanning. If the line is absent or the user switched branches since session start, fall back to the existing Glob-based detection. The hook context is a session-start snapshot — treat it as a hint, not as authoritative.
+
 1. Glob for `openspec/config.yaml`. If absent, skip this entire block — no OpenSpec in this project.
 2. **Gate check:** If `openspec/config.yaml` exists but neither `--spec` flag was passed NOR the user provided a path into `openspec/changes/`:
    a. **Classify the request:** Determine whether the user's task involves functional changes (new features, behavior modifications, API changes, new integrations, capability additions) vs non-functional changes (refactoring, config, docs, CI/CD, dependency updates, formatting, infrastructure).
