@@ -63,8 +63,8 @@ Configures only version and review sections, skipping Jira and ship setup.
 
 | File | Purpose |
 |------|---------|
-| `.claude/sdlc.json` | Unified project config with `version`, `ship`, and `jira` sections |
-| `.sdlc/local.json` | User-local config with `review` scope preferences |
+| `.claude/sdlc.json` | Unified project config with `version` and `jira` sections |
+| `.sdlc/local.json` | User-local config with `review` scope preferences and `ship` settings |
 
 Content files (delegated to other skills):
 
@@ -80,5 +80,5 @@ Content files (delegated to other skills):
 - [`/review-init-sdlc`](review-init-sdlc.md) — create review dimensions (delegated by setup-sdlc)
 - [`/pr-customize-sdlc`](pr-customize-sdlc.md) — create PR template (delegated by setup-sdlc)
 - [`/version-sdlc`](version-sdlc.md) — version management (reads config from `.claude/sdlc.json`)
-- [`/ship-sdlc`](ship-sdlc.md) — shipping pipeline (reads config from `.claude/sdlc.json`)
+- [`/ship-sdlc`](ship-sdlc.md) — shipping pipeline (reads config from `.sdlc/local.json`)
 - [`/jira-sdlc`](jira-sdlc.md) — Jira integration (reads config from `.claude/sdlc.json`)

@@ -2,7 +2,7 @@
 
 ## Summary
 
-Feature branch `feat/auth-flow` with 3 commits. The project has a `.sdlc/ship-config.json`
+Feature branch `feat/auth-flow` with 3 commits. The project has ship config in `.sdlc/local.json`
 with preset: B, skip: [version], and bump: patch. gh CLI authenticated.
 
 ## Git State
@@ -32,16 +32,19 @@ f4a9e12 feat(auth): add session management and token storage
 
 ## Config File
 
-`.sdlc/ship-config.json` contents:
+`.sdlc/local.json` ship section contents:
 
 ```json
 {
-  "preset": "B",
-  "skip": ["version"],
-  "bump": "patch",
-  "draft": false,
-  "reviewThreshold": "high",
-  "workspace": "worktree"
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
+  "ship": {
+    "preset": "B",
+    "skip": ["version"],
+    "bump": "patch",
+    "draft": false,
+    "reviewThreshold": "high",
+    "workspace": "worktree"
+  }
 }
 ```
 
@@ -57,4 +60,4 @@ f4a9e12 feat(auth): add session management and token storage
 
 - `package.json` version: 2.1.0
 - No `.github/PULL_REQUEST_TEMPLATE.md`
-- `.sdlc/ship-config.json` present (see above)
+- `.sdlc/local.json` present (ship section configured, see above)

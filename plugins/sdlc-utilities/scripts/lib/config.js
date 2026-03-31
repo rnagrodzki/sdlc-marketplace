@@ -95,17 +95,6 @@ function readProjectConfig(projectRoot) {
     sources.push(LEGACY.version);
   }
 
-  // ship (.sdlc/ship-config.json)
-  const shipPath = path.join(projectRoot, LEGACY.ship);
-  const shipData = readJsonFile(shipPath);
-  if (shipData) {
-    process.stderr.write(
-      `Deprecation: ${LEGACY.ship} detected. Run /setup-sdlc --migrate to consolidate into .claude/sdlc.json.\n`
-    );
-    config.ship = stripMeta(shipData, '$schema', 'version');
-    sources.push(LEGACY.ship);
-  }
-
   // jira (.sdlc/jira-config.json)
   const jiraPath = path.join(projectRoot, LEGACY.jira);
   const jiraData = readJsonFile(jiraPath);
@@ -136,33 +125,64 @@ function readLocalConfig(projectRoot) {
   const localPath = path.join(projectRoot, LOCAL_CONFIG_PATH);
   const localData = readJsonFile(localPath);
 
-  if (localData) {
+  // If local.json exists and has both review and ship, no fallbacks needed
+  if (localData && localData.review && localData.ship) {
     return { config: localData, sources: [LOCAL_CONFIG_PATH] };
   }
 
-  // Legacy fallback: .sdlc/review.json
-  const sdlcReviewPath = path.join(projectRoot, LEGACY.reviewSdlc);
-  const sdlcReview = readJsonFile(sdlcReviewPath);
-  if (sdlcReview) {
-    process.stderr.write(
-      `Deprecation: ${LEGACY.reviewSdlc} detected. Run /setup-sdlc --migrate to consolidate into .sdlc/local.json.\n`
-    );
-    const review = sdlcReview.defaults ? { ...sdlcReview.defaults } : stripMeta(sdlcReview, '$schema');
-    return { config: { review }, sources: [LEGACY.reviewSdlc] };
+  const sources = localData ? [LOCAL_CONFIG_PATH] : [];
+  const config = localData ? { ...localData } : {};
+
+  // Review fallback (only if review is missing from config)
+  if (!config.review) {
+    const sdlcReviewPath = path.join(projectRoot, LEGACY.reviewSdlc);
+    const sdlcReview = readJsonFile(sdlcReviewPath);
+    if (sdlcReview) {
+      process.stderr.write(
+        `Deprecation: ${LEGACY.reviewSdlc} detected. Run /setup-sdlc --migrate to consolidate into .sdlc/local.json.\n`
+      );
+      config.review = sdlcReview.defaults ? { ...sdlcReview.defaults } : stripMeta(sdlcReview, '$schema');
+      sources.push(LEGACY.reviewSdlc);
+    } else {
+      const claudeReviewPath = path.join(projectRoot, LEGACY.reviewClaude);
+      const claudeReview = readJsonFile(claudeReviewPath);
+      if (claudeReview) {
+        process.stderr.write(
+          `Deprecation: ${LEGACY.reviewClaude} detected. Run /setup-sdlc --migrate to consolidate into .sdlc/local.json.\n`
+        );
+        config.review = claudeReview.defaults ? { ...claudeReview.defaults } : stripMeta(claudeReview, '$schema');
+        sources.push(LEGACY.reviewClaude);
+      }
+    }
   }
 
-  // Legacy fallback: .claude/review.json
-  const claudeReviewPath = path.join(projectRoot, LEGACY.reviewClaude);
-  const claudeReview = readJsonFile(claudeReviewPath);
-  if (claudeReview) {
-    process.stderr.write(
-      `Deprecation: ${LEGACY.reviewClaude} detected. Run /setup-sdlc --migrate to consolidate into .sdlc/local.json.\n`
-    );
-    const review = claudeReview.defaults ? { ...claudeReview.defaults } : stripMeta(claudeReview, '$schema');
-    return { config: { review }, sources: [LEGACY.reviewClaude] };
+  // Ship fallback (only if ship is missing from config)
+  if (!config.ship) {
+    // Legacy .sdlc/ship-config.json
+    const shipPath = path.join(projectRoot, LEGACY.ship);
+    const shipData = readJsonFile(shipPath);
+    if (shipData) {
+      process.stderr.write(
+        `Deprecation: ${LEGACY.ship} detected. Run /setup-sdlc --migrate to consolidate into .sdlc/local.json.\n`
+      );
+      config.ship = stripMeta(shipData, '$schema', 'version');
+      sources.push(LEGACY.ship);
+    } else {
+      // Fallback to .claude/sdlc.json ship key
+      const projectConfigPath = path.join(projectRoot, PROJECT_CONFIG_PATH);
+      const projectData = readJsonFile(projectConfigPath);
+      if (projectData?.ship) {
+        process.stderr.write(
+          `Deprecation: ship section found in ${PROJECT_CONFIG_PATH}. Run /setup-sdlc --migrate to move it to .sdlc/local.json.\n`
+        );
+        config.ship = projectData.ship;
+        sources.push(PROJECT_CONFIG_PATH);
+      }
+    }
   }
 
-  return { config: null, sources: [] };
+  if (sources.length === 0) return { config: null, sources: [] };
+  return { config, sources };
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +190,7 @@ function readLocalConfig(projectRoot) {
 // ---------------------------------------------------------------------------
 
 /** Sections that live in the project config vs local config. */
-const PROJECT_SECTIONS = new Set(['version', 'ship', 'jira']);
+const PROJECT_SECTIONS = new Set(['version', 'jira']);
 
 /**
  * Read a single config section by name.
@@ -183,6 +203,10 @@ function readSection(projectRoot, section) {
   if (PROJECT_SECTIONS.has(section)) {
     const { config } = readProjectConfig(projectRoot);
     return config?.[section] ?? null;
+  }
+  if (section === 'ship') {
+    const { config } = readLocalConfig(projectRoot);
+    return config?.ship ?? null;
   }
   if (section === 'review') {
     const { config } = readLocalConfig(projectRoot);
@@ -241,6 +265,8 @@ function writeLocalConfig(projectRoot, config) {
 function writeSection(projectRoot, section, value) {
   if (PROJECT_SECTIONS.has(section)) {
     writeProjectConfig(projectRoot, { [section]: value });
+  } else if (section === 'ship') {
+    writeLocalConfig(projectRoot, { ship: value });
   } else if (section === 'review') {
     writeLocalConfig(projectRoot, { review: value });
   }
@@ -276,19 +302,6 @@ function migrateConfig(projectRoot) {
     } else {
       projectConfig.version = section;
       migrated.push(LEGACY.version);
-    }
-  }
-
-  // ship
-  const shipPath = path.join(projectRoot, LEGACY.ship);
-  const shipData = readJsonFile(shipPath);
-  if (shipData) {
-    const section = stripMeta(shipData, '$schema', 'version');
-    if (existingUnified?.ship) {
-      conflicts.push(LEGACY.ship);
-    } else {
-      projectConfig.ship = section;
-      migrated.push(LEGACY.ship);
     }
   }
 
@@ -339,6 +352,35 @@ function migrateConfig(projectRoot) {
       writeLocalConfig(projectRoot, { review });
       migrated.push(reviewSource);
     }
+  }
+
+  // ship — legacy .sdlc/ship-config.json → .sdlc/local.json
+  let shipMigrated = false;
+  const shipPath = path.join(projectRoot, LEGACY.ship);
+  const shipData = readJsonFile(shipPath);
+  if (shipData) {
+    const section = stripMeta(shipData, '$schema', 'version');
+    if (existingLocal?.ship) {
+      conflicts.push(LEGACY.ship);
+    } else {
+      writeLocalConfig(projectRoot, { ship: section });
+      migrated.push(LEGACY.ship);
+      shipMigrated = true;
+    }
+  }
+
+  // ship — .claude/sdlc.json ship key → .sdlc/local.json
+  if (existingUnified?.ship) {
+    const localHasShip = existingLocal?.ship || shipMigrated;
+    if (localHasShip) {
+      conflicts.push(PROJECT_CONFIG_PATH + '#ship');
+    } else {
+      writeLocalConfig(projectRoot, { ship: existingUnified.ship });
+      migrated.push(PROJECT_CONFIG_PATH + '#ship');
+    }
+    // Remove ship from project config regardless of conflict
+    const { ship: _removed, ...rest } = existingUnified;
+    writeJsonFile(unifiedPath, { ...rest, $schema: PROJECT_SCHEMA_URL });
   }
 
   return { migrated, conflicts };

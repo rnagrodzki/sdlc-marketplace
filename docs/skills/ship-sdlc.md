@@ -45,7 +45,7 @@ This skill is for **expert users working on projects with established quality gu
 | `--draft` | Create the PR as a draft. | Off |
 | `--dry-run` | Display the full pipeline plan and stop. No steps are executed. | Off |
 | `--resume` | Resume from the most recent state file for the current branch. Completed steps are skipped; in-progress steps are retried. | Off |
-| `--init-config` | Launch interactive config creation for `.sdlc/ship-config.json`, then stop. No pipeline execution. | Off |
+| `--init-config` | Launch interactive config creation for `.sdlc/local.json`, then stop. No pipeline execution. | Off |
 | `--workspace branch\|worktree\|prompt` | Workspace isolation mode forwarded to execute-plan-sdlc. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. | `prompt` |
 
 ---
@@ -140,7 +140,7 @@ The pipeline prints every decision and state change. Here is a realistic full ou
 ```
 I'm using the ship-sdlc skill.
 
-Ship config loaded from .sdlc/ship-config.json
+Ship config loaded from .sdlc/local.json
   preset: B, skip: [version], draft: false, bump: patch
   reviewThreshold: high
 
@@ -331,13 +331,13 @@ Finds the most recent state file for the current branch, skips completed steps, 
 /ship-sdlc --init-config
 ```
 
-Walks through an interactive questionnaire and writes `.sdlc/ship-config.json`. Does not run the pipeline.
+Walks through an interactive questionnaire and writes `.sdlc/local.json`. Does not run the pipeline.
 
 ---
 
 ## Configuration
 
-Pipeline behavior is configured via `.sdlc/ship-config.json`. Create it manually or run `/ship-sdlc --init-config` for guided setup.
+Pipeline behavior is configured via `.sdlc/local.json`. Create it manually or run `/ship-sdlc --init-config` for guided setup.
 
 ### Config fields
 
@@ -354,7 +354,7 @@ Pipeline behavior is configured via `.sdlc/ship-config.json`. Create it manually
 ### Merge precedence
 
 ```
-CLI flag  >  .sdlc/ship-config.json  >  built-in defaults
+CLI flag  >  .sdlc/local.json  >  built-in defaults
 ```
 
 ### Team-specific examples
@@ -365,8 +365,7 @@ Skip version management, auto-commit, only pause on critical findings.
 
 ```json
 {
-  "$schema": "ship-config",
-  "version": 1,
+  "$schema": "sdlc-local.schema.json",
   "preset": "A",
   "skip": ["version"],
   "auto": true,
@@ -382,8 +381,7 @@ Full pipeline with high-severity review threshold. PRs open as drafts for team r
 
 ```json
 {
-  "$schema": "ship-config",
-  "version": 1,
+  "$schema": "sdlc-local.schema.json",
   "preset": "B",
   "skip": [],
   "auto": false,
@@ -399,8 +397,7 @@ Quality preset catches medium-severity findings. Suitable for regulated environm
 
 ```json
 {
-  "$schema": "ship-config",
-  "version": 1,
+  "$schema": "sdlc-local.schema.json",
   "preset": "C",
   "skip": [],
   "auto": false,
@@ -416,8 +413,7 @@ For when you've already implemented and reviewed manually, and just need to comm
 
 ```json
 {
-  "$schema": "ship-config",
-  "version": 1,
+  "$schema": "sdlc-local.schema.json",
   "preset": "B",
   "skip": ["execute", "review"],
   "auto": true,
@@ -489,7 +485,7 @@ Then run `/ship-sdlc` without `--resume` to start a new pipeline.
 
 | File / Artifact | Description |
 |-----------------|-------------|
-| `.sdlc/ship-config.json` | Developer-local config. Gitignored by `.sdlc/.gitignore` (created by `--init-config` via `ship-init.js`). |
+| `.sdlc/local.json` | Developer-local config. Gitignored by `.sdlc/.gitignore` (created by `--init-config` via `ship-init.js`). |
 | `.sdlc/.gitignore` | Internal gitignore that prevents `.sdlc/` contents from being committed. Created by `--init-config` via `ship-init.js`. |
 | `.sdlc/execution/ship-*.json` | Pipeline state file. Created at start, deleted on successful completion, retained on failure for `--resume`. |
 | Git commits | Feature commit (step 2) and optionally a review fix commit (step 5). |

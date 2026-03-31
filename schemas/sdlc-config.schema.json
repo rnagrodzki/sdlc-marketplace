@@ -43,61 +43,6 @@
       "required": ["mode"],
       "additionalProperties": false
     },
-    "shipSection": {
-      "type": "object",
-      "description": "Controls the ship-sdlc skill behaviour.",
-      "properties": {
-        "preset": {
-          "type": "string",
-          "enum": ["A", "B", "C"],
-          "description": "Preset pipeline variant."
-        },
-        "skip": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": ["execute", "commit", "review", "received-review", "commit-fixes", "version", "pr"]
-          },
-          "description": "Pipeline steps to skip."
-        },
-        "bump": {
-          "type": "string",
-          "enum": ["patch", "minor", "major"],
-          "description": "Version bump level."
-        },
-        "draft": {
-          "type": "boolean",
-          "description": "Open the pull request as a draft."
-        },
-        "auto": {
-          "type": "boolean",
-          "description": "Run the pipeline non-interactively."
-        },
-        "reviewThreshold": {
-          "type": "string",
-          "enum": ["critical", "high", "medium"],
-          "description": "Minimum severity level that blocks the pipeline."
-        },
-        "workspace": {
-          "type": "string",
-          "enum": ["branch", "worktree", "prompt"],
-          "description": "How to set up the working environment for the ship run."
-        },
-        "rebase": {
-          "description": "Whether to rebase before shipping, or prompt the user.",
-          "oneOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "string",
-              "const": "prompt"
-            }
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
     "jiraSection": {
       "type": "object",
       "description": "Controls Jira integration behaviour.",
@@ -118,9 +63,6 @@
     },
     "version": {
       "$ref": "#/$defs/versionSection"
-    },
-    "ship": {
-      "$ref": "#/$defs/shipSection"
     },
     "jira": {
       "$ref": "#/$defs/jiraSection"

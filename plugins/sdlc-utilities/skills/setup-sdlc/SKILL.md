@@ -74,11 +74,11 @@ SDLC Setup Status
 ---------------------------------------------------
 Project config (.claude/sdlc.json):
   version:  [checkmark] configured / [x] not configured
-  ship:     [checkmark] configured / [x] not configured (defaults work)
   jira:     [checkmark] configured / [x] not configured (optional)
 
 Local config (.sdlc/local.json):
   review:   [checkmark] configured / [x] not configured (defaults work)
+  ship:     [checkmark] configured / [x] not configured (defaults work)
 
 Content:
   Review dimensions:  N installed [checkmark] / [x] not installed (required for /review-sdlc)
@@ -93,9 +93,9 @@ Legacy files found:
 
 Determine configured status:
 - `version`: configured if `projectConfig.sections` includes `"version"`
-- `ship`: configured if `projectConfig.sections` includes `"ship"`
 - `jira`: configured if `projectConfig.sections` includes `"jira"`
 - `review`: configured if `localConfig.exists` is true
+- `ship`: configured if `localConfig.exists` is true and local config includes a `"ship"` section
 - Review dimensions: installed if `content.reviewDimensions.count > 0`
 - PR template: installed if `content.prTemplate.exists` is true
 - Jira templates: installed if `content.jiraTemplates.count > 0`
@@ -206,7 +206,7 @@ On **skip**: do not write a version section.
 
 #### 3b. Ship section
 
-Use AskUserQuestion for each setting. Note to the user: "Ship config is committed to `.claude/sdlc.json` (shared with the team). Previously it lived in gitignored `.sdlc/ship-config.json`."
+Use AskUserQuestion for each setting. Note to the user: "Ship config is stored in `.sdlc/local.json` (developer-local, gitignored). Each developer has their own ship preferences."
 
 Ask about each field:
 1. **preset** -- Pipeline variant: A (full), B (skip version), C (minimal: execute + commit + PR). Default: A
@@ -280,7 +280,7 @@ const projectRoot = process.cwd();
 
 // Only include sections that were configured (not skipped)
 const projectConfig = {};
-// ... add version, ship, jira sections as collected ...
+// ... add version, jira sections as collected ...
 
 if (Object.keys(projectConfig).length > 0) {
   writeProjectConfig(projectRoot, projectConfig);
@@ -288,6 +288,7 @@ if (Object.keys(projectConfig).length > 0) {
 }
 
 const localConfig = { review: { scope: 'committed' } }; // use actual collected value
+// ... add ship section to localConfig as collected ...
 writeLocalConfig(projectRoot, localConfig);
 console.log('Wrote .sdlc/local.json');
 "
@@ -343,8 +344,8 @@ Show what was created or updated:
 Setup complete
 ---------------------------------------------------
 Created/updated:
-  .claude/sdlc.json      -- project config (version, ship, jira)
-  .sdlc/local.json        -- local config (review scope)
+  .claude/sdlc.json      -- project config (version, jira)
+  .sdlc/local.json        -- local config (review, ship)
 
 Content:
   Review dimensions       -- [installed via /review-init-sdlc | skipped]
@@ -383,7 +384,7 @@ This skill is safe to re-run. Already-configured sections are skipped unless `--
 
 **The version section requires `mode` as a required field.** The JSON schema enforces this. When `detected.versionFile` is present, default to `mode: "file"`. When null, default to `mode: "tag"`. Always include `mode` in the written config.
 
-**Ship config moved from gitignored to committed.** Previously ship config lived in `.sdlc/ship-config.json` (gitignored). The unified config at `.claude/sdlc.json` is committed to the repo. Mention this to the user during ship section setup so they are aware the config becomes shared with the team.
+**Ship config is developer-local.** Ship preferences live in `.sdlc/local.json` (gitignored), not in `.claude/sdlc.json`. Each developer has their own ship preferences.
 
 **Migration may find conflicts.** If both unified config (`.claude/sdlc.json`) and legacy files exist for the same section, the unified config wins. The `migrateConfig()` function reports these as `conflicts` -- display them to the user and explain that the legacy values were NOT merged.
 

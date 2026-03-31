@@ -1,18 +1,18 @@
 # ship-sdlc Configuration Reference
 
-This document describes the `.claude/sdlc.json → ship section`, the persistent configuration for ship-sdlc. Settings here apply to every `ship-sdlc` invocation in the repository unless overridden by a CLI flag.
+This document describes the `.sdlc/local.json → ship section`, the persistent configuration for ship-sdlc. Settings here apply to every `ship-sdlc` invocation in the repository unless overridden by a CLI flag.
 
 ---
 
 ## File Location
 
 ```
-<repo-root>/.claude/sdlc.json
+<repo-root>/.sdlc/local.json
 ```
 
-The ship configuration lives in the `ship` section of the unified `.claude/sdlc.json` config file. Create it manually or run `/setup-sdlc` to walk through an interactive setup.
+The ship configuration lives in the `ship` section of the user-local (gitignored) `.sdlc/local.json` config file. Create it manually or run `/setup-sdlc` to walk through an interactive setup.
 
-A JSON Schema is available at `schemas/sdlc-config.schema.json` for IDE autocompletion. Set the `$schema` field in your config to enable it.
+A JSON Schema is available at `schemas/sdlc-local.schema.json` for IDE autocompletion. Set the `$schema` field in your config to enable it.
 
 ---
 
@@ -20,7 +20,7 @@ A JSON Schema is available at `schemas/sdlc-config.schema.json` for IDE autocomp
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "ship": {
     "preset": "B",
     "skip": ["version"],
@@ -66,7 +66,7 @@ At `"high"` (the default), findings rated Medium or lower are reported but do no
 When the same setting is specified in multiple places, the order of precedence is:
 
 ```
-CLI flag  >  .claude/sdlc.json (ship section)  >  built-in defaults
+CLI flag  >  .sdlc/local.json (ship section)  >  built-in defaults
 ```
 
 A flag passed directly on the command line always wins. If no flag is given, the config file value is used. If the config file is absent or does not specify a field, the built-in default applies.
@@ -75,7 +75,7 @@ A flag passed directly on the command line always wins. If no flag is given, the
 
 ## --init-config Walkthrough
 
-Running `ship-sdlc --init-config` launches an interactive sequence that writes the `ship` section to `.claude/sdlc.json`. The steps are:
+Running `ship-sdlc --init-config` launches an interactive sequence that writes the `ship` section to `.sdlc/local.json`. The steps are:
 
 1. **Preset preference** — Choose an execution preset:
    - `A` = Speed (minimal gates, maximise parallelism)
@@ -105,7 +105,7 @@ Running `ship-sdlc --init-config` launches an interactive sequence that writes t
    - `high` = blockers + high-severity findings (recommended)
    - `medium` = blockers + high + medium-severity findings
 
-9. **Write and confirm** — The tool runs `ship-init.js` with the collected answers to write the `ship` section to `.claude/sdlc.json` and create `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the ship section already exists, you are asked whether to overwrite it.
+9. **Write and confirm** — The tool runs `ship-init.js` with the collected answers to write the `ship` section to `.sdlc/local.json` and create `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the ship section already exists, you are asked whether to overwrite it.
 
 ---
 
@@ -117,7 +117,7 @@ Minimises prompts and skips the version step to manage it manually.
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "ship": {
     "preset": "A",
     "skip": ["version"],
@@ -136,7 +136,7 @@ Balanced preset, review threshold set to catch high-severity findings, PRs alway
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "ship": {
     "preset": "B",
     "skip": [],
@@ -155,7 +155,7 @@ Quality preset with the widest review threshold. Suitable for regulated environm
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "ship": {
     "preset": "C",
     "skip": [],
