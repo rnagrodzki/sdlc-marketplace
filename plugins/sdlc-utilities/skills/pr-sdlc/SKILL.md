@@ -154,6 +154,7 @@ Key fields available (including `customTemplate` added for project-level PR temp
 | `changedFiles` | `string[]` — relative file paths changed in this PR |
 | `repoLabels` | `[{ name, description }]` — labels defined in the repository; empty if unavailable |
 | `customTemplate` | Full content of `.claude/pr-template.md` or `null` if not present |
+| `prConfig` | PR title validation config from `.claude/sdlc.json` (null when absent) |
 | `isAuto` | Whether `--auto` was passed — skip interactive prompts |
 | `forcedLabels` | `string[]` — labels forced via `--label` flag(s), pre-validated against `repoLabels`. Always included in PR regardless of signal matching |
 
@@ -188,8 +189,64 @@ For each section, apply the fill rules:
 - **Changes Overview**: Group by logical concern — each bullet describes a concept or behavior change (e.g. "Added retry deduplication", "New database migration for event tracking"). Never list file paths. Think about what a reviewer needs to understand, not which files were touched.
 - **Testing**: Summarize test coverage from diff; if none, say so explicitly
 
-Also draft the PR title: under 72 characters, conventional commit style
-(`feat:`, `fix:`, `refactor:`, etc.).
+Also draft the PR title: under 72 characters. If `prConfig` is non-null, constrain the title generation:
+- **allowedTypes** set → choose from allowed types only for the title prefix (e.g., if `allowedTypes: ["feat", "fix"]`, only use those)
+- **allowedScopes** set → choose from allowed scopes only (e.g., if `allowedScopes: ["api", "ui"]`, only use those)
+- Config constraints take precedence over conventional commit style inference from commit subjects
+
+If `prConfig` is null or absent, use conventional commit style (`feat:`, `fix:`, `refactor:`, etc.).
+
+#### Common Patterns Reference
+
+Teams can configure their PR title patterns in `.claude/sdlc.json`. Here are four real-world examples to guide configuration:
+
+**Pattern 1: Conventional Commits**
+```json
+{
+  "pr": {
+    "titlePattern": "^(feat|fix|refactor|chore|docs|test|ci)(\\([a-z-]+\\))?: .+$",
+    "titlePatternError": "Title must follow conventional commits: type(scope): description",
+    "allowedTypes": ["feat", "fix", "refactor", "chore", "docs", "test", "ci"],
+    "allowedScopes": []
+  }
+}
+```
+
+**Pattern 2: Ticket Prefix**
+```json
+{
+  "pr": {
+    "titlePattern": "^[A-Z]{2,10}-\\d+: .+$",
+    "titlePatternError": "Title must start with ticket ID (e.g., PROJ-42: description)",
+    "allowedTypes": [],
+    "allowedScopes": []
+  }
+}
+```
+
+**Pattern 3: Ticket Prefix + Conventional**
+```json
+{
+  "pr": {
+    "titlePattern": "^[A-Z]{2,10}-\\d+ (feat|fix|chore): .+$",
+    "titlePatternError": "Title format: TICKET-123 type: description",
+    "allowedTypes": ["feat", "fix", "chore"],
+    "allowedScopes": []
+  }
+}
+```
+
+**Pattern 4: Semantic PR (Squash-Merge Friendly)**
+```json
+{
+  "pr": {
+    "titlePattern": "^(feat|fix|breaking): .+$",
+    "titlePatternError": "Title must use semantic type: feat|fix|breaking",
+    "allowedTypes": ["feat", "fix", "breaking"],
+    "allowedScopes": []
+  }
+}
+```
 
 #### Step 2b: Infer Labels
 
@@ -231,6 +288,7 @@ Before presenting to the user, review the draft against every quality gate:
 | Business honesty | Business Context/Benefits are concrete or "N/A" | No "because it was needed" or invented reasons |
 | No file paths | Changes Overview uses concepts only | Zero file paths in this section |
 | Title length | Title under 72 characters | `len(title) < 72` |
+| Title pattern match | Title matches `prConfig.titlePattern` regex (skip when null/absent) | Regex passes or `prConfig` is null |
 | No fabrication | All claims traceable to commits, diff, or user input | Nothing invented |
 | JIRA accuracy | JIRA value matches evidence or is "Not detected" | No guessed ticket numbers |
 | Audience check | Readable by non-technical stakeholders | No unexplained jargon in Summary/Business sections |
@@ -313,6 +371,28 @@ Loop until explicit `yes` or `cancel`.
 ### Step 6: Create or Update PR
 
 **Only execute after explicit `yes` from Step 5.**
+
+**Pre-execution title pattern validation:** Before executing `gh pr create` or `gh pr edit`, if `prConfig` is non-null and `prConfig.titlePattern` is set, validate the title against the pattern:
+
+```bash
+node -e "
+const title = process.argv[1];
+const pattern = process.argv[2];
+const error = process.argv[3];
+if (!new RegExp(pattern).test(title)) {
+  console.error(error || pattern);
+  process.exit(1);
+}
+" "$title" "$titlePattern" "$titlePatternError"
+```
+
+On failure:
+- Show the error message from `prConfig.titlePatternError` (or the pattern itself as fallback)
+- Do NOT create or edit the PR
+- Ask the user to edit the title and retry
+
+On success:
+- Continue to label creation and `gh pr create` / `gh pr edit`
 
 **Just-in-time label creation:** Before executing `gh pr create` or `gh pr edit`, check each label in `forcedLabels` against `repoLabels`. For any forced label NOT found in `repoLabels`, create it:
 

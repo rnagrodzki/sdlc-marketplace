@@ -26,6 +26,7 @@
 'use strict';
 
 const { exec, checkGitState } = require('./lib/git');
+const { readSection } = require('./lib/config');
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -83,6 +84,27 @@ function main() {
 
   const { currentBranch } = gitState;
 
+  // Step 3b: Read commit config
+  let commitConfig = null;
+  try {
+    commitConfig = readSection(projectRoot, 'commit');
+  } catch (err) {
+    warnings.push(`Could not read commit config: ${err.message}`);
+  }
+
+  // Step 3c: Validate flags against config
+  if (type && commitConfig?.allowedTypes && Array.isArray(commitConfig.allowedTypes) && commitConfig.allowedTypes.length > 0) {
+    if (!commitConfig.allowedTypes.includes(type)) {
+      errors.push(`Commit type "${type}" is not allowed. Allowed types: ${commitConfig.allowedTypes.join(', ')}`);
+    }
+  }
+
+  if (scope && commitConfig?.allowedScopes && Array.isArray(commitConfig.allowedScopes) && commitConfig.allowedScopes.length > 0) {
+    if (!commitConfig.allowedScopes.includes(scope)) {
+      errors.push(`Commit scope "${scope}" is not allowed. Allowed scopes: ${commitConfig.allowedScopes.join(', ')}`);
+    }
+  }
+
   // Step 4: Get staged files
   const stagedRaw   = exec('git diff --cached --name-only', { cwd: projectRoot });
   const stagedFiles = stagedRaw ? stagedRaw.split('\n').filter(Boolean) : [];
@@ -134,6 +156,7 @@ function main() {
     warnings,
     currentBranch,
     flags,
+    commitConfig,
     staged: {
       files:     stagedFiles,
       fileCount: stagedFiles.length,

@@ -392,6 +392,71 @@ describe('readSection', () => {
       fs.rmSync(tmp, { recursive: true });
     }
   });
+
+  it('reads commit section from project config', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, PROJECT_CONFIG_PATH, { commit: { allowedTypes: ['feat', 'fix'], allowedScopes: ['auth'] } });
+
+      const result = readSection(tmp, 'commit');
+      assert.deepEqual(result, { allowedTypes: ['feat', 'fix'], allowedScopes: ['auth'] });
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('reads pr section from project config', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, PROJECT_CONFIG_PATH, { pr: { requiredLabels: ['bug', 'feature'], minCommits: 1 } });
+
+      const result = readSection(tmp, 'pr');
+      assert.deepEqual(result, { requiredLabels: ['bug', 'feature'], minCommits: 1 });
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('returns null when commit section absent', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, PROJECT_CONFIG_PATH, { version: { mode: 'file' } });
+
+      const result = readSection(tmp, 'commit');
+      assert.equal(result, null);
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('returns null when pr section absent', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, PROJECT_CONFIG_PATH, { version: { mode: 'file' } });
+
+      const result = readSection(tmp, 'pr');
+      assert.equal(result, null);
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('does not affect other sections when commit/pr are added', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, PROJECT_CONFIG_PATH, { version: { mode: 'file' }, jira: { defaultProject: 'X' } });
+
+      const version = readSection(tmp, 'version');
+      const jira = readSection(tmp, 'jira');
+      const commit = readSection(tmp, 'commit');
+
+      assert.deepEqual(version, { mode: 'file' });
+      assert.deepEqual(jira, { defaultProject: 'X' });
+      assert.equal(commit, null);
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
 });
 
 // ===========================================================================

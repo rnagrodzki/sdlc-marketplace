@@ -52,3 +52,69 @@
         yes/edit/cancel options. The commit message and plan are still displayed for visibility.
         Critique gates run internally but the interactive approval step is skipped because
         --auto was passed. The stash behavior is unchanged.
+
+- description: "commit-sdlc: enforces type constraint from config"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-config-present.md"
+    user_request: >
+      Run /commit-sdlc. The commit-prepare.js output includes commitConfig with
+      allowedTypes: [feat, fix, chore, refactor, docs]. Generate a commit with
+      type constraint enforced during planning. The staged changes are logging-related.
+  assert:
+    # Must generate a type from allowedTypes
+    - type: regex
+      value: '^(feat|fix|chore|refactor|docs)(\([a-z-]+\))?:'
+    # Must NOT generate an invalid type (e.g., "perf" or "style" which aren't in allowedTypes)
+    - type: not-regex
+      value: '^(perf|style|test|ci)(\([a-z-]+\))?:'
+    # Behavioral: type constraint respected in critique/planning
+    - type: llm-rubric
+      value: >
+        The commit message uses only types from the allowedTypes constraint (feat, fix, chore,
+        refactor, docs). The skill's critique gate validates the type against the config,
+        ensuring no invalid types (perf, style, test, ci, etc.) are used. The planning output
+        reflects the constraint being applied.
+
+- description: "commit-sdlc: validates subject against pattern from config"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-config-present.md"
+    user_request: >
+      Run /commit-sdlc. The project config contains subjectPattern:
+      "^(feat|fix|chore|refactor|docs)(\\([a-z-]+\\))?:". Generate a commit message
+      whose subject matches this pattern. The critique gate must validate the match.
+  assert:
+    # Must produce subject matching the pattern (type:scope format)
+    - type: regex
+      value: '^(feat|fix|chore|refactor|docs)(\([a-z-]+\))?:'
+    # Must include scope from allowedScopes: logger, utils, api
+    - type: regex
+      value: '\((logger|utils|api)\):'
+    # Behavioral: pattern validation in critique gate
+    - type: llm-rubric
+      value: >
+        The commit subject matches the configured pattern with a valid type and scope.
+        The scope is drawn from allowedScopes (logger, utils, api). The critique gate
+        validates the subject line against the subjectPattern regex, confirming pattern match.
+        The response mentions pattern validation or matching in the critique output.
+
+- description: "commit-sdlc: enforces required trailers from config"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-config-present.md"
+    user_request: >
+      Run /commit-sdlc. The commitConfig specifies requiredTrailers: [Reviewed-by].
+      Generate a commit message that includes the required trailer. The quality gate
+      must validate its presence.
+  assert:
+    # Must include the required trailer
+    - type: icontains
+      value: "Reviewed-by:"
+    # Behavioral: trailer requirement enforced in quality gate
+    - type: llm-rubric
+      value: >
+        The commit message includes all required trailers specified in the config
+        (Reviewed-by in this case). The quality gate validates the presence of required
+        trailers before allowing the commit. The critique output indicates trailer validation
+        or requirement checking.

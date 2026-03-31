@@ -150,3 +150,49 @@
         PR as shown?" prompt or offer yes/edit/cancel options. The PR title, labels (if any),
         and description are still displayed for visibility. Critique gates are applied internally
         — the description quality is not degraded by auto mode.
+
+- description: "pr-sdlc: enforces title type constraint from config"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-config-present.md"
+    user_request: >
+      Run /pr-sdlc. The pr-prepare.js output includes prConfig with
+      allowedTypes: [feat, fix, chore, refactor, docs]. Generate a PR title with
+      type constraint enforced during planning. The commits are about caching.
+  assert:
+    # Must generate a type from allowedTypes
+    - type: regex
+      value: '^(feat|fix|chore|refactor|docs)(\([a-z-]+\))?:'
+    # Must NOT generate an invalid type (e.g., "perf" or "style" which aren't in allowedTypes)
+    - type: not-regex
+      value: '^(perf|style|test|ci)(\([a-z-]+\))?:'
+    # Behavioral: type constraint respected in critique/planning
+    - type: llm-rubric
+      value: >
+        The PR title uses only types from the allowedTypes constraint (feat, fix, chore,
+        refactor, docs). The skill's quality gate validates the type against the config,
+        ensuring no invalid types (perf, style, test, ci, etc.) are used. The planning output
+        reflects the type constraint being applied.
+
+- description: "pr-sdlc: validates title against pattern from config"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-config-present.md"
+    user_request: >
+      Run /pr-sdlc. The project config contains titlePattern:
+      "^(feat|fix|chore|refactor|docs)(\\([a-z-]+\\))?:". Generate a PR title
+      whose text matches this pattern. The quality gate must validate the match.
+  assert:
+    # Must produce title matching the pattern (type:scope format)
+    - type: regex
+      value: '^(feat|fix|chore|refactor|docs)(\([a-z-]+\))?:'
+    # Must include scope from allowedScopes: api, auth, db
+    - type: regex
+      value: '\((api|auth|db)\):'
+    # Behavioral: pattern validation in quality gate
+    - type: llm-rubric
+      value: >
+        The PR title matches the configured pattern with a valid type and scope.
+        The scope is drawn from allowedScopes (api, auth, db). The quality gate
+        validates the title against the titlePattern regex, confirming pattern match.
+        The response mentions pattern validation or matching in the critique output.

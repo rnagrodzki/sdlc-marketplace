@@ -42,6 +42,8 @@ const {
   getChangedFiles,
 } = require('./lib/git');
 
+const { readSection } = require('./lib/config');
+
 // ---------------------------------------------------------------------------
 // CLI argument parsing
 // ---------------------------------------------------------------------------
@@ -249,6 +251,14 @@ function main() {
     }
   }
 
+  // Step 10c: Read PR config
+  let prConfig = null;
+  try {
+    prConfig = readSection(projectRoot, 'pr');
+  } catch (err) {
+    warnings.push(`Could not read PR config: ${err.message}`);
+  }
+
   // Step 11: Read custom PR template
   const templatePath = path.join(projectRoot, '.claude', 'pr-template.md');
   const customTemplate = fs.existsSync(templatePath)
@@ -270,6 +280,7 @@ function main() {
       : null,
     jiraTicket,
     customTemplate,
+    prConfig,
     commits,
     changedFiles,
     diffStat,

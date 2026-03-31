@@ -82,6 +82,7 @@ Extract these fields from `COMMIT_CONTEXT_JSON`:
 | `unstaged.hasChanges` | Whether unstaged changes exist |
 | `recentCommits` | Last 15 commits (oneline format) for style detection |
 | `lastCommitMessage` | Previous commit message (only when `flags.amend` is true) |
+| `commitConfig` | Commit message validation config from .claude/sdlc.json (null when absent) |
 
 ### Step 2 (PLAN): Generate Commit Message
 
@@ -91,8 +92,24 @@ Extract these fields from `COMMIT_CONTEXT_JSON`:
    - Plain imperative English?
    - Ticket prefix pattern (e.g. `PROJ-123: ...`)?
    - Capitalization conventions?
-3. If `flags.type` is set, use it as the commit type. If not, infer from the nature of the change.
-4. If `flags.scope` is set, use it as the scope. If not, infer from the changed files or omit.
+**2a. Config override (run before steps 3–6 below):** If `commitConfig` is non-null:
+- If `commitConfig.allowedTypes` is set AND `flags.type` is NOT set → choose the type exclusively from `allowedTypes`. Do not infer a type outside this list.
+- If `commitConfig.allowedScopes` is set AND `flags.scope` is NOT set → choose the scope exclusively from `allowedScopes` (or omit if none fits). Do not infer a scope outside this list.
+- Config constraints take precedence over `recentCommits` inference. If `recentCommits` suggests a type not in `allowedTypes`, use the closest allowed type.
+- If `commitConfig.requireBodyFor` is set and the selected type appears in that list → a body is mandatory. Do not omit the body for these commit types.
+- If `commitConfig.requiredTrailers` is set → include all listed trailer keys in the commit body, after a blank line, in `Key: Value` format. Use an empty string as the value placeholder if no value is known; do not invent values.
+
+**Common `subjectPattern` examples (for reference when `commitConfig.subjectPattern` is set):**
+
+| Style | Pattern | Example |
+| ----- | ------- | ------- |
+| Conventional commits | `^(feat\|fix\|refactor\|chore\|docs\|test\|ci)(\([a-z-]+\))?: .+$` | `feat(auth): add OAuth2 PKCE flow` |
+| Ticket prefix | `^[A-Z]{2,10}-\d+: .+$` | `PROJ-123: fix login timeout` |
+| Ticket + conventional | `^[A-Z]{2,10}-\d+ (feat\|fix\|chore): .+$` | `PROJ-123 feat: add dark mode` |
+| Plain imperative | `^[A-Z].{10,70}$` | `Add rate limiting to API endpoints` |
+
+3. If `flags.type` is set, use it as the commit type. If not, infer from the nature of the change (constrained by `commitConfig.allowedTypes` per step 2a above).
+4. If `flags.scope` is set, use it as the scope. If not, infer from the changed files or omit (constrained by `commitConfig.allowedScopes` per step 2a above).
 4a. **OpenSpec scope hint (optional):** If `flags.scope` is not set, Glob for `openspec/config.yaml`. If found, Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If exactly one active change exists, or one matches the current branch name, use the change directory name as a candidate scope (e.g., change `add-dark-mode` → scope `add-dark-mode`). This is a hint only — the style detected from `recentCommits` in step 2 takes precedence. If recent commits don't use scopes, do not force one.
 
     **Hook context fast-path:** If the session-start system-reminder contains an `OpenSpec active:` line, use its data (change name, branch match status) to skip the `Glob for openspec/config.yaml` and change directory scanning. If the line is absent or the user switched branches since session start, fall back to the existing Glob-based detection. The hook context is a session-start snapshot — treat it as a hint, not as authoritative.
@@ -149,6 +166,19 @@ Show `Amend:` instead of `Commit:` heading when `flags.amend` is true.
 
 **On `yes`:**
 
+0. **Subject pattern gate (hard gate):** If `commitConfig` is non-null and `commitConfig.subjectPattern` is set, validate the subject line before proceeding:
+
+   ```bash
+   node -e "
+     const pattern = new RegExp(process.argv[1]);
+     const subject = process.argv[2];
+     if (!pattern.test(subject)) { process.exit(1); }
+   " "<subjectPattern>" "<subject line>"
+   ```
+
+   - If the check **passes** (exit 0): continue to step 1.
+   - If the check **fails** (exit 1): show the error message from `commitConfig.subjectPatternError` if set, otherwise show the pattern itself as a fallback. Do **not** proceed with the commit. Ask the user to edit the subject to match the pattern. Do not allow overriding this gate.
+
 1. If `unstaged.hasChanges` is true AND `flags.noStash` is false:
    ```bash
    git stash push --keep-index -m "commit-sdlc: temp stash"
@@ -194,6 +224,9 @@ Omit the `Stash:` line if no stash was used.
 | Imperative mood | Subject uses imperative form | "add" not "adds" or "added" |
 | No fabrication | Nothing invented beyond the diff | Every claim backed by staged changes |
 | Body relevance | Body adds value or is absent | Does not restate the subject; no filler |
+| Pattern match | Subject matches `commitConfig.subjectPattern` regex | Regex test passes; skip when `commitConfig` is null or `subjectPattern` is absent |
+| Required body | Body present when type in `commitConfig.requireBodyFor` | Body non-empty for the selected type; skip when `commitConfig` is null or `requireBodyFor` is absent |
+| Required trailers | All `commitConfig.requiredTrailers` keys present in body | Every listed trailer key appears; skip when `commitConfig` is null or `requiredTrailers` is absent |
 
 ## Best Practices
 

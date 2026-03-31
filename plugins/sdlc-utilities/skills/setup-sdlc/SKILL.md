@@ -20,7 +20,7 @@ delegates content creation to specialized skills.
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--migrate` | Force migration of legacy config files even if no legacy files are auto-detected | off |
-| `--skip <section>` | Skip a config section during setup. Valid values: `version`, `ship`, `jira`, `review`, `content` | none |
+| `--skip <section>` | Skip a config section during setup. Valid values: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `content` | none |
 | `--force` | Reconfigure all sections even if already configured | off |
 
 ---
@@ -76,6 +76,8 @@ SDLC Setup Status
 Project config (.claude/sdlc.json):
   version:  [checkmark] configured / [x] not configured
   jira:     [checkmark] configured / [x] not configured (optional)
+  commit:   [checkmark] configured / [x] not configured (optional)
+  pr:       [checkmark] configured / [x] not configured (optional)
 
 Local config (.sdlc/local.json):
   review:   [checkmark] configured / [x] not configured (defaults work)
@@ -95,6 +97,8 @@ Legacy files found:
 Determine configured status:
 - `version`: configured if `projectConfig.sections` includes `"version"`
 - `jira`: configured if `projectConfig.sections` includes `"jira"`
+- `commit`: configured if `projectConfig.sections` includes `"commit"`
+- `pr`: configured if `projectConfig.sections` includes `"pr"`
 - `review`: configured if `localConfig.exists` is true
 - `ship`: configured if `localConfig.exists` is true and local config includes a `"ship"` section
 - Review dimensions: installed if `content.reviewDimensions.count > 0`
@@ -272,6 +276,118 @@ Write `.sdlc/local.json` with the review section:
 }
 ```
 
+#### 3e. Commit message patterns
+
+Use AskUserQuestion:
+
+> Do you enforce commit message patterns in this project?
+
+Options:
+- **conventional** -- Conventional commits: `type(scope): description`
+- **ticket-prefix** -- Ticket prefix: `PROJ-123: description`
+- **custom** -- Enter your own regex pattern
+- **skip** -- Don't configure commit patterns
+
+On **conventional**: Use AskUserQuestion for sequential refinement:
+
+1. "Require scope?" -- yes / no → Determines `subjectPattern`:
+   - yes: `^(feat|fix|refactor|chore|docs|test|ci)(\\(.*\\)): .+$`
+   - no: `^(feat|fix|refactor|chore|docs|test|ci)(\\(.*\\))?: .+$`
+
+2. "Allowed types?" -- multi-select (feat, fix, refactor, chore, docs, test, ci; all selected by default) → Updates regex `(type1|type2|...)`
+
+3. "Allowed scopes?" -- free text comma-separated or skip → Adds scope constraint if provided:
+   - If scopes provided: `^(types)(\\((scope1|scope2)\\)): .+$`
+   - If skip: use pattern without scope constraint
+
+4. "Require body for which types?" -- multi-select (feat, fix, or skip) → Sets `requiresBody` array
+
+5. "Required trailers?" -- free text comma-separated (e.g., `Ticket`, `Reviewed-By`) or skip → Sets `trailers` array
+
+Assemble the `commit` section object with the following fields:
+```json
+{
+  "commit": {
+    "subjectPattern": "regex-here",
+    "subjectPatternError": "Commit subject must follow Conventional Commits format",
+    "allowedTypes": ["feat", "fix", ...],
+    "allowedScopes": ["scope1", "scope2"],
+    "requiresBody": ["feat", "fix"],
+    "trailers": ["Ticket", "Reviewed-By"]
+  }
+}
+```
+
+Only include optional fields if the user provided values. Omit empty arrays.
+
+On **ticket-prefix**: Use AskUserQuestion for sequential refinement:
+
+1. "Ticket pattern?" -- free text regex (default: `[A-Z]{2,10}-\\d+` for `PROJ-123`) → Sets `ticketPattern`
+
+2. "Combine with conventional type?" -- yes / no:
+   - yes: `subjectPattern` becomes `^PROJ-\\d+ (feat|fix|...)(\\(.*\\))?: .+$`
+   - no: `subjectPattern` becomes `^PROJ-\\d+: .+$`
+
+3. If combined with types, ask the same type/scope/body/trailer refinement questions as **conventional**.
+
+Assemble the `commit` section with `ticketPattern` and `subjectPattern`.
+
+On **custom**: Use AskUserQuestion:
+
+1. "Enter your regex pattern for commit subject:" → free text → `subjectPattern`
+2. "Enter error message if pattern doesn't match:" → free text → `subjectPatternError`
+
+On **skip**: Do not write a commit section.
+
+Store the assembled `commit` config for use in the "Writing config files" step.
+
+#### 3f. PR title patterns
+
+Use AskUserQuestion:
+
+> Do you enforce PR title patterns?
+
+Options:
+- **same-as-commit** -- Use the same pattern as commit messages (only if Step 3e produced a config)
+- **conventional** -- Conventional format for PR titles
+- **ticket-prefix** -- Ticket prefix format
+- **custom** -- Enter your own regex
+- **skip** -- Don't configure PR title patterns
+
+On **same-as-commit** (if available): Copy the commit config fields to PR config with renamed fields:
+- `subjectPattern` → `titlePattern`
+- `subjectPatternError` → `titlePatternError`
+- Keep `allowedTypes`, `allowedScopes`, `requiresBody`, `trailers` as-is
+
+Assemble the `pr` section:
+```json
+{
+  "pr": {
+    "titlePattern": "regex-from-commit",
+    "titlePatternError": "PR title must follow Conventional Commits format"
+  }
+}
+```
+
+On **conventional**: Use sequential AskUserQuestion:
+
+1. "Allowed types?" -- multi-select (feat, fix, refactor, chore, docs, test, ci; all selected by default)
+2. "Require scope?" -- yes / no
+3. "Allowed scopes?" -- free text comma-separated or skip
+4. "Required trailers?" -- free text comma-separated or skip
+
+Assemble the `pr` section with `titlePattern`, `titlePatternError`, `allowedTypes`, `allowedScopes`, `trailers`.
+
+On **ticket-prefix**: Ask same questions as commit (ticket pattern, combine with types, etc.). Assemble `pr` section with `titlePattern`.
+
+On **custom**: Ask:
+1. "Enter your regex pattern for PR title:" → free text → `titlePattern`
+2. "Enter error message if pattern doesn't match:" → free text → `titlePatternError`
+
+On **skip**: Do not write a pr section.
+
+Store the assembled `pr` config for use in the "Writing config files" step.
+
 #### Writing config files
 
 After collecting all answers, write project config and local config in a single Bash call:
@@ -287,7 +403,7 @@ const projectRoot = process.cwd();
 
 // Only include sections that were configured (not skipped)
 const projectConfig = {};
-// ... add version, jira sections as collected ...
+// ... add version, jira, commit, pr sections as collected ...
 
 if (Object.keys(projectConfig).length > 0) {
   writeProjectConfig(projectRoot, projectConfig);

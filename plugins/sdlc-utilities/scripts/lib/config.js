@@ -190,13 +190,13 @@ function readLocalConfig(projectRoot) {
 // ---------------------------------------------------------------------------
 
 /** Sections that live in the project config vs local config. */
-const PROJECT_SECTIONS = new Set(['version', 'jira']);
+const PROJECT_SECTIONS = new Set(['version', 'jira', 'commit', 'pr']);
 
 /**
  * Read a single config section by name.
  *
  * @param {string} projectRoot
- * @param {string} section — one of 'version', 'ship', 'jira', 'review'
+ * @param {string} section — one of 'version', 'commit', 'jira', 'pr', 'ship', 'review'
  * @returns {object|null}
  */
 function readSection(projectRoot, section) {
