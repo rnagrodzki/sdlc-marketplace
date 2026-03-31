@@ -442,20 +442,24 @@ Use AskUserQuestion with multiSelect:
 > Content setup (optional):
 >   1. Review dimensions -- required for /review-sdlc
 >   2. PR template -- customized PR descriptions
->   3. Skip content setup
+>   3. Plan guardrails -- custom rules for /plan-sdlc critique phases
+>   4. Skip content setup
 
 Options:
 - **review-dimensions** -- install review dimensions (delegates to /review-init-sdlc)
 - **pr-template** -- create PR template (delegates to /pr-customize-sdlc)
+- **plan-guardrails** -- configure plan guardrails (delegates to /guardrails-init-sdlc)
 - **skip** -- skip content setup
 
 On **review-dimensions**: invoke `/review-init-sdlc` via the Skill tool.
 
 On **pr-template**: invoke `/pr-customize-sdlc` via the Skill tool.
 
+On **plan-guardrails**: invoke `/guardrails-init-sdlc` via the Skill tool.
+
 On **skip**: proceed to Step 5.
 
-If both are selected, invoke them sequentially: first `/review-init-sdlc`, then `/pr-customize-sdlc`.
+If multiple are selected, invoke them sequentially: first `/review-init-sdlc`, then `/pr-customize-sdlc`, then `/guardrails-init-sdlc`.
 
 ---
 
@@ -473,6 +477,7 @@ Created/updated:
 Content:
   Review dimensions       -- [installed via /review-init-sdlc | skipped]
   PR template             -- [installed via /pr-customize-sdlc | skipped]
+  Plan guardrails         -- [N configured via /guardrails-init-sdlc | skipped]
 
 Migrated:
   .claude/version.json    -- merged into .claude/sdlc.json [deleted | kept]
@@ -536,5 +541,6 @@ Record entries for: projects with unusual version file locations, migration edge
 - [`/ship-sdlc`](../ship-sdlc/SKILL.md) -- end-to-end feature shipping pipeline
 - [`/review-init-sdlc`](../review-init-sdlc/SKILL.md) -- initialize review dimensions
 - [`/pr-customize-sdlc`](../pr-customize-sdlc/SKILL.md) -- create custom PR template
+- [`/guardrails-init-sdlc`](../guardrails-init-sdlc/SKILL.md) -- initialize plan guardrails
 - [`/review-sdlc`](../review-sdlc/SKILL.md) -- multi-dimension code review
 - [`/jira-sdlc`](../jira-sdlc/SKILL.md) -- Jira integration

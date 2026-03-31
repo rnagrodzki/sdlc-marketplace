@@ -34,10 +34,11 @@ function detect(projectRoot) {
   const unifiedPath = path.join(projectRoot, PROJECT_CONFIG_PATH);
   const unifiedExists = fs.existsSync(unifiedPath);
   let projectConfigSections = [];
+  let parsedProjectConfig = null;
   if (unifiedExists) {
     try {
-      const parsed = JSON.parse(fs.readFileSync(unifiedPath, 'utf8'));
-      projectConfigSections = Object.keys(parsed).filter(k => k !== '$schema');
+      parsedProjectConfig = JSON.parse(fs.readFileSync(unifiedPath, 'utf8'));
+      projectConfigSections = Object.keys(parsedProjectConfig).filter(k => k !== '$schema');
     } catch (_) {
       // file exists but is not valid JSON — report it as existing with no sections
     }
@@ -121,6 +122,11 @@ function detect(projectRoot) {
       jiraTemplates: {
         count: countFiles(jiraTemplatesDir, '.md'),
         path: path.join('.claude', 'jira-templates') + path.sep,
+      },
+      planGuardrails: {
+        count: Array.isArray(parsedProjectConfig?.plan?.guardrails)
+          ? parsedProjectConfig.plan.guardrails.length
+          : 0,
       },
     },
     detected: {

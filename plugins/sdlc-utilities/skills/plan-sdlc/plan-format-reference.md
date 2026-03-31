@@ -45,6 +45,22 @@ Recommended for plans with 5+ tasks. Omit for simple plans. The Key Decisions se
 
 ---
 
+## Guardrail Compliance (optional)
+
+Present when `plan.guardrails` are configured in `.claude/sdlc.json`. Produced by plan-sdlc Step 4.
+`execute-plan-sdlc` does not parse this section — it documents constraint evaluation for reviewers.
+
+```markdown
+## Guardrail Compliance
+
+| Guardrail | Severity | Status | Rationale |
+|---|---|---|---|
+| no-direct-db-access | error | PASS | No tasks modify database schema files |
+| prefer-composition | warning | PASS | No class hierarchies proposed |
+```
+
+---
+
 ## Per-Task Block (required for every task)
 
 ```markdown

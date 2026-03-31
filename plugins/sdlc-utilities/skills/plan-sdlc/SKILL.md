@@ -81,6 +81,23 @@ Wait for explicit response. If "resume", re-read the plan file and skip to Step 
 ---
 ```
 
+**Guardrail loading:** Load plan guardrails from project config:
+
+> **VERBATIM** — Run this bash block exactly as written.
+
+```bash
+SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/lib/config.js" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
+[ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
+[ -z "$SCRIPT_DIR" ] && { echo "[]"; exit 0; }
+node -e "
+const { readSection } = require('$SCRIPT_DIR/config.js');
+const plan = readSection(process.cwd(), 'plan');
+console.log(JSON.stringify(plan?.guardrails || []));
+"
+```
+
+Parse the JSON output. If the array is non-empty, store as `activeGuardrails` and print: "Loaded N plan guardrails." If empty or config not found: "No plan guardrails configured." This is backward compatible — no guardrails means no change in behavior.
+
 **Normal mode path resolution:** Resolve the output path before writing:
 1. User-specified path (if provided in conversation)
 2. Project `.claude/settings.json` → `plansDirectory` (relative paths resolve from workspace root)
@@ -204,12 +221,24 @@ Check each quality gate:
 | OpenSpec requirements coverage | When `openspecContext` exists: every ADDED/MODIFIED requirement in delta specs has at least one task |
 | Dependency target existence | Every "Depends on: Task N" references a task number that exists in the plan |
 | Self-containment test | Pick the most complex task — could an agent implement it using only its description + Key Decisions? If not, the description is incomplete |
+| Guardrail compliance | For each guardrail in `activeGuardrails`: evaluate whether the plan (as written) satisfies its `description`. Report each as PASS or FAIL with a one-line rationale. Guardrails with `severity: "error"` (or no severity, defaulting to error) that FAIL are blocking — they must be fixed in Step 4. Guardrails with `severity: "warning"` that FAIL are advisory — note them but do not block. |
 
 Note every issue. Do NOT write to the plan file in this step.
 
 ## Step 4 (IMPROVE): Revise Plan and Present for Approval
 
 Fix all issues from Step 3. Rewrite the plan file with fixes applied (edit the existing file, don't append).
+
+If `activeGuardrails` is non-empty, append a `## Guardrail Compliance` section to the plan file listing each guardrail's evaluation result. Error-severity failures must be resolved before presenting to user. Format:
+
+```markdown
+## Guardrail Compliance
+
+| Guardrail | Severity | Status | Rationale |
+|---|---|---|---|
+| no-direct-db-access | error | PASS | No tasks modify database schema files |
+| prefer-composition | warning | PASS | No class hierarchies proposed |
+```
 
 Present to user via AskUserQuestion:
 
@@ -244,6 +273,7 @@ Dispatch a plan reviewer subagent using `./plan-reviewer-prompt.md`. Provide:
 - The requirements checklist from Step 1
 - Source requirements or spec (if a file exists)
 - When `openspecContext` is available, include the delta spec files as the "Source requirements" input — this gives the cross-model reviewer the ability to verify that every OpenSpec requirement is covered by at least one task
+- When `activeGuardrails` is non-empty, include them as `{GUARDRAILS}` — format as one guardrail per line: `- [id] (severity): description`. If no guardrails: `"none configured"`.
 
 **Model selection:** Use a different model than the one that wrote the plan when the plan has 5+ tasks. Cross-model review catches blind spots.
 - Plan written by sonnet → dispatch reviewer as opus
