@@ -129,9 +129,9 @@ function main() {
         guardrails: [],
       };
       if (flags.json) {
-        console.log(JSON.stringify(output, null, 2));
+        process.stdout.write(JSON.stringify(output, null, 2) + '\n');
       } else {
-        console.log('No plan guardrails configured.');
+        process.stdout.write('No plan guardrails configured.\n');
       }
       process.exit(0);
     }
@@ -169,24 +169,24 @@ function main() {
     };
 
     if (flags.json) {
-      console.log(JSON.stringify(output, null, 2));
+      process.stdout.write(JSON.stringify(output, null, 2) + '\n');
     } else {
-      console.log(`Guardrails: ${totalPass}/${guardrails.length} passed`);
+      process.stdout.write(`Guardrails: ${totalPass}/${guardrails.length} passed\n`);
       for (const result of results) {
         const statusStr = result.status === 'PASS' ? '✓' : '✗';
-        console.log(`  ${statusStr} ${result.id}`);
+        process.stdout.write(`  ${statusStr} ${result.id}\n`);
         for (const err of result.errors) {
-          console.log(`    ERROR: ${err}`);
+          process.stdout.write(`    ERROR: ${err}\n`);
         }
         for (const warn of result.warnings) {
-          console.log(`    WARNING: ${warn}`);
+          process.stdout.write(`    WARNING: ${warn}\n`);
         }
       }
     }
 
     process.exit(overall === 'pass' ? 0 : 1);
   } catch (err) {
-    console.error('CRASH:', err.message);
+    process.stderr.write('CRASH: ' + err.message + '\n');
     process.exit(2);
   }
 }

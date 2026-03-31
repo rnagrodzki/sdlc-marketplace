@@ -115,7 +115,7 @@ function findDir(projectRoot, ...candidates) {
 }
 
 /**
- * Recursively check whether any file matching a predicate exists under dir (non-recursive depth=1).
+ * Check whether any file at the top level of dir matches a predicate (non-recursive).
  */
 function anyFileMatches(dirPath, predicate) {
   if (!fs.existsSync(dirPath)) return false;
@@ -327,8 +327,8 @@ function detectReviewDimensions(projectRoot, signals) {
   try {
     const files = fs.readdirSync(dimDir);
     for (const f of files) {
-      if (f.endsWith('.yaml') || f.endsWith('.yml')) {
-        signals.reviewDimensions.push(f.replace(/\.(ya?ml)$/, ''));
+      if (f.endsWith('.md')) {
+        signals.reviewDimensions.push(f.replace(/\.md$/, ''));
       }
     }
   } catch (_) {

@@ -32,6 +32,7 @@ export const skillsMeta: SkillMeta[] = [
     tagline: 'Writes an implementation plan from requirements with per-task complexity, risk, and dependency metadata.',
     pipeline: [
       { id: 'requirements', label: 'Gather requirements', type: 'user', description: 'Free-form description, spec file, or clarification questions' },
+      { id: 'guardrails', label: 'Load guardrails', type: 'script', description: 'Reads plan guardrails from project config for critique evaluation' },
       { id: 'explore', label: 'Explore codebase', type: 'script', description: 'Scans project tree, maps files, writes scratchpad' },
       { id: 'decompose', label: 'Decompose tasks', type: 'llm', description: 'Breaks requirements into tasks with complexity/risk metadata' },
       { id: 'critique-plan', label: 'Self-critique plan', type: 'critique', description: 'Reviews for coverage, dependency integrity, scope creep' },
