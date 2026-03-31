@@ -64,7 +64,7 @@ Suggested new dimensions for uncovered files:
 
   ...
 
-Run `/review-init-sdlc --add` to create these dimensions.
+Run `/setup-sdlc --dimensions --add` to create these dimensions.
 ```
 
 If `plan_critique.still_uncovered` is non-empty (files that could not be mapped to any known dimension type), display:

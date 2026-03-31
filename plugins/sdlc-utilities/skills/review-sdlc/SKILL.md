@@ -130,6 +130,6 @@ If verdict is **APPROVED**: skip — nothing to fix.
 
 - `agents/review-orchestrator.md` — full orchestration logic
 - `REFERENCE.md` — dimension format spec, subagent prompt template, comment template
-- [`/review-init-sdlc`](../review-init-sdlc/SKILL.md) — creates review dimensions
+- [`/setup-sdlc --dimensions`](../setup-sdlc/SKILL.md) — creates review dimensions
 - [`/received-review-sdlc`](../received-review-sdlc/SKILL.md) — responds to findings
 - [`/commit-sdlc`](../commit-sdlc/SKILL.md) — commit after review approval

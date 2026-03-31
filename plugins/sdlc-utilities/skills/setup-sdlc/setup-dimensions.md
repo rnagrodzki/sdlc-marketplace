@@ -1,16 +1,8 @@
----
-name: review-init-sdlc
-description: "Use this skill when initializing or expanding review dimensions for a project. Scans the project's tech stack, dependencies, file patterns, and architecture to propose relevant review dimensions tailored to the specific project. Arguments: [--add] [--no-copilot]. Triggers on: initialize review dimensions, add review dimension, setup code review, create dimension files, expand review config, review-init."
-user-invocable: true
-argument-hint: "[--add] [--no-copilot]"
----
+# Dimensions Sub-Flow
 
-# Initializing Review Dimensions
-
-Project-aware dimension creator: scan tech stack, propose tailored dimensions with evidence,
-let the user select, write files, and validate with the validation script.
-
-**Announce at start:** "I'm using review-init-sdlc (sdlc v{sdlc_version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+Project-aware dimension creator: consumes tech stack scan results from parent,
+proposes tailored dimensions with evidence, lets the user select, writes files,
+and validates with the validation script.
 
 > **CRITICAL — Inline output only.** Always produce dimension proposals, evidence citations,
 > and trigger patterns directly in your current response. Never write "the simulated output is
@@ -31,83 +23,24 @@ Glob with the default path (cwd). Use the same approach for EXAMPLES.md.
 
 ---
 
-## Plan Mode Check
+## Scan Input
 
-If the system context contains "Plan mode is active":
+This sub-flow expects the parent skill (setup-sdlc) to have provided the following scan results in Step 4:
 
-1. Announce: "This skill requires write operations. Exit plan mode first, then re-invoke `/review-init-sdlc`."
-2. Stop. Do not proceed to subsequent steps.
+- **Dependency manifests** — contents of package.json, requirements.txt, pyproject.toml, setup.py, go.mod, Cargo.toml, pom.xml, build.gradle, Gemfile
+- **Framework/config signals** — .github/workflows/*.yml, .eslintrc*, tsconfig.json, lerna.json, pnpm-workspace.yaml, nx.json, *.graphql, openapi.yaml, openapi.json, openspec/config.yaml
+- **Directory structure** — glob results for all patterns in @scan-patterns.md
+- **CI/CD config** — .github/workflows, .circleci, Jenkinsfile presence
+- **Database signals** — migrations/ dir, *.sql files, Prisma/Alembic/Flyway presence
+- **Test structure** — *.test.*, *.spec.* files, test runner configs
+- **Existing review dimensions** — what is already installed in .claude/review-dimensions/
+- **GitHub hosting detection** — output of the multi-signal cascade (git remote, gh CLI, .github/ dir)
+
+All structural and dependency evidence has been collected. This sub-flow consumes it and produces dimension proposals and installed files.
 
 ---
 
 ## Workflow
-
-### Step 0 — Pre-flight Checks
-
-```bash
-git rev-parse --is-inside-work-tree
-```
-
-If not inside a git repository, stop with: `This skill must be run from inside a git repository.`
-
-### Step 1 (SCAN) — Analyze Project Tech Stack
-
-Use Glob to discover and then Read in parallel to collect signals. Do NOT read entire
-codebases — read only manifests, config files, and directory listings.
-
-**Dependency manifests (read if they exist):**
-
-- `package.json` — Node.js/JS/TS deps, devDeps, scripts
-- `requirements.txt`, `pyproject.toml`, `setup.py` — Python
-- `go.mod` — Go
-- `Cargo.toml` — Rust
-- `pom.xml`, `build.gradle` — Java/JVM
-- `Gemfile` — Ruby
-
-**Structural signals:** Read `./scan-patterns.md` for glob patterns. Run each pattern and record hits.
-
-**Config files (read if they exist):**
-
-- `.github/workflows/*.yml` → CI/CD
-- `.eslintrc*`, `pylintrc`, `golangci.yml` → linting
-- `tsconfig.json` → check `strict` mode (type-safety dimension evidence)
-- `lerna.json`, `pnpm-workspace.yaml`, `nx.json` → monorepo evidence
-- `*.graphql`, `openapi.yaml`, `openapi.json` → API contract evidence
-
-**Spec framework signals:**
-
-- `openspec/config.yaml` → OpenSpec spec-driven development; propose `spec-compliance-review` dimension
-
-From the scan, extract: primary language(s)/framework(s), key dependency categories, directory patterns with file counts, and infrastructure/tooling signals.
-
-**GitHub hosting detection (multi-signal cascade):**
-
-```bash
-GITHUB_HOSTED=false
-
-# Signal 1: standard GitHub remote URL (fast path)
-git remote -v 2>/dev/null | grep -q 'github\.com' && GITHUB_HOSTED=true
-
-# Signal 2: gh CLI resolves to GitHub (handles custom SSH aliases, HTTPS variants)
-if [ "$GITHUB_HOSTED" != "true" ]; then
-  gh repo view --json url 2>/dev/null | grep -q 'github\.com' && GITHUB_HOSTED=true
-fi
-
-# Signal 3: .github/ directory exists (weak heuristic fallback)
-if [ "$GITHUB_HOSTED" != "true" ] && [ -d ".github" ]; then
-  GITHUB_HOSTED=true
-fi
-```
-
-| Condition | Action |
-|---|---|
-| `--no-copilot` passed | `copilotEnabled = false`. No prompt. |
-| Not GitHub-hosted | `copilotEnabled = false`. No prompt. |
-| GitHub-hosted, no `--no-copilot` | Use AskUserQuestion: "This repository is hosted on GitHub. Would you like to initialize Copilot review dimensions? (Y/n)" — **Yes**: `copilotEnabled = true`; **No**: `copilotEnabled = false` |
-
-This is a mandatory decision point for GitHub-hosted repositories. The result carries forward to Step 8 — no second prompt is needed.
-
----
 
 ### Step 2 — Discover Existing Dimensions
 
@@ -223,7 +156,7 @@ Present the markdown output table. If any file has errors, show the error detail
 
 ### Step 8 (COPILOT) — Propose GitHub Copilot Review Instructions
 
-**Skip this step if:** Step 7 reported any errors, or `copilotEnabled` is false (determined during Step 1 GitHub hosting detection).
+**Skip this step if:** Step 7 reported any errors, or `copilotEnabled` is false (determined during Step 1 GitHub hosting detection in parent).
 
 **Check existing state:** Glob `.github/instructions/*.instructions.md`. If files exist with the same names as selected dimensions, confirm overwrite. In `--add` mode: only generate for newly added dimensions.
 
@@ -319,24 +252,13 @@ Present the markdown output table. If any file has errors, show the error detail
 
 ## DO NOT
 
-- Do NOT create dimension files without first running the tech stack scan (Step 1)
+- Do NOT create dimension files without first running the tech stack scan (Step 1 in parent)
 - Do NOT skip the validate-dimensions.js step — invalid dimensions cause review-sdlc to fail silently
 - Do NOT overwrite existing dimension files without explicit user consent
 - Do NOT propose more than 10 dimensions at once — offer expansion in follow-up runs with `--add`
 - Do NOT invoke `error-report-sdlc` for user errors — only for script crashes (exit 2)
 
 ---
-
-## Learning Capture
-
-Log to `.claude/learnings/log.md` when:
-
-- A tech stack pattern mapped to an accepted dimension — note the evidence-to-dimension mapping
-- User rejected a proposed dimension — note which and likely reason
-- User requested a dimension that was not proposed — note what evidence was missed
-- A created dimension failed validation — note which check failed and root cause
-- User opted in/out of Copilot instructions — note outcome and any condensing needed
-- A Copilot instruction exceeded 4,000 chars — note which dimension and how it was condensed
 
 ## What's Next
 
@@ -349,3 +271,5 @@ After setting up review dimensions, common follow-ups include:
 - `review-sdlc/REFERENCE.md` — dimension file format spec and examples
 - `review-sdlc/EXAMPLES.md` — 5 copy-paste-ready dimension files to adapt
 - [`/review-sdlc`](../review-sdlc/SKILL.md) — uses the dimensions created by this skill
+- `/setup-sdlc --pr-template` — custom PR template configuration
+- `/setup-sdlc --guardrails` — plan mode guardrails configuration

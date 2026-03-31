@@ -52,7 +52,7 @@ For plans with 5+ tasks, the skill also writes a `## Key Decisions` section — 
 
 When Claude Code's [plan mode](https://docs.anthropic.com/en/docs/claude-code/plan-mode) is active, the skill adapts automatically:
 
-- **Incremental plan file building:** The plan evolves in the designated file across the pipeline. Step 0 writes a skeleton header immediately. Step 1 fills in the header fields and appends a Requirements section. Step 2 appends tasks. Steps 4 and 6 rewrite the file with critique fixes applied.
+- **Incremental plan file building:** The plan evolves in the designated file across the pipeline. Step 0 writes a skeleton header immediately and loads plan guardrails from project config. Step 1 fills in the header fields and appends a Requirements section. Step 2 appends tasks. Steps 4 and 6 rewrite the file with critique fixes applied.
 - **Session recovery:** If the plan file already has content when the skill starts, it uses `AskUserQuestion` to ask whether to resume from critique or restart — no scratchpad needed, the plan file itself is the checkpoint.
 - **All interaction via AskUserQuestion:** Requirements gathering, scope clarification, and approval prompts all go through `AskUserQuestion`, which is compatible with plan mode constraints.
 - **TodoWrite for progress tracking:** In full-pipeline runs, `TodoWrite` items are created for Steps 1–7 so you can see planning progress.
@@ -168,8 +168,8 @@ Invoke `/plan-sdlc` while Claude Code plan mode is active:
 1. The skill detects plan mode and writes a skeleton header to the designated plan file immediately — the file is initialized before any exploration begins
 2. After requirements discovery and codebase exploration, the plan file is updated: header fields (Goal, Architecture, Verification) are filled in and a Requirements section is appended
 3. After task decomposition, task blocks (and a Key Decisions section, if applicable) are appended to the plan file
-4. After self-critique (Step 3) and user approval (Step 4), the plan file is rewritten with all fixes applied
-5. The skill calls `ExitPlanMode` — Claude Code presents the finalized plan for your review
+4. After self-critique (Step 3) — which includes a guardrail compliance gate checking every task against the loaded guardrails — and user approval (Step 4), the plan file is rewritten with all fixes applied; a `## Guardrail Compliance` section is appended listing each guardrail and its pass/fail status
+5. The skill calls `ExitPlanMode` — Claude Code presents the finalized plan for your review; the cross-model reviewer also receives the guardrails as a `{GUARDRAILS}` template variable so the second model can verify compliance independently
 6. After you approve, execution begins automatically — `/execute-plan-sdlc` is auto-invoked with the plan already in context
 
 The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads it without any adjustments.

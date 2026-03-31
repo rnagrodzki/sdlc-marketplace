@@ -82,7 +82,7 @@ function computeEdgePath(edge: WorkflowEdge): EdgePath {
     const midY = fromPos.y + NODE_H / 2;
 
     if (edge.style === 'dashed' && fromNode.col > toNode.col) {
-      // pr-customize-sdlc -> pr-sdlc: connect from left of from to right of to
+      // setup-sdlc -> pr-sdlc: connect from left of from to right of to
       const fromLeft = fromPos.x;
       const toRight = toPos.x + NODE_W;
       const midX = (fromLeft + toRight) / 2;

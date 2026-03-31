@@ -502,7 +502,7 @@ function main() {
 
   const dims = loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter);
   if (dims.length === 0) {
-    process.stderr.write('No review dimensions found in .claude/review-dimensions/.\nRun /review-init-sdlc to create tailored review dimensions.\n');
+    process.stderr.write('No review dimensions found in .claude/review-dimensions/.\nRun /setup-sdlc --dimensions to create tailored review dimensions.\n');
     process.exit(1);
   }
 

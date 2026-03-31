@@ -2,7 +2,7 @@
 
 ## Overview
 
-Loads project review dimensions from `.claude/review-dimensions/`, matches them to changed files via glob patterns, dispatches parallel review subagents for each matching dimension, deduplicates findings, and posts a consolidated comment to the PR. By default reviews committed branch changes plus staged changes. Requires at least one dimension file — run `/review-init-sdlc` first if none exist.
+Loads project review dimensions from `.claude/review-dimensions/`, matches them to changed files via glob patterns, dispatches parallel review subagents for each matching dimension, deduplicates findings, and posts a consolidated comment to the PR. By default reviews committed branch changes plus staged changes. Requires at least one dimension file — run `/setup-sdlc --dimensions` first if none exist.
 
 ---
 
@@ -166,7 +166,7 @@ Suggested new dimensions for uncovered files:
   configuration-management-review — 3 configuration files not covered
     Files: src/config/db.ts, src/config/auth.ts, .env.example
 
-Run `/review-init-sdlc --add` to create these dimensions.
+Run `/setup-sdlc --dimensions --add` to create these dimensions.
 ```
 
 Files that cannot be mapped to any known dimension type are listed separately:
@@ -178,7 +178,7 @@ Files that cannot be mapped to any known dimension type are listed separately:
 Consider creating a custom dimension or broadening existing trigger patterns.
 ```
 
-These suggestions are informational during a review run. To act on them, run `/review-init-sdlc --add`.
+These suggestions are informational during a review run. To act on them, run `/setup-sdlc --dimensions --add`.
 
 ---
 
@@ -198,7 +198,7 @@ Choosing `fix` invokes `/received-review-sdlc`, which picks up the findings from
 
 ## Prerequisites
 
-- **`.claude/review-dimensions/`** — at least one dimension file must exist. Run `/review-init-sdlc` to create them.
+- **`.claude/review-dimensions/`** — at least one dimension file must exist. Run `/setup-sdlc --dimensions` to create them.
 - **`gh` CLI** — recommended for posting the PR comment. Falls back to terminal output if unavailable.
 
 ### Harness Configuration
@@ -218,7 +218,7 @@ Choosing `fix` invokes `/received-review-sdlc`, which picks up the findings from
 
 ## Related Skills
 
-- [`/review-init-sdlc`](review-init-sdlc.md) — creates the review dimensions this skill uses
+- [`/setup-sdlc`](setup-sdlc.md) — create or expand review dimensions via `--dimensions` flag
 - [`/received-review-sdlc`](received-review-sdlc.md) — process and respond to review findings
 - [`/commit-sdlc`](commit-sdlc.md) — commit changes after review approval
 - [`/pr-sdlc`](pr-sdlc.md) — review a PR branch

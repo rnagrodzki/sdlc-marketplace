@@ -536,5 +536,5 @@ If OpenSpec enrichment was applied in Step 2 (an active change was detected), al
 
 - [`/commit-sdlc`](../commit-sdlc/SKILL.md) — commit changes before creating a PR
 - [`/review-sdlc`](../review-sdlc/SKILL.md) — review the branch
-- [`/pr-customize-sdlc`](../pr-customize-sdlc/SKILL.md) — create a custom PR template
+- [`/setup-sdlc --pr-template`](../setup-sdlc/SKILL.md) — create a custom PR template
 - [`/version-sdlc`](../version-sdlc/SKILL.md) — tag a release after merge

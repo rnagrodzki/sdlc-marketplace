@@ -4,11 +4,11 @@
 #   project-with-cicd-monorepo -- CORRECT: TypeScript monorepo + CI/CD; tests extended dimension catalog
 #   healthy-plugin-structure   -- INVALID: plugin manifest context, not a project to scan
 
-- description: "review-init-sdlc: scans tech stack and proposes tailored dimensions"
+- description: "setup-sdlc --dimensions: scans tech stack and proposes tailored dimensions"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-tech-stack.md"
-    user_request: "Run /review-init-sdlc to scan this project and propose review dimensions."
+    user_request: "Run /setup-sdlc --dimensions to scan this project and propose review dimensions."
   assert:
     # Must always include the baseline code-quality dimension
     - type: icontains
@@ -32,11 +32,11 @@
         in the fixture. Trigger patterns reference the actual project directories (src/components/,
         src/pages/, __tests__/).
 
-- description: "review-init-sdlc: monorepo with CI/CD gets extended dimension proposals"
+- description: "setup-sdlc --dimensions: monorepo with CI/CD gets extended dimension proposals"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-cicd-monorepo.md"
-    user_request: "Run /review-init-sdlc to scan this project and propose review dimensions."
+    user_request: "Run /setup-sdlc --dimensions to scan this project and propose review dimensions."
   assert:
     # Must always include baseline
     - type: icontains
@@ -65,11 +65,11 @@
         security, api-review, or data-integrity dimensions since there is no auth/ORM/route
         evidence in the fixture. It presents the proposals to the user before creating files.
 
-- description: "review-init-sdlc: Python/FastAPI project gets appropriate proposals"
+- description: "setup-sdlc --dimensions: Python/FastAPI project gets appropriate proposals"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/project-no-dimensions.md"
-    user_request: "Run /review-init-sdlc for this project."
+    user_request: "Run /setup-sdlc --dimensions for this project."
   assert:
     # Must always include baseline
     - type: icontains
@@ -91,12 +91,12 @@
         directory names). The response does NOT propose ui-review since there is no frontend
         evidence. It presents proposals to the user and asks which ones to install.
 
-- description: "review-init-sdlc: shows workflow continuation menu after dimension setup"
+- description: "setup-sdlc --dimensions: shows workflow continuation menu after dimension setup"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/review-dimensions-created.md"
     user_request: >
-      Run /review-init-sdlc. The review dimensions have been created — 3 dimension
+      Run /setup-sdlc --dimensions. The review dimensions have been created — 3 dimension
       files written to .claude/review-dimensions/ and all validation checks passed.
       The workflow is complete. Now show what comes next.
   assert:
@@ -117,12 +117,12 @@
         includes at minimum: review (/review-sdlc), commit (/commit-sdlc), and done.
         The user is asked to select an option rather than being given a passive suggestion.
 
-- description: "review-init-sdlc: --add mode proposes only new dimensions, acknowledges existing"
+- description: "setup-sdlc --dimensions: --add mode proposes only new dimensions, acknowledges existing"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-dimensions-add-mode.md"
     user_request: >
-      Run /review-init-sdlc --add on this project. The project already has code-quality-review
+      Run /setup-sdlc --dimensions --add on this project. The project already has code-quality-review
       and security-review dimensions installed. Propose additional dimensions based on the
       project's tech stack.
   assert:
@@ -141,12 +141,12 @@
         It does NOT re-propose the already-installed dimensions. Each new proposal
         cites specific evidence from the project.
 
-- description: "review-init-sdlc: validation failure shows errors and offers to fix"
+- description: "setup-sdlc --dimensions: validation failure shows errors and offers to fix"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-invalid-dimension.md"
     user_request: >
-      I ran /review-init-sdlc and the dimensions were created, but validation failed.
+      I ran /setup-sdlc --dimensions and the dimensions were created, but validation failed.
       The validation output is in the project context. Help me fix the issues.
   assert:
     - type: regex
@@ -164,12 +164,12 @@
         is actionable — it either fixes the dimension directly or asks for confirmation
         before fixing.
 
-- description: "review-init-sdlc: minimal project still gets baseline dimension proposal"
+- description: "setup-sdlc --dimensions: minimal project still gets baseline dimension proposal"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/project-empty-signals.md"
     user_request: >
-      Run /review-init-sdlc on this project. It's a very minimal project with just a
+      Run /setup-sdlc --dimensions on this project. It's a very minimal project with just a
       README and a single Python file.
   assert:
     - type: regex
@@ -187,12 +187,12 @@
         ci-cd-pipeline-review since there is no evidence for any of these. It may
         suggest the user add more project structure before re-running.
 
-- description: "review-init-sdlc: --no-copilot skips GitHub Copilot instructions step"
+- description: "setup-sdlc --dimensions: --no-copilot skips GitHub Copilot instructions step"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/review-init-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-tech-stack.md"
     user_request: >
-      Run /review-init-sdlc --no-copilot on this project. Scan the tech stack and
+      Run /setup-sdlc --dimensions --no-copilot on this project. Scan the tech stack and
       propose dimensions, but skip the GitHub Copilot instructions generation step.
   assert:
     - type: not-regex

@@ -3,11 +3,11 @@
 #   project-with-pr-template  -- CORRECT: validates editing existing template
 #   project-with-dimensions   -- INVALID: review context, not PR template context
 
-- description: "pr-customize-sdlc: proposes new template from scanned project signals"
+- description: "setup-sdlc --pr-template: proposes new template from scanned project signals"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/pr-customize-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/project-no-pr-template.md"
-    user_request: "Run /pr-customize-sdlc to create a PR template for this project."
+    user_request: "Run /setup-sdlc --pr-template to create a PR template for this project."
   assert:
     # Must propose section headings
     - type: regex
@@ -28,11 +28,11 @@
         of at least 20 characters. It presents the proposal and asks the user to accept, edit,
         or customize specific sections.
 
-- description: "pr-customize-sdlc: edits existing template preserving custom sections"
+- description: "setup-sdlc --pr-template: edits existing template preserving custom sections"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/pr-customize-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/project-with-pr-template.md"
-    user_request: "Run /pr-customize-sdlc to update the existing PR template."
+    user_request: "Run /setup-sdlc --pr-template to update the existing PR template."
   assert:
     # Must reference the existing custom sections
     - type: regex
@@ -51,12 +51,12 @@
         PR patterns, it proposes minimal changes. It presents the current state and proposed
         adaptations (if any) and asks the user for feedback.
 
-- description: "pr-customize-sdlc: shows workflow continuation menu after template customization"
+- description: "setup-sdlc --pr-template: shows workflow continuation menu after template customization"
   vars:
-    skill_path: "plugins/sdlc-utilities/skills/pr-customize-sdlc/SKILL.md"
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/pr-template-customized.md"
     user_request: >
-      Run /pr-customize-sdlc. The PR template has been customized and saved to
+      Run /setup-sdlc --pr-template. The PR template has been customized and saved to
       .claude/pr-template.md — all V1-V5 validation checks passed. The workflow is
       complete. Now show what comes next.
   assert:

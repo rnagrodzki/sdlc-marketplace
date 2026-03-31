@@ -52,18 +52,20 @@ This walks you through:
 - **Ship config** — pipeline preset, bump type, review threshold
 - **Review dimensions** — project-tailored code review criteria
 - **PR template** — customized PR descriptions
+- **Plan guardrails** — custom rules for plan critique phases
 
-Individual skills can also be configured independently:
-- `/review-init-sdlc` — create review dimensions
-- `/pr-customize-sdlc` — create PR template
+Configuration sub-flows can also be accessed directly:
+- `/setup-sdlc --dimensions` — create or expand review dimensions
+- `/setup-sdlc --pr-template` — create PR template
+- `/setup-sdlc --guardrails` — configure plan guardrails
 - `/version-sdlc --init` — configure versioning
 
 ## What Gets Created
 
 | File / Directory | Purpose |
 | --- | --- |
-| `.claude/sdlc.json` | Unified project config — version, jira settings (created by `/setup-sdlc`) |
+| `.claude/sdlc.json` | Unified project config — version, jira, commit, pr settings, and plan guardrails (created by `/setup-sdlc`) |
 | `.sdlc/local.json` | User-local config — review and ship preferences (created by `/setup-sdlc`) |
-| `.claude/review-dimensions/` | Per-project code review dimension files (created by `/review-init-sdlc`) |
-| `.claude/pr-template.md` | Project PR template (created by `/pr-customize-sdlc`) |
+| `.claude/review-dimensions/` | Per-project code review dimension files (created via `/setup-sdlc --dimensions`) |
+| `.claude/pr-template.md` | Project PR template (created via `/setup-sdlc --pr-template`) |
 

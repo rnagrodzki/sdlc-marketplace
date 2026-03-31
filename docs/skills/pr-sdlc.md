@@ -117,7 +117,7 @@ A template is a plain markdown file with `## Section` headings. The text under e
 [How was this verified? Manual steps, automated tests, edge cases.]
 ```
 
-Run `/pr-customize-sdlc` to create or edit the template interactively.
+Run `/setup-sdlc --pr-template` to create or edit the template interactively.
 
 ---
 
@@ -296,5 +296,5 @@ See [OpenSpec Integration Guide](../openspec-integration.md) for the full workfl
 
 - [`/commit-sdlc`](commit-sdlc.md) — commit changes before creating a PR
 - [`/review-sdlc`](review-sdlc.md) — review the branch before or after creating a PR
-- [`/pr-customize-sdlc`](pr-customize-sdlc.md) — create a custom PR description template
+- [`/setup-sdlc --pr-template`](setup-sdlc.md) — create a custom PR description template
 - [`/version-sdlc`](version-sdlc.md) — tag a release after the PR is merged

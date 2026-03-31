@@ -1,15 +1,6 @@
----
-name: guardrails-init-sdlc
-description: "Use this skill when initializing or expanding plan guardrails for a project. Scans the project's codebase structure, dependencies, and architecture to propose relevant plan guardrails tailored to the specific project. Arguments: [--add]. Triggers on: initialize guardrails, add guardrail, setup plan guardrails, create guardrails, guardrails-init."
-user-invocable: true
-argument-hint: "[--add]"
----
+# Guardrails Sub-Flow
 
-# Initializing Plan Guardrails
-
-Script-driven guardrail initializer: runs guardrails-prepare.js to scan the project and generate proposals, then lets the user review and select. Writes guardrails to `.claude/sdlc.json` via lib/config.js.
-
-**Announce at start:** "I'm using guardrails-init-sdlc (sdlc v{sdlc_version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
+Sub-flow of `/setup-sdlc --guardrails`. Runs guardrails-prepare.js to scan the project and generate proposals, then lets the user review and select. Writes guardrails to `.claude/sdlc.json` via lib/config.js.
 
 ## Arguments
 
@@ -17,19 +8,9 @@ Script-driven guardrail initializer: runs guardrails-prepare.js to scan the proj
 |------|-------------|---------|
 | `--add` | Expansion mode: propose only guardrails not already configured | off |
 
-## Plan Mode Check
-
-If plan mode is active, announce: "This skill requires write operations. Exit plan mode first, then re-invoke `/guardrails-init-sdlc`." and stop.
-
 ## Workflow
 
-### Step 0 — Pre-flight and Prepare
-
-Verify git repo:
-
-```bash
-git rev-parse --is-inside-work-tree
-```
+### Step 0 — Prepare
 
 Run guardrails-prepare.js:
 
@@ -115,7 +96,6 @@ Parse output. If `overall` is "pass", report success with count. If "fail", show
 - Run `promptfoo eval` automatically
 - Write config files using Write or Edit tools directly — always use lib/config.js via inline Node.js
 - Skip AskUserQuestion for user interaction
-- Invoke sub-skills via Agent tool — use Skill tool
 - Scan the entire codebase — the prepare script handles scanning
 
 ## Gotchas
@@ -124,22 +104,8 @@ Parse output. If `overall` is "pass", report success with count. If "fail", show
 - **Config write is read-merge-write.** `writeSection` handles merging. In `--add` mode, the skill must read existing guardrails from the prepare output and prepend them to the selection before writing.
 - **Custom guardrails need ID validation.** The kebab-case pattern `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` must be enforced before writing.
 
-## Learning Capture
-
-After completing setup, append to `.claude/learnings/log.md`:
-
-- Projects where scan signals produced poor proposals
-- Custom guardrails users added that should become template catalog entries
-
-Format:
-
-```
-## YYYY-MM-DD — guardrails-init-sdlc: <brief summary>
-<what was learned>
-```
-
 ## See Also
 
 - [`/plan-sdlc`](../plan-sdlc/SKILL.md) — consumes guardrails during critique phases
-- [`/setup-sdlc`](../setup-sdlc/SKILL.md) — delegates guardrail setup to this skill
-- [`/review-init-sdlc`](../review-init-sdlc/SKILL.md) — analogous pattern for review dimensions
+- [`/setup-sdlc --guardrails`](../setup-sdlc/SKILL.md) — parent skill that delegates guardrail setup to this sub-flow
+- [`/setup-sdlc --dimensions`](../setup-sdlc/SKILL.md) — analogous pattern for review dimensions

@@ -11,6 +11,7 @@ Orchestrates implementation plan execution with adaptive task classification, wa
 ```text
 /execute-plan-sdlc
 /execute-plan-sdlc --preset B
+/execute-plan-sdlc --resume
 ```
 
 Provide the plan in one of two ways:
@@ -28,6 +29,9 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 | Flag | Description | Default |
 |---|---|---|
 | `--preset <A\|B\|C>` | Auto-select a model preset, skipping the interactive selection prompt. `A` = Speed, `B` = Balanced, `C` = Quality. Invalid values fall back to interactive selection. | Interactive prompt |
+| `--resume` | Resume from the most recent execution state file for the current branch. Completed waves are skipped; in-progress waves are retried. If the plan has changed since execution started, you are prompted to resume or restart. | Off |
+| `--workspace <branch\|worktree\|prompt>` | Workspace isolation mode when on the default branch. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. | `prompt` |
+| `--rebase <auto\|skip\|prompt>` | Rebase onto the default branch before execution. `auto` rebases silently (aborts on conflict), `skip` skips, `prompt` asks. | Skip |
 
 ---
 
@@ -56,13 +60,15 @@ Suggested: feat/add-jwt-authentication
 
 The slug is derived from the plan title (lowercase, hyphenated, max 50 characters). You can override both the prefix and slug by providing a custom name.
 
-**Option 1 — Create branch:** Runs `git checkout -b <name>` and continues execution on the new branch. Lightweight and familiar.
+**Option 1 — Create branch:** Runs `git checkout -b <name>` and continues execution on the new branch. Lightweight and familiar. When `--workspace branch` is passed, this option is selected automatically without prompting.
 
-**Option 2 — Create worktree:** Calls `EnterWorktree` to create an isolated copy of the repository. All execution happens in the worktree. After execution and any follow-up actions (commit, PR), call `ExitWorktree` to return.
+**Option 2 — Create worktree:** Creates an isolated copy of the repository using `worktree-create.js`. All execution happens in the worktree. After execution and any follow-up actions (commit, PR), clean up with `git worktree remove <path>` from the main worktree. When `--workspace worktree` is passed, this option is selected automatically without prompting.
 
 **Option 3 — Continue:** Proceeds without changes. This is the user's decision — the check is a suggestion, not a block.
 
 The check is skipped entirely when you are already on a non-default branch.
+
+Pass `--workspace branch` or `--workspace worktree` to bypass the interactive prompt and have the skill act immediately. Pass `--workspace prompt` (the default) to always be asked.
 
 **Note:** Branch detection always runs `git branch --show-current` at execution time. It does not use the session-level `gitStatus` snapshot, which may be stale if you switched branches after starting the conversation.
 
@@ -118,13 +124,21 @@ If the reviewer finds issues:
 
 Plans with **3 or fewer tasks** that are all Trivial or Standard complexity and have no high-risk tasks are executed directly in the main context — no agent dispatch, no wave orchestration. Verification still runs after each task.
 
-Plans with 4–8 tasks use standard wave execution. Plans with 9+ tasks use standard wave execution with mandatory checkpoint persistence after every wave.
+Plans with 4 or more tasks use standard wave execution with state persistence after every wave.
 
 ---
 
-## Checkpoint Persistence
+## State Persistence and Resume
 
-After each wave completes, a checkpoint is written to `$TMPDIR/claude-exec/<plan-name>-checkpoint.md` recording completed waves, next wave tasks, and key output context. If a session ends and is restarted with the same plan, the orchestrator detects the checkpoint and offers to resume from the last completed wave.
+After each wave completes, execution state is written to `.sdlc/execution/execute-<branch>-<timestamp>.json` in the main working tree. This JSON file records completed waves, task status, file changes, and contextual information (interfaces created, decisions made) needed to resume in a fresh session. When execution runs in a worktree, state is written to the main repo root so it survives worktree cleanup.
+
+**Resuming:** Pass `--resume` to pick up from the last completed wave. The state file contains enough context for a new session to continue without prior conversation history. If the plan file has changed since execution started (detected via content hash), you are prompted to resume with the old structure or restart.
+
+**Automatic detection:** Even without `--resume`, if a state file exists for the current branch, the skill offers to resume.
+
+**Cleanup:** The state file is deleted on successful completion and preserved on failure or interruption.
+
+Plans with 3 or fewer simple tasks (small-plan direct execution) do not write state files.
 
 ---
 
@@ -184,6 +198,23 @@ Claude loads the plan from the specified file, validates it, classifies tasks, a
 
 Claude applies the Balanced preset automatically and proceeds to execution after showing the wave structure — no interactive prompt.
 
+### Resume after interruption
+
+```text
+/execute-plan-sdlc --resume
+```
+
+Claude finds the most recent state file for the current branch, loads the execution context, and resumes from the last completed wave:
+
+```
+Found execution state from 2026-03-27T14:30:00Z
+  Completed: Wave 1 (3 tasks), Wave 2 (2 tasks)
+  Resuming from: Wave 3 (1 task)
+  Plan hash: verified (unchanged)
+
+Proceeding to Wave 3...
+```
+
 ### High-risk task gate
 
 When a wave contains high-risk tasks (breaking changes, credential handling, irreversible operations), Claude pauses before executing:
@@ -231,7 +262,7 @@ Files changed:    12 files (4 added, 8 modified, 0 deleted)
 |-----------------|-------------|
 | Source code files | Files created or modified as specified by plan tasks |
 | `.claude/learnings/log.md` | Execution learnings appended after completion (classification accuracy, wave conflicts, recovery outcomes) |
-| `$TMPDIR/claude-exec/<plan-name>-checkpoint.md` | Execution checkpoint written after each wave; enables session resume |
+| `.sdlc/execution/execute-<branch>-<timestamp>.json` | Execution state file written after each wave; enables cross-session resume via --resume. Deleted on success, preserved on failure. |
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.
 

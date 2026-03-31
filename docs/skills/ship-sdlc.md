@@ -12,13 +12,13 @@ This skill is for **expert users working on projects with established quality gu
 
 **Before using `/ship-sdlc`, your project should have:**
 
-- **Review dimensions configured** via `/review-init-sdlc` — these drive the automated review step. Without dimensions, `/review-sdlc` has nothing to evaluate against.
+- **Review dimensions configured** via `/setup-sdlc --dimensions` — these drive the automated review step. Without dimensions, `/review-sdlc` has nothing to evaluate against.
 - **A passing test suite** — the pipeline does not run tests itself. It assumes your CI or pre-commit hooks catch regressions.
 - **Commit conventions** — `/commit-sdlc` detects and follows your project's commit style. If you have no conventions, it still works, but the generated messages will be generic.
 
 **If your project isn't there yet:**
 
-- No review dimensions? Start with `/review-init-sdlc` to scaffold them.
+- No review dimensions? Start with `/setup-sdlc --dimensions` to scaffold them.
 - No commit conventions? `/commit-sdlc` works standalone and will establish a style from your existing history.
 - Want to ship a single step? Each sub-skill (`/commit-sdlc`, `/pr-sdlc`, etc.) works independently. `/ship-sdlc` is the orchestrator, not a prerequisite.
 
@@ -469,7 +469,7 @@ Then run `/ship-sdlc` without `--resume` to start a new pipeline.
 
 - **`gh` CLI** — required for PR creation. Must be authenticated (`gh auth login`). The pipeline validates this before execution and stops with a clear error if authentication fails.
 - **git** — must be run inside a git repository on a feature branch (not the default branch).
-- **Review dimensions** — `.claude/review-dimensions/` must contain at least one dimension file for the review step. Run `/review-init-sdlc` to create them. If review is in the skip set, this is not required.
+- **Review dimensions** — `.claude/review-dimensions/` must contain at least one dimension file for the review step. Run `/setup-sdlc --dimensions` to create them. If review is in the skip set, this is not required.
 - **Plan in context** — for the execute step, a plan must be present in the conversation. If no plan is found and execute is not skipped, the step is auto-skipped.
 
 ### Harness Configuration
@@ -502,7 +502,7 @@ Then run `/ship-sdlc` without `--resume` to start a new pipeline.
 - [`/received-review-sdlc`](received-review-sdlc.md) — process and fix review findings
 - [`/version-sdlc`](version-sdlc.md) — semantic versioning and release tags
 - [`/pr-sdlc`](pr-sdlc.md) — pull request creation
-- [`/review-init-sdlc`](review-init-sdlc.md) — scaffold review dimensions for a new project
+- [`/setup-sdlc`](setup-sdlc.md) — configure review dimensions via `--dimensions` flag
 
 <!--
 NOTE: This section is for GitHub markdown browsing only.
