@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.2] - 2026-04-01
+
+### Fixed
+- Script resolution `find` patterns now scoped to `*/sdlc*` to prevent cross-plugin collisions (#111)
+- Auto mode execution no longer resumes from stale state files without explicit `--resume` (#110)
+- Synced plan-sdlc and execute-plan-sdlc docs with SKILL.md changes (#107, #108, #110)
+- received-review-sdlc fallback pattern aligned with other skills (#111)
+
+### Changed
+- Plan handoff menu now offers ship (full pipeline) as the primary option (#108)
+- Ship pipeline includes context budget awareness guidance for inter-step compaction (#105)
+- Plan approval output no longer includes wave preview (#107)
+
+### Added
+- DRY and KISS plan guardrails
+
 ## [0.17.1] - 2026-03-31
 
 ### Fixed

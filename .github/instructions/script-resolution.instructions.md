@@ -9,8 +9,8 @@ Default severity: high
 
 ## Checklist
 
-- Every script resolution uses the two-step pattern: `find ~/.claude/plugins` first, then `find .` fallback — both steps include `-path "*/scripts/*"` to narrow scope
-- `find .` fallback uses `-path "*/scripts/*"` to narrow the search — never bare `-name "script.js"` without a path filter (risks matching unrelated scripts in user projects)
+- Every script resolution uses the two-step pattern: `find ~/.claude/plugins` first, then static path fallback — the `find` step includes `-path "*/sdlc*/scripts/*"` to narrow scope to sdlc-utilities
+- The `-path` filter in the primary `find` uses `*/sdlc*/scripts/<script>.js` (or `*/sdlc*/lib/config.js` for config.js) — never bare `-name "script.js"` or a generic `*/scripts/*` filter that could match plugins outside sdlc-utilities
 - The script filename in `-name "script.js"` exactly matches the file as it exists in `plugins/*/scripts/` (case-sensitive, no typos, correct extension)
 - Every resolution block ends with a failure guard: `[ -z "$SCRIPT" ] && { echo "ERROR: ..."; exit 2; }` — no silent continuation with an empty `$SCRIPT`
 - The error message in the failure guard names the specific script and explains how to fix it (e.g., "Is the sdlc plugin installed?")
@@ -25,7 +25,7 @@ Default severity: high
 | Finding | Severity |
 |---------|----------|
 | Missing failure guard — script runs with empty `$SCRIPT` | high |
-| `find .` fallback without `-path "*/scripts/*"` | high |
+| `find ~/.claude/plugins` without `-path "*/sdlc*/scripts/*"` — could match scripts from other plugins | high |
 | Script filename mismatch between resolution pattern and actual file | high |
 | Glob reference lookup pattern too broad | medium |
 | Missing cwd fallback for Glob-based reference lookup | medium |

@@ -59,6 +59,16 @@
         "id": "pr-link-github-issue",
         "description": "When a change fixes or addresses a GitHub issue, the plan must include linking the issue in the PR (e.g., Fixes #123 or Closes #123).",
         "severity": "error"
+      },
+      {
+        "id": "dry",
+        "description": "Do not duplicate logic. If the same behavior exists elsewhere, reuse it or extract a shared function. Copy-pasted code blocks across tasks are a plan failure.",
+        "severity": "warning"
+      },
+      {
+        "id": "kiss",
+        "description": "Prefer the simplest implementation that satisfies the requirements. Avoid unnecessary abstractions, premature generalization, and over-engineered solutions.",
+        "severity": "warning"
       }
     ]
   },

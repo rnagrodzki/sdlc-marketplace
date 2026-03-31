@@ -64,7 +64,7 @@ removed entirely — the API call is never made with raw placeholder text.
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "jira-prepare.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "jira-prepare.js" -path "*/sdlc*/scripts/jira-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/jira-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/jira-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate jira-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 

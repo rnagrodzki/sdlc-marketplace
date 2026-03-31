@@ -43,6 +43,7 @@ export const skillsMeta: SkillMeta[] = [
     connections: [
       { to: 'setup-sdlc', label: 'consumes guardrails from' },
       { to: 'execute-plan-sdlc', label: 'produces plans for' },
+      { to: 'ship-sdlc', label: 'full pipeline after' },
       { to: 'review-sdlc', label: 'review after execution' },
       { to: 'pr-sdlc', label: 'open PR after execution' },
     ],
