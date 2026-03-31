@@ -296,6 +296,12 @@ function computeSteps(flags) {
     },
   ];
 
+  for (const step of steps) {
+    step.invocation = step.args
+      ? `skill: "${step.skill}", args: "${step.args}"`
+      : `skill: "${step.skill}"`;
+  }
+
   return steps;
 }
 

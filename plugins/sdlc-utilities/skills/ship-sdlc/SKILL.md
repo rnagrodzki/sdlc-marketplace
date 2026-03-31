@@ -280,6 +280,9 @@ For each step that will run, print verbose progress:
 ```
 
 Invoke each sub-skill using the Skill tool:
+
+**Invocation source:** Each step in the ship-prepare.js output includes an `invocation` field containing the exact Skill tool call string with computed args. Use `step.invocation` verbatim — do not construct invocations from the examples below.
+
 - `skill: "execute-plan-sdlc", args: "--preset B"` (example)
 
 **Execute step resume:** When the pipeline is resuming (`--resume` active) and the execute step's status in the ship state file is `in_progress`:
@@ -502,6 +505,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Delete the state file on failure — it is needed for `--resume`
 - Proceed past a failed sub-skill — stop, save state, inform user
 - Skip pipeline steps that were marked "will run" in the pipeline plan. The pipeline plan is a contract with the user. If a step was planned to run and the user confirmed the pipeline, it MUST run. The LLM does not have authority to skip planned steps based on its own assessment of change complexity or risk. Only the skip set and auto-skip rules (computed by ship-prepare.js) control which steps run.
+- Copy example args from this document when invoking sub-skills — use the `invocation` field from the ship-prepare.js output, which contains the exact computed args
 
 ---
 

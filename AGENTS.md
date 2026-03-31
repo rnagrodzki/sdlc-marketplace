@@ -40,6 +40,20 @@ scripts/                     # Node.js helper scripts (optional; invoked via Bas
 
 ---
 
+## Testing
+
+This project uses **promptfoo** for all testing — both behavioral skill tests and script execution tests. Do not introduce `node:test`, Jest, Mocha, or other unit test frameworks.
+
+Two promptfoo configurations exist:
+- `tests/promptfoo/promptfooconfig.yaml` — behavioral tests (LLM-evaluated skill behavior via claude-cli provider)
+- `tests/promptfoo/promptfooconfig-exec.yaml` — script execution tests (no LLM, runs scripts against fixture directories)
+
+Test cases live in `tests/promptfoo/datasets/<skill-name>.yaml`. Fixtures live in `tests/promptfoo/fixtures/` (markdown context) and `tests/promptfoo/fixtures-fs/` (filesystem fixtures).
+
+When adding or modifying a prepare script, add test cases to the corresponding skill's promptfoo dataset — not unit test files.
+
+---
+
 ## Plan Mode Routing
 
 When plan mode is active, **always invoke plan-sdlc** via the Skill tool for plan creation. Do not follow the default plan mode workflow independently. plan-sdlc handles plan-mode detection, writes to the designated plan file, runs critique gates, and calls ExitPlanMode when done.

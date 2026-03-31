@@ -267,3 +267,49 @@
         correctly attributed in the flag resolution output (from CLI). The pipeline
         table clearly shows the version step will receive the minor bump type.
         The response stops after the table (dry-run — no sub-skills invoked).
+
+- description: "ship-sdlc: pr step invocation uses computed args from ship-prepare.js, not SKILL.md example args"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-config-present.md"
+    user_request: >
+      Run /ship-sdlc --auto --dry-run. The project has .sdlc/local.json with
+      draft: false. Show the pipeline table. Pay attention to the pr-sdlc step args —
+      they should come from the ship-prepare.js output, not from SKILL.md examples.
+  assert:
+    # Must show pr-sdlc step
+    - type: icontains
+      value: "pr-sdlc"
+    # Must NOT show --auto --draft together (the bug from issue #97)
+    - type: not-icontains
+      value: "--auto --draft"
+    # Behavioral: pr step args come from prepare output, not SKILL.md examples
+    - type: llm-rubric
+      value: >
+        The pr-sdlc step in the pipeline table shows args that do NOT include --draft,
+        because the config has draft: false and no --draft CLI flag was passed. The
+        args come from the ship-prepare.js output (the invocation field), not from the
+        SKILL.md example which shows "--auto --draft". The response correctly reflects
+        that draft is false — the PR will not be created as a draft.
+
+- description: "ship-sdlc: pr step includes --draft when --draft CLI flag is passed"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --auto --draft --dry-run. The --draft flag is explicitly passed.
+      Show the pipeline table and confirm the pr-sdlc step args include --draft.
+  assert:
+    # Must show --draft in the pr step
+    - type: icontains
+      value: "--draft"
+    # Must show pr-sdlc step
+    - type: icontains
+      value: "pr-sdlc"
+    # Behavioral: --draft is present because it was explicitly requested
+    - type: llm-rubric
+      value: >
+        The pr-sdlc step in the pipeline table includes --draft in its args because
+        the user explicitly passed the --draft CLI flag. The flag resolution shows
+        draft: true with source: cli. The pipeline table correctly reflects the
+        --draft flag in the pr step's args column.
