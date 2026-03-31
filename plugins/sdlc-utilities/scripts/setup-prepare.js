@@ -6,7 +6,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const { detectVersionFile } = require('./lib/version');
-const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH } = require('./lib/config');
+const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH, PROJECT_SECTIONS } = require('./lib/config');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -89,10 +89,13 @@ function detect(projectRoot) {
   // Assemble output
   // ---------------------------------------------------------------------------
 
-  return {
+  const misplacedSections = projectConfigSections.filter(s => !PROJECT_SECTIONS.has(s));
+
+  const result = {
     projectConfig: {
       exists: unifiedExists,
       sections: projectConfigSections,
+      misplaced: misplacedSections,
       path: PROJECT_CONFIG_PATH,
     },
     localConfig: {
@@ -127,18 +130,27 @@ function detect(projectRoot) {
       defaultBranch,
     },
   };
+
+  result.needsMigration =
+    Object.values(result.legacy).some(l => l.exists) || misplacedSections.length > 0;
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-try {
-  const projectRoot = process.cwd();
-  const result = detect(projectRoot);
-  process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-  process.exit(0);
-} catch (err) {
-  process.stderr.write(`setup-prepare: unexpected error: ${err.message}\n`);
-  process.exit(2);
+if (require.main === module) {
+  try {
+    const projectRoot = process.cwd();
+    const result = detect(projectRoot);
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    process.exit(0);
+  } catch (err) {
+    process.stderr.write(`setup-prepare: unexpected error: ${err.message}\n`);
+    process.exit(2);
+  }
 }
+
+module.exports = { detect };

@@ -404,4 +404,5 @@ module.exports = {
   LEGACY,
   PROJECT_SCHEMA_URL,
   LOCAL_SCHEMA_URL,
+  PROJECT_SECTIONS,
 };

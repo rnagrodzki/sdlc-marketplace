@@ -57,11 +57,12 @@ echo "EXIT_CODE=$EXIT_CODE"
 Parse the JSON output from `$PREPARE_OUTPUT_FILE`. If exit code != 0, display the error and stop.
 
 The JSON contains these top-level keys:
-- `projectConfig` -- `{ exists, sections, path }`
+- `projectConfig` -- `{ exists, sections, misplaced, path }`
 - `localConfig` -- `{ exists, path }`
 - `legacy` -- `{ version, ship, review, reviewLegacy, jira }` each with `{ exists, path }`
 - `content` -- `{ reviewDimensions: { count, path }, prTemplate: { exists, path }, jiraTemplates: { count, path } }`
 - `detected` -- `{ versionFile, fileType, tagPrefix, defaultBranch }`
+- `needsMigration` -- boolean: `true` when any legacy file exists OR any misplaced section found in project config
 
 ---
 
@@ -102,7 +103,13 @@ Determine configured status:
 
 Legacy files: list each legacy entry where `exists` is true. If none, omit the "Legacy files found" section.
 
-**Early exit:** If everything is configured (all project config sections present, local config exists, review dimensions count > 0) and `--force` was NOT passed, print:
+Misplaced sections: if `projectConfig.misplaced` is non-empty, display a warning:
+```
+Misplaced sections in project config:
+  ship — should be in .sdlc/local.json (will migrate)
+```
+
+**Early exit:** If everything is configured (all project config sections present, local config exists, review dimensions count > 0) AND `needsMigration` is `false` AND `--force` was NOT passed, print:
 
 ```
 All configured. Use --force to reconfigure.
@@ -114,9 +121,9 @@ And stop.
 
 ### Step 2 -- Migration
 
-**Skip this step if:** no legacy files were detected AND `--migrate` was NOT passed.
+**Skip this step if:** `needsMigration` is `false` AND `--migrate` was NOT passed.
 
-If legacy files exist, use AskUserQuestion:
+If legacy files exist or `projectConfig.misplaced` is non-empty, use AskUserQuestion:
 
 > Legacy config files detected. Migrate to unified config before proceeding?
 
