@@ -41,18 +41,15 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | Skill | Description |
 | --- | --- |
 | [`/pr-sdlc`](docs/skills/pr-sdlc.md) | Create a PR with an auto-generated structured description |
-| [`/pr-customize-sdlc`](docs/skills/pr-customize-sdlc.md) | Create or edit a project-specific PR template interactively |
 | [`/review-sdlc`](docs/skills/review-sdlc.md) | Run multi-dimension code review on the current branch |
-| [`/review-init-sdlc`](docs/skills/review-init-sdlc.md) | Scan the project and create tailored review dimension files |
 | [`/received-review-sdlc`](docs/skills/received-review-sdlc.md) | Process code review feedback with verification, self-critique, and implementation |
 | [`/version-sdlc`](docs/skills/version-sdlc.md) | Bump version, create git tag, optionally generate CHANGELOG, and push |
 | [`/commit-sdlc`](docs/skills/commit-sdlc.md) | Analyze staged changes, generate a commit message matching project style, stash unstaged changes, and commit |
 | [`/plan-sdlc`](docs/skills/plan-sdlc.md) | Write an implementation plan from requirements, a spec, or a user description — produces plans optimized for execute-plan-sdlc |
 | [`/execute-plan-sdlc`](docs/skills/execute-plan-sdlc.md) | Execute an implementation plan with adaptive task classification, wave-based parallel dispatch, and automatic error recovery |
-| [`/guardrails-init-sdlc`](docs/skills/guardrails-init-sdlc.md) | Scan the project and configure plan guardrails for `/plan-sdlc` critique phases |
 | [`/ship-sdlc`](docs/skills/ship-sdlc.md) | Chain execute, commit, review, version, and PR into a single shipping pipeline with conditional review-fix loop |
 | [`/jira-sdlc`](docs/skills/jira-sdlc.md) | Create, edit, search, and transition Jira issues with cached project metadata |
-| [`/setup-sdlc`](docs/skills/setup-sdlc.md) | Unified project setup — configure version, ship, review, and jira settings in one flow |
+| [`/setup-sdlc`](docs/skills/setup-sdlc.md) | Unified project setup — configure version, ship, review, PR templates, guardrails, and jira settings in one flow |
 
 ---
 

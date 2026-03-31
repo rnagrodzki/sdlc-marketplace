@@ -114,6 +114,132 @@ No external tools or configuration files are required beyond `git`.
 
 ---
 
+## Configuration
+
+Commit message validation is configured in `.claude/sdlc.json` under the `commit` key. All fields are optional; if absent, the skill uses auto-detected style from recent commits and does not enforce pattern or type validation.
+
+### Full Configuration Example
+
+```json
+{
+  "commit": {
+    "subjectPattern": "^(feat|fix|refactor|docs|test)(?:\\([a-z0-9-]+\\))?!?: .+$",
+    "subjectPatternError": "Subject must match: type(scope)?: description (conventional commits)",
+    "allowedTypes": ["feat", "fix", "refactor", "docs", "test", "chore"],
+    "allowedScopes": ["auth", "api", "ui", "db", "cli"],
+    "requireBodyFor": ["breaking"],
+    "requiredTrailers": ["Co-Authored-By"]
+  }
+}
+```
+
+### Configuration Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `subjectPattern` | string (regex) | Regex pattern the commit subject must match. Enforced as a quality gate during commit. |
+| `subjectPatternError` | string | Human-readable error message displayed when `subjectPattern` validation fails. |
+| `allowedTypes` | array of strings | Allowed commit types when using conventional commits (e.g., `feat`, `fix`, `refactor`). Applies only to `--type` flag and auto-detection. Absence allows any type. |
+| `allowedScopes` | array of strings | Allowed commit scopes (the parenthetical in `feat(scope)`). Applies only to `--scope` flag and auto-detection. Absence allows any scope. |
+| `requireBodyFor` | array of strings | Commit types that require a body message (lines after a blank line). Checked as a quality gate. |
+| `requiredTrailers` | array of strings | Required trailer keys in the commit message (e.g., `Co-Authored-By`, `Reviewed-By`). Checked as a quality gate. |
+
+### Flag Conflicts with Configuration
+
+When `--type` or `--scope` flags are provided, they override the configuration's `allowedTypes` and `allowedScopes`. The supplied type/scope is not validated against the allow-lists — it is used as-is. This supports rapid iteration when the project policy is intentionally bypassed for a single commit.
+
+### Pattern Examples
+
+#### 1. Conventional Commits (Strict)
+
+Type and scope both required.
+
+```json
+{
+  "subjectPattern": "^(feat|fix|refactor|docs)\\([a-z0-9-]+\\): .+$",
+  "subjectPatternError": "Subject must match: type(scope): description",
+  "allowedTypes": ["feat", "fix", "refactor", "docs"],
+  "allowedScopes": ["auth", "api", "ui", "db"]
+}
+```
+
+Matching message:
+```
+feat(auth): add OAuth2 PKCE flow
+```
+
+#### 2. Conventional Commits (Relaxed)
+
+Type required, scope optional.
+
+```json
+{
+  "subjectPattern": "^(feat|fix|refactor|docs)(?:\\([a-z0-9-]+\\))?: .+$",
+  "subjectPatternError": "Subject must match: type[(scope)]: description",
+  "allowedTypes": ["feat", "fix", "refactor", "docs"],
+  "allowedScopes": ["auth", "api", "ui", "db"]
+}
+```
+
+Matching messages:
+```
+feat(auth): add OAuth2 PKCE flow
+fix: correct login retry logic
+```
+
+#### 3. Ticket Prefix
+
+No type/scope; ticket ID required.
+
+```json
+{
+  "subjectPattern": "^[A-Z]+-\\d+: .+$",
+  "subjectPatternError": "Subject must match: PROJ-123: description"
+}
+```
+
+Matching message:
+```
+PROJ-456: Update authentication handler
+```
+
+#### 4. Ticket Prefix + Conventional
+
+Ticket ID and conventional type.
+
+```json
+{
+  "subjectPattern": "^[A-Z]+-\\d+ (feat|fix|refactor)(?:\\([a-z0-9-]+\\))?: .+$",
+  "subjectPatternError": "Subject must match: PROJ-123 type[(scope)]: description",
+  "allowedTypes": ["feat", "fix", "refactor", "docs"]
+}
+```
+
+Matching message:
+```
+PROJ-456 feat(auth): add OAuth2 PKCE flow
+```
+
+#### 5. Plain Imperative (No Type System)
+
+No conventional commits; free-form imperative style.
+
+```json
+{
+  "subjectPattern": "^[A-Z].+$",
+  "subjectPatternError": "Subject must start with uppercase letter"
+}
+```
+
+Matching messages:
+```
+Update authentication handler
+Add OAuth2 PKCE flow
+Refactor login logic
+```
+
+---
+
 ## What It Creates or Modifies
 
 | File / Artifact | Description |

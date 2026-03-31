@@ -147,3 +147,46 @@ To add another plugin to this marketplace:
    ```
 
 3. Follow the same structure: `skills/`, `hooks/` (and optionally `scripts/`, `commands/`)
+
+## Testing
+
+All testing uses [promptfoo](https://promptfoo.dev/) — a framework for evaluating LLM outputs. Two configurations cover different test types:
+
+### Behavioral Tests (`promptfooconfig.yaml`)
+
+Test skill behavior end-to-end via the `claude-cli` provider. Each test case provides a skill path, project context fixture, and user request, then asserts on the LLM's response.
+
+```text
+tests/promptfoo/
+├── promptfooconfig.yaml          # Behavioral test config
+├── providers/claude-cli.js       # Invokes Claude Code skills
+├── prompts/skill-runner.txt      # Prompt template
+├── datasets/<skill-name>.yaml    # Test cases per skill
+├── fixtures/*.md                 # Markdown project context
+└── fixtures-fs/                  # Filesystem project fixtures
+```
+
+**Dataset structure:**
+```yaml
+- description: "skill-name: test scenario description"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/<skill>/SKILL.md"
+    project_context: "file://fixtures/<fixture>.md"
+    user_request: "..."
+  assert:
+    - type: icontains
+      value: "expected substring"
+    - type: llm-rubric
+      value: "behavioral expectation in plain English"
+```
+
+### Script Execution Tests (`promptfooconfig-exec.yaml`)
+
+Test prepare scripts and utilities directly — no LLM involved. Uses the `script-runner.js` provider to execute Node.js scripts against fixture directories.
+
+### Adding Tests
+
+When adding or modifying a skill or prepare script:
+1. Add test cases to `tests/promptfoo/datasets/<skill-name>.yaml`
+2. Create fixtures in `tests/promptfoo/fixtures/` if existing ones don't cover the scenario
+3. Do **not** create unit test files — all testing goes through promptfoo datasets

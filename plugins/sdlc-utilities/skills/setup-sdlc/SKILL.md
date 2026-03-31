@@ -1,8 +1,8 @@
 ---
 name: setup-sdlc
-description: "Use this skill when setting up the SDLC plugin for a project, initializing configuration, or when any skill reports missing config. Handles unified config creation (.claude/sdlc.json), local config (.sdlc/local.json), and orchestrates content setup (review dimensions, PR template). Arguments: [--migrate] [--skip <section>] [--force]"
+description: "Use this skill when setting up the SDLC plugin for a project, initializing configuration, or when any skill reports missing config. Handles unified config creation (.claude/sdlc.json), local config (.sdlc/local.json), and orchestrates content setup (review dimensions, PR template, plan guardrails). Supports direct sub-flow entry via --dimensions, --pr-template, --guardrails. Arguments: [--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--add] [--no-copilot]"
 user-invocable: true
-argument-hint: "[--migrate] [--skip <section>] [--force]"
+argument-hint: "[--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--add] [--no-copilot]"
 ---
 
 # SDLC Setup
@@ -22,6 +22,11 @@ delegates content creation to specialized skills.
 | `--migrate` | Force migration of legacy config files even if no legacy files are auto-detected | off |
 | `--skip <section>` | Skip a config section during setup. Valid values: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `content` | none |
 | `--force` | Reconfigure all sections even if already configured | off |
+| `--dimensions` | Jump directly to review dimensions sub-flow (skip config builder) | off |
+| `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | off |
+| `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | off |
+| `--add` | Expansion mode (with --dimensions or --guardrails) | off |
+| `--no-copilot` | Skip GitHub Copilot instructions (with --dimensions) | off |
 
 ---
 
@@ -55,6 +60,24 @@ echo "EXIT_CODE=$EXIT_CODE"
 ```
 
 Parse the JSON output from `$PREPARE_OUTPUT_FILE`. If exit code != 0, display the error and stop.
+
+**Flag routing (check after pre-flight succeeds):**
+
+If `--dimensions` was passed:
+1. Run the shared project scan phase (same scan defined in Step 4, scan phase).
+2. Read and follow `@setup-dimensions.md`, passing the scan results as "Scan Input". Pass through `--add` and `--no-copilot` modifiers if present.
+3. Jump to Step 5 (summary). Skip Steps 1–4.
+
+If `--pr-template` was passed:
+1. Run the shared project scan phase (same scan defined in Step 4, scan phase).
+2. Read and follow `@setup-pr-template.md`, passing the scan results as "Scan Input". Pass through `--add` if present.
+3. Jump to Step 5 (summary). Skip Steps 1–4.
+
+If `--guardrails` was passed:
+1. Read and follow `@setup-guardrails.md` (it runs its own guardrails-prepare.js script internally). Pass through `--add` if present.
+2. Jump to Step 5 (summary). Skip Steps 1–4.
+
+If none of `--dimensions`, `--pr-template`, or `--guardrails` was passed: continue with the full interactive flow (Steps 1–4) as normal.
 
 The JSON contains these top-level keys:
 - `projectConfig` -- `{ exists, sections, misplaced, path }`
@@ -437,29 +460,54 @@ If validation fails (sections missing or file unreadable), warn the user and off
 
 ### Step 4 -- Content Setup
 
+#### Scan Phase
+
+Before presenting the content menu, collect all project signals needed by the sub-flows. Run the following in a single Bash block (or parallel where noted):
+
+- **Dependency manifests:** Read `package.json`, `requirements.txt`, `Pipfile`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle` if present.
+- **Framework config:** Check for `.eslintrc*`, `tsconfig.json`, `openapi.yaml`/`openapi.json`, `.prettierrc*`, `jest.config.*`, `vitest.config.*`.
+- **Directory structure:** List top-level dirs and check for `src/`, `lib/`, `controllers/`, `services/`, `middleware/`, `models/`, `routes/`, `api/`, `pkg/`, `cmd/`, `internal/`.
+- **CI/CD config:** Check for `.github/workflows/`, `Jenkinsfile`, `.circleci/`, `.gitlab-ci.yml`.
+- **Database presence:** Check for ORM config files (`prisma/`, `migrations/`, `alembic.ini`, `db/migrate/`, `sequelize`, `typeorm`, `sqlalchemy`).
+- **Test structure:** Check for `test/`, `tests/`, `spec/`, `__tests__/`, `cypress/`, `playwright.config.*`.
+- **Existing review dimensions:** List files in `.claude/review-dimensions/` (count and names).
+- **Existing guardrails:** Read `sdlc.json` → `plan.guardrails` array if present.
+- **GitHub hosting detection:** Check `git remote -v` for `github.com`, check if `gh` CLI is available, check for `.github/` directory.
+- **CLAUDE.md / AGENTS.md:** Read if present at project root or `.claude/`.
+- **GitHub PR template:** Check for `.github/PULL_REQUEST_TEMPLATE.md` or `.github/pull_request_template.md`.
+- **Recent PRs:** Run `gh pr list --limit 5 --json title,body` if `gh` CLI is available.
+- **Existing PR template:** Check for `.claude/pr-template.md`.
+- **JIRA evidence:** Check current branch name and recent commit subjects for ticket patterns (e.g., `[A-Z]{2,10}-\d+`).
+
+Collect all signals into a "Scan Input" object to pass to sub-flows.
+
+#### Content Menu
+
 Use AskUserQuestion with multiSelect:
 
 > Content setup (optional):
 >   1. Review dimensions -- required for /review-sdlc
 >   2. PR template -- customized PR descriptions
 >   3. Plan guardrails -- custom rules for /plan-sdlc critique phases
->   4. Skip content setup
+>   4. All (dimensions → guardrails → PR template)
+>   5. Skip content setup
 
 Options:
-- **review-dimensions** -- install review dimensions (delegates to /review-init-sdlc)
-- **pr-template** -- create PR template (delegates to /pr-customize-sdlc)
-- **plan-guardrails** -- configure plan guardrails (delegates to /guardrails-init-sdlc)
+- **review-dimensions** -- install review dimensions
+- **pr-template** -- create PR template
+- **plan-guardrails** -- configure plan guardrails
+- **all** -- run all three sequentially
 - **skip** -- skip content setup
 
-On **review-dimensions**: invoke `/review-init-sdlc` via the Skill tool.
+On **review-dimensions**: Read and follow `@setup-dimensions.md`, passing the scan results as "Scan Input".
 
-On **pr-template**: invoke `/pr-customize-sdlc` via the Skill tool.
+On **pr-template**: Read and follow `@setup-pr-template.md`, passing the scan results as "Scan Input".
 
-On **plan-guardrails**: invoke `/guardrails-init-sdlc` via the Skill tool.
+On **plan-guardrails**: Read and follow `@setup-guardrails.md` (it runs guardrails-prepare.js internally).
+
+On **all**: Run sequentially in this order: read and follow `@setup-dimensions.md` (passing scan results), then `@setup-guardrails.md`, then `@setup-pr-template.md` (passing scan results).
 
 On **skip**: proceed to Step 5.
-
-If multiple are selected, invoke them sequentially: first `/review-init-sdlc`, then `/pr-customize-sdlc`, then `/guardrails-init-sdlc`.
 
 ---
 
@@ -475,9 +523,9 @@ Created/updated:
   .sdlc/local.json        -- local config (review, ship)
 
 Content:
-  Review dimensions       -- [installed via /review-init-sdlc | skipped]
-  PR template             -- [installed via /pr-customize-sdlc | skipped]
-  Plan guardrails         -- [N configured via /guardrails-init-sdlc | skipped]
+  Review dimensions       -- [installed via dimensions sub-flow | skipped]
+  PR template             -- [installed via PR template sub-flow | skipped]
+  Plan guardrails         -- [N configured via guardrails sub-flow | skipped]
 
 Migrated:
   .claude/version.json    -- merged into .claude/sdlc.json [deleted | kept]
@@ -498,7 +546,8 @@ This skill is safe to re-run. Already-configured sections are skipped unless `--
 
 - Run `promptfoo eval` automatically
 - Delete legacy files without explicit user confirmation via AskUserQuestion
-- Modify review dimensions, PR template, or Jira templates directly -- delegate to `/review-init-sdlc`, `/pr-customize-sdlc`, and `/jira-sdlc` respectively via the Skill tool
+- Invoke removed skills (`/review-init-sdlc`, `/pr-customize-sdlc`, `/guardrails-init-sdlc`) -- they no longer exist as standalone skills; use the sub-flows (`@setup-dimensions.md`, `@setup-pr-template.md`, `@setup-guardrails.md`) instead
+- Modify Jira templates directly -- delegate to `/jira-sdlc` via the Skill tool
 - Write config files using the Write or Edit tools directly -- always go through `lib/config.js` functions (`writeProjectConfig`, `writeLocalConfig`) via inline Node.js in Bash
 - Invoke sub-skills via the Agent tool -- use the Skill tool exclusively
 - Skip AskUserQuestion for any user interaction -- do not print questions and wait for freeform input
@@ -539,8 +588,5 @@ Record entries for: projects with unusual version file locations, migration edge
 
 - [`/version-sdlc`](../version-sdlc/SKILL.md) -- version bumps and release tags
 - [`/ship-sdlc`](../ship-sdlc/SKILL.md) -- end-to-end feature shipping pipeline
-- [`/review-init-sdlc`](../review-init-sdlc/SKILL.md) -- initialize review dimensions
-- [`/pr-customize-sdlc`](../pr-customize-sdlc/SKILL.md) -- create custom PR template
-- [`/guardrails-init-sdlc`](../guardrails-init-sdlc/SKILL.md) -- initialize plan guardrails
 - [`/review-sdlc`](../review-sdlc/SKILL.md) -- multi-dimension code review
 - [`/jira-sdlc`](../jira-sdlc/SKILL.md) -- Jira integration

@@ -22,7 +22,7 @@ const base = import.meta.env.BASE_URL;
 
   <section class="wd-graph-section">
     <div class="wd-graph-container">
-      <WorkflowGraph highlightSlugs={['commit-sdlc', 'pr-sdlc', 'version-sdlc', 'pr-customize-sdlc']} />
+      <WorkflowGraph highlightSlugs={['commit-sdlc', 'pr-sdlc', 'version-sdlc', 'setup-sdlc']} />
     </div>
   </section>
 
@@ -74,7 +74,7 @@ const base = import.meta.env.BASE_URL;
               <p>
                 Analyzes all branch commits and the full diff to generate a structured PR description.
                 Uses an 8-section default template or your custom template from
-                <a href={`${base}/skills/pr-customize-sdlc/`} class="wd-skill-link">/pr-customize-sdlc</a>.
+                <a href={`${base}/skills/setup-sdlc/`} class="wd-skill-link">/setup-sdlc --pr-template</a>.
                 Handles multi-account GitHub setups automatically.
               </p>
             </div>
@@ -101,7 +101,7 @@ const base = import.meta.env.BASE_URL;
       <div class="wd-setup">
         <h2 class="wd-setup-title">One-Time Setup</h2>
         <p class="wd-setup-body">
-          Run <a href={`${base}/skills/pr-customize-sdlc/`} class="wd-skill-link" style="--step-color: var(--color-gitops);">/pr-customize-sdlc</a> once per
+          Run <a href={`${base}/skills/setup-sdlc/`} class="wd-skill-link" style="--step-color: var(--color-gitops);">/setup-sdlc --pr-template</a> once per
           project to create a custom PR description template at <code>.claude/pr-template.md</code>.
           It scans your existing PR conventions, proposes a tailored template, and lets you refine it
           interactively. Once saved, <a href={`${base}/skills/pr-sdlc/`} class="wd-skill-link" style="--step-color: var(--color-gitops);">/pr-sdlc</a> uses

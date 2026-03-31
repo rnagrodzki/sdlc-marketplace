@@ -119,19 +119,19 @@ const SCRIPT_TO_SKILL = {
   'ship-prepare.js':             'ship-sdlc',
 };
 
-// All 11 skills that must declare user-invocable: true
+// All 10 skills that must declare user-invocable: true
+// (review-init-sdlc, pr-customize-sdlc, guardrails-init-sdlc absorbed into setup-sdlc)
 const USER_INVOCABLE_SKILLS = [
   'plan-sdlc',
   'execute-plan-sdlc',
   'pr-sdlc',
-  'pr-customize-sdlc',
   'review-sdlc',
-  'review-init-sdlc',
   'received-review-sdlc',
   'commit-sdlc',
   'version-sdlc',
   'jira-sdlc',
   'ship-sdlc',
+  'setup-sdlc',
 ];
 
 // ---------------------------------------------------------------------------

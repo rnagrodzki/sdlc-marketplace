@@ -93,9 +93,9 @@ user-invocable: true
 ---
 ```
 
-The 11 user-facing skills that must have this flag are: `plan-sdlc`, `execute-plan-sdlc`,
-`pr-sdlc`, `pr-customize-sdlc`, `review-sdlc`, `review-init-sdlc`, `received-review-sdlc`,
-`commit-sdlc`, `version-sdlc`, `jira-sdlc`, `ship-sdlc`.
+The 10 user-facing skills that must have this flag are: `plan-sdlc`, `execute-plan-sdlc`,
+`pr-sdlc`, `review-sdlc`, `received-review-sdlc`,
+`commit-sdlc`, `version-sdlc`, `jira-sdlc`, `ship-sdlc`, `setup-sdlc`.
 
 ### `docs-skill-existence` (error)
 

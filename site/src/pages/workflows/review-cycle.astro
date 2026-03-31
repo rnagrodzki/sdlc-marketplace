@@ -5,7 +5,7 @@ import WorkflowGraph from '../../components/WorkflowGraph.astro';
 const base = import.meta.env.BASE_URL;
 ---
 
-<BaseLayout title="Review Cycle Workflow" description="How review-init-sdlc, review-sdlc, and received-review-sdlc form a complete code review loop.">
+<BaseLayout title="Review Cycle Workflow" description="How setup-sdlc, review-sdlc, and received-review-sdlc form a complete code review loop.">
   <section class="wd-hero">
     <div class="wd-hero-inner">
       <a href={`${base}/workflows/`} class="wd-back">&larr; All Workflows</a>
@@ -19,7 +19,7 @@ const base = import.meta.env.BASE_URL;
 
   <section class="wd-graph-section">
     <div class="wd-graph-container">
-      <WorkflowGraph highlightSlugs={['review-init-sdlc', 'review-sdlc', 'received-review-sdlc']} />
+      <WorkflowGraph highlightSlugs={['setup-sdlc', 'review-sdlc', 'received-review-sdlc']} />
     </div>
   </section>
 
@@ -31,7 +31,7 @@ const base = import.meta.env.BASE_URL;
           <div class="wd-step-body">
             <h2 class="wd-step-title">
               Initialize with
-              <a href={`${base}/skills/review-init-sdlc/`} class="wd-skill-link">/review-init-sdlc</a>
+              <a href={`${base}/skills/setup-sdlc/`} class="wd-skill-link">/setup-sdlc</a>
             </h2>
             <p>
               Scans your project's tech stack -- package.json, directory structure, file patterns --

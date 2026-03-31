@@ -31,7 +31,7 @@ no `setup.py`, no `Pipfile`, no `go.mod`, no `Cargo.toml`, no `pom.xml`.
 
 ## Context
 
-User ran `/review-init-sdlc` on a very minimal project. Almost no tech stack signals are
+User ran `/setup-sdlc --dimensions` on a very minimal project. Almost no tech stack signals are
 present beyond a single Python file. The skill should handle this gracefully — it may propose
 only a minimal baseline dimension (code-quality-review) or explain that insufficient signals
 exist to propose meaningful tailored dimensions. It must not hallucinate dimensions that

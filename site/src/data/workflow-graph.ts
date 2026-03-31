@@ -20,7 +20,7 @@ export const workflowNodes: WorkflowNode[] = [
   { slug: 'plan-sdlc', command: '/plan-sdlc', category: 'planning', lane: 'plan', col: 1, tagline: 'Write implementation plans' },
   { slug: 'execute-plan-sdlc', command: '/execute-plan-sdlc', category: 'planning', lane: 'plan', col: 2, tagline: 'Execute plans with parallel waves' },
   // Review lane
-  { slug: 'review-init-sdlc', command: '/review-init-sdlc', category: 'review', lane: 'review', col: 0, tagline: 'Initialize review dimensions' },
+  { slug: 'setup-sdlc', command: '/setup-sdlc', category: 'review', lane: 'review', col: 0, tagline: 'Configure review dimensions, PR template, guardrails' },
   { slug: 'review-sdlc', command: '/review-sdlc', category: 'review', lane: 'review', col: 1, tagline: 'Multi-dimension code review' },
   { slug: 'received-review-sdlc', command: '/received-review-sdlc', category: 'review', lane: 'review', col: 2, tagline: 'Process review feedback' },
   // Ship lane
@@ -35,7 +35,7 @@ export const workflowEdges: WorkflowEdge[] = [
   { from: 'jira-sdlc', to: 'plan-sdlc', label: 'informs', style: 'solid' },
   { from: 'plan-sdlc', to: 'execute-plan-sdlc', label: 'executes', style: 'solid' },
   // Review lane flow
-  { from: 'review-init-sdlc', to: 'review-sdlc', label: 'configures', style: 'solid' },
+  { from: 'setup-sdlc', to: 'review-sdlc', label: 'configures', style: 'solid' },
   { from: 'review-sdlc', to: 'received-review-sdlc', label: 'findings to', style: 'solid' },
   // Ship lane flow
   { from: 'commit-sdlc', to: 'pr-sdlc', label: 'staged for', style: 'solid' },

@@ -41,39 +41,31 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 
 ## First Use
 
-### Code review setup
-
-The plugin provides a project-customizable multi-dimension code review system.
-
-**Step 1 — Create review dimensions** (one-time per project):
+Run the unified setup skill to configure the plugin for your project:
 
 ```text
-/review-init-sdlc
+/setup-sdlc
 ```
 
-Scans your tech stack and proposes tailored dimension files (security, API contracts, test coverage, etc.) in `.claude/review-dimensions/`. Run with `--add` to expand an existing set.
+This walks you through:
+- **Version config** — version source, tag prefix, changelog
+- **Ship config** — pipeline preset, bump type, review threshold
+- **Review dimensions** — project-tailored code review criteria
+- **PR template** — customized PR descriptions
+- **Plan guardrails** — custom rules for plan critique phases
 
-**Step 2 — Run reviews** (on any feature branch):
-
-```text
-/review-sdlc
-```
-
-Matches dimensions to your changed files, dispatches parallel review subagents, deduplicates findings, and posts a consolidated comment to the PR.
-
-### Creating a pull request
-
-```text
-/pr-sdlc
-```
-
-Generates a structured PR description from your commits and diffs, then opens the PR via `gh`.
+Configuration sub-flows can also be accessed directly:
+- `/setup-sdlc --dimensions` — create or expand review dimensions
+- `/setup-sdlc --pr-template` — create PR template
+- `/setup-sdlc --guardrails` — configure plan guardrails
+- `/version-sdlc --init` — configure versioning
 
 ## What Gets Created
 
 | File / Directory | Purpose |
 | --- | --- |
-| `.claude/review-dimensions/` | Per-project code review dimension files (created by `/review-init-sdlc`) |
-| `.claude/pr-template.md` | Project PR template (created by `/pr-customize-sdlc`) |
-| `.claude/version.json` | Release configuration (created by `/version-sdlc --init`) |
+| `.claude/sdlc.json` | Unified project config — version, jira, commit, pr settings, and plan guardrails (created by `/setup-sdlc`) |
+| `.sdlc/local.json` | User-local config — review and ship preferences (created by `/setup-sdlc`) |
+| `.claude/review-dimensions/` | Per-project code review dimension files (created via `/setup-sdlc --dimensions`) |
+| `.claude/pr-template.md` | Project PR template (created via `/setup-sdlc --pr-template`) |
 

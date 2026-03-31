@@ -72,10 +72,10 @@
     # Must reference the uncovered file paths or types
     - type: regex
       value: '(workflows|ci\.yml|config|\.env)'
-    # Must point to review-init-sdlc --add
+    # Must point to setup-sdlc --dimensions --add
     - type: regex
-      value: "(review-init-sdlc|--add)"
-    # Behavioral: surfaces suggestions, directs user to review-init-sdlc
+      value: "(setup-sdlc --dimensions|--add)"
+    # Behavioral: surfaces suggestions, directs user to setup-sdlc
     - type: llm-rubric
       value: >
         The response reads the manifest showing 5 uncovered files with 2 dimension suggestions:
@@ -83,10 +83,10 @@
         configuration-management-review (for src/config/db.ts, src/config/auth.ts, .env.example).
         It displays these suggestions in the review plan — either in a "Suggested new dimensions"
         block or as plan critique warnings — and references the specific file paths or types.
-        It recommends running /review-init-sdlc --add to create those dimensions. It does NOT
+        It recommends running /setup-sdlc --dimensions --add to create those dimensions. It does NOT
         create the dimension files itself during the review run.
 
-- description: "review-sdlc: no dimensions installed reports error and suggests review-init-sdlc"
+- description: "review-sdlc: no dimensions installed reports error and suggests setup-sdlc"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
     project_context: "file://fixtures/project-no-dimensions.md"
@@ -95,15 +95,15 @@
     # Must report the missing dimensions problem
     - type: regex
       value: "(no.+dimension|dimension.+not.+found|no review dimension|0 dimension)"
-    # Must suggest running review-init-sdlc
+    # Must suggest running setup-sdlc --dimensions
     - type: regex
-      value: "(review-init-sdlc|/review-init-sdlc)"
+      value: "(setup-sdlc --dimensions|/setup-sdlc --dimensions)"
     # Behavioral: clear error message, correct suggestion
     - type: llm-rubric
       value: >
         The response reads the error from the review-prepare.js manifest (no dimensions found)
         and clearly reports that no review dimensions are installed. It recommends running
-        /review-init-sdlc to create tailored dimensions for this Python/FastAPI project. It does
+        /setup-sdlc --dimensions to create tailored dimensions for this Python/FastAPI project. It does
         NOT fabricate a review without dimensions. The message is clear and actionable.
 
 - description: "review-sdlc: --dimensions filter shows only selected dimension as active"

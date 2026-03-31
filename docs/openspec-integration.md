@@ -147,12 +147,12 @@ Executes the plan with wave-based parallel dispatch. When the plan's Source poin
 | `/execute-plan-sdlc` | Spec compliance checks task acceptance criteria only | Additionally checks implementations against delta spec requirements (per-wave in Step 5c-bis, holistic in Step 8-bis). Suggests `/opsx:verify` and `/opsx:archive` after completion |
 | `/pr-sdlc` | Asks user for Business Context/Benefits | Auto-detects active change and pre-fills Business Context/Benefits from `proposal.md` intent and scope. Suggests `/opsx:verify` and `/opsx:archive` in What's Next after merge. Silently skips if ambiguous |
 | `/commit-sdlc` | Infers scope from changed files | Uses change directory name as scope candidate. Adds `OpenSpec-Change` trailer to commit body when active change detected |
-| `/review-init-sdlc` | Proposes dimensions based on tech stack | Additionally proposes `spec-compliance-review` dimension |
+| `/setup-sdlc --dimensions` | Proposes dimensions based on tech stack | Additionally proposes `spec-compliance-review` dimension |
 | `/review-sdlc` | Reviews against installed dimensions | No change (spec awareness comes from the dimension) |
 | `/version-sdlc` | No change | No change |
 | `/jira-sdlc` | No change | No change |
 | `/received-review-sdlc` | No change | No change |
-| `/pr-customize-sdlc` | No change | No change |
+| `/setup-sdlc --pr-template` | Creates PR template from conventions | No change |
 
 ---
 
@@ -198,10 +198,10 @@ Run `/plan-sdlc --spec` or `/plan-sdlc openspec/changes/<name>/` when OpenSpec a
 
 ## Adding a Spec-Compliance Review Dimension
 
-When OpenSpec is detected, `/review-init-sdlc` proposes a `spec-compliance-review` dimension. To install it:
+When OpenSpec is detected, `/setup-sdlc --dimensions` proposes a `spec-compliance-review` dimension. To install it:
 
 ```text
-/review-init-sdlc
+/setup-sdlc --dimensions
 ```
 
 Select `spec-compliance-review` from the proposed dimensions. The dimension verifies:

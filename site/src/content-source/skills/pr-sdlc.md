@@ -22,6 +22,7 @@ Analyzes all commits and the diff on the current branch, generates a structured 
 | `--update` | Update the description of an existing PR on this branch | — |
 | `--base <branch>` | Target branch for the PR | repo default |
 | `--auto` | Skip interactive approval — create/update the PR immediately after generation | — |
+| `--label <name>` | Force a label onto the PR (repeatable). Created automatically if it doesn't exist in the repo | — |
 
 ---
 
@@ -78,6 +79,14 @@ Create this PR? (yes / edit / cancel)
 /pr-sdlc --update
 ```
 
+### Force a label onto the PR
+
+```text
+/pr-sdlc --label skip-version-check
+```
+
+Multiple labels can be forced: `/pr-sdlc --label bug --label urgent`. Forced labels are always included regardless of auto-labeling signals and are created in the repository if they don't already exist.
+
 ### Create a PR without interactive approval
 
 ```text
@@ -108,7 +117,7 @@ A template is a plain markdown file with `## Section` headings. The text under e
 [How was this verified? Manual steps, automated tests, edge cases.]
 ```
 
-Run `/pr-customize-sdlc` to create or edit the template interactively.
+Run `/setup-sdlc --pr-template` to create or edit the template interactively.
 
 ---
 
@@ -124,7 +133,9 @@ When creating or updating a PR, the skill analyzes the PR context — branch nam
 
 **Update mode:** Existing labels on the PR are preserved. Only new labels are added — the skill never removes labels.
 
-**When labeling is skipped:** If the repository has no labels defined or `gh` is unavailable, the labeling step is silently skipped.
+**Forced labels:** The `--label` flag bypasses signal matching — forced labels are always included in the PR. If a forced label doesn't exist in the repository, it is created automatically before the PR is opened. Forced labels are marked with `(forced)` in the approval prompt to distinguish them from inferred labels. This is used by `/ship-sdlc` to auto-apply `skip-version-check` on worktree PRs.
+
+**When labeling is skipped:** If the repository has no labels defined or `gh` is unavailable, the labeling step is silently skipped. Forced labels (via `--label`) still work — they are created in the repo if needed.
 
 ---
 
@@ -152,8 +163,114 @@ To override manually: `gh auth switch --user <login>` before running the skill.
 
 | Field | Value |
 |---|---|
-| `argument-hint` | `[--draft] [--update] [--base <branch>] [--auto]` |
+| `argument-hint` | `[--draft] [--update] [--base <branch>] [--auto] [--label <name>]` |
 | Plan mode | Graceful refusal (Step 0) |
+
+---
+
+## Configuration
+
+PR title validation is configured in `.claude/sdlc.json` under the `pr` key. All fields are optional; if absent, the skill uses auto-generated titles and does not enforce pattern validation.
+
+### Full Configuration Example
+
+```json
+{
+  "pr": {
+    "titlePattern": "^(feat|fix|breaking|docs|refactor)(?:\\([a-z0-9-]+\\))?: .+$",
+    "titlePatternError": "PR title must match: type[(scope)]: description (e.g., feat: add auth)",
+    "allowedTypes": ["feat", "fix", "breaking", "docs", "refactor", "chore"],
+    "allowedScopes": ["auth", "api", "ui", "db"]
+  }
+}
+```
+
+### Configuration Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `titlePattern` | string (regex) | Regex pattern the PR title must match. Enforced as a quality gate before PR creation. |
+| `titlePatternError` | string | Human-readable error message displayed when `titlePattern` validation fails. |
+| `allowedTypes` | array of strings | Allowed PR title type prefixes (e.g., `feat`, `fix`, `breaking`). Absence allows any type. Used for title generation hints only; validation uses `titlePattern`. |
+| `allowedScopes` | array of strings | Allowed PR title scopes (the parenthetical in `feat(scope)`). Absence allows any scope. Used for title generation hints only; validation uses `titlePattern`. |
+
+### Note on Type/Scope Flags
+
+Unlike `/commit-sdlc`, `/pr-sdlc` does not accept `--type` or `--scope` flags; PR titles are generated contextually from commit analysis and branch information. The configuration fields `allowedTypes` and `allowedScopes` are advisory only — they guide title generation but do not restrict what titles are accepted, only the `titlePattern` does that.
+
+### Pattern Examples
+
+#### 1. Conventional PR Titles
+
+Type and scope optional; matches squash-merge commit format.
+
+```json
+{
+  "titlePattern": "^(feat|fix|refactor|docs|chore)(?:\\([a-z0-9-]+\\))?: .+$",
+  "titlePatternError": "Title must match: type[(scope)]: description",
+  "allowedTypes": ["feat", "fix", "refactor", "docs", "chore"],
+  "allowedScopes": ["auth", "api", "ui", "db"]
+}
+```
+
+Matching titles:
+```
+feat(auth): add OAuth2 PKCE flow
+fix: correct login retry logic
+docs: update API documentation
+```
+
+#### 2. Ticket Prefix Only
+
+Ticket ID required, no type system.
+
+```json
+{
+  "titlePattern": "^[A-Z]+-\\d+: .+$",
+  "titlePatternError": "Title must match: PROJ-123: description"
+}
+```
+
+Matching title:
+```
+PROJ-456: Implement webhook retry with idempotency
+```
+
+#### 3. Ticket Prefix + Conventional
+
+Ticket ID and conventional type.
+
+```json
+{
+  "titlePattern": "^[A-Z]+-\\d+ (feat|fix|refactor|docs): .+$",
+  "titlePatternError": "Title must match: PROJ-123 type: description",
+  "allowedTypes": ["feat", "fix", "refactor", "docs"]
+}
+```
+
+Matching title:
+```
+PROJ-456 feat: add webhook retry with idempotency
+```
+
+#### 4. Semantic PR Titles
+
+Explicit keyword categories (no parenthetical scope).
+
+```json
+{
+  "titlePattern": "^(feat|fix|breaking|refactor|docs): .+$",
+  "titlePatternError": "Title must start with: feat: fix: breaking: refactor: or docs:",
+  "allowedTypes": ["feat", "fix", "breaking", "refactor", "docs"]
+}
+```
+
+Matching titles:
+```
+feat: add webhook retry with idempotency
+breaking: remove deprecated auth endpoint
+fix: correct login session expiration
+```
 
 ---
 
@@ -179,5 +296,5 @@ See [OpenSpec Integration Guide](../openspec-integration.md) for the full workfl
 
 - [`/commit-sdlc`](commit-sdlc.md) — commit changes before creating a PR
 - [`/review-sdlc`](review-sdlc.md) — review the branch before or after creating a PR
-- [`/pr-customize-sdlc`](pr-customize-sdlc.md) — create a custom PR description template
+- [`/setup-sdlc --pr-template`](setup-sdlc.md) — create a custom PR description template
 - [`/version-sdlc`](version-sdlc.md) — tag a release after the PR is merged

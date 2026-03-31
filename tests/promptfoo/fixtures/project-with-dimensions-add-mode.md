@@ -27,6 +27,12 @@ package.json
 tsconfig.json
 ```
 
+## Current Invocation
+
+User ran: `/setup-sdlc --dimensions --add`
+
+This project already has code-quality-review and security-review dimensions installed.
+
 ## Key Dependencies (package.json)
 
 ```json
@@ -79,7 +85,7 @@ Overall: PASS
 
 ## Context
 
-User ran `/review-init-sdlc --add` to expand existing dimensions. The skill should detect
+User ran `/setup-sdlc --dimensions --add` to expand existing dimensions. The skill should detect
 the 2 already-installed dimensions and propose only the additional dimensions justified by
 new signals (test infrastructure and CI/CD workflows). It must not re-propose or overwrite
 `code-quality-review` or `security-review`.
