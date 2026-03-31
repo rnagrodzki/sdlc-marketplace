@@ -134,7 +134,7 @@ After each wave completes, execution state is written to `.sdlc/execution/execut
 
 **Resuming:** Pass `--resume` to pick up from the last completed wave. The state file contains enough context for a new session to continue without prior conversation history. If the plan file has changed since execution started (detected via content hash), you are prompted to resume with the old structure or restart.
 
-**Automatic detection:** Even without `--resume`, if a state file exists for the current branch, the skill offers to resume.
+**Automatic detection:** Even without `--resume`, if a state file exists for the current branch, the skill offers to resume in interactive mode. In `--auto` mode, it starts a fresh run instead (pass `--resume` explicitly to auto-resume).
 
 **Cleanup:** The state file is deleted on successful completion and preserved on failure or interruption.
 

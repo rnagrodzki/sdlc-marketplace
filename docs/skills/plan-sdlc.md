@@ -57,7 +57,7 @@ When Claude Code's [plan mode](https://docs.anthropic.com/en/docs/claude-code/pl
 - **All interaction via AskUserQuestion:** Requirements gathering, scope clarification, and approval prompts all go through `AskUserQuestion`, which is compatible with plan mode constraints.
 - **TodoWrite for progress tracking:** In full-pipeline runs, `TodoWrite` items are created for Steps 1–7 so you can see planning progress.
 - **Handoff:** The skill calls `ExitPlanMode` at the end — Claude Code presents the plan for your review. No manual exit needed.
-- **After approval:** Once you approve the plan in Claude Code's review UI, invoke `/execute-plan-sdlc` to start execution.
+- **After approval:** Once you approve the plan in Claude Code's review UI, invoke `/ship-sdlc` for the full pipeline (execute, commit, review, version, PR), or `/execute-plan-sdlc` for execution only.
 
 ---
 
@@ -75,7 +75,7 @@ receive a token, and include that token in subsequent API requests. The middlewa
 attach the decoded user to req.user and reject invalid or expired tokens with 401.
 ```
 
-The skill explores the codebase and presents a requirements checklist with task mappings, followed by the full plan and an estimated wave preview:
+The skill explores the codebase and presents a requirements checklist with task mappings, followed by the full plan for approval:
 
 ```
 Requirements:
@@ -83,11 +83,6 @@ Requirements:
   - [ ] Token validation middleware             → Task 3
   - [ ] Attach decoded user to req.user         → Task 3
   - [ ] Reject invalid/expired tokens with 401  → Task 3, Task 4
-
-Wave preview:
-  Pre-wave: Task 1 [Trivial]
-  Wave 1:   Task 2 [Standard], Task 3 [Standard]
-  Wave 2:   Task 4 [Complex]
 
 Approve this plan, or describe changes?
 ```

@@ -33,7 +33,7 @@ When a PR number or URL is provided (via arguments or user input), run the prepa
 
 ```bash
 SCRIPT=$(find ~/.claude/plugins -name "received-review-prepare.js" -path "*/sdlc*/scripts/received-review-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && SCRIPT=$(find . -path "*/scripts/received-review-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/received-review-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/received-review-prepare.js"
 [ -z "$SCRIPT" ] && { echo "WARNING: Could not locate received-review-prepare.js" >&2; }
 
 if [ -n "$SCRIPT" ]; then
