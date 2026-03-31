@@ -63,7 +63,7 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
   7. Skip to Step 5, resuming from the first wave with status `in_progress` or `pending`. Use the context object to construct inter-wave context for the next wave's agent prompts.
 
 - If `--resume` was NOT passed but a state file exists for the current branch:
-  - If `--auto` is set: auto-resume without prompting. Follow the resume flow above (steps 2-7). Print: "Auto-resuming from Wave N (state file found)."
+  - If `--auto` is set: **skip the stale state file and start a fresh run** (do not prompt, do not auto-resume). Print: "Existing state file found for branch `<branch>` but --resume not passed. Starting fresh."
   - Otherwise, use AskUserQuestion:
     > Found execution state from <startedAt> with <N> of <total> waves completed. Resume from Wave <next>?
     Options: **yes** — resume | **restart** — discard state file and start fresh
@@ -96,7 +96,7 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
 
    - **If `--workspace worktree`:** Create worktree without prompting:
      ```bash
-     SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" 2>/dev/null | head -1)
+     SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/worktree-create.js" 2>/dev/null | head -1)
      [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/worktree-create.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/worktree-create.js"
      result=$(node "$SCRIPT" --name <derived-name>)
      cd $(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
@@ -310,7 +310,7 @@ Proceeding to Wave N+1 (N tasks)
 
 **State persistence:** After each wave completes, update the execution state via `execute-state.js`. Locate the script:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "execute-state.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "execute-state.js" -path "*/sdlc*/scripts/execute-state.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/execute-state.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/execute-state.js"
 ```
 

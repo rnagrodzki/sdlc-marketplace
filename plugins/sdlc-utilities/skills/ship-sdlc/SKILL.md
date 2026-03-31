@@ -31,7 +31,7 @@ If `--init-config` was passed:
 1. Read `./config-format.md` and run the interactive walkthrough to collect the user's answers (preset, skip set, bump type, auto, threshold, workspace isolation).
 2. Locate and call `ship-init.js` via Bash with the collected answers:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" -path "*/sdlc*/scripts/ship-init.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-init.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
@@ -61,7 +61,7 @@ If not found: `No ship config found — using built-in defaults. Run /setup-sdlc
 
 Locate and run `ship-prepare.js` with all CLI flags to pre-compute flags, context, and step statuses:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship-prepare.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "ship-prepare.js" -path "*/sdlc*/scripts/ship-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
@@ -267,6 +267,14 @@ Before invoking each step, read its `status` from the ship-prepare.js output:
 
 A step with `status: "will_run"` MUST be invoked via the Skill tool. The LLM does not have authority to override this status. Printing a skip message for a "will_run" step is a pipeline violation.
 
+### Context budget awareness
+
+Each sub-skill invocation via the Skill tool loads the full SKILL.md into context (200–550 lines per skill). In a 7-step pipeline, this accumulates 2000+ lines of context budget. To prevent context exhaustion in later steps:
+
+- **Between steps:** After each sub-skill completes, compact its verbose output into a 2–3 line status summary before invoking the next step. The full SKILL.md definition and detailed output will be garbage-collected when compacted.
+- **Before the final steps:** If context usage is high after the review step, compact all prior step outputs before invoking version-sdlc and pr-sdlc.
+- **Do NOT skip sub-skill invocation** — each sub-skill contains complex logic (state management, verification, recovery) that requires its full definition. The Skill tool is the correct invocation method. Inter-step compaction is the mitigation, not inline execution.
+
 ### Execution loop
 
 For each step that will run, print verbose progress:
@@ -390,7 +398,7 @@ Note: in a worktree, all of this is safe — main working tree is untouched.
 
 After each step, update pipeline state via `ship-state.js`. Locate the script:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship-state.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "ship-state.js" -path "*/sdlc*/scripts/ship-state.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-state.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-state.js"
 ```
 
@@ -542,6 +550,10 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 **Version step is auto-skipped in worktree mode.** `computeSteps` in ship-prepare.js skips the version step when `workspace === 'worktree'`. Tags are repo-global — creating them from an isolated worktree risks collisions with parallel pipelines. The pipeline prints a post-merge advisory: run `/version-sdlc` on main after the PR merges. This also handles changelog — `version-sdlc` generates changelog from `previousTag..HEAD`, capturing all commits from all merged branches regardless of their source worktree.
 
 **Worktree PRs auto-label `skip-version-check`.** When `workspace === 'worktree'` causes the version step to be auto-skipped, `ship-prepare.js` adds `--label skip-version-check` to the PR step args. The label is included in `gh pr create` from the start (not added post-creation), so `check-version-bump.yml` sees it on the `opened` event. Only fires for worktree auto-skip, not manual `--skip version`. Prerequisite: the label must exist in the repository (pr-sdlc creates it automatically if missing).
+
+**Auto mode does not auto-resume without --resume.** When `--auto` is set but `--resume` is not, the pipeline starts fresh even if a state file exists for the current branch. This prevents accidental continuation from stale state. The state file is preserved (not deleted) so the user can explicitly `--resume` later.
+
+**Sub-skill loading consumes context.** Each Skill tool invocation loads the sub-skill's full SKILL.md (200–550 lines each). In a 7-step pipeline, this can consume 2000+ lines of context budget. The inter-step compaction described in "Context budget awareness" is not optional — without it, later steps (version, PR) execute with degraded context quality and are more likely to hallucinate or skip required logic.
 
 ---
 

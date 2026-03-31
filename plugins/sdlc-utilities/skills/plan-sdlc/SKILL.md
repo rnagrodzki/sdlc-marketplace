@@ -86,7 +86,7 @@ Wait for explicit response. If "resume", re-read the plan file and skip to Step 
 > **VERBATIM** — Run this bash block exactly as written.
 
 ```bash
-SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/lib/config.js" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
+SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
 [ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
 [ -z "$SCRIPT_DIR" ] && { echo "[]"; exit 0; }
 node -e "
@@ -252,15 +252,7 @@ Present to user via AskUserQuestion:
    | 1 | [name] | Standard | Low |
    | ... | ... | ... | ... |
 
-3. **Wave preview:**
-   ```
-   Wave preview:
-     Pre-wave: Task 1 [Trivial]
-     Wave 1:   Task 2 [Standard], Task 3 [Standard]
-     Wave 2:   Task 4 [Complex]
-   ```
-
-4. **Options:** approve / change (describe what) / question (ask anything)
+3. **Options:** approve / change (describe what) / question (ask anything)
 
 Approval loop is unbounded. Do not proceed without explicit approval.
 
@@ -297,10 +289,11 @@ If this is the 3rd iteration, use AskUserQuestion to surface remaining issues in
 
 **Plan mode:** Announce the plan path and propose execution:
 
-> Plan written to `<path>`. On approval, I'll execute this plan using `/execute-plan-sdlc`.
-> To skip execution, decline or provide different instructions.
+> Plan written to `<path>`. On approval:
+>   ship    — run the full pipeline: execute → commit → review → version → PR (/ship-sdlc)
+>   execute — execute the plan only (/execute-plan-sdlc)
 
-Then call ExitPlanMode. Do NOT invoke execute-plan-sdlc in this turn — it runs after the user accepts in the next turn.
+Then call ExitPlanMode. Do NOT invoke execute-plan-sdlc or ship-sdlc in this turn — they run after the user accepts in the next turn.
 
 **Normal mode:** Announce the plan path, then present the Workflow Continuation menu (see below).
 
@@ -364,8 +357,8 @@ After writing the plan (normal mode only), present the user with available next 
 
 ```
 What would you like to do next?
-  execute  — execute the plan (/execute-plan-sdlc)
-  commit   — commit any scaffolding changes (/commit-sdlc)
+  ship     — execute, commit, review, version, and PR (/ship-sdlc)
+  execute  — execute the plan only (/execute-plan-sdlc)
   done     — stop here
 
 Select:

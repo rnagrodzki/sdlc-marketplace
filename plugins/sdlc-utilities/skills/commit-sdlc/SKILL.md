@@ -38,7 +38,7 @@ If the system context contains "Plan mode is active":
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "commit-prepare.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "commit-prepare.js" -path "*/sdlc*/scripts/commit-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/commit-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/commit-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate commit-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 

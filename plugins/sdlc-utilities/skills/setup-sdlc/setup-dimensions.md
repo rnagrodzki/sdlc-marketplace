@@ -50,7 +50,7 @@ In `--add` (expansion) mode:
 
 - Locate the validation script:
   ```bash
-  SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" 2>/dev/null | head -1)
+  SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/sdlc*/scripts/validate-dimensions.js" 2>/dev/null | head -1)
   [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/validate-dimensions.js"
   ```
 - Run: `node "$SCRIPT" --project-root . --json`
@@ -59,7 +59,7 @@ In `--add` (expansion) mode:
 Also check for uncovered file suggestions from a recent review run:
 
 ```bash
-PREP=$(find ~/.claude/plugins -name "review-prepare.js" 2>/dev/null | head -1)
+PREP=$(find ~/.claude/plugins -name "review-prepare.js" -path "*/sdlc*/scripts/review-prepare.js" 2>/dev/null | head -1)
 [ -z "$PREP" ] && [ -f "plugins/sdlc-utilities/scripts/review-prepare.js" ] && PREP="plugins/sdlc-utilities/scripts/review-prepare.js"
 [ -n "$PREP" ] && node "$PREP" --project-root . --json 2>/dev/null
 ```
@@ -141,7 +141,7 @@ For each selected dimension:
 Run the validation script (use `SCRIPT` resolved in Step 2, or re-resolve if Step 2 was skipped):
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/sdlc*/scripts/validate-dimensions.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/validate-dimensions.js"
 node "$SCRIPT" --project-root . --markdown
 EXIT_CODE=$?

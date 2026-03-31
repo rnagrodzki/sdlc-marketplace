@@ -32,7 +32,7 @@ If the system context contains "Plan mode is active":
 When a PR number or URL is provided (via arguments or user input), run the prepare script to pre-compute review thread state:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "received-review-prepare.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "received-review-prepare.js" -path "*/sdlc*/scripts/received-review-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && SCRIPT=$(find . -path "*/scripts/received-review-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && { echo "WARNING: Could not locate received-review-prepare.js" >&2; }
 
