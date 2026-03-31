@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.12] - 2026-03-31
+
+### Fixed
+- Ship pipeline LLM now uses computed `invocation` field from ship-prepare.js output instead of copying hardcoded example args from SKILL.md (#97)
+
 ## [0.16.11] - 2026-03-31
 
 ### Added
