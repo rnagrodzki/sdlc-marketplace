@@ -19,8 +19,7 @@ SCRIPT=$(find ~/.claude/plugins -name "guardrails-prepare.js" 2>/dev/null | head
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/guardrails-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/guardrails-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate guardrails-prepare.js" >&2; exit 2; }
 
-PREPARE_OUTPUT_FILE=$(mktemp /tmp/guardrails-prepare-XXXXXX.json)
-node "$SCRIPT" --project-root . --mode {init|add} --json > "$PREPARE_OUTPUT_FILE"
+PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --project-root . --mode {init|add} --json)
 EXIT_CODE=$?
 echo "EXIT_CODE=$EXIT_CODE"
 cat "$PREPARE_OUTPUT_FILE"

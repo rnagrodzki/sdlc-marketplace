@@ -23,8 +23,7 @@ SCRIPT=$(find ~/.claude/plugins -name "review-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/review-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/review-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate review-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-MANIFEST_FILE=$(mktemp /tmp/review-manifest-XXXXXX.json)
-node "$SCRIPT" $ARGUMENTS --json > "$MANIFEST_FILE"
+MANIFEST_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --json)
 EXIT_CODE=$?
 echo "MANIFEST_FILE=$MANIFEST_FILE"
 echo "EXIT_CODE=$EXIT_CODE"

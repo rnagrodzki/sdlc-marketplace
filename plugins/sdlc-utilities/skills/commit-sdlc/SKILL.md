@@ -42,8 +42,7 @@ SCRIPT=$(find ~/.claude/plugins -name "commit-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/commit-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/commit-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate commit-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-COMMIT_CONTEXT_FILE=$(mktemp /tmp/commit-context-XXXXXX.json)
-node "$SCRIPT" $ARGUMENTS > "$COMMIT_CONTEXT_FILE"
+COMMIT_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
 ```
 

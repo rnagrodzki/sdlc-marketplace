@@ -17,7 +17,7 @@ Review the command→script→skill execution pipeline for correctness and resil
 
 ## Checklist
 
-- [ ] Commands that invoke scripts write output to a temp file using `mktemp /tmp/<prefix>-XXXXXX.json` — never pipe script output directly through the shell into a variable
+- [ ] Commands that invoke scripts capture output via `--output-file` flag — the script writes JSON to a crypto-random temp file and prints its path to stdout. Never use `mktemp` in the bash block
 - [ ] The temp file variable name is unique per command (e.g., `PR_CONTEXT_FILE`, `MANIFEST_FILE`, `VERSION_CONTEXT_FILE`) and not a generic name like `TMPFILE` that could shadow across steps
 - [ ] Every temp file created by a command has a corresponding `rm -f` cleanup that executes on all exit paths — success, error, and user cancellation (look for cleanup noted in the workflow, not just in the "happy path")
 - [ ] Exit code handling matches script semantics: `0` = success with usable output, `1` = errors captured in JSON `errors` array, `2` = script crash — the command checks both `$?` and the `errors` array in the JSON

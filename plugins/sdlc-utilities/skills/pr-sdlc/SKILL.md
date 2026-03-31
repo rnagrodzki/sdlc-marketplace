@@ -102,8 +102,7 @@ SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/pr-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/pr-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate pr-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-PR_CONTEXT_FILE=$(mktemp /tmp/pr-context-XXXXXX.json)
-node "$SCRIPT" $ARGUMENTS > "$PR_CONTEXT_FILE"
+PR_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
 ```
 

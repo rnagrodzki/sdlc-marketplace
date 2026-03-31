@@ -41,6 +41,7 @@ const {
   ensureGhAccount,
 } = require('./lib/git');
 const { readSection, writeLocalConfig } = require('./lib/config');
+const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
 // Review config (.sdlc/review.json)
@@ -572,7 +573,7 @@ function main() {
     diff_dir: tmpDir,
   };
 
-  process.stdout.write(JSON.stringify(manifest, null, 2) + '\n');
+  writeOutput(manifest, 'review-manifest');
 }
 
 if (require.main === module) {

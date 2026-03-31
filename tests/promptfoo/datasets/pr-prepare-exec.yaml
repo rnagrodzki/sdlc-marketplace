@@ -1,0 +1,99 @@
+# Script execution tests for pr-prepare.js.
+# These tests run pr-prepare.js directly against fixture directories (no LLM).
+# Ported from tests/unit/pr-prepare.test.js.
+#
+# Note: pr-prepare.js calls gh CLI which fails without a remote.
+# Tests assert on fields populated before remote operations (flags, prConfig).
+
+- description: "pr-prepare: default flags with no args"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-no-config"
+  assert:
+    - type: icontains
+      value: '"isDraft": false'
+    - type: icontains
+      value: '"isAuto": false'
+
+- description: "pr-prepare: --draft flag"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_args: "--draft"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-no-config"
+  assert:
+    - type: icontains
+      value: '"isDraft": true'
+
+- description: "pr-prepare: --update flag"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_args: "--update"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-no-config"
+  assert:
+    - type: icontains
+      value: '"forceUpdate": true'
+
+- description: "pr-prepare: --base main override"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_args: "--base main"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-no-config"
+  assert:
+    - type: icontains
+      value: '"baseBranchOverride": "main"'
+
+- description: "pr-prepare: --auto flag"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_args: "--auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-no-config"
+  assert:
+    - type: icontains
+      value: '"isAuto": true'
+
+- description: "pr-prepare: --label bug --label feature adds both labels"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_args: "--label bug --label feature"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-no-config"
+  assert:
+    - type: icontains
+      value: '"bug"'
+    - type: icontains
+      value: '"feature"'
+
+- description: "pr-prepare: --label bug --label bug deduplicates"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_args: "--label bug --label bug"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-no-config"
+  assert:
+    - type: regex
+      value: '"forcedLabels":\s*\[\s*"bug"\s*\]'
+
+- description: "pr-prepare: config present includes prConfig"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-config"
+  assert:
+    - type: icontains
+      value: '"requiredLabels"'
+    - type: icontains
+      value: '"review"'
+
+- description: "pr-prepare: no config sets prConfig null"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-no-config"
+  assert:
+    - type: icontains
+      value: '"prConfig": null'

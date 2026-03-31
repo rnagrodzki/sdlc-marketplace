@@ -20,3 +20,6 @@ tests:
   - file://datasets/sdlc-dimensions-exec.yaml
   - file://datasets/sdlc-pr-template-exec.yaml
   - file://datasets/sdlc-script-resolution-exec.yaml
+  - file://datasets/commit-prepare-exec.yaml
+  - file://datasets/pr-prepare-exec.yaml
+  - file://datasets/ship-prepare-exec.yaml

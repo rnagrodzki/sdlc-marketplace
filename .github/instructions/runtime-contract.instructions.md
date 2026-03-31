@@ -9,7 +9,7 @@ Default severity: high
 
 ## Checklist
 
-- Commands that invoke scripts write output to a temp file using `mktemp /tmp/<prefix>-XXXXXX.json` — never pipe script output directly through the shell into a variable
+- Commands that invoke scripts capture output via `--output-file` flag — the script writes JSON to a crypto-random temp file and prints its path to stdout. Never use `mktemp` in the bash block
 - The temp file variable name is unique per command (e.g., `PR_CONTEXT_FILE`, `MANIFEST_FILE`) — not a generic name like `TMPFILE` that could shadow across steps
 - Every temp file has a corresponding `rm -f` cleanup that executes on all exit paths — success, error, and user cancellation
 - Exit code handling matches script semantics: `0` = success, `1` = errors in JSON `errors` array, `2` = script crash — the command checks both `$?` and the `errors` array

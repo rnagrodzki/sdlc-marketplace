@@ -24,8 +24,7 @@ SCRIPT=$(find ~/.claude/plugins -name "test-report-prepare.js" 2>/dev/null | hea
 [ -z "$SCRIPT" ] && [ -f ".claude/skills/test-report/test-report-prepare.js" ] && SCRIPT=".claude/skills/test-report/test-report-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate test-report-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-DATA_FILE=$(mktemp /tmp/test-report-data-XXXXXX.json)
-node "$SCRIPT" $ARGUMENTS > "$DATA_FILE"
+DATA_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
 ```
 

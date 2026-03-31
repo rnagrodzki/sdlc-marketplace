@@ -43,6 +43,7 @@ const {
 } = require('./lib/git');
 
 const { readSection } = require('./lib/config');
+const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -141,7 +142,7 @@ function main() {
     gitState = checkGitState(projectRoot);
   } catch (err) {
     errors.push(err.message);
-    output({ errors, warnings }, 1);
+    writeOutput({ errors, warnings }, 'pr-context', 1);
     return;
   }
 
@@ -150,7 +151,7 @@ function main() {
   // Step 3: Reject protected branches
   if (currentBranch === 'main' || currentBranch === 'master') {
     errors.push(`You are on the ${currentBranch} branch. Switch to a feature branch before creating a PR.`);
-    output({ errors, warnings, currentBranch }, 1);
+    writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
     return;
   }
 
@@ -168,7 +169,7 @@ function main() {
     );
     if (!exists) {
       errors.push(`Base branch "origin/${baseBranchOverride}" does not exist on the remote.`);
-      output({ errors, warnings, currentBranch }, 1);
+      writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
       return;
     }
     baseBranch = baseBranchOverride;
@@ -177,7 +178,7 @@ function main() {
       baseBranch = detectBaseBranch(projectRoot);
     } catch (err) {
       errors.push(err.message);
-      output({ errors, warnings, currentBranch }, 1);
+      writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
       return;
     }
   }
@@ -218,7 +219,7 @@ function main() {
 
   if (modeError) {
     errors.push(modeError);
-    output({ errors, warnings, currentBranch, baseBranch, remoteState }, 1);
+    writeOutput({ errors, warnings, currentBranch, baseBranch, remoteState }, 'pr-context', 1);
     return;
   }
 
@@ -292,12 +293,7 @@ function main() {
     errors,
   };
 
-  output(result, 0);
-}
-
-function output(data, exitCode) {
-  process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-  process.exit(exitCode);
+  writeOutput(result, 'pr-context', 0);
 }
 
 if (require.main === module) {

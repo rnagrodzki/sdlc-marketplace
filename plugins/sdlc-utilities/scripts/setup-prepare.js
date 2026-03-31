@@ -7,6 +7,7 @@ const { execSync } = require('child_process');
 
 const { detectVersionFile } = require('./lib/version');
 const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH, PROJECT_SECTIONS } = require('./lib/config');
+const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -151,8 +152,7 @@ if (require.main === module) {
   try {
     const projectRoot = process.cwd();
     const result = detect(projectRoot);
-    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.exit(0);
+    writeOutput(result, 'setup-prepare', 0);
   } catch (err) {
     process.stderr.write(`setup-prepare: unexpected error: ${err.message}\n`);
     process.exit(2);

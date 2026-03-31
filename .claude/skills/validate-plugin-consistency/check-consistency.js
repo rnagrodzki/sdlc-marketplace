@@ -230,8 +230,8 @@ function checkSkillRunsScript(skills, scriptNames, findings) {
 }
 
 /**
- * Rule 3 — skill-uses-mktemp
- * Skills that run prepare scripts must write output to a mktemp file.
+ * Rule 3 — skill-uses-output-file
+ * Skills that run prepare scripts must use --output-file to capture output.
  */
 function checkSkillUsesMktemp(skills, scriptNames, findings) {
   for (const [scriptName, skillName] of Object.entries(SCRIPT_TO_SKILL)) {
@@ -243,12 +243,12 @@ function checkSkillUsesMktemp(skills, scriptNames, findings) {
     const content = readFile(skill.file);
     if (!content || !containsPrepareScriptExecution(content, scriptName)) continue;
 
-    if (!content.includes('mktemp')) {
+    if (!content.includes('--output-file')) {
       findings.push({
-        rule: 'skill-uses-mktemp',
+        rule: 'skill-uses-output-file',
         severity: 'error',
         file: path.relative(process.cwd(), skill.file),
-        message: `Skill '${skillName}' runs ${scriptName} but does not write output to a mktemp file. Large manifests (100KB+) break shell pipes — always use mktemp.`,
+        message: `Skill '${skillName}' runs ${scriptName} but does not use --output-file. Scripts write JSON to a crypto-random temp file via --output-file — never use mktemp in the bash block.`,
       });
     }
   }
@@ -451,7 +451,7 @@ function checkReadmeSkillsTable(projectRoot, findings) {
 
 /**
  * Rule 11 — temp-file-cleanup
- * Skills that use mktemp must also contain a cleanup reference (rm -f, rm -rf, or clean).
+ * Skills that use --output-file must also contain a cleanup reference (rm -f, rm -rf, or clean).
  */
 function checkTempFileCleanup(skills, scriptNames, findings) {
   for (const [scriptName, skillName] of Object.entries(SCRIPT_TO_SKILL)) {
@@ -463,7 +463,7 @@ function checkTempFileCleanup(skills, scriptNames, findings) {
     const content = readFile(skill.file);
     if (!content) continue;
 
-    if (!content.includes('mktemp')) continue;
+    if (!content.includes('--output-file')) continue;
 
     const hasCleanup = /rm\s+-[rf]f?/.test(content) || /clean/i.test(content);
     if (!hasCleanup) {
@@ -471,7 +471,7 @@ function checkTempFileCleanup(skills, scriptNames, findings) {
         rule: 'temp-file-cleanup',
         severity: 'warning',
         file: path.relative(process.cwd(), skill.file),
-        message: `Skill '${skillName}' uses mktemp but has no cleanup reference (rm -f, rm -rf, or clean). Temp files should be cleaned up after use.`,
+        message: `Skill '${skillName}' uses --output-file but has no cleanup reference (rm -f, rm -rf, or clean). Temp files should be cleaned up after use.`,
       });
     }
   }

@@ -5,6 +5,7 @@
  * Expects vars:
  *   script_path  — absolute path to the node script
  *   script_args  — space-separated args (e.g., "--project-root /tmp/fixture-abc --json")
+ *   script_cwd   — (optional) working directory for script execution
  */
 const { execFileSync } = require('child_process');
 
@@ -17,6 +18,7 @@ class ScriptRunnerProvider {
     const vars = context?.vars ?? {};
     const scriptPath = vars.script_path;
     const scriptArgs = (vars.script_args ?? '').split(/\s+/).filter(Boolean);
+    const cwd = vars.script_cwd || undefined;
 
     if (!scriptPath) {
       return { error: 'script-runner: script_path var is required' };
@@ -26,6 +28,7 @@ class ScriptRunnerProvider {
       const stdout = execFileSync('node', [scriptPath, ...scriptArgs], {
         timeout: 30_000,
         encoding: 'utf8',
+        cwd,
       });
       return { output: stdout };
     } catch (err) {

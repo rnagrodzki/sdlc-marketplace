@@ -37,8 +37,7 @@ SCRIPT=$(find ~/.claude/plugins -name "received-review-prepare.js" 2>/dev/null |
 [ -z "$SCRIPT" ] && { echo "WARNING: Could not locate received-review-prepare.js" >&2; }
 
 if [ -n "$SCRIPT" ]; then
-  MANIFEST_FILE=$(mktemp /tmp/received-review-manifest-XXXXXX.json)
-  node "$SCRIPT" $ARGUMENTS --pr <PR_NUMBER> > "$MANIFEST_FILE"
+  MANIFEST_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --pr <PR_NUMBER>)
   EXIT_CODE=$?
   echo "MANIFEST_FILE=$MANIFEST_FILE"
   echo "EXIT_CODE=$EXIT_CODE"

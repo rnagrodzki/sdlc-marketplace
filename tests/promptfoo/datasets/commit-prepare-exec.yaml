@@ -1,0 +1,130 @@
+# Script execution tests for commit-prepare.js.
+# These tests run commit-prepare.js directly against fixture directories (no LLM).
+# Ported from tests/unit/commit-prepare.test.js.
+
+- description: "commit-prepare: default flags with no args"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: '"noStash": false'
+    - type: icontains
+      value: '"amend": false'
+    - type: icontains
+      value: '"auto": false'
+
+- description: "commit-prepare: --type feat parses correctly"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_args: "--type feat"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: '"type": "feat"'
+
+- description: "commit-prepare: --scope auth parses correctly"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_args: "--scope auth"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: '"scope": "auth"'
+
+- description: "commit-prepare: --no-stash flag"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_args: "--no-stash"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: '"noStash": true'
+
+- description: "commit-prepare: --amend flag"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_args: "--amend"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: '"amend": true'
+
+- description: "commit-prepare: --auto flag"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_args: "--auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: '"auto": true'
+
+- description: "commit-prepare: config present includes commitConfig"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-config"
+  assert:
+    - type: icontains
+      value: '"allowedTypes"'
+    - type: icontains
+      value: '"feat"'
+
+- description: "commit-prepare: no config sets commitConfig null"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: '"commitConfig": null'
+
+- description: "commit-prepare: --type chore violates allowedTypes"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_args: "--type chore"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-config"
+  assert:
+    - type: icontains
+      value: "not allowed"
+    - type: icontains
+      value: "Allowed types"
+
+- description: "commit-prepare: --scope ui violates allowedScopes"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_args: "--scope ui"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-config"
+  assert:
+    - type: icontains
+      value: "not allowed"
+    - type: icontains
+      value: "Allowed scopes"
+
+- description: "commit-prepare: --type feat passes allowedTypes validation"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_args: "--type feat"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-config"
+  assert:
+    - type: icontains
+      value: '"errors": []'
+
+- description: "commit-prepare: --scope auth passes allowedScopes validation"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_args: "--scope auth"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-config"
+  assert:
+    - type: icontains
+      value: '"errors": []'

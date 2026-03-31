@@ -68,8 +68,7 @@ SCRIPT=$(find ~/.claude/plugins -name "jira-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/jira-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/jira-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate jira-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-JIRA_CONTEXT_FILE=$(mktemp /tmp/jira-context-XXXXXX.json)
-node "$SCRIPT" $ARGUMENTS --check > "$JIRA_CONTEXT_FILE"
+JIRA_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --check)
 EXIT_CODE=$?
 ```
 
@@ -108,8 +107,7 @@ If `--init-templates` flag is present:
 
 1. Run the init-templates script:
    ```bash
-   INIT_RESULT=$(mktemp /tmp/jira-init-XXXXXX.json)
-   node "$SCRIPT" --project "$PROJECT_KEY" --init-templates > "$INIT_RESULT"
+   INIT_RESULT=$(node "$SCRIPT" --output-file --project "$PROJECT_KEY" --init-templates)
    ```
 
 2. Read and parse the output. Report: "N templates initialized (exact match), N skipped (already exist)."

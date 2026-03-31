@@ -27,6 +27,7 @@
 
 const { exec, checkGitState } = require('./lib/git');
 const { readSection } = require('./lib/config');
+const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -78,7 +79,7 @@ function main() {
     gitState = checkGitState(projectRoot);
   } catch (err) {
     errors.push(err.message);
-    output({ errors, warnings }, 1);
+    writeOutput({ errors, warnings }, 'commit-context', 1);
     return;
   }
 
@@ -112,7 +113,7 @@ function main() {
   // Step 5: Error if nothing staged and not amending
   if (stagedFiles.length === 0 && !amend) {
     errors.push('No staged changes. Use `git add` to stage files before committing.');
-    output({ errors, warnings, currentBranch, flags }, 1);
+    writeOutput({ errors, warnings, currentBranch, flags }, 'commit-context', 1);
     return;
   }
 
@@ -176,12 +177,7 @@ function main() {
     lastCommitMessage,
   };
 
-  output(result, 0);
-}
-
-function output(data, exitCode) {
-  process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-  process.exit(exitCode);
+  writeOutput(result, 'commit-context', 0);
 }
 
 if (require.main === module) {

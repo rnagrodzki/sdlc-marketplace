@@ -37,6 +37,7 @@ const {
   getCurrentUser,
   fetchPrReviewThreads,
 } = require('./lib/git');
+const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -187,7 +188,7 @@ function main() {
     summary,
   };
 
-  process.stdout.write(JSON.stringify(manifest, null, 2) + '\n');
+  writeOutput(manifest, 'received-review-manifest');
 }
 
 if (require.main === module) {

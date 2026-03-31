@@ -43,8 +43,7 @@ SCRIPT=$(find ~/.claude/plugins -name "version-prepare.js" 2>/dev/null | head -1
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/version-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/version-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate version-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-VERSION_CONTEXT_FILE=$(mktemp /tmp/version-context-XXXXXX.json)
-node "$SCRIPT" $ARGUMENTS > "$VERSION_CONTEXT_FILE"
+VERSION_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
 ```
 

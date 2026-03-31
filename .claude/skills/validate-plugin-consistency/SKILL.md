@@ -53,12 +53,11 @@ the skill following the pattern in `review-sdlc/SKILL.md`:
 
 ### `skill-uses-mktemp` (error)
 
-A skill runs a prepare script but pipes output directly instead of using a temp file.
+A skill runs a prepare script but pipes output directly instead of using `--output-file` capture.
 Replace with:
 
 ```bash
-MANIFEST_FILE=$(mktemp /tmp/<name>-XXXXXX.json)
-node "$SCRIPT" $ARGUMENTS --json > "$MANIFEST_FILE"
+MANIFEST_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --json)
 EXIT_CODE=$?
 ```
 
@@ -140,8 +139,7 @@ SCRIPT=$(find ~/.claude/plugins -name "<name>-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/<name>-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/<name>-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate <name>-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-CONTEXT_FILE=$(mktemp /tmp/<name>-context-XXXXXX.json)
-node "$SCRIPT" $ARGUMENTS --json > "$CONTEXT_FILE"
+CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --json)
 EXIT_CODE=$?
 # Cleanup: rm -f "$CONTEXT_FILE" after use
 

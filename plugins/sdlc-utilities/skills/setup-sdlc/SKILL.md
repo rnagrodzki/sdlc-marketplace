@@ -52,8 +52,7 @@ SCRIPT=$(find ~/.claude/plugins -name "setup-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/setup-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/setup-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate setup-prepare.js" >&2; exit 2; }
 
-PREPARE_OUTPUT_FILE=$(mktemp)
-node "$SCRIPT" > "$PREPARE_OUTPUT_FILE"
+PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file)
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"

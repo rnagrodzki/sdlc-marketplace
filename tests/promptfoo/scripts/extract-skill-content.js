@@ -48,6 +48,14 @@ module.exports = async function transformVars(vars) {
     const sourceDir = path.join(REPO_ROOT, relativePath);
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'promptfoo-fixture-'));
     fs.cpSync(sourceDir, tmpDir, { recursive: true });
+
+    // Auto-run fixture setup script if present (initializes git state, stages files, etc.)
+    const setupScript = path.join(tmpDir, 'setup.sh');
+    if (fs.existsSync(setupScript)) {
+      const { execSync } = require('child_process');
+      execSync(`bash "${setupScript}"`, { cwd: tmpDir, timeout: 10_000, stdio: 'pipe' });
+    }
+
     result.project_root = tmpDir;
     result.repo_root = REPO_ROOT;
   }

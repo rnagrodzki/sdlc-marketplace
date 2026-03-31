@@ -35,8 +35,7 @@ SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-init.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-INIT_OUTPUT_FILE=$(mktemp /tmp/ship-init-XXXXXX.json)
-node "$SCRIPT" --preset B --skip version --bump patch --auto --threshold high --workspace prompt > "$INIT_OUTPUT_FILE"
+INIT_OUTPUT_FILE=$(node "$SCRIPT" --output-file --preset B --skip version --bump patch --auto --threshold high --workspace prompt)
 EXIT_CODE=$?
 echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -66,8 +65,7 @@ SCRIPT=$(find ~/.claude/plugins -name "ship-prepare.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-PREPARE_OUTPUT_FILE=$(mktemp /tmp/ship-prepare-XXXXXX.json)
-node "$SCRIPT" --has-plan --auto --skip version --preset B --bump patch --workspace branch > "$PREPARE_OUTPUT_FILE"
+PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --skip version --preset B --bump patch --workspace branch)
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"

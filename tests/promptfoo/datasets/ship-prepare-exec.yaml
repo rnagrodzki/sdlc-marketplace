@@ -1,0 +1,43 @@
+# Script execution tests for ship-prepare.js.
+# These tests run ship-prepare.js directly against fixture directories (no LLM).
+# Covers: sdlcGitignored fix (#99) and auto-mode workspace override (#104).
+
+- description: "ship-prepare: .sdlc/.gitignore inner pattern sets sdlcGitignored true"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"sdlcGitignored": true'
+
+- description: "ship-prepare: --auto defaults workspace to branch"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"workspace": "branch"'
+
+- description: "ship-prepare: --auto with explicit --workspace prompt keeps prompt"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_args: "--has-plan --auto --workspace prompt"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"workspace": "prompt"'
+
+- description: "ship-prepare: --auto with config workspace=worktree keeps config value"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-auto-workspace"
+  assert:
+    - type: icontains
+      value: '"workspace": "worktree"'

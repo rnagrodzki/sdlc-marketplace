@@ -26,15 +26,7 @@
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
-
-// ---------------------------------------------------------------------------
-// Output helper
-// ---------------------------------------------------------------------------
-
-function output(data, exitCode) {
-  process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-  process.exit(exitCode);
-}
+const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -147,7 +139,7 @@ function readStdin() {
   try {
     return fs.readFileSync('/dev/stdin', 'utf8');
   } catch (err) {
-    output({ errors: [`Failed to read stdin: ${err.message}`] }, 1);
+    writeOutput({ errors: [`Failed to read stdin: ${err.message}`] }, 'jira-context', 1);
   }
 }
 
@@ -212,7 +204,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
       process.stderr.write('Warning: .claude/jira-cache/ is deprecated. Cache will be written to .sdlc/jira-cache/ on next refresh.\n');
       cachePath = legacyPath;
     } else {
-      output({
+      writeOutput({
         exists:     false,
         fresh:      false,
         projectKey,
@@ -220,7 +212,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
         missing:    ['all'],
         errors:     [],
         warnings:   [],
-      }, 0);
+      }, 'jira-context', 0);
       return;
     }
   }
@@ -229,7 +221,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
   try {
     cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
   } catch (err) {
-    output({
+    writeOutput({
       exists:     true,
       fresh:      false,
       projectKey,
@@ -237,7 +229,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
       missing:    ['all'],
       errors:     [`Cache file is not valid JSON: ${err.message}`],
       warnings:   [],
-    }, 0);
+    }, 'jira-context', 0);
     return;
   }
 
@@ -328,7 +320,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
     warnings.push(`Workflow data missing for issue types: ${incompleteWorkflows.join(', ')}`);
   }
 
-  output({
+  writeOutput({
     exists: true,
     fresh,
     ageHours:    ageHours !== null ? Math.round(ageHours * 100) / 100 : null,
@@ -345,7 +337,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
     missing,
     errors:   [],
     warnings,
-  }, 0);
+  }, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -359,12 +351,12 @@ function loadCache(cachePath, projectKey) {
       process.stderr.write('Warning: .claude/jira-cache/ is deprecated. Cache will be written to .sdlc/jira-cache/ on next refresh.\n');
       cachePath = legacyPath;
     } else {
-      output({ errors: ['No cache found for project. Run cache initialization first.'] }, 1);
+      writeOutput({ errors: ['No cache found for project. Run cache initialization first.'] }, 'jira-context', 1);
       return;
     }
   }
   const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
-  output(cache, 0);
+  writeOutput(cache, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -377,19 +369,19 @@ function saveCache(cachePath) {
   try {
     data = JSON.parse(raw);
   } catch (err) {
-    output({ errors: [`Invalid JSON on stdin: ${err.message}`] }, 1);
+    writeOutput({ errors: [`Invalid JSON on stdin: ${err.message}`] }, 'jira-context', 1);
     return;
   }
 
   const missingFields = ['version', 'cloudId', 'project'].filter(f => !(f in data));
   if (missingFields.length > 0) {
-    output({ errors: [`Cache JSON is missing required fields: ${missingFields.join(', ')}`] }, 1);
+    writeOutput({ errors: [`Cache JSON is missing required fields: ${missingFields.join(', ')}`] }, 'jira-context', 1);
     return;
   }
 
   fs.mkdirSync(path.dirname(cachePath), { recursive: true });
   fs.writeFileSync(cachePath, JSON.stringify(data, null, 2) + '\n', 'utf8');
-  output({ saved: true, cachePath }, 0);
+  writeOutput({ saved: true, cachePath }, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,7 +390,7 @@ function saveCache(cachePath) {
 
 function saveField(cachePath, fieldName) {
   if (!fs.existsSync(cachePath)) {
-    output({ errors: ['No cache found for project. Run cache initialization first.'] }, 1);
+    writeOutput({ errors: ['No cache found for project. Run cache initialization first.'] }, 1);
     return;
   }
 
@@ -407,7 +399,7 @@ function saveField(cachePath, fieldName) {
   try {
     incoming = JSON.parse(raw);
   } catch (err) {
-    output({ errors: [`Invalid JSON on stdin: ${err.message}`] }, 1);
+    writeOutput({ errors: [`Invalid JSON on stdin: ${err.message}`] }, 'jira-context', 1);
     return;
   }
 
@@ -415,7 +407,7 @@ function saveField(cachePath, fieldName) {
   try {
     cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
   } catch (err) {
-    output({ errors: [`Cache file is not valid JSON: ${err.message}`] }, 1);
+    writeOutput({ errors: [`Cache file is not valid JSON: ${err.message}`] }, 'jira-context', 1);
     return;
   }
 
@@ -428,7 +420,7 @@ function saveField(cachePath, fieldName) {
   }
 
   fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2) + '\n', 'utf8');
-  output({ saved: true, field: fieldName, cachePath }, 0);
+  writeOutput({ saved: true, field: fieldName, cachePath }, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +429,7 @@ function saveField(cachePath, fieldName) {
 
 function resolveTemplates(projectKey, cachePath, templatesDir) {
   const status = resolveTemplateStatus(projectKey, cachePath, templatesDir);
-  output(status, 0);
+  writeOutput(status, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -477,7 +469,7 @@ function initTemplates(projectKey, cachePath, templatesDir) {
     }
   }
 
-  output({ initialized, skipped, unavailable }, 0);
+  writeOutput({ initialized, skipped, unavailable }, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -488,7 +480,7 @@ function clearCache(cachePath) {
   if (fs.existsSync(cachePath)) {
     fs.unlinkSync(cachePath);
   }
-  output({ cleared: true, cachePath }, 0);
+  writeOutput({ cleared: true, cachePath }, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -498,7 +490,7 @@ function clearCache(cachePath) {
 function copyTemplate(copyType, copyFrom, templatesDir) {
   const src = path.join(templatesDir, copyFrom + '.md');
   if (!fs.existsSync(src)) {
-    output({ errors: [`Template source not found: ${src}`] }, 1);
+    writeOutput({ errors: [`Template source not found: ${src}`] }, 'jira-context', 1);
     return;
   }
 
@@ -506,12 +498,12 @@ function copyTemplate(copyType, copyFrom, templatesDir) {
   fs.mkdirSync(path.dirname(dst), { recursive: true });
 
   if (fs.existsSync(dst)) {
-    output({ copied: false, reason: 'exists', type: copyType, destination: dst }, 0);
+    writeOutput({ copied: false, reason: 'exists', type: copyType, destination: dst }, 'jira-context', 0);
     return;
   }
 
   fs.copyFileSync(src, dst);
-  output({ copied: true, type: copyType, from: copyFrom, destination: dst }, 0);
+  writeOutput({ copied: true, type: copyType, from: copyFrom, destination: dst }, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -522,7 +514,7 @@ function main() {
   const { projectKey, cacheDir, templatesDir: templatesOverride, subcommand, saveFieldName, copyType, copyFrom, errors } = parseArgs(process.argv);
 
   if (errors.length > 0) {
-    output({ errors }, 1);
+    writeOutput({ errors }, 'jira-context', 1);
     return;
   }
 
@@ -555,7 +547,7 @@ function main() {
       copyTemplate(copyType, copyFrom, templatesDir);
       break;
     default:
-      output({ errors: [`Unknown subcommand: ${subcommand}`] }, 1);
+      writeOutput({ errors: [`Unknown subcommand: ${subcommand}`] }, 'jira-context', 1);
   }
 }
 

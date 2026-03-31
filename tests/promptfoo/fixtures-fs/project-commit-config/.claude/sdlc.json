@@ -1,0 +1,1 @@
+{ "commit": { "allowedTypes": ["feat", "fix"], "allowedScopes": ["auth", "db"] } }

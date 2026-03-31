@@ -30,6 +30,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { readSection, writeSection } = require('./lib/config');
+const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -121,7 +122,7 @@ function main() {
   const validationErrors = validate({ preset, skip, bump, draft, auto, threshold, workspace });
   if (validationErrors.length > 0) {
     errors.push(...validationErrors);
-    output({ errors, warnings }, 1);
+    writeOutput({ errors, warnings }, 'ship-init', 1);
     return;
   }
 
@@ -175,12 +176,7 @@ function main() {
     config,
   };
 
-  output(result, 0);
-}
-
-function output(data, exitCode) {
-  process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-  process.exit(exitCode);
+  writeOutput(result, 'ship-init', 0);
 }
 
 if (require.main === module) {

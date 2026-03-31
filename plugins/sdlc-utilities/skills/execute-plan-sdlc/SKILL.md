@@ -2,7 +2,7 @@
 name: execute-plan-sdlc
 description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan. Also auto-triggered when the user accepts a plan from plan-sdlc (plan content is already in conversation context)."
 user-invocable: true
-argument-hint: "[plan-file-path] [--preset A|B|C] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt]"
+argument-hint: "[plan-file-path] [--preset A|B|C] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto]"
 ---
 
 # Execute Plan (SDLC)
@@ -63,10 +63,13 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
   7. Skip to Step 5, resuming from the first wave with status `in_progress` or `pending`. Use the context object to construct inter-wave context for the next wave's agent prompts.
 
 - If `--resume` was NOT passed but a state file exists for the current branch:
-  Use AskUserQuestion:
-  > Found execution state from <startedAt> with <N> of <total> waves completed. Resume from Wave <next>?
-  Options: **yes** — resume | **restart** — discard state file and start fresh
-  If "yes", follow the resume flow above (steps 2-7). If "restart", delete the state file and proceed normally.
+  - If `--auto` is set: auto-resume without prompting. Follow the resume flow above (steps 2-7). Print: "Auto-resuming from Wave N (state file found)."
+  - Otherwise, use AskUserQuestion:
+    > Found execution state from <startedAt> with <N> of <total> waves completed. Resume from Wave <next>?
+    Options: **yes** — resume | **restart** — discard state file and start fresh
+    If "yes", follow the resume flow above (steps 2-7). If "restart", delete the state file and proceed normally.
+
+**Parse `--auto`:** If `--auto` was passed, store the flag. Auto mode suppresses interactive prompts: resume detection auto-resumes if state exists, high-risk gates auto-approve, and preset selection uses the value from `--preset` (required when `--auto` is set).
 
 **Parse `--workspace`:** If `--workspace branch|worktree|prompt` was passed as an argument, store the mode. If absent, default to `prompt`. When `--workspace` is explicitly set to `branch` or `worktree`, the corresponding action is taken automatically without prompting (steps 3a-3c below).
 
@@ -229,7 +232,11 @@ Always present all 3 presets. Default is Balanced. When the user selects a prese
 
 **For each wave:**
 
-**5a. High-risk gate** — If the wave contains high-risk tasks, use AskUserQuestion to ask:
+**5a. High-risk gate** — If the wave contains high-risk tasks:
+
+If `--auto` is set, skip the prompt. Print: "Auto-approving high-risk wave N." Proceed as if the user selected "yes".
+
+Otherwise, use AskUserQuestion to ask:
 > Wave N contains high-risk task(s):
 > - Task N: "..." [HIGH RISK: database change]
 >

@@ -38,6 +38,7 @@ const {
   computeNextVersions, computePreRelease, parseConventionalCommit,
   readConfig,
 } = require('./lib/version');
+const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -127,16 +128,6 @@ function fileTypeFromPath(filePath) {
 // Output helper
 // ---------------------------------------------------------------------------
 
-/**
- * Serialise data as pretty JSON to stdout and exit.
- * @param {object} data
- * @param {number} exitCode
- */
-function output(data, exitCode) {
-  process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-  process.exit(exitCode);
-}
-
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -158,7 +149,7 @@ async function main() {
     try {
       gitState = checkGitState(projectRoot);
     } catch (err) {
-      output({ flow: 'init', errors: [err.message], warnings }, 1);
+      writeOutput({ flow: 'init', errors: [err.message], warnings }, 'version-context', 1);
       return;
     }
 
@@ -213,7 +204,7 @@ async function main() {
     };
 
     // 7. Output
-    output({
+    writeOutput({
       flow:                 'init',
       errors:               [],
       warnings,
@@ -222,7 +213,7 @@ async function main() {
       existingTags,
       tagConvention:        { usesVPrefix, tagPrefix },
       suggestedConfig,
-    }, 0);
+    }, 'version-context', 0);
     return;
   }
 
@@ -240,13 +231,13 @@ async function main() {
       config = readConfig(projectRoot);
     } catch (err) {
       errors.push(err.message);
-      output({ flow: 'changelog-update', errors, warnings }, 1);
+      writeOutput({ flow: 'changelog-update', errors, warnings }, 'version-context', 1);
       return;
     }
 
     if (!config) {
       errors.push('No version config found. Run /version-sdlc --init to set up versioning for this project.');
-      output({ flow: 'changelog-update', errors, warnings }, 1);
+      writeOutput({ flow: 'changelog-update', errors, warnings }, 'version-context', 1);
       return;
     }
 
@@ -255,7 +246,7 @@ async function main() {
       checkGitState(projectRoot);
     } catch (err) {
       errors.push(err.message);
-      output({ flow: 'changelog-update', errors, warnings }, 1);
+      writeOutput({ flow: 'changelog-update', errors, warnings }, 'version-context', 1);
       return;
     }
 
@@ -271,7 +262,7 @@ async function main() {
       }
       if (currentVersion === null) {
         errors.push(`Could not read version from ${config.versionFile}`);
-        output({ flow: 'changelog-update', errors, warnings }, 1);
+        writeOutput({ flow: 'changelog-update', errors, warnings }, 'version-context', 1);
         return;
       }
     } else {
@@ -279,7 +270,7 @@ async function main() {
       const tags = getTagList(projectRoot);
       if (!tags[0]) {
         errors.push('No version tags found.');
-        output({ flow: 'changelog-update', errors, warnings }, 1);
+        writeOutput({ flow: 'changelog-update', errors, warnings }, 'version-context', 1);
         return;
       }
       currentVersion = tags[0].startsWith('v') ? tags[0].slice(1) : tags[0];
@@ -287,7 +278,7 @@ async function main() {
 
     if (!validateSemver(currentVersion)) {
       errors.push(`Current version '${currentVersion}' is not valid semver.`);
-      output({ flow: 'changelog-update', errors, warnings }, 1);
+      writeOutput({ flow: 'changelog-update', errors, warnings }, 'version-context', 1);
       return;
     }
 
@@ -298,7 +289,7 @@ async function main() {
 
     if (!allTags.includes(currentTag)) {
       errors.push(`Tag '${currentTag}' not found. Has the release been tagged yet?`);
-      output({ flow: 'changelog-update', errors, warnings }, 1);
+      writeOutput({ flow: 'changelog-update', errors, warnings }, 'version-context', 1);
       return;
     }
 
@@ -341,7 +332,7 @@ async function main() {
     }
 
     // 7. Output
-    output({
+    writeOutput({
       flow:         'changelog-update',
       errors:       [],
       warnings,
@@ -359,7 +350,7 @@ async function main() {
         filePath:       changelogFile,
         currentContent: changelogContent,
       },
-    }, 0);
+    }, 'version-context', 0);
     return;
   }
 
@@ -376,13 +367,13 @@ async function main() {
     config = readConfig(projectRoot);
   } catch (err) {
     errors.push(err.message);
-    output({ flow: 'release', errors, warnings }, 1);
+    writeOutput({ flow: 'release', errors, warnings }, 'version-context', 1);
     return;
   }
 
   if (!config) {
     errors.push('No version config found. Run /version-sdlc --init to set up versioning for this project.');
-    output({ flow: 'release', errors, warnings }, 1);
+    writeOutput({ flow: 'release', errors, warnings }, 'version-context', 1);
     return;
   }
 
@@ -392,7 +383,7 @@ async function main() {
     gitState = checkGitState(projectRoot);
   } catch (err) {
     errors.push(err.message);
-    output({ flow: 'release', errors, warnings }, 1);
+    writeOutput({ flow: 'release', errors, warnings }, 'version-context', 1);
     return;
   }
 
@@ -418,7 +409,7 @@ async function main() {
 
     if (version === null) {
       errors.push(`Could not read version from ${config.versionFile}`);
-      output({ flow: 'release', errors, warnings }, 1);
+      writeOutput({ flow: 'release', errors, warnings }, 'version-context', 1);
       return;
     }
 
@@ -437,7 +428,7 @@ async function main() {
 
     if (!latestTag) {
       errors.push('No version tags found. Create an initial tag (e.g., git tag v0.0.0) and try again.');
-      output({ flow: 'release', errors, warnings }, 1);
+      writeOutput({ flow: 'release', errors, warnings }, 'version-context', 1);
       return;
     }
 
@@ -455,13 +446,13 @@ async function main() {
   // 6. Validate semver
   if (!validateSemver(currentVersion)) {
     errors.push(`Current version '${currentVersion}' is not valid semver.`);
-    output({ flow: 'release', errors, warnings }, 1);
+    writeOutput({ flow: 'release', errors, warnings }, 'version-context', 1);
     return;
   }
 
   // If we accumulated any errors so far, stop before going further
   if (errors.length > 0) {
-    output({ flow: 'release', errors, warnings }, 1);
+    writeOutput({ flow: 'release', errors, warnings }, 'version-context', 1);
     return;
   }
 
@@ -588,7 +579,7 @@ async function main() {
   }
 
   // 14. Build and output final JSON
-  output({
+  writeOutput({
     flow:    'release',
     errors:  [],
     warnings,
@@ -609,7 +600,7 @@ async function main() {
     conventionalSummary,
     changelog:          changelogOutput,
     remoteState,
-  }, 0);
+  }, 'version-context', 0);
 }
 
 // ---------------------------------------------------------------------------

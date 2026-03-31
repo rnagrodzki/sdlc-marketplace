@@ -35,6 +35,7 @@ const path = require('path');
 const { exec, checkGitState, detectBaseBranch } = require('./lib/git');
 const { resolveMainWorktree } = require('./lib/state');
 const { readSection } = require('./lib/config');
+const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -459,13 +460,19 @@ function main() {
   // Merge flags
   const { merged: flags, sources: flagSources } = mergeFlags(cli, fileConfig);
 
+  // Auto mode: override workspace default from 'prompt' to 'branch'
+  if (flags.auto && flags.workspace === 'prompt' && flagSources.workspace === 'default') {
+    flags.workspace = 'branch';
+    flagSources.workspace = 'default (auto)';
+  }
+
   // Check git state
   let gitState;
   try {
     gitState = checkGitState(projectRoot);
   } catch (err) {
     errors.push(err.message);
-    output({ errors, warnings }, 1);
+    writeOutput({ errors, warnings }, 'ship-prepare', 1);
     return;
   }
 
@@ -475,7 +482,7 @@ function main() {
     defaultBranch = detectBaseBranch(projectRoot);
   } catch (err) {
     errors.push(err.message);
-    output({ errors, warnings }, 1);
+    writeOutput({ errors, warnings }, 'ship-prepare', 1);
     return;
   }
 
@@ -501,8 +508,11 @@ function main() {
   const openspecDetected = fs.existsSync(path.join(projectRoot, 'openspec', 'config.yaml'));
 
   // Check .sdlc/ gitignore status
-  // git check-ignore returns non-null (empty string) if ignored, null if not ignored
-  const sdlcGitignored = exec('git check-ignore -q .sdlc/', { cwd: projectRoot }) !== null;
+  // git check-ignore returns non-null (empty string) if ignored, null if not ignored.
+  // Also detect .sdlc/.gitignore (self-ignoring pattern created by setup-sdlc).
+  const sdlcGitignored =
+    exec('git check-ignore -q .sdlc/', { cwd: projectRoot }) !== null ||
+    fs.existsSync(path.join(projectRoot, '.sdlc', '.gitignore'));
 
   // Detect worktree context
   const worktreeInfo = detectWorktree(projectRoot);
@@ -574,12 +584,7 @@ function main() {
 
   // Exit with 1 if there are fatal errors, 0 otherwise
   const exitCode = errors.length > 0 ? 1 : 0;
-  output(result, exitCode);
-}
-
-function output(data, exitCode) {
-  process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-  process.exit(exitCode);
+  writeOutput(result, 'ship-prepare', exitCode);
 }
 
 if (require.main === module) {

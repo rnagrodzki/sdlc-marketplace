@@ -25,6 +25,7 @@ const fs   = require('fs');
 const path = require('path');
 
 const { readSection } = require('./lib/config');
+const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -536,12 +537,7 @@ function main() {
     proposals,
   };
 
-  process.stdout.write(JSON.stringify(output, null, 2) + '\n');
-
-  if (errors.length > 0) {
-    process.exit(1);
-  }
-  process.exit(0);
+  writeOutput(output, 'guardrails-prepare', errors.length > 0 ? 1 : 0);
 }
 
 if (require.main === module) {
