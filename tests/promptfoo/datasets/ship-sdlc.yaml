@@ -233,13 +233,17 @@
       value: ".claude/worktrees/"
     - type: not-icontains
       value: "EnterWorktree"
+    - type: icontains
+      value: "skip-version-check"
     - type: llm-rubric
       value: >
         execute-plan-sdlc auto-selects worktree via git worktree add (no prompt).
         State managed via scripts (ship-state.js / execute-state.js). At pipeline
         end, cleanup via git worktree remove. The version step is auto-skipped
-        because workspace is worktree (tags are repo-global). A post-pipeline
-        advisory mentions running /version-sdlc on main after PR merge.
+        because workspace is worktree (tags are repo-global). The PR step args
+        include --label skip-version-check because the version step was auto-skipped
+        in worktree mode (shown in the dry-run pipeline table args column).
+        A post-pipeline advisory mentions running /version-sdlc on main after PR merge.
 
 - description: "ship-sdlc: --bump minor forwarded to version-sdlc in pipeline plan"
   vars:

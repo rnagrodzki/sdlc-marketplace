@@ -539,6 +539,8 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Version step is auto-skipped in worktree mode.** `computeSteps` in ship-prepare.js skips the version step when `workspace === 'worktree'`. Tags are repo-global — creating them from an isolated worktree risks collisions with parallel pipelines. The pipeline prints a post-merge advisory: run `/version-sdlc` on main after the PR merges. This also handles changelog — `version-sdlc` generates changelog from `previousTag..HEAD`, capturing all commits from all merged branches regardless of their source worktree.
 
+**Worktree PRs auto-label `skip-version-check`.** When `workspace === 'worktree'` causes the version step to be auto-skipped, `ship-prepare.js` adds `--label skip-version-check` to the PR step args. The label is included in `gh pr create` from the start (not added post-creation), so `check-version-bump.yml` sees it on the `opened` event. Only fires for worktree auto-skip, not manual `--skip version`. Prerequisite: the label must exist in the repository (pr-sdlc creates it automatically if missing).
+
 ---
 
 ## Learning Capture
