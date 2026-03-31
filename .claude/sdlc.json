@@ -7,5 +7,71 @@
     "changelog": true,
     "changelogFile": "CHANGELOG.md"
   },
-  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json"
+  "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
+  "plan": {
+    "guardrails": [
+      {
+        "id": "test-coverage-required",
+        "description": "Every task that creates or modifies source code must include corresponding promptfoo test cases.",
+        "severity": "error"
+      },
+      {
+        "id": "no-ci-bypass",
+        "description": "Plans must not include steps that skip or disable CI checks.",
+        "severity": "error"
+      },
+      {
+        "id": "no-auto-eval",
+        "description": "Plans must never include steps that run promptfoo eval — evaluation runs are user-initiated only.",
+        "severity": "error"
+      },
+      {
+        "id": "skill-docs-required",
+        "description": "Any task adding or renaming a skill must include a matching doc in docs/skills/.",
+        "severity": "error"
+      },
+      {
+        "id": "no-scope-creep",
+        "description": "Tasks must only address stated requirements; no gold-plating.",
+        "severity": "warning"
+      },
+      {
+        "id": "single-responsibility-tasks",
+        "description": "Each task must have exactly one clear deliverable.",
+        "severity": "warning"
+      },
+      {
+        "id": "scripts-over-llm-logic",
+        "description": "When adding or editing skills, prioritize deterministic behavior driven by prepare scripts over complex LLM instructions. Move logic into scripts whenever feasible.",
+        "severity": "error"
+      },
+      {
+        "id": "yagni",
+        "description": "Do not add functionality until it is actually needed. No speculative abstractions, premature generalization, or unused parameters.",
+        "severity": "warning"
+      },
+      {
+        "id": "cross-skill-consistency",
+        "description": "Check consistency with other skills and expand scope to provide a compatibility layer with other skills execution if necessary.",
+        "severity": "error"
+      }
+    ]
+  },
+  "commit": {
+    "subjectPattern": "^(feat|fix|refactor|chore|docs|test|ci)\\(#\\d+\\): .+ - .+$",
+    "subjectPatternError": "Commit subject must follow: type(#issue): scope - description",
+    "allowedTypes": [
+      "feat",
+      "fix",
+      "refactor",
+      "chore",
+      "docs",
+      "test",
+      "ci"
+    ]
+  },
+  "pr": {
+    "titlePattern": "^(feat|fix|refactor|chore|docs|test|ci)\\(#\\d+\\): .+ - .+$",
+    "titlePatternError": "PR title must follow: type(#issue): scope - description"
+  }
 }
