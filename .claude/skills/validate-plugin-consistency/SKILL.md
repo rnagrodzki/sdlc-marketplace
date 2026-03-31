@@ -49,9 +49,9 @@ A skill is paired with a prepare script but does not contain the find+node resol
 pattern. Skills must run their own prepare scripts. Add the find+mktemp+node block to
 the skill following the pattern in `review-sdlc/SKILL.md`:
 
-1. Skill: find script → mktemp → `node "$SCRIPT" $ARGUMENTS --json > "$FILE"` → read and parse JSON
+1. Skill: find script → `$(node "$SCRIPT" --output-file $ARGUMENTS --json)` → read and parse JSON
 
-### `skill-uses-mktemp` (error)
+### `skill-uses-output-file` (error)
 
 A skill runs a prepare script but pipes output directly instead of using `--output-file` capture.
 Replace with:

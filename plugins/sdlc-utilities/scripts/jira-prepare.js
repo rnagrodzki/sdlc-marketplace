@@ -390,7 +390,7 @@ function saveCache(cachePath) {
 
 function saveField(cachePath, fieldName) {
   if (!fs.existsSync(cachePath)) {
-    writeOutput({ errors: ['No cache found for project. Run cache initialization first.'] }, 1);
+    writeOutput({ errors: ['No cache found for project. Run cache initialization first.'] }, 'jira-context', 1);
     return;
   }
 
