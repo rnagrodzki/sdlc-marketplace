@@ -50,9 +50,9 @@ echo "EXIT_CODE=$EXIT_CODE"
 
 **Hook context fast-path:** If the session-start system-reminder contains a `Ship config:` line, note it for display. The prepare script (`ship-prepare.js`) remains the authoritative source for config values — the hook line is a user-facing heads-up, not a data source.
 
-Check for ship config via ship-prepare.js output (reads from `.claude/sdlc.json` → `ship` section, with legacy `.sdlc/ship-config.json` fallback). If found, read and merge. Print loaded config verbosely:
+Check for ship config via ship-prepare.js output (reads from `.sdlc/local.json` → `ship` section, with legacy `.sdlc/ship-config.json` fallback). If found, read and merge. Print loaded config verbosely:
 ```
-Ship config loaded from .claude/sdlc.json
+Ship config loaded from .sdlc/local.json
   preset: B, skip: [version], draft: false, bump: patch
   reviewThreshold: high
 ```
@@ -517,7 +517,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Version consent gate.** version-sdlc supports `--auto`. When forwarded, the release plan approval prompt is skipped but the plan is still displayed. Pre-condition checks (Steps 6–7) and critique gates (Steps 3–4) still run.
 
-**Config file is optional.** The pipeline runs with built-in defaults when no ship config exists in `.claude/sdlc.json`. Do not error on missing config.
+**Config file is optional.** The pipeline runs with built-in defaults when no ship config exists in `.sdlc/local.json`. Do not error on missing config.
 
 **Skip set validation matters.** Unrecognized values in `--skip` (e.g., `--skip reviw`) should warn, not silently ignore. Typos in skip values cause steps to run when the user expected them skipped.
 

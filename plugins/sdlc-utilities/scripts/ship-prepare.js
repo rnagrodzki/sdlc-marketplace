@@ -103,14 +103,14 @@ function parseArgs(argv) {
 // ---------------------------------------------------------------------------
 
 /**
- * Read .sdlc/ship-config.json if it exists, return parsed object or null.
+ * Read ship config from .sdlc/local.json if it exists, return parsed object or null.
  * @param {string} projectRoot
  * @returns {{ config: object|null, source: string }}
  */
 function loadConfig(projectRoot) {
   const result = readSection(projectRoot, 'ship');
   return result
-    ? { config: result, source: '.claude/sdlc.json' }
+    ? { config: result, source: '.sdlc/local.json' }
     : { config: null, source: 'defaults' };
 }
 

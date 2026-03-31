@@ -170,7 +170,7 @@ function main() {
     created: {
       directory: '.sdlc/',
       gitignore: { path: '.sdlc/.gitignore', action: gitignoreAction },
-      config:    { path: '.claude/sdlc.json', action: configAction },
+      config:    { path: '.sdlc/local.json', action: configAction },
     },
     config,
   };

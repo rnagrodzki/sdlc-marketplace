@@ -27,6 +27,7 @@ const CHECK_CHANGELOG_SCRIPT_VERSION = 1;
 const fs   = require('node:fs');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
+const { readSection } = require('./lib/config');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,10 +46,8 @@ function exec(cmd, opts = {}) {
 // ---------------------------------------------------------------------------
 
 function readConfig(repoRoot) {
-  const configPath = path.join(repoRoot, '.claude', 'version.json');
-  if (!fs.existsSync(configPath)) return null;
   try {
-    return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    return readSection(repoRoot, 'version');
   } catch (_) {
     return null;
   }

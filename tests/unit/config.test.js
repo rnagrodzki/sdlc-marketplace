@@ -119,22 +119,6 @@ describe('readProjectConfig', () => {
     }
   });
 
-  it('falls back to legacy .sdlc/ship-config.json and strips $schema and version keys', () => {
-    const tmp = makeTmpDir();
-    try {
-      writeJson(tmp, LEGACY.ship, { $schema: 'x', version: 1, preset: 'B', skip: ['pr'] });
-
-      const { result: { config, sources }, stderr } = captureStderr(
-        () => readProjectConfig(tmp)
-      );
-      assert.deepEqual(config, { ship: { preset: 'B', skip: ['pr'] } });
-      assert.deepEqual(sources, [LEGACY.ship]);
-      assert.ok(stderr.includes(LEGACY.ship));
-    } finally {
-      fs.rmSync(tmp, { recursive: true });
-    }
-  });
-
   it('falls back to legacy .sdlc/jira-config.json', () => {
     const tmp = makeTmpDir();
     try {
@@ -151,11 +135,10 @@ describe('readProjectConfig', () => {
     }
   });
 
-  it('merges all three legacy files into one config', () => {
+  it('merges legacy version and jira files into one config', () => {
     const tmp = makeTmpDir();
     try {
       writeJson(tmp, LEGACY.version, { $schema: 'x', mode: 'tag' });
-      writeJson(tmp, LEGACY.ship, { $schema: 'x', version: 1, preset: 'A' });
       writeJson(tmp, LEGACY.jira, { $schema: 'x', defaultProject: 'ABC' });
 
       const { result: { config, sources }, stderr } = captureStderr(
@@ -163,12 +146,11 @@ describe('readProjectConfig', () => {
       );
       assert.deepEqual(config, {
         version: { mode: 'tag' },
-        ship: { preset: 'A' },
         jira: { defaultProject: 'ABC' },
       });
-      assert.equal(sources.length, 3);
-      // Three deprecation warnings
-      assert.equal((stderr.match(/Deprecation/g) || []).length, 3);
+      assert.equal(sources.length, 2);
+      // Two deprecation warnings
+      assert.equal((stderr.match(/Deprecation/g) || []).length, 2);
     } finally {
       fs.rmSync(tmp, { recursive: true });
     }
@@ -285,6 +267,67 @@ describe('readLocalConfig', () => {
       fs.rmSync(tmp, { recursive: true });
     }
   });
+
+  it('reads ship section from .sdlc/local.json', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, LOCAL_CONFIG_PATH, { ship: { preset: 'B' } });
+
+      const { config } = readLocalConfig(tmp);
+      assert.deepEqual(config.ship, { preset: 'B' });
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('falls back to .sdlc/ship-config.json for ship when local.json has no ship', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, LOCAL_CONFIG_PATH, { review: { scope: 'all' } });
+      writeJson(tmp, LEGACY.ship, { $schema: 'x', version: 1, preset: 'A', skip: ['pr'] });
+
+      const { result: { config }, stderr } = captureStderr(
+        () => readLocalConfig(tmp)
+      );
+      assert.deepEqual(config.ship, { preset: 'A', skip: ['pr'] });
+      assert.deepEqual(config.review, { scope: 'all' });
+      assert.ok(stderr.includes(LEGACY.ship));
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('falls back to .claude/sdlc.json ship key when no other ship source exists', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, PROJECT_CONFIG_PATH, { ship: { preset: 'C' } });
+
+      const { result: { config }, stderr } = captureStderr(
+        () => readLocalConfig(tmp)
+      );
+      assert.deepEqual(config.ship, { preset: 'C' });
+      assert.ok(stderr.includes(PROJECT_CONFIG_PATH));
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('returns both review and ship from .sdlc/local.json', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, LOCAL_CONFIG_PATH, { review: { scope: 'staged' }, ship: { preset: 'B', auto: true } });
+
+      const { result: { config, sources }, stderr } = captureStderr(
+        () => readLocalConfig(tmp)
+      );
+      assert.deepEqual(config.review, { scope: 'staged' });
+      assert.deepEqual(config.ship, { preset: 'B', auto: true });
+      assert.deepEqual(sources, [LOCAL_CONFIG_PATH]);
+      assert.equal(stderr, '');
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
 });
 
 // ===========================================================================
@@ -295,7 +338,7 @@ describe('readSection', () => {
   it('reads version section from project config', () => {
     const tmp = makeTmpDir();
     try {
-      writeJson(tmp, PROJECT_CONFIG_PATH, { version: { mode: 'file' }, ship: { preset: 'A' } });
+      writeJson(tmp, PROJECT_CONFIG_PATH, { version: { mode: 'file' }, jira: { defaultProject: 'X' } });
 
       const result = readSection(tmp, 'version');
       assert.deepEqual(result, { mode: 'file' });
@@ -311,6 +354,18 @@ describe('readSection', () => {
 
       const result = readSection(tmp, 'review');
       assert.deepEqual(result, { scope: 'all' });
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('reads ship section from local config', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, LOCAL_CONFIG_PATH, { ship: { preset: 'A' } });
+
+      const result = readSection(tmp, 'ship');
+      assert.deepEqual(result, { preset: 'A' });
     } finally {
       fs.rmSync(tmp, { recursive: true });
     }
@@ -449,15 +504,32 @@ describe('writeSection', () => {
     }
   });
 
+  it('writes ship section via writeLocalConfig', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeSection(tmp, 'ship', { preset: 'C' });
+
+      const written = readJson(tmp, LOCAL_CONFIG_PATH);
+      assert.deepEqual(written.ship, { preset: 'C' });
+      assert.equal(written.$schema, LOCAL_SCHEMA_URL);
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
   it('does not clobber existing sections when writing one', () => {
     const tmp = makeTmpDir();
     try {
       writeSection(tmp, 'version', { mode: 'file' });
       writeSection(tmp, 'ship', { preset: 'C' });
 
-      const written = readJson(tmp, PROJECT_CONFIG_PATH);
-      assert.deepEqual(written.version, { mode: 'file' });
-      assert.deepEqual(written.ship, { preset: 'C' });
+      // version goes to project config
+      const project = readJson(tmp, PROJECT_CONFIG_PATH);
+      assert.deepEqual(project.version, { mode: 'file' });
+
+      // ship goes to local config
+      const local = readJson(tmp, LOCAL_CONFIG_PATH);
+      assert.deepEqual(local.ship, { preset: 'C' });
     } finally {
       fs.rmSync(tmp, { recursive: true });
     }
@@ -493,17 +565,18 @@ describe('migrateConfig', () => {
       assert.equal(migrated.length, 4);
       assert.deepEqual(conflicts, []);
 
-      // Verify unified project config
+      // Verify unified project config — ship should NOT be here
       const project = readJson(tmp, PROJECT_CONFIG_PATH);
       assert.equal(project.$schema, PROJECT_SCHEMA_URL);
       assert.deepEqual(project.version, { mode: 'tag', tagPrefix: 'v' });
-      assert.deepEqual(project.ship, { preset: 'B' });
       assert.deepEqual(project.jira, { defaultProject: 'PROJ' });
+      assert.equal(project.ship, undefined);
 
-      // Verify local config
+      // Verify local config — ship and review should be here
       const local = readJson(tmp, LOCAL_CONFIG_PATH);
       assert.equal(local.$schema, LOCAL_SCHEMA_URL);
       assert.deepEqual(local.review, { scope: 'all' });
+      assert.deepEqual(local.ship, { preset: 'B' });
     } finally {
       fs.rmSync(tmp, { recursive: true });
     }
@@ -519,7 +592,7 @@ describe('migrateConfig', () => {
       });
       // Legacy version file that would conflict
       writeJson(tmp, LEGACY.version, { $schema: 'x', mode: 'tag' });
-      // Non-conflicting legacy ship file
+      // Non-conflicting legacy ship file — migrates to local config
       writeJson(tmp, LEGACY.ship, { $schema: 'x', version: 1, preset: 'A' });
 
       const { migrated, conflicts } = migrateConfig(tmp);
@@ -530,11 +603,15 @@ describe('migrateConfig', () => {
       assert.ok(conflicts.includes(LEGACY.version));
       assert.ok(!conflicts.includes(LEGACY.ship));
 
-      // Version should NOT be overwritten
+      // Version should NOT be overwritten in project config
       const project = readJson(tmp, PROJECT_CONFIG_PATH);
       assert.deepEqual(project.version, { mode: 'file' });
-      // Ship should be written
-      assert.deepEqual(project.ship, { preset: 'A' });
+      // Ship should NOT be in project config
+      assert.equal(project.ship, undefined);
+
+      // Ship should be in local config
+      const local = readJson(tmp, LOCAL_CONFIG_PATH);
+      assert.deepEqual(local.ship, { preset: 'A' });
     } finally {
       fs.rmSync(tmp, { recursive: true });
     }
@@ -605,6 +682,61 @@ describe('migrateConfig', () => {
 
       const local = readJson(tmp, LOCAL_CONFIG_PATH);
       assert.deepEqual(local.review, { scope: 'committed' });
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('migrates ship from .claude/sdlc.json to .sdlc/local.json and removes it from project config', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, PROJECT_CONFIG_PATH, {
+        $schema: 'x',
+        version: { mode: 'file' },
+        ship: { preset: 'B' },
+      });
+
+      const { migrated, conflicts } = migrateConfig(tmp);
+
+      assert.ok(migrated.includes(PROJECT_CONFIG_PATH + '#ship'));
+      assert.deepEqual(conflicts, []);
+
+      // Ship should be in local config
+      const local = readJson(tmp, LOCAL_CONFIG_PATH);
+      assert.deepEqual(local.ship, { preset: 'B' });
+
+      // Ship should be removed from project config, version should remain
+      const project = readJson(tmp, PROJECT_CONFIG_PATH);
+      assert.equal(project.ship, undefined);
+      assert.deepEqual(project.version, { mode: 'file' });
+    } finally {
+      fs.rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('reports conflict when local.json already has ship and .claude/sdlc.json also has ship', () => {
+    const tmp = makeTmpDir();
+    try {
+      writeJson(tmp, LOCAL_CONFIG_PATH, { ship: { preset: 'A' } });
+      writeJson(tmp, PROJECT_CONFIG_PATH, {
+        version: { mode: 'file' },
+        ship: { preset: 'B' },
+      });
+
+      const { migrated, conflicts } = migrateConfig(tmp);
+
+      // Conflict because local already has ship
+      assert.ok(conflicts.includes(PROJECT_CONFIG_PATH + '#ship'));
+      assert.ok(!migrated.includes(PROJECT_CONFIG_PATH + '#ship'));
+
+      // Local ship should NOT be overwritten (still preset A)
+      const local = readJson(tmp, LOCAL_CONFIG_PATH);
+      assert.deepEqual(local.ship, { preset: 'A' });
+
+      // Ship should still be removed from project config
+      const project = readJson(tmp, PROJECT_CONFIG_PATH);
+      assert.equal(project.ship, undefined);
+      assert.deepEqual(project.version, { mode: 'file' });
     } finally {
       fs.rmSync(tmp, { recursive: true });
     }

@@ -62,8 +62,8 @@ Individual skills can also be configured independently:
 
 | File / Directory | Purpose |
 | --- | --- |
-| `.claude/sdlc.json` | Unified project config — version, ship, jira settings (created by `/setup-sdlc`) |
-| `.sdlc/local.json` | User-local config — review scope preferences (created by `/setup-sdlc`) |
+| `.claude/sdlc.json` | Unified project config — version, jira settings (created by `/setup-sdlc`) |
+| `.sdlc/local.json` | User-local config — review and ship preferences (created by `/setup-sdlc`) |
 | `.claude/review-dimensions/` | Per-project code review dimension files (created by `/review-init-sdlc`) |
 | `.claude/pr-template.md` | Project PR template (created by `/pr-customize-sdlc`) |
 

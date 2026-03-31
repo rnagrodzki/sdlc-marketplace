@@ -313,10 +313,10 @@ try {
 // ---------------------------------------------------------------------------
 
 try {
+  const { readSection } = require(path.join(__dirname, '..', 'scripts', 'lib', 'config.js'));
   const projectRoot = process.cwd();
-  const shipConfigPath = path.join(projectRoot, '.sdlc', 'ship-config.json');
-  if (fs.existsSync(shipConfigPath)) {
-    const shipConfig = JSON.parse(fs.readFileSync(shipConfigPath, 'utf8'));
+  const shipConfig = readSection(projectRoot, 'ship');
+  if (shipConfig) {
     const preset    = shipConfig.preset    !== undefined ? `preset ${shipConfig.preset}` : null;
     const skip      = shipConfig.skip      !== undefined ? `skip ${JSON.stringify(shipConfig.skip)}` : null;
     const bump      = shipConfig.bump      !== undefined ? `bump ${shipConfig.bump}` : null;
