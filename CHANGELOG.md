@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.8] - 2026-03-31
+
+### Added
+- Unified configuration: consolidates 4 config files into 2 (`sdlc.json` + `local.json`) with centralized `lib/config.js` and `/setup-sdlc` skill for one-step project initialization (#86)
+- Hook-based context injection: session-start hook detects pipeline resume, OpenSpec context, git status, Jira cache staleness, and ship config; adds PostToolUse and PreCompact hooks for workflow awareness (#85)
+
+### Fixed
+- Ship config section moved from project config to local config; legacy fallback now resolves review and ship sections independently instead of returning early on first match (#87)
+
 ## [0.16.7] - 2026-03-30
 
 ### Added
