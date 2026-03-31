@@ -126,6 +126,40 @@
         }
       },
       "additionalProperties": false
+    },
+    "planSection": {
+      "type": "object",
+      "description": "Controls plan-sdlc behavior and custom guardrails.",
+      "properties": {
+        "guardrails": {
+          "type": "array",
+          "description": "Custom guardrails evaluated during plan-sdlc critique phases.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+                "description": "Unique kebab-case identifier."
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 512,
+                "description": "Natural-language rule the plan must satisfy."
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["error", "warning"],
+                "description": "error = blocks plan approval; warning = advisory. Defaults to error when omitted."
+              }
+            },
+            "required": ["id", "description"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "properties": {
@@ -144,6 +178,9 @@
     },
     "pr": {
       "$ref": "#/$defs/prSection"
+    },
+    "plan": {
+      "$ref": "#/$defs/planSection"
     }
   },
   "additionalProperties": false

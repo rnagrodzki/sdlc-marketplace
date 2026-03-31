@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.13] - 2026-03-31
+
+### Added
+- Custom plan guardrails support — configurable `plan.guardrails[]` in sdlc.json with interactive `/guardrails-init-sdlc` skill for project-aware proposal generation (#91)
+
+### Fixed
+- Review dimension detection in guardrails-prepare.js now correctly identifies `.md` dimension files
+
 ## [0.16.12] - 2026-03-31
 
 ### Fixed

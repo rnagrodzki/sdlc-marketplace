@@ -117,6 +117,29 @@ Choose whether PR titles should match a specific pattern:
 
 After selection, the skill writes the configuration to `.claude/sdlc.json` and stores local preferences in `.sdlc/local.json`.
 
+### Step 4: Content Setup
+
+After configuration sections are complete, `/setup-sdlc` offers to set up content assets by delegating to other skills:
+
+1. **Review dimensions** — delegates to `/review-init-sdlc` to scan the tech stack and create `.claude/review-dimensions/*.yaml`
+2. **PR template** — delegates to `/pr-customize-sdlc` to create `.claude/pr-template.md`
+3. **Plan guardrails** — delegates to `/guardrails-init-sdlc` to configure custom rules evaluated by `/plan-sdlc` during critique phases
+
+Each option can be individually skipped.
+
+### Step 5: Summary
+
+After all steps complete, `/setup-sdlc` prints a summary of what was configured:
+
+```
+Version tracking   — [detected from package.json | configured]
+Ship pipeline      — [configured | skipped]
+Jira integration   — [configured | skipped]
+Review dimensions  — [N dimensions created via /review-init-sdlc | skipped]
+PR template        — [created via /pr-customize-sdlc | skipped]
+Plan guardrails    — [N configured via /guardrails-init-sdlc | skipped]
+```
+
 ---
 
 ## What It Creates or Modifies
@@ -132,6 +155,7 @@ Content files (delegated to other skills):
 |------|------------|
 | `.claude/review-dimensions/*.yaml` | `/review-init-sdlc` |
 | `.claude/pr-template.md` | `/pr-customize-sdlc` |
+| Plan guardrails in `.claude/sdlc.json` | `/guardrails-init-sdlc` |
 
 ---
 

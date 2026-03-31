@@ -32,6 +32,7 @@ export const skillsMeta: SkillMeta[] = [
     tagline: 'Writes an implementation plan from requirements with per-task complexity, risk, and dependency metadata.',
     pipeline: [
       { id: 'requirements', label: 'Gather requirements', type: 'user', description: 'Free-form description, spec file, or clarification questions' },
+      { id: 'guardrails', label: 'Load guardrails', type: 'script', description: 'Reads plan guardrails from project config for critique evaluation' },
       { id: 'explore', label: 'Explore codebase', type: 'script', description: 'Scans project tree, maps files, writes scratchpad' },
       { id: 'decompose', label: 'Decompose tasks', type: 'llm', description: 'Breaks requirements into tasks with complexity/risk metadata' },
       { id: 'critique-plan', label: 'Self-critique plan', type: 'critique', description: 'Reviews for coverage, dependency integrity, scope creep' },
@@ -40,6 +41,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'plan-review', label: 'Cross-model review', type: 'dispatch', description: 'Dispatches a second model to review the written plan' },
     ],
     connections: [
+      { to: 'guardrails-init-sdlc', label: 'consumes guardrails from' },
       { to: 'execute-plan-sdlc', label: 'produces plans for' },
       { to: 'review-sdlc', label: 'review after execution' },
       { to: 'pr-sdlc', label: 'open PR after execution' },
@@ -69,6 +71,24 @@ export const skillsMeta: SkillMeta[] = [
       { to: 'pr-sdlc', label: 'open PR after' },
       { to: 'commit-sdlc', label: 'commit changes after' },
       { to: 'version-sdlc', label: 'release after' },
+    ],
+  },
+  {
+    slug: 'guardrails-init-sdlc',
+    command: '/guardrails-init-sdlc',
+    category: 'planning',
+    userInvocable: true,
+    tagline: 'Scans the project and configures plan guardrails that plan-sdlc evaluates during critique phases.',
+    pipeline: [
+      { id: 'scan', label: 'Scan project', type: 'script', description: 'Runs guardrails-prepare.js to detect languages, frameworks, and patterns' },
+      { id: 'discover', label: 'Discover existing', type: 'script', description: 'Reads current guardrails from config for --add mode filtering' },
+      { id: 'propose', label: 'Propose guardrails', type: 'llm', description: 'Reviews and refines script-generated proposals with project context' },
+      { id: 'present', label: 'Present and write', type: 'user', description: 'User selects guardrails; writes to .claude/sdlc.json via config library' },
+      { id: 'validate', label: 'Validate config', type: 'verify', description: 'Runs guardrails-validate.js to confirm persistence and format' },
+    ],
+    connections: [
+      { to: 'plan-sdlc', label: 'provides guardrails to' },
+      { to: 'setup-sdlc', label: 'invoked from content setup' },
     ],
   },
   {
@@ -278,6 +298,7 @@ export const skillsMeta: SkillMeta[] = [
       { to: 'version-sdlc', label: 'configures versioning for' },
       { to: 'ship-sdlc', label: 'configures pipeline for' },
       { to: 'review-init-sdlc', label: 'delegates dimensions to' },
+      { to: 'guardrails-init-sdlc', label: 'delegates guardrails to' },
       { to: 'jira-sdlc', label: 'configures project key for' },
     ],
   },

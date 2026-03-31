@@ -24,6 +24,7 @@ Task tool (general-purpose):
     **Source requirements:** {SOURCE_REQUIREMENTS — file path or inline text, or "not provided"}
     **Requirements checklist:**
     {REQUIREMENTS_CHECKLIST}
+    **Plan guardrails:** {GUARDRAILS — one per line, or "none configured"}
 
     ## What to Check
 
@@ -41,6 +42,7 @@ Task tool (general-purpose):
     | Buildability | An agent with no codebase context could execute each task using only its description |
     | Decision documentation | Key Decisions section present for plans with 5+ tasks; each rationale references codebase evidence, not preference; no obvious decisions included |
     | Plan completeness | All header fields (Goal, Architecture, Source, Verification) are filled in — no placeholders like "[TBD]"; no leftover working sections (e.g., `## Requirements` scaffolding); task numbering is sequential with no gaps |
+    | Guardrail compliance | Each guardrail from the guardrails list above is satisfied by the plan. Error-severity violations are blocking. Warning-severity violations are advisory. If no guardrails configured, skip this check. |
 
     ## Calibration
 
