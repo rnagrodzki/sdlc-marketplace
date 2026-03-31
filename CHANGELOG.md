@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.1] - 2026-03-31
+
+### Fixed
+- False gitignore warning when `.sdlc/.gitignore` exists instead of root `.gitignore` entry (#99)
+- `mktemp` collision in prepare script invocations — replaced with script-driven `--output-file` flag using crypto-random temp filenames (#101)
+- `execute-plan-sdlc` interactive prompts when config provides all answers — added `--auto` flag for non-interactive execution (#104)
+- Auto-mode workspace default now overrides from `prompt` to `branch` in ship-prepare.js (#104)
+- Missing prefix argument in `jira-prepare.js` `writeOutput` call causing wrong exit code
+
+### Changed
+- Migrated legacy unit tests to promptfoo exec datasets (#100)
+- `validate-plugin-consistency` now checks for `--output-file` instead of `mktemp`
+
 ## [0.17.0] - 2026-03-31
 
 ### Changed
