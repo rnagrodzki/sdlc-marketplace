@@ -52,6 +52,7 @@ function parseArgs(argv) {
   let forceUpdate = false;
   let baseBranchOverride = null;
   let isAuto = false;
+  let forcedLabels = [];
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -63,10 +64,12 @@ function parseArgs(argv) {
       baseBranchOverride = args[++i];
     } else if (a === '--auto') {
       isAuto = true;
+    } else if (a === '--label' && args[i + 1]) {
+      forcedLabels.push(args[++i]);
     }
   }
 
-  return { isDraft, forceUpdate, baseBranchOverride, isAuto };
+  return { isDraft, forceUpdate, baseBranchOverride, isAuto, forcedLabels: [...new Set(forcedLabels)] };
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +128,7 @@ function detectPrMode(forceUpdate, prMeta) {
 
 function main() {
   const projectRoot = process.cwd();
-  const { isDraft, forceUpdate, baseBranchOverride, isAuto } = parseArgs(process.argv);
+  const { isDraft, forceUpdate, baseBranchOverride, isAuto, forcedLabels } = parseArgs(process.argv);
 
   const errors   = [];
   const warnings = [];
@@ -238,6 +241,14 @@ function main() {
 
   const repoLabels = fetchRepoLabels();
 
+  // Step 10b: Validate forced labels against repoLabels
+  const repoLabelNames = repoLabels.map(label => label.name);
+  for (const label of forcedLabels) {
+    if (!repoLabelNames.includes(label)) {
+      warnings.push(`Label "${label}" does not exist in the repository. It will be created during execution if needed.`);
+    }
+  }
+
   // Step 11: Read custom PR template
   const templatePath = path.join(projectRoot, '.claude', 'pr-template.md');
   const customTemplate = fs.existsSync(templatePath)
@@ -264,6 +275,7 @@ function main() {
     diffStat,
     diffContent,
     repoLabels,
+    forcedLabels,
     remoteState,
     warnings,
     errors,

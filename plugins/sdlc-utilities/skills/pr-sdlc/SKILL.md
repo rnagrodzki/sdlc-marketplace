@@ -1,8 +1,8 @@
 ---
 name: pr-sdlc
-description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Auto-labels PRs based on context signals (branch, commits, diff, Jira) with mandatory approval. Arguments: [--draft] [--update] [--base <branch>] [--auto]. Use --auto to skip interactive approval. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
+description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Auto-labels PRs based on context signals (branch, commits, diff, Jira) with mandatory approval. Arguments: [--draft] [--update] [--base <branch>] [--auto] [--label <name>]. Use --auto to skip interactive approval. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
 user-invocable: true
-argument-hint: "[--draft] [--update] [--base <branch>] [--auto]"
+argument-hint: "[--draft] [--update] [--base <branch>] [--auto] [--label <name>]"
 ---
 
 # Creating Pull Requests
@@ -155,6 +155,7 @@ Key fields available (including `customTemplate` added for project-level PR temp
 | `repoLabels` | `[{ name, description }]` — labels defined in the repository; empty if unavailable |
 | `customTemplate` | Full content of `.claude/pr-template.md` or `null` if not present |
 | `isAuto` | Whether `--auto` was passed — skip interactive prompts |
+| `forcedLabels` | `string[]` — labels forced via `--label` flag(s), pre-validated against `repoLabels`. Always included in PR regardless of signal matching |
 
 ### Step 2 (PLAN): Draft PR Description
 
@@ -217,6 +218,8 @@ Otherwise, analyze the PR context and fuzzy-match against `repoLabels` to produc
 
 **Auto mode:** When `PR_CONTEXT_JSON.isAuto` is true, apply `suggestedLabels` directly without presenting them for approval. Labels are still validated against `repoLabels` — no fabricated labels. The applied labels are shown in the Step 5 output for visibility.
 
+**Forced labels:** If `PR_CONTEXT_JSON.forcedLabels` is non-empty, merge all forced labels into `suggestedLabels`. Forced labels are always included regardless of signal matching — they cannot be removed during interactive edit. Deduplicate: if a forced label was also inferred from signals, it appears only once. In the final `suggestedLabels` list, forced labels appear first.
+
 ### Step 3 (CRITIQUE): Self-review the Draft
 
 Before presenting to the user, review the draft against every quality gate:
@@ -233,6 +236,7 @@ Before presenting to the user, review the draft against every quality gate:
 | Audience check | Readable by non-technical stakeholders | No unexplained jargon in Summary/Business sections |
 | Documentation sync | If diff adds new commands, changes structure, renames concepts, or adds new directories/scripts: check that at least one `docs:` commit exists on this branch OR ask the user to confirm docs are updated | PR does not silently ship structural changes without a corresponding docs update |
 | Label validity | Every label in `suggestedLabels` exists in `repoLabels` | Zero fabricated labels |
+| Forced label inclusion | Every label in `forcedLabels` appears in the final `suggestedLabels` list | Zero forced labels dropped |
 
 > **Note**: When a custom template is active, the "No file paths in Changes Overview"
 > gate applies only if the custom template includes a section named "Changes Overview".
@@ -264,13 +268,15 @@ before receiving explicit user approval via AskUserQuestion.**
 
 ```text
 PR Title: <title>
-Labels: <label1>, <label2>
+Labels: <label1> (forced), <label2>
 
 PR Description:
 ─────────────────────────────────────────────
 <full description>
 ─────────────────────────────────────────────
 ```
+
+Labels from `forcedLabels` are marked with `(forced)` suffix to distinguish them from inferred labels.
 
 **Update mode** (with existing labels and new suggestions):
 
@@ -307,6 +313,14 @@ Loop until explicit `yes` or `cancel`.
 ### Step 6: Create or Update PR
 
 **Only execute after explicit `yes` from Step 5.**
+
+**Just-in-time label creation:** Before executing `gh pr create` or `gh pr edit`, check each label in `forcedLabels` against `repoLabels`. For any forced label NOT found in `repoLabels`, create it:
+
+```bash
+gh label create "<name>" --description "Auto-created by pr-sdlc" --color "c5def5" 2>/dev/null
+```
+
+This is idempotent — the command succeeds silently if the label already exists. This ensures forced labels work in any repository where the plugin is installed, not just repos where labels were pre-created.
 
 **Create mode:**
 

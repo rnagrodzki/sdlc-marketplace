@@ -22,6 +22,7 @@ Analyzes all commits and the diff on the current branch, generates a structured 
 | `--update` | Update the description of an existing PR on this branch | — |
 | `--base <branch>` | Target branch for the PR | repo default |
 | `--auto` | Skip interactive approval — create/update the PR immediately after generation | — |
+| `--label <name>` | Force a label onto the PR (repeatable). Created automatically if it doesn't exist in the repo | — |
 
 ---
 
@@ -78,6 +79,14 @@ Create this PR? (yes / edit / cancel)
 /pr-sdlc --update
 ```
 
+### Force a label onto the PR
+
+```text
+/pr-sdlc --label skip-version-check
+```
+
+Multiple labels can be forced: `/pr-sdlc --label bug --label urgent`. Forced labels are always included regardless of auto-labeling signals and are created in the repository if they don't already exist.
+
 ### Create a PR without interactive approval
 
 ```text
@@ -124,7 +133,9 @@ When creating or updating a PR, the skill analyzes the PR context — branch nam
 
 **Update mode:** Existing labels on the PR are preserved. Only new labels are added — the skill never removes labels.
 
-**When labeling is skipped:** If the repository has no labels defined or `gh` is unavailable, the labeling step is silently skipped.
+**Forced labels:** The `--label` flag bypasses signal matching — forced labels are always included in the PR. If a forced label doesn't exist in the repository, it is created automatically before the PR is opened. Forced labels are marked with `(forced)` in the approval prompt to distinguish them from inferred labels. This is used by `/ship-sdlc` to auto-apply `skip-version-check` on worktree PRs.
+
+**When labeling is skipped:** If the repository has no labels defined or `gh` is unavailable, the labeling step is silently skipped. Forced labels (via `--label`) still work — they are created in the repo if needed.
 
 ---
 
@@ -152,7 +163,7 @@ To override manually: `gh auth switch --user <login>` before running the skill.
 
 | Field | Value |
 |---|---|
-| `argument-hint` | `[--draft] [--update] [--base <branch>] [--auto]` |
+| `argument-hint` | `[--draft] [--update] [--base <branch>] [--auto] [--label <name>]` |
 | Plan mode | Graceful refusal (Step 0) |
 
 ---

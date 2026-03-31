@@ -285,8 +285,13 @@ function computeSteps(flags) {
       args: [
         flags.auto ? '--auto' : '',
         flags.draft ? '--draft' : '',
+        flags.workspace === 'worktree' ? '--label skip-version-check' : '',
       ].filter(Boolean).join(' '),
-      reason: skipSet.has('pr') ? 'in skip set' : 'not in skip set',
+      reason: skipSet.has('pr')
+        ? 'in skip set'
+        : flags.workspace === 'worktree'
+          ? 'not in skip set; --label skip-version-check added (version auto-skipped)'
+          : 'not in skip set',
       pause: false,
     },
   ];
