@@ -36,8 +36,8 @@ const { writeOutput } = require('./lib/output');
 const MAX_DIFF_CHARS = 8000;
 
 /**
- * Truncates a staged diff to MAX_DIFF_CHARS by dropping the largest files first.
- * Always includes at least one file's diff even if it exceeds the budget.
+ * Truncates a staged diff to MAX_DIFF_CHARS by keeping the largest file diffs
+ * (most semantic signal) within the budget and omitting the smallest.
  *
  * @param {string} fullDiff
  * @returns {{ diff: string, diffTruncated: boolean, truncatedFiles: string[] }}
@@ -48,6 +48,11 @@ function truncateStagedDiff(fullDiff) {
   }
 
   const fileChunks = splitDiffByFile(fullDiff); // Map<filePath, diffChunk>
+
+  // Guard: if diff doesn't parse into files, return original unchanged
+  if (fileChunks.size === 0) {
+    return { diff: fullDiff, diffTruncated: false, truncatedFiles: [] };
+  }
 
   // Sort descending by chunk size (largest first — most signal)
   const sorted = [...fileChunks.entries()].sort((a, b) => b[1].length - a[1].length);
