@@ -9,7 +9,7 @@
  *   node ship-init.js [options]
  *
  * Options:
- *   --preset A|B|C              Pipeline preset (default: B)
+ *   --preset full|balanced|minimal  Pipeline preset (default: balanced, legacy A|B|C accepted)
  *   --skip <csv>                Comma-separated steps to skip (default: empty)
  *   --bump patch|minor|major    Version bump type (default: patch)
  *   --draft                     Mark PR as draft (default: false)
@@ -29,7 +29,7 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { readSection, writeSection } = require('./lib/config');
+const { readSection, writeSection, normalizePreset, PRESET_NAMES } = require('./lib/config');
 const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
@@ -38,7 +38,7 @@ const { writeOutput } = require('./lib/output');
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let preset    = 'B';
+  let preset    = 'balanced';
   let skip      = [];
   let bump      = 'patch';
   let draft     = false;
@@ -50,7 +50,7 @@ function parseArgs(argv) {
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '--preset' && args[i + 1]) {
-      preset = args[++i];
+      preset = normalizePreset(args[++i]);
     } else if (a === '--skip' && args[i + 1]) {
       skip = args[++i].split(',').map(s => s.trim()).filter(Boolean);
     } else if (a === '--bump' && args[i + 1]) {
@@ -73,7 +73,7 @@ function parseArgs(argv) {
 // Validation
 // ---------------------------------------------------------------------------
 
-const VALID_PRESETS   = ['A', 'B', 'C'];
+const VALID_PRESETS   = PRESET_NAMES;
 const VALID_BUMPS     = ['patch', 'minor', 'major'];
 const VALID_THRESHOLD = ['critical', 'high', 'medium'];
 const VALID_WORKSPACE = ['branch', 'worktree', 'prompt'];

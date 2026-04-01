@@ -38,7 +38,7 @@ f4a9e12 feat(auth): add session management and token storage
 {
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "ship": {
-    "preset": "B",
+    "preset": "balanced",
     "skip": ["version"],
     "bump": "patch",
     "draft": false,

@@ -41,3 +41,45 @@
   assert:
     - type: icontains
       value: '"workspace": "worktree"'
+
+# Preset normalization tests (issue #114)
+
+- description: "ship-prepare: --preset B normalizes to balanced"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_args: "--has-plan --preset B"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"preset": "balanced"'
+
+- description: "ship-prepare: --preset A normalizes to full"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_args: "--has-plan --preset A"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"preset": "full"'
+
+- description: "ship-prepare: --preset full passes through as full"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_args: "--has-plan --preset full"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"preset": "full"'
+
+- description: "ship-prepare: config with legacy preset B normalizes to balanced"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-legacy-preset"
+  assert:
+    - type: icontains
+      value: '"preset": "balanced"'

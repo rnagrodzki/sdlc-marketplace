@@ -313,11 +313,11 @@ try {
 // ---------------------------------------------------------------------------
 
 try {
-  const { readSection } = require(path.join(__dirname, '..', 'scripts', 'lib', 'config.js'));
+  const { readSection, normalizePreset } = require(path.join(__dirname, '..', 'scripts', 'lib', 'config.js'));
   const projectRoot = process.cwd();
   const shipConfig = readSection(projectRoot, 'ship');
   if (shipConfig) {
-    const preset    = shipConfig.preset    !== undefined ? `preset ${shipConfig.preset}` : null;
+    const preset    = shipConfig.preset    !== undefined ? `preset ${normalizePreset(shipConfig.preset)}` : null;
     const skip      = shipConfig.skip      !== undefined ? `skip ${JSON.stringify(shipConfig.skip)}` : null;
     const bump      = shipConfig.bump      !== undefined ? `bump ${shipConfig.bump}` : null;
     const threshold = shipConfig.reviewThreshold !== undefined ? `threshold ${shipConfig.reviewThreshold}` : null;

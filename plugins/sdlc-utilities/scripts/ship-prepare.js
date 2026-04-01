@@ -13,7 +13,7 @@
  *   --has-plan              Plan is present in conversation context
  *   --auto                  Skip interactive approval prompts
  *   --skip <csv>            Comma-separated steps to skip
- *   --preset A|B|C          Pipeline preset
+ *   --preset full|balanced|minimal  Pipeline preset (legacy A|B|C accepted)
  *   --bump patch|minor|major  Version bump type
  *   --draft                 Mark PR as draft
  *   --dry-run               Print plan without executing
@@ -34,7 +34,7 @@ const fs   = require('fs');
 const path = require('path');
 const { exec, checkGitState, detectBaseBranch } = require('./lib/git');
 const { resolveMainWorktree } = require('./lib/state');
-const { readSection } = require('./lib/config');
+const { readSection, normalizePreset } = require('./lib/config');
 const { writeOutput } = require('./lib/output');
 
 // ---------------------------------------------------------------------------
@@ -44,7 +44,7 @@ const { writeOutput } = require('./lib/output');
 const VALID_SKIP = ['execute', 'commit', 'review', 'version', 'pr'];
 
 const BUILT_IN_DEFAULTS = {
-  preset: 'B',
+  preset: 'balanced',
   skip: [],
   bump: 'patch',
   draft: false,
@@ -199,6 +199,9 @@ function mergeFlags(cli, config) {
     merged.rebase  = 'auto';
     sources.rebase = 'default';
   }
+
+  // Normalize legacy preset names (A/B/C → full/balanced/minimal).
+  merged.preset = normalizePreset(merged.preset);
 
   // Pass-through flags that don't come from config.
   merged.hasPlan = cli.hasPlan;

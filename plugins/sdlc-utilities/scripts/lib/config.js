@@ -16,6 +16,20 @@ const PROJECT_SCHEMA_URL =
 const LOCAL_SCHEMA_URL =
   'https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json';
 
+const PRESET_NAMES = ['full', 'balanced', 'minimal'];
+const LEGACY_PRESET_MAP = { A: 'full', B: 'balanced', C: 'minimal' };
+
+/**
+ * Normalize a preset value: maps legacy A/B/C to full/balanced/minimal.
+ * Unknown values pass through unchanged (validation catches them later).
+ * @param {string|undefined} value
+ * @returns {string|undefined}
+ */
+function normalizePreset(value) {
+  if (typeof value !== 'string') return value;
+  return LEGACY_PRESET_MAP[value.toUpperCase()] || value;
+}
+
 /** Legacy file paths relative to projectRoot. */
 const LEGACY = {
   version: path.join('.claude', 'version.json'),
@@ -414,6 +428,9 @@ module.exports = {
   writeLocalConfig,
   writeSection,
   migrateConfig,
+  // Preset normalization
+  normalizePreset,
+  PRESET_NAMES,
   // Exposed for testing
   PROJECT_CONFIG_PATH,
   LOCAL_CONFIG_PATH,

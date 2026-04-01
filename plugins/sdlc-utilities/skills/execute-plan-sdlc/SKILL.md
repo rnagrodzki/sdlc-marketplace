@@ -2,7 +2,7 @@
 name: execute-plan-sdlc
 description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan. Also auto-triggered when the user accepts a plan from plan-sdlc (plan content is already in conversation context)."
 user-invocable: true
-argument-hint: "[plan-file-path] [--preset A|B|C] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto]"
+argument-hint: "[plan-file-path] [--preset full|balanced|minimal] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto]"
 ---
 
 # Execute Plan (SDLC)
@@ -212,9 +212,9 @@ Note every issue found.
 
 Fix each issue from the critique. Then present the final wave structure showing per-task model assignments:
 
-**Preset auto-selection:** If the user invoked the skill with `--preset <A|B|C>` (e.g., `/execute-plan-sdlc --preset B`), apply the specified preset without presenting the selection prompt. Show the wave structure with the applied preset and proceed directly to Step 5.
+**Preset auto-selection:** If the user invoked the skill with `--preset <full|balanced|minimal>` (e.g., `/execute-plan-sdlc --preset balanced`), apply the specified preset without presenting the selection prompt. Show the wave structure with the applied preset and proceed directly to Step 5.
 
-Valid values: `A` (Speed), `B` (Balanced), `C` (Quality). Invalid values → fall back to interactive selection.
+Valid values: `full` (Speed), `balanced` (Balanced), `minimal` (Quality). Legacy `A`/`B`/`C` are accepted and normalized. Invalid values → fall back to interactive selection.
 
 ```
 Execution Plan
@@ -236,18 +236,18 @@ Wave 3 (N tasks — HIGH RISK, will pause):
 Total: N tasks across N waves + pre-wave
 
 Model Presets:
-  A) Speed:     N × haiku, N × sonnet              — fast, low cost (skips spec compliance review)
-  B) Balanced:  N × haiku, N × sonnet, N × opus    — default ✓
-  C) Quality:   N × sonnet, N × opus                — max correctness
+  full) Speed:       N × haiku, N × sonnet              — fast, low cost (skips spec compliance review)
+  balanced) Balanced:  N × haiku, N × sonnet, N × opus  — default ✓
+  minimal) Quality:    N × sonnet, N × opus              — max correctness
 
 Use AskUserQuestion to select a preset:
 > Select execution preset
 
-Options: **A** (Speed) | **B** (Balanced, default) | **C** (Quality) | **custom** | **cancel**
-Tip: Use --preset B to skip this prompt next time.
+Options: **full** (Speed) | **balanced** (Balanced, default) | **minimal** (Quality) | **custom** | **cancel**
+Tip: Use --preset balanced to skip this prompt next time.
 ```
 
-Always present all 3 presets. Default is Balanced. When the user selects a preset (A/B/C), update the per-task model assignments and proceed to execution immediately. "custom" opens per-task editing before execution. "cancel" aborts. No additional confirmation needed — preset selection is the approval.
+Always present all 3 presets. Default is Balanced. When the user selects a preset (full/balanced/minimal), update the per-task model assignments and proceed to execution immediately. "custom" opens per-task editing before execution. "cancel" aborts. No additional confirmation needed — preset selection is the approval.
 
 ## Step 5 (DO): Execute
 

@@ -501,6 +501,37 @@ function buildProposals(signals, target) {
     evidence: 'Universal guardrail — always applicable.',
   });
 
+  // Engineering principles — universally applicable
+  proposals.push({
+    id: 'yagni',
+    description: isPlan
+      ? 'Tasks must not add functionality beyond stated requirements — no speculative abstractions, premature generalization, or unused parameters.'
+      : 'Do not add functionality until it is actually needed. No speculative abstractions, premature generalization, or unused parameters.',
+    severity: 'warning',
+    category: 'scope',
+    evidence: 'Universal guardrail — always applicable.',
+  });
+
+  proposals.push({
+    id: 'dry',
+    description: isPlan
+      ? 'Tasks must not duplicate logic that exists elsewhere — reuse existing functions or extract shared utilities.'
+      : 'Do not duplicate logic. If the same behavior exists elsewhere, reuse it or extract a shared function.',
+    severity: 'warning',
+    category: 'quality',
+    evidence: 'Universal guardrail — always applicable.',
+  });
+
+  proposals.push({
+    id: 'kiss',
+    description: isPlan
+      ? 'Tasks must prefer the simplest design that satisfies requirements — avoid unnecessary abstractions and over-engineering.'
+      : 'Prefer the simplest implementation that satisfies the requirements. Avoid unnecessary abstractions and over-engineered solutions.',
+    severity: 'warning',
+    category: 'quality',
+    evidence: 'Universal guardrail — always applicable.',
+  });
+
   return proposals;
 }
 

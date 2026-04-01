@@ -4,9 +4,9 @@ Use this template in Step 5c-bis when dispatching the per-wave spec compliance r
 
 **Purpose:** Verify that agents built what was requested — nothing more, nothing less.
 
-**When to use:** After every wave containing Standard or Complex tasks, unless the Speed preset was selected.
+**When to use:** After every wave containing Standard or Complex tasks, unless the full preset (Speed) was selected.
 
-**When to skip:** Wave contains only Trivial tasks, or Speed preset was selected.
+**When to skip:** Wave contains only Trivial tasks, or the full preset (Speed) was selected.
 
 ## How to Fill This Template
 

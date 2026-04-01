@@ -51,7 +51,7 @@ Captures the effective flags after defaults and config are applied, so a resumed
 {
   "auto": true,
   "skip": ["version"],
-  "preset": "B",
+  "preset": "balanced",
   "bump": "patch",
   "draft": true
 }
@@ -61,7 +61,7 @@ Captures the effective flags after defaults and config are applied, so a resumed
 |----------|-----------------|----------------------------------------------------------------------|
 | `auto`   | boolean         | Whether `--auto` (non-interactive) mode was active.                  |
 | `skip`   | string[]        | Step names explicitly skipped via `--skip`.                          |
-| `preset` | string \| null  | Execution preset used (`"A"`, `"B"`, or `"C"`), or `null` if none.  |
+| `preset` | string \| null  | Execution preset used (`"full"`, `"balanced"`, or `"minimal"`), or `null` if none. Legacy `"A"`/`"B"`/`"C"` may appear in older state files. |
 | `bump`   | string \| null  | Version bump type (`"major"`, `"minor"`, `"patch"`), or `null`.      |
 | `draft`  | boolean         | Whether the PR was opened as a draft.                                |
 
@@ -197,7 +197,7 @@ If multiple state files exist for the same branch (from multiple failed attempts
   "flags": {
     "auto": true,
     "skip": ["version"],
-    "preset": "B",
+    "preset": "balanced",
     "bump": "patch",
     "draft": true
   },

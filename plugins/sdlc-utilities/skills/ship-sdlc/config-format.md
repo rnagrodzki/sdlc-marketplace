@@ -22,7 +22,7 @@ A JSON Schema is available at `schemas/sdlc-local.schema.json` for IDE autocompl
 {
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "ship": {
-    "preset": "B",
+    "preset": "balanced",
     "skip": ["version"],
     "bump": "patch",
     "draft": false,
@@ -40,7 +40,7 @@ A JSON Schema is available at `schemas/sdlc-local.schema.json` for IDE autocompl
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `preset` | `"A"` \| `"B"` \| `"C"` | `"B"` | Execution preset passed to execute-plan-sdlc. `"A"` = Speed (fewer steps, parallel), `"B"` = Balanced, `"C"` = Quality (full gates). |
+| `preset` | `"full"` \| `"balanced"` \| `"minimal"` | `"balanced"` | Execution preset passed to execute-plan-sdlc. `"full"` = Speed (fewer steps, parallel), `"balanced"` = Balanced, `"minimal"` = Quality (full gates). Legacy `"A"`/`"B"`/`"C"` values are accepted and normalized automatically. |
 | `skip` | `string[]` | `[]` | Step names to skip by default on every run (e.g. `["version"]` to never bump version). Equivalent to passing `--skip` on the CLI. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type applied when the `version` step runs. Overridden by `--bump` on the CLI. |
 | `draft` | `boolean` | `false` | When `true`, PRs are created as drafts. Equivalent to `--draft`. |
@@ -78,9 +78,9 @@ A flag passed directly on the command line always wins. If no flag is given, the
 Running `ship-sdlc --init-config` launches an interactive sequence that writes the `ship` section to `.sdlc/local.json`. The steps are:
 
 1. **Preset preference** — Choose an execution preset:
-   - `A` = Speed (minimal gates, maximise parallelism)
-   - `B` = Balanced (default)
-   - `C` = Quality (full critique and review gates)
+   - `full` = Speed (minimal gates, maximise parallelism)
+   - `balanced` = Balanced (default)
+   - `minimal` = Quality (full critique and review gates)
 
 2. **Steps to skip by default** — Enter a comma-separated list of step names to always skip (leave blank for none). Common choices: `version`, `review`.
 
@@ -119,7 +119,7 @@ Minimises prompts and skips the version step to manage it manually.
 {
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "ship": {
-    "preset": "A",
+    "preset": "full",
     "skip": ["version"],
     "bump": "patch",
     "draft": false,
@@ -138,7 +138,7 @@ Balanced preset, review threshold set to catch high-severity findings, PRs alway
 {
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "ship": {
-    "preset": "B",
+    "preset": "balanced",
     "skip": [],
     "bump": "minor",
     "draft": true,
@@ -157,7 +157,7 @@ Quality preset with the widest review threshold. Suitable for regulated environm
 {
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "ship": {
-    "preset": "C",
+    "preset": "minimal",
     "skip": [],
     "bump": "patch",
     "draft": false,

@@ -23,8 +23,8 @@
       "properties": {
         "preset": {
           "type": "string",
-          "enum": ["A", "B", "C"],
-          "description": "Preset pipeline variant."
+          "enum": ["full", "balanced", "minimal", "A", "B", "C"],
+          "description": "Preset pipeline variant. Preferred values: full, balanced, minimal. Legacy A/B/C are accepted for backward compatibility."
         },
         "skip": {
           "type": "array",

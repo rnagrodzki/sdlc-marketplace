@@ -10,7 +10,7 @@ Orchestrates implementation plan execution with adaptive task classification, wa
 
 ```text
 /execute-plan-sdlc
-/execute-plan-sdlc --preset B
+/execute-plan-sdlc --preset balanced
 /execute-plan-sdlc --resume
 ```
 
@@ -28,7 +28,7 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 
 | Flag | Description | Default |
 |---|---|---|
-| `--preset <A\|B\|C>` | Auto-select a model preset, skipping the interactive selection prompt. `A` = Speed, `B` = Balanced, `C` = Quality. Invalid values fall back to interactive selection. | Interactive prompt |
+| `--preset <full\|balanced\|minimal>` | Auto-select a model preset, skipping the interactive selection prompt. `full` = Speed, `balanced` = Balanced, `minimal` = Quality. Legacy A/B/C accepted. Invalid values fall back to interactive selection. | Interactive prompt |
 | `--resume` | Resume from the most recent execution state file for the current branch. Completed waves are skipped; in-progress waves are retried. If the plan has changed since execution started, you are prompted to resume or restart. | Off |
 | `--workspace <branch\|worktree\|prompt>` | Workspace isolation mode when on the default branch. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. | `prompt` |
 | `--rebase <auto\|skip\|prompt>` | Rebase onto the default branch before execution. `auto` rebases silently (aborts on conflict), `skip` skips, `prompt` asks. | Skip |
@@ -84,7 +84,7 @@ Each task is assigned a model based on its complexity class. Before executing, t
 | **Balanced** | haiku | sonnet | opus | Default — matches complexity to capability |
 | **Quality** | sonnet | opus | opus | Codebase is unfamiliar, tasks are ambiguous |
 
-Select a preset with a single letter (A/B/C) or choose `custom` to edit individual task assignments. On retry after failure, the model is automatically escalated one step (haiku → sonnet → opus) and counts toward the 2-retry budget.
+Select a preset by name (full/balanced/minimal) or choose `custom` to edit individual task assignments. On retry after failure, the model is automatically escalated one step (haiku → sonnet → opus) and counts toward the 2-retry budget.
 
 ---
 
@@ -173,11 +173,11 @@ Wave 3 (1 task — HIGH RISK, will pause):
 Total: 8 tasks across 3 waves + pre-wave
 
 Model Presets:
-  A) Speed:     6 × haiku, 2 × sonnet                 — fast, low cost
-  B) Balanced:  2 × haiku, 4 × sonnet, 2 × opus       — default ✓
-  C) Quality:   2 × sonnet, 6 × opus                  — max correctness
+  full) Speed:       6 × haiku, 2 × sonnet                 — fast, low cost
+  balanced) Balanced:  2 × haiku, 4 × sonnet, 2 × opus    — default ✓
+  minimal) Quality:    2 × sonnet, 6 × opus                — max correctness
 
-Select preset (A/B/C), "custom" to edit individual tasks, or "cancel":
+Select preset (full/balanced/minimal), "custom" to edit individual tasks, or "cancel":
 ```
 
 ### Execute a plan from a file
@@ -193,7 +193,7 @@ Claude loads the plan from the specified file, validates it, classifies tasks, a
 ### Skip preset selection
 
 ```text
-/execute-plan-sdlc --preset B
+/execute-plan-sdlc --preset balanced
 ```
 
 Claude applies the Balanced preset automatically and proceeds to execution after showing the wave structure — no interactive prompt.

@@ -247,7 +247,7 @@ On **skip**: do not write a version section.
 Use AskUserQuestion for each setting. Note to the user: "Ship config is stored in `.sdlc/local.json` (developer-local, gitignored). Each developer has their own ship preferences."
 
 Ask about each field:
-1. **preset** -- Pipeline variant: A (full), B (skip version), C (minimal: execute + commit + PR). Default: A
+1. **preset** -- Pipeline variant: full (all steps), balanced (skip version), minimal (execute + commit + PR). Default: balanced
 2. **skip** -- Additional steps to skip (comma-separated). Valid: execute, commit, review, received-review, commit-fixes, version, pr. Default: none
 3. **bump** -- Default version bump level: patch, minor, major. Default: patch
 4. **draft** -- Open PRs as drafts? yes/no. Default: no

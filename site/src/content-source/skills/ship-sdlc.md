@@ -29,7 +29,7 @@ This skill is for **expert users working on projects with established quality gu
 ## Usage
 
 ```text
-/ship-sdlc [--auto] [--skip <steps>] [--preset A|B|C] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]
+/ship-sdlc [--auto] [--skip <steps>] [--preset full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]
 ```
 
 ---
@@ -40,7 +40,7 @@ This skill is for **expert users working on projects with established quality gu
 |------|-------------|---------|
 | `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
 | `--skip <steps>` | Comma-separated list of steps to skip: `execute`, `commit`, `review`, `version`. PR cannot be skipped. | None |
-| `--preset A\|B\|C` | Execution preset forwarded to execute-plan-sdlc. A = Speed, B = Balanced, C = Quality. | `B` |
+| `--preset full\|balanced\|minimal` | Execution preset forwarded to execute-plan-sdlc. full = Speed, balanced = Balanced, minimal = Quality. Legacy A/B/C accepted. | `balanced` |
 | `--bump patch\|minor\|major` | Version bump type forwarded to version-sdlc. | `patch` |
 | `--draft` | Create the PR as a draft. | Off |
 | `--dry-run` | Display the full pipeline plan and stop. No steps are executed. | Off |
@@ -135,18 +135,18 @@ plan-sdlc      (--auto if     (--committed)
 
 ## What Gets Printed
 
-The pipeline prints every decision and state change. Here is a realistic full output for a run with `--auto --preset B`:
+The pipeline prints every decision and state change. Here is a realistic full output for a run with `--auto --preset balanced`:
 
 ```
 I'm using the ship-sdlc skill.
 
 Ship config loaded from .sdlc/local.json
-  preset: B, skip: [version], draft: false, bump: patch
+  preset: balanced, skip: [version], draft: false, bump: patch
   reviewThreshold: high
 
 Flag resolution (CLI overrides config):
   auto:    true  (from CLI --auto)
-  preset:  B     (from config)
+  preset:  balanced  (from config)
   skip:    [version]  (from config)
   bump:    patch (from config default)
   draft:   false (from built-in default)
@@ -177,7 +177,7 @@ Ship Pipeline
 --------------------------------------------------------------------
 Step  Skill                 Status       Args           Pause?
 --------------------------------------------------------------------
-1     execute-plan-sdlc     will run     --preset B     no
+1     execute-plan-sdlc     will run     --preset balanced  no
 2     commit-sdlc           will run     --auto         no
 3     review-sdlc           will run     --committed    no
 4     received-review-sdlc  conditional  (if crit/high) YES
@@ -191,8 +191,8 @@ Interactive pauses: received-review (if triggered)
 Auto mode — proceeding without confirmation.
 
 ━━━ Ship Pipeline — Step 1/7: Execute ━━━
-  Invoking: /execute-plan-sdlc --preset B
-  Reason: plan detected in context, preset B from config
+  Invoking: /execute-plan-sdlc --preset balanced
+  Reason: plan detected in context, preset balanced from config
   Expectation: execute all plan tasks in waves
 
   [done] Step 1 complete: 6 tasks, 2 waves completed
@@ -288,7 +288,7 @@ Loads config (if present), detects context, presents the pipeline plan, and asks
 ### Full auto mode with preset
 
 ```text
-/ship-sdlc --auto --preset C
+/ship-sdlc --auto --preset minimal
 ```
 
 Runs the quality preset with no confirmation prompts except at received-review-sdlc (if triggered) and version-sdlc.
@@ -343,7 +343,7 @@ Pipeline behavior is configured via `.sdlc/local.json`. Create it manually or ru
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `preset` | `"A"` \| `"B"` \| `"C"` | `"B"` | Execution preset forwarded to execute-plan-sdlc. |
+| `preset` | `"full"` \| `"balanced"` \| `"minimal"` | `"balanced"` | Execution preset forwarded to execute-plan-sdlc. Legacy `"A"`/`"B"`/`"C"` accepted. |
 | `skip` | `string[]` | `[]` | Steps to skip by default on every run. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type. |
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |
@@ -366,7 +366,7 @@ Skip version management, auto-commit, only pause on critical findings.
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "preset": "A",
+  "preset": "full",
   "skip": ["version"],
   "auto": true,
   "bump": "patch",
@@ -382,7 +382,7 @@ Full pipeline with high-severity review threshold. PRs open as drafts for team r
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "preset": "B",
+  "preset": "balanced",
   "skip": [],
   "auto": false,
   "bump": "minor",
@@ -398,7 +398,7 @@ Quality preset catches medium-severity findings. Suitable for regulated environm
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "preset": "C",
+  "preset": "minimal",
   "skip": [],
   "auto": false,
   "bump": "patch",
@@ -414,7 +414,7 @@ For when you've already implemented and reviewed manually, and just need to comm
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "preset": "B",
+  "preset": "balanced",
   "skip": ["execute", "review"],
   "auto": true,
   "bump": "patch",
@@ -476,7 +476,7 @@ Then run `/ship-sdlc` without `--resume` to start a new pipeline.
 
 | Field | Value |
 |---|---|
-| `argument-hint` | `[--auto] [--skip <steps>] [--preset A\|B\|C] [--draft] [--dry-run]` |
+| `argument-hint` | `[--auto] [--skip <steps>] [--preset full\|balanced\|minimal] [--draft] [--dry-run]` |
 | Plan mode | Graceful refusal (Step 0) |
 
 ---

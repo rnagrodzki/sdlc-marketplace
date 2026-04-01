@@ -60,7 +60,7 @@ If there is only one worktree entry (no linked worktrees), the main working tree
   "branch": "feat/my-feature",
   "planPath": "tasks/plan.md",
   "planHash": "sha256:a1b2c3d4e5f6...",
-  "preset": "B",
+  "preset": "balanced",
   "totalTasks": 8,
   "waves": [ ... ],
   "context": { ... }
@@ -75,7 +75,7 @@ If there is only one worktree entry (no linked worktrees), the main working tree
 | `branch`     | string        | Git branch name at execution start.                                                  |
 | `planPath`   | string \| null | Repository-relative path to the plan file, or `null` if the plan was provided via context rather than a file. |
 | `planHash`   | string        | SHA-256 hash of the plan content at execution start. Detects if the plan changed between a failure and a resume attempt. |
-| `preset`     | string \| null | Execution preset (`"A"`, `"B"`, or `"C"`), or `null` if none was applied.           |
+| `preset`     | string \| null | Execution preset (`"full"`, `"balanced"`, or `"minimal"`), or `null` if none was applied. Legacy `"A"`/`"B"`/`"C"` values may appear in older state files. |
 | `totalTasks` | number        | Total number of tasks across all waves.                                              |
 | `waves`      | array         | Ordered list of wave records (see below).                                            |
 | `context`    | object        | Accumulated cross-wave context enabling fresh-session resume (see below).            |
@@ -230,7 +230,7 @@ Mid-execution state: wave 0 completed, wave 1 in progress, wave 2 pending.
   "branch": "feat/my-feature",
   "planPath": "tasks/plan.md",
   "planHash": "sha256:3f2a1b9c7e4d8a5f6b0c2d9e1a4f7b3c8d2e5f0a1b6c9d4e7f2a5b8c3d6e9f0",
-  "preset": "B",
+  "preset": "balanced",
   "totalTasks": 8,
   "waves": [
     {

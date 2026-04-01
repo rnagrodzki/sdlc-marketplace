@@ -1,8 +1,8 @@
 ---
 name: ship-sdlc
-description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Chains execute-plan-sdlc, commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, and pr-sdlc with conditional review-fix loop. Arguments: [--auto] [--skip <steps>] [--preset A|B|C] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
+description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Chains execute-plan-sdlc, commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, and pr-sdlc with conditional review-fix loop. Arguments: [--auto] [--skip <steps>] [--preset full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
-argument-hint: "[--auto] [--skip <steps>] [--preset A|B|C] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--init-config]"
+argument-hint: "[--auto] [--skip <steps>] [--preset full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--init-config]"
 ---
 
 # Ship Pipeline
@@ -35,7 +35,7 @@ SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" -path "*/sdlc*/scripts/ship
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-init.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-INIT_OUTPUT_FILE=$(node "$SCRIPT" --output-file --preset B --skip version --bump patch --auto --threshold high --workspace prompt)
+INIT_OUTPUT_FILE=$(node "$SCRIPT" --output-file --preset balanced --skip version --bump patch --auto --threshold high --workspace prompt)
 EXIT_CODE=$?
 echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -52,7 +52,7 @@ echo "EXIT_CODE=$EXIT_CODE"
 Check for ship config via ship-prepare.js output (reads from `.sdlc/local.json` → `ship` section, with legacy `.sdlc/ship-config.json` fallback). If found, read and merge. Print loaded config verbosely:
 ```
 Ship config loaded from .sdlc/local.json
-  preset: B, skip: [version], draft: false, bump: patch
+  preset: balanced, skip: [version], draft: false, bump: patch
   reviewThreshold: high
 ```
 If not found: `No ship config found — using built-in defaults. Run /setup-sdlc to configure.`
@@ -65,7 +65,7 @@ SCRIPT=$(find ~/.claude/plugins -name "ship-prepare.js" -path "*/sdlc*/scripts/s
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --skip version --preset B --bump patch --workspace branch)
+PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --skip version --preset balanced --bump patch --workspace branch)
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -150,7 +150,7 @@ The pipeline table is generated from the `steps` array in the `ship-prepare.js` 
 
 | Step | Skill | Status | Args | Pause |
 |------|-------|--------|------|-------|
-| 1 | execute-plan-sdlc | will_run | `--preset B` | no |
+| 1 | execute-plan-sdlc | will_run | `--preset balanced` | no |
 | 2 | commit-sdlc | will_run | `--auto` | no |
 | 3 | review-sdlc | will_run | `--committed` | no |
 | 4 | received-review-sdlc | conditional | (if crit/high) | YES |
@@ -232,7 +232,7 @@ Ship Pipeline (dry run)
 ────────────────────────────────────────────────────────────────
 Step  Skill                 Status       Args              Pause?
 ────────────────────────────────────────────────────────────────
-1     execute-plan-sdlc     will run     --preset B        no
+1     execute-plan-sdlc     will run     --preset balanced  no
 2     commit-sdlc           will run     --auto            no
 3     review-sdlc           will run     --committed       no
 4     received-review-sdlc  conditional  (if crit/high)    YES
@@ -342,7 +342,7 @@ git worktree list --porcelain
 Match the branch from the ship state file against worktree entries. If found and directory exists, `cd <path>` before continuing. If the worktree directory is gone, warn and fall back to running on the current branch.
 
 Example dispatch sequence (use `step.invocation` for actual args):
-- Agent: execute-plan-sdlc, args: `"--preset B"`
+- Agent: execute-plan-sdlc, args: `"--preset balanced"`
 - Agent: commit-sdlc, args: `"--auto"`
 - Agent: review-sdlc, args: `"--committed"`
 - Agent: received-review-sdlc (no args — always interactive)
