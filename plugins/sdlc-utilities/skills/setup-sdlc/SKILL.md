@@ -1,8 +1,8 @@
 ---
 name: setup-sdlc
-description: "Use this skill when setting up the SDLC plugin for a project, initializing configuration, or when any skill reports missing config. Handles unified config creation (.claude/sdlc.json), local config (.sdlc/local.json), and orchestrates content setup (review dimensions, PR template, plan guardrails). Supports direct sub-flow entry via --dimensions, --pr-template, --guardrails. Arguments: [--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--add] [--no-copilot]"
+description: "Use this skill when setting up the SDLC plugin for a project, initializing configuration, or when any skill reports missing config. Handles unified config creation (.claude/sdlc.json), local config (.sdlc/local.json), and orchestrates content setup (review dimensions, PR template, plan guardrails, execution guardrails). Supports direct sub-flow entry via --dimensions, --pr-template, --guardrails, --execution-guardrails. Arguments: [--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--add] [--no-copilot]"
 user-invocable: true
-argument-hint: "[--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--add] [--no-copilot]"
+argument-hint: "[--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--add] [--no-copilot]"
 ---
 
 # SDLC Setup
@@ -25,6 +25,7 @@ delegates content creation to specialized skills.
 | `--dimensions` | Jump directly to review dimensions sub-flow (skip config builder) | off |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | off |
 | `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | off |
+| `--execution-guardrails` | Jump directly to execution guardrails sub-flow (skip config builder) | off |
 | `--add` | Expansion mode (with --dimensions or --guardrails) | off |
 | `--no-copilot` | Skip GitHub Copilot instructions (with --dimensions) | off |
 
@@ -76,7 +77,11 @@ If `--guardrails` was passed:
 1. Read and follow `@setup-guardrails.md` (it runs its own guardrails-prepare.js script internally). Pass through `--add` if present.
 2. Jump to Step 5 (summary). Skip Steps 1–4.
 
-If none of `--dimensions`, `--pr-template`, or `--guardrails` was passed: continue with the full interactive flow (Steps 1–4) as normal.
+If `--execution-guardrails` was passed:
+1. Read and follow `@setup-execution-guardrails.md`. Pass through `--add` if present.
+2. Jump to Step 5 (summary). Skip Steps 1–4.
+
+If none of `--dimensions`, `--pr-template`, `--guardrails`, or `--execution-guardrails` was passed: continue with the full interactive flow (Steps 1–4) as normal.
 
 The JSON contains these top-level keys:
 - `projectConfig` -- `{ exists, sections, misplaced, path }`

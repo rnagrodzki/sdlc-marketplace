@@ -11,6 +11,7 @@ function parseArgs(args) {
   const result = {
     projectRoot: process.cwd(),
     json: false,
+    section: 'plan',
   };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--project-root' && i + 1 < args.length) {
@@ -18,6 +19,9 @@ function parseArgs(args) {
       i++;
     } else if (args[i] === '--json') {
       result.json = true;
+    } else if (args[i] === '--section' && i + 1 < args.length) {
+      result.section = args[i + 1];
+      i++;
     }
   }
   return result;
@@ -119,10 +123,11 @@ function main() {
 
   try {
     const readSection = loadReadSection(flags.projectRoot);
-    const plan = readSection(flags.projectRoot, 'plan');
+    const section = flags.section || 'plan';
+    const sectionData = readSection(flags.projectRoot, section);
 
-    // If no plan section or no guardrails, return empty pass
-    if (!plan || !Array.isArray(plan.guardrails)) {
+    // If no section or no guardrails, return empty pass
+    if (!sectionData || !Array.isArray(sectionData.guardrails)) {
       const output = {
         overall: 'pass',
         summary: { total: 0, pass: 0, errors: 0, warnings: 0 },
@@ -131,12 +136,12 @@ function main() {
       if (flags.json) {
         process.stdout.write(JSON.stringify(output, null, 2) + '\n');
       } else {
-        process.stdout.write('No plan guardrails configured.\n');
+        process.stdout.write(`No ${section} guardrails configured.\n`);
       }
       process.exit(0);
     }
 
-    const guardrails = plan.guardrails;
+    const guardrails = sectionData.guardrails;
     const seenIds = new Set();
     const results = [];
 
