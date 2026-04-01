@@ -129,6 +129,8 @@ plan-sdlc      (--auto if     (--committed)
 - **One mandatory pause point in `--auto` mode**: received-review-sdlc (automated code changes need human sign-off). version-sdlc skips the release approval prompt when `--auto` is forwarded.
 - **Staging gap**: execute-plan-sdlc creates files but does not stage them. The pipeline runs `git add -A -- ':!.sdlc/'` between execute and commit, excluding the `.sdlc/` runtime directory.
 - **Pipeline plan is binding**: Steps marked "will run" in the pipeline table must execute. Step statuses are computed by `ship-prepare.js` — the LLM follows them mechanically and cannot unilaterally skip planned steps.
+- **Agent-based dispatch**: Sub-skills are dispatched as Agents, not invoked via the Skill tool. Each Agent loads its sub-skill's SKILL.md in its own context and returns only a structured result (status, summary, artifacts). This keeps the ship pipeline's context clean — sub-skill definitions stay in the agent, not the orchestrator.
+- **Skip provenance (`skipSource`)**: Each step in the `ship-prepare.js` output includes a `skipSource` field tracking why it was skipped: `"none"` (not skipped), `"cli"` (user `--skip`), `"config"` (from `.sdlc/local.json`), `"auto"` (workspace rule), `"condition"` (precondition unmet), or `"default"` (unexpected — may indicate fabricated flags).
 - **Review threshold**: The severity that triggers the fix loop is configurable via `reviewThreshold` in config (default: `high`). At `high`, critical and high findings trigger fixes; medium and below are deferred to the summary.
 
 ---

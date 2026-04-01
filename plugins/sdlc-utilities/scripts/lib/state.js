@@ -8,9 +8,29 @@
  * Zero npm dependencies — Node.js built-ins only.
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs     = require('fs');
+const path   = require('path');
+const crypto = require('crypto');
 const { exec } = require('./git');
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Write content to filePath atomically: write to a .tmp sibling, then rename.
+ * The tmp file is placed in the same directory so fs.renameSync works across
+ * same-filesystem paths without a copy.
+ * @param {string} filePath  Absolute destination path
+ * @param {string} content   String content to write
+ */
+function atomicWriteSync(filePath, content) {
+  const dir    = path.dirname(filePath);
+  const suffix = crypto.randomBytes(4).toString('hex');
+  const tmp    = path.join(dir, path.basename(filePath) + '.' + suffix + '.tmp');
+  fs.writeFileSync(tmp, content, 'utf8');
+  fs.renameSync(tmp, filePath);
+}
 
 // ---------------------------------------------------------------------------
 // Worktree helpers
@@ -128,6 +148,7 @@ function readState(prefix, branchSlug) {
     const data = JSON.parse(raw);
     return { data, filePath: found.fullPath };
   } catch (_) {
+    process.stderr.write(`[state] Warning: corrupt or unreadable state file: ${found.fullPath}\n`);
     return null;
   }
 }
@@ -138,7 +159,7 @@ function readState(prefix, branchSlug) {
  * @param {object} data
  */
 function writeState(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  atomicWriteSync(filePath, JSON.stringify(data, null, 2));
 }
 
 /**
@@ -162,7 +183,7 @@ function initState(prefix, branch, data) {
   const fileName = `${prefix}-${branchSlug}-${timestamp}.json`;
   const filePath = path.join(stateDir, fileName);
 
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  atomicWriteSync(filePath, JSON.stringify(data, null, 2));
   return filePath;
 }
 
