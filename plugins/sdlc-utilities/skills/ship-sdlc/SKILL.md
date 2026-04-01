@@ -115,7 +115,7 @@ Context detection (from ship-prepare.js):
 
 ### 1g. Auto-skip logic
 
-Print each step from the `steps` array in the `ship-prepare.js` output with its `status` and `reason`:
+Print each step from the `steps` array in the `ship-prepare.js` output with its `status`, `reason`, and `skipSource`:
 ```
 Auto-skip decisions (from ship-prepare.js):
   execute: will_run — plan detected in context
@@ -123,9 +123,17 @@ Auto-skip decisions (from ship-prepare.js):
   review:  will_run — not in skip set
   received-review: conditional — depends on review verdict
   commit (fixes): conditional — depends on received-review changes
-  version: skipped — in skip set (from config)
+  version: skipped (auto) — auto-skipped — tags are repo-global
   pr:      will_run — not in skip set
 ```
+
+The parenthetical after `skipped` reflects the step's `skipSource` field:
+- `(cli)` — user passed `--skip` on the command line
+- `(config)` — skip set loaded from `.sdlc/local.json`
+- `(auto)` — auto-skipped by `computeSteps` logic (e.g., worktree mode)
+- `(condition)` — conditional step whose condition was not met
+
+Steps with `skipSource: "none"` are not skipped and show no parenthetical.
 
 The LLM does not compute these statuses — `ship-prepare.js` is the source of truth.
 
@@ -260,41 +268,68 @@ On **edit**: ask what to change, update flags, rebuild the pipeline table, and r
 
 ### Pre-step validation
 
-Before invoking each step, read its `status` from the ship-prepare.js output:
-1. `"will_run"` → invoke via Skill tool. No exceptions. This is non-negotiable.
-2. `"conditional"` → evaluate the runtime condition (e.g., review verdict). If condition met → invoke. If not → print why with the specific condition that was not met.
-3. `"skipped"` → print "skipped" with the `reason` from the script output.
+Before dispatching each step, read its `status` from the ship-prepare.js output:
+1. `"will_run"` → dispatch as Agent. No exceptions. This is non-negotiable.
+2. `"conditional"` → evaluate the runtime condition (e.g., review verdict). If condition met → dispatch as Agent. If not → print why with the specific condition that was not met.
+3. `"skipped"` → print "skipped" with the `reason` and `skipSource` from the script output.
 
-A step with `status: "will_run"` MUST be invoked via the Skill tool. The LLM does not have authority to override this status. Printing a skip message for a "will_run" step is a pipeline violation.
+A step with `status: "will_run"` MUST be dispatched as an Agent. The LLM does not have authority to override this status. Printing a skip message for a "will_run" step is a pipeline violation.
 
-### Context budget awareness
+### Context budget — agent isolation
 
-Each sub-skill invocation via the Skill tool loads the full SKILL.md into context (200–550 lines per skill). In a 7-step pipeline, this accumulates 2000+ lines of context budget. To prevent context exhaustion in later steps:
+Each sub-skill's SKILL.md is 200–550 lines. With the Skill tool, every invocation loads the full SKILL.md into the ship pipeline's context — 2000+ lines across a 7-step pipeline. Agent dispatch eliminates this: each Agent loads SKILL.md in its own context and returns only a structured result (5–10 lines). The ship pipeline's context receives structured data, not sub-skill definitions.
 
-- **Between steps:** After each sub-skill completes, compact its verbose output into a 2–3 line status summary before invoking the next step. The full SKILL.md definition and detailed output will be garbage-collected when compacted.
-- **Before the final steps:** If context usage is high after the review step, compact all prior step outputs before invoking version-sdlc and pr-sdlc.
-- **Do NOT skip sub-skill invocation** — each sub-skill contains complex logic (state management, verification, recovery) that requires its full definition. The Skill tool is the correct invocation method. Inter-step compaction is the mitigation, not inline execution.
+This is why all sub-skills are dispatched as Agents. Do not fall back to the Skill tool — it defeats the isolation and risks context exhaustion in later steps (version, PR).
+
+### Agent dispatch protocol
+
+All pipeline steps use the same dispatch protocol. No branching between simple and complex steps — uniform pattern for every sub-skill.
+
+**Invocation source:** Each step in the ship-prepare.js output includes an `invocation` field containing the skill name and computed args. Use `step.invocation` verbatim — do not construct invocations from the examples below.
+
+For each step that will run:
+
+1. **Print verbose progress header** to user:
+   ```
+   ━━━ Ship Pipeline — Step 2/7: Commit ━━━
+     Skill: commit-sdlc
+     Args: --auto
+     Reason: --auto forwarded from ship --auto mode
+   ```
+
+2. **Record step start** via ship-state.js.
+
+3. **Dispatch Agent** with: skill name, args from `step.invocation`, and brief pipeline context (branch, previous step results needed for this step). Agent prompt template:
+   ```
+   You are executing the <skill-name> skill. Read `plugins/sdlc-utilities/skills/<skill-name>/SKILL.md` and follow it with args: <args>. Return a structured result:
+   (1) status — success or failure
+   (2) result summary — 2-3 lines
+   (3) artifacts — commit hash, tag, PR URL, verdict, etc.
+   (4) any warnings or issues encountered
+   ```
+
+4. **Receive agent result.** Print result to user:
+   ```
+     [done] Step 2 complete: a1b2c3d feat(auth): add OAuth2 PKCE flow
+     State saved to .sdlc/execution/ship-<branch>-<timestamp>.json
+   ```
+
+5. **Record step completion/failure** via ship-state.js.
+
+6. **Use result to determine next step** (e.g., review verdict → received-review decision). Print decision reasoning:
+   ```
+     Review verdict: APPROVED WITH NOTES (2 medium)
+     Decision: CONTINUING — no critical/high issues found
+   ```
+
+Ship-sdlc retains full control of: pipeline table display, validation output, step progress headers, result formatting, state persistence messages, verdict-based flow decisions, and the final summary report. The agent only executes the sub-skill and returns structured data — it does not print pipeline-level output.
 
 ### Execution loop
 
-For each step that will run, print verbose progress:
-```
-━━━ Ship Pipeline — Step 2/7: Commit ━━━
-  Invoking: /commit-sdlc --auto
-  Reason: --auto forwarded from ship --auto mode
-  Expectation: stage all changes, generate commit message, commit without approval prompt
-```
-
-Invoke each sub-skill using the Skill tool:
-
-**Invocation source:** Each step in the ship-prepare.js output includes an `invocation` field containing the exact Skill tool call string with computed args. Use `step.invocation` verbatim — do not construct invocations from the examples below.
-
-- `skill: "execute-plan-sdlc", args: "--preset B"` (example)
-
 **Execute step resume:** When the pipeline is resuming (`--resume` active) and the execute step's status in the ship state file is `in_progress`:
 1. Check for `<main-worktree>/.sdlc/execution/execute-<branch>-*.json` (an execute-plan-sdlc state file for the current branch). Resolve `<main-worktree>` via `git worktree list --porcelain` (first `worktree` line).
-2. If found, invoke: `skill: "execute-plan-sdlc", args: "--preset <X> --resume"`
-3. If not found, invoke normally: `skill: "execute-plan-sdlc", args: "--preset <X>"` (execute restarts from scratch)
+2. If found, dispatch Agent with args: `"--preset <X> --resume"`
+3. If not found, dispatch Agent normally with args: `"--preset <X>"` (execute restarts from scratch)
 
 ship-sdlc does not manage execute-plan-sdlc's state file — execute-plan-sdlc handles its own creation, updates, and cleanup.
 
@@ -306,17 +341,13 @@ git worktree list --porcelain
 ```
 Match the branch from the ship state file against worktree entries. If found and directory exists, `cd <path>` before continuing. If the worktree directory is gone, warn and fall back to running on the current branch.
 
-- `skill: "commit-sdlc", args: "--auto"` (example)
-- `skill: "review-sdlc", args: "--committed"` (example)
-- `skill: "received-review-sdlc"` (no args — always interactive)
-- `skill: "version-sdlc", args: "patch"` (example)
-- `skill: "pr-sdlc", args: "--auto --draft"` (example)
-
-After each step, print the result and save state:
-```
-  [done] Step 2 complete: a1b2c3d feat(auth): add OAuth2 PKCE flow
-  State saved to .sdlc/execution/ship-<branch>-<timestamp>.json
-```
+Example dispatch sequence (use `step.invocation` for actual args):
+- Agent: execute-plan-sdlc, args: `"--preset B"`
+- Agent: commit-sdlc, args: `"--auto"`
+- Agent: review-sdlc, args: `"--committed"`
+- Agent: received-review-sdlc (no args — always interactive)
+- Agent: version-sdlc, args: `"patch"`
+- Agent: pr-sdlc, args: `"--auto --draft"`
 
 ### Between execute and commit
 
@@ -492,10 +523,18 @@ This will tag the release and generate the changelog from all merged commits.
 | Sub-skill fails (script crash) | Show error from sub-skill, stop pipeline, save state for `--resume` | Delegated — sub-skill handles its own error reporting |
 | `gh auth status` fails | Stop at validation (Step 3). Tell user to run `gh auth login` | No — user setup |
 | `git add -A -- ':!.sdlc/'` fails | Show error, stop pipeline | No — user action needed |
+| Network error (gh API) | Auto-retry via `retryExec` (3 attempts with exponential backoff). If exhausted, record failure + print resume instruction (see below) | No — transient |
 | State file write fails | Warn and continue — state persistence is best-effort | No |
 | Resume state file corrupt | Warn, start fresh | No |
 | Review verdict unparseable | Treat as APPROVED WITH NOTES, warn user, defer all findings | No |
 | Sub-skill times out | Stop pipeline, save state, inform user to `--resume` | No — transient |
+
+**Resume instruction format** (printed on step failure after retries exhausted or on any unrecoverable step error):
+```
+Step <N> (<name>) failed: <error summary>
+State saved to: <state file path>
+To resume: /ship-sdlc --resume
+```
 
 Each sub-skill has its own error recovery. ship-sdlc does not duplicate their recovery logic — it catches pipeline-level failures (sequencing, state, context) and delegates skill-level failures to the skill itself.
 
@@ -503,7 +542,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 ## DO NOT
 
-- Invoke sub-skills via the Agent tool — use the Skill tool exclusively
+- Invoke sub-skills via the Skill tool — all sub-skills are dispatched as Agents. Agent dispatch keeps sub-skill SKILL.md out of the ship pipeline's context.
 - Skip the critique step (Step 3) even when all checks seem obvious
 - Forward `--auto` to sub-skills that do not support it (see audit table)
 - Automatically resolve review findings — received-review-sdlc is always interactive
@@ -511,7 +550,8 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Delete the state file on failure — it is needed for `--resume`
 - Proceed past a failed sub-skill — stop, save state, inform user
 - Skip pipeline steps that were marked "will run" in the pipeline plan. The pipeline plan is a contract with the user. If a step was planned to run and the user confirmed the pipeline, it MUST run. The LLM does not have authority to skip planned steps based on its own assessment of change complexity or risk. Only the skip set and auto-skip rules (computed by ship-prepare.js) control which steps run.
-- Copy example args from this document when invoking sub-skills — use the `invocation` field from the ship-prepare.js output, which contains the exact computed args
+- Copy example args from this document when dispatching sub-skill Agents — use the `invocation` field from the ship-prepare.js output, which contains the exact computed args
+- Add `--skip` flags not present in the user's original invocation or ship config. The skip set is user/config-controlled. If ship-prepare.js output shows `skipSource` as unexpected (e.g., `flags.skip.length > 0` but `flagSources.skip === 'default'`), warn before proceeding.
 
 ---
 
@@ -533,7 +573,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **.sdlc/ must be gitignored.** The `.sdlc/` directory contains developer-local config (`local.json`) and ephemeral pipeline state (`execution/`). `--init-config` creates `.sdlc/.gitignore` automatically via `ship-init.js`. If `.sdlc/` is not gitignored, the staging command (`git add -A -- ':!.sdlc/'`) provides a fallback exclusion, but the gitignore is the primary defense.
 
-**Pipeline plan is binding.** The pipeline table displayed in Step 4 and confirmed by the user is a contract. Step statuses (`will_run`, `skipped`, `conditional`) are computed by `ship-prepare.js` — the LLM follows them, it does not override them. Steps with `status: "will_run"` must be invoked via the Skill tool. This was added after an incident where the review step was skipped because the LLM judged the changes to be "just docs/config" (issue #68). The pipeline's value is precisely in catching cases where the developer thinks changes are low-risk but the review disagrees.
+**Pipeline plan is binding.** The pipeline table displayed in Step 4 and confirmed by the user is a contract. Step statuses (`will_run`, `skipped`, `conditional`) are computed by `ship-prepare.js` — the LLM follows them, it does not override them. Steps with `status: "will_run"` must be dispatched as Agents. This was added after an incident where the review step was skipped because the LLM judged the changes to be "just docs/config" (issue #68). The pipeline's value is precisely in catching cases where the developer thinks changes are low-risk but the review disagrees.
 
 **State files are script-managed.** Use ship-state.js / execute-state.js for all state operations. Don't hand-write JSON to `.sdlc/execution/`.
 
@@ -553,7 +593,9 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Auto mode does not auto-resume without --resume.** When `--auto` is set but `--resume` is not, the pipeline starts fresh even if a state file exists for the current branch. This prevents accidental continuation from stale state. The state file is preserved (not deleted) so the user can explicitly `--resume` later.
 
-**Sub-skill loading consumes context.** Each Skill tool invocation loads the sub-skill's full SKILL.md (200–550 lines each). In a 7-step pipeline, this can consume 2000+ lines of context budget. The inter-step compaction described in "Context budget awareness" is not optional — without it, later steps (version, PR) execute with degraded context quality and are more likely to hallucinate or skip required logic.
+**Sub-skill loading and agent isolation.** Each sub-skill's SKILL.md is 200–550 lines. Agent dispatch is the primary mitigation: each Agent loads SKILL.md in its own context and returns only a structured result (5–10 lines). The ship pipeline's context receives structured data, not sub-skill definitions. Without agent dispatch, the Skill tool would load all definitions into the pipeline's context (2000+ lines), degrading context quality in later steps (version, PR) and increasing the risk of hallucination or skipped logic.
+
+**skipSource tracks provenance.** Each step's `skipSource` field records why a step was skipped: `"none"` (not skipped), `"cli"` (user `--skip` flag), `"config"` (from `.sdlc/local.json`), `"auto"` (auto-skipped by `computeSteps` logic), `"condition"` (conditional step not triggered). If `flags.skip.length > 0` but `flagSources.skip === 'default'`, the skip set was fabricated — warn before proceeding.
 
 ---
 

@@ -212,14 +212,28 @@ function mergeFlags(cli, config) {
 // Step computation
 // ---------------------------------------------------------------------------
 
-function computeSteps(flags) {
+function computeSteps(flags, flagSources) {
   const skipSet = new Set(flags.skip);
+
+  // Derive the skip source for a given step name.
+  function skipSource(name) {
+    if (!skipSet.has(name)) return 'none';
+    const src = flagSources && flagSources.skip;
+    if (src === 'cli') return 'cli';
+    if (src === 'config') return 'config';
+    return 'none';
+  }
 
   const steps = [
     {
       name: 'execute',
       skill: 'execute-plan-sdlc',
       status: (!flags.hasPlan || skipSet.has('execute')) ? 'skipped' : 'will_run',
+      skipSource: !flags.hasPlan && !skipSet.has('execute')
+        ? 'none'
+        : !flags.hasPlan
+          ? 'condition'
+          : skipSource('execute'),
       args: [
         flags.preset ? `--preset ${flags.preset}` : '',
         flags.workspace !== 'prompt' ? `--workspace ${flags.workspace}` : '',
@@ -236,6 +250,7 @@ function computeSteps(flags) {
       name: 'commit',
       skill: 'commit-sdlc',
       status: skipSet.has('commit') ? 'skipped' : 'will_run',
+      skipSource: skipSource('commit'),
       args: flags.auto ? '--auto' : '',
       reason: skipSet.has('commit') ? 'in skip set' : 'pending (will check after execute)',
       pause: false,
@@ -244,6 +259,7 @@ function computeSteps(flags) {
       name: 'review',
       skill: 'review-sdlc',
       status: skipSet.has('review') ? 'skipped' : 'will_run',
+      skipSource: skipSource('review'),
       args: '--committed',
       reason: skipSet.has('review') ? 'in skip set' : 'not in skip set',
       pause: false,
@@ -252,6 +268,7 @@ function computeSteps(flags) {
       name: 'received-review',
       skill: 'received-review-sdlc',
       status: 'conditional',
+      skipSource: 'none',
       args: '',
       reason: 'triggered by review verdict (critical/high findings)',
       pause: true,
@@ -260,6 +277,7 @@ function computeSteps(flags) {
       name: 'commit-fixes',
       skill: 'commit-sdlc',
       status: 'conditional',
+      skipSource: 'none',
       args: flags.auto ? '--auto' : '',
       reason: 'triggered if review fixes applied',
       pause: false,
@@ -268,6 +286,11 @@ function computeSteps(flags) {
       name: 'version',
       skill: 'version-sdlc',
       status: (skipSet.has('version') || flags.workspace === 'worktree') ? 'skipped' : 'will_run',
+      skipSource: skipSet.has('version')
+        ? skipSource('version')
+        : flags.workspace === 'worktree'
+          ? 'auto'
+          : 'none',
       args: [
         flags.bump || 'patch',
         flags.auto ? '--auto' : '',
@@ -283,6 +306,7 @@ function computeSteps(flags) {
       name: 'pr',
       skill: 'pr-sdlc',
       status: skipSet.has('pr') ? 'skipped' : 'will_run',
+      skipSource: skipSource('pr'),
       args: [
         flags.auto ? '--auto' : '',
         flags.draft ? '--draft' : '',
@@ -343,7 +367,7 @@ function detectWorktree(projectRoot) {
 // Validation
 // ---------------------------------------------------------------------------
 
-function runValidation(flags, steps, context) {
+function runValidation(flags, flagSources, steps, context) {
   const errors   = [];
   const warnings = [];
 
@@ -365,6 +389,12 @@ function runValidation(flags, steps, context) {
       warnings.push(`Unrecognized skip value "${s}". Valid values: ${VALID_SKIP.join(', ')}`);
       skipValuesRecognized = false;
     }
+  }
+
+  // Fabrication guard: skip values present but source is 'default' means the
+  // LLM may have hallucinated --skip arguments that were never actually passed.
+  if (flags.skip.length > 0 && flagSources.skip === 'default') {
+    warnings.push("Skip flags present but source is 'default' — verify --skip arguments were intentional.");
   }
 
   // At least one non-conditional step must run (conditional steps only
@@ -531,10 +561,10 @@ function main() {
   };
 
   // Compute steps
-  const steps = computeSteps(flags);
+  const steps = computeSteps(flags, flagSources);
 
   // Run validation
-  const validation = runValidation(flags, steps, context);
+  const validation = runValidation(flags, flagSources, steps, context);
 
   // Collect validation errors/warnings into top-level arrays
   errors.push(...validation.errors);

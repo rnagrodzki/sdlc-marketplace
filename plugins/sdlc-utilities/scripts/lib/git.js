@@ -38,6 +38,33 @@ function exec(cmd, opts = {}) {
   }
 }
 
+/**
+ * Run a shell command with automatic retry and exponential backoff.
+ * Uses Atomics.wait for the delay — no subprocess spawned.
+ * @param {string} cmd
+ * @param {object} [opts]
+ * @param {number} [opts.retries=3]       Maximum number of attempts (total, including the first).
+ * @param {number} [opts.baseDelayMs=1000] Delay before the second attempt; doubles on each retry.
+ * @param {boolean} [opts.throwOnError]    If true and all retries exhausted, throws with attempt count.
+ * @returns {string|null}  Trimmed stdout, or null when all attempts fail and throwOnError is false.
+ */
+function retryExec(cmd, opts = {}) {
+  const { retries = 3, baseDelayMs = 1000, throwOnError, ...execOpts } = opts;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const result = exec(cmd, execOpts);
+    if (result !== null) return result;
+    // All attempts exhausted — break before sleeping.
+    if (attempt === retries) break;
+    // Exponential backoff: 1×, 2×, 4×, …
+    const delay = baseDelayMs * Math.pow(2, attempt - 1);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
+  }
+  if (throwOnError) {
+    throw new Error(`retryExec: command failed after ${retries} attempt(s): ${cmd}`);
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Shared helpers (used by both review-prepare.js and pr-prepare.js)
 // ---------------------------------------------------------------------------
@@ -661,6 +688,7 @@ function fetchPrReviewThreads(owner, repo, prNumber) {
 module.exports = {
   // Core
   exec,
+  retryExec,
   // Shared
   checkGitState,
   detectBaseBranch,

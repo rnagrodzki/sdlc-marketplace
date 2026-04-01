@@ -1,7 +1,8 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
+const fs     = require('fs');
+const path   = require('path');
+const crypto = require('crypto');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -43,12 +44,27 @@ function readJsonFile(filePath) {
 }
 
 /**
+ * Write content to filePath atomically: write to a .tmp sibling, then rename.
+ * The tmp file is placed in the same directory so fs.renameSync works across
+ * same-filesystem paths without a copy.
+ * @param {string} filePath  Absolute destination path
+ * @param {string} content   String content to write
+ */
+function atomicWriteSync(filePath, content) {
+  const dir    = path.dirname(filePath);
+  const suffix = crypto.randomBytes(4).toString('hex');
+  const tmp    = path.join(dir, path.basename(filePath) + '.' + suffix + '.tmp');
+  fs.writeFileSync(tmp, content, 'utf8');
+  fs.renameSync(tmp, filePath);
+}
+
+/**
  * Write an object as pretty-printed JSON, creating parent directories as needed.
  */
 function writeJsonFile(filePath, data) {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf8');
+  atomicWriteSync(filePath, JSON.stringify(data, null, 2) + '\n');
 }
 
 /**
