@@ -1,6 +1,7 @@
 # Fixture appropriateness:
 #   plan-execution-complete        -- CORRECT: simulates completed plan execution, triggers workflow continuation
 #   feature-branch-with-commits   -- CORRECT: provides branch context for plan execution with --preset
+#   plan-execution-with-guardrails -- CORRECT: provides execution guardrails context for guardrail evaluation testing
 
 - description: "execute-plan-sdlc: shows workflow continuation menu after plan execution"
   vars:
@@ -48,3 +49,40 @@
         Balanced preset (haiku for Trivial, sonnet for Standard, opus for Complex) and
         proceeds directly to execution. The response does not ask the user to "Select preset
         (A/B/C)" — the selection is already made via the --preset argument.
+
+- description: "execute-plan-sdlc: loads execution guardrails from config and evaluates during execution"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-execution-with-guardrails.md"
+    user_request: >
+      Run /execute-plan-sdlc --preset B. A plan with 4 tasks has been loaded and validated.
+      The project has execution guardrails configured in .claude/sdlc.json under execute.guardrails.
+      Show how guardrails are loaded and describe how they will be evaluated during execution.
+  assert:
+    - type: icontains
+      value: "execution guardrails"
+    - type: icontains
+      value: "guardrail"
+    - type: llm-rubric
+      value: >
+        The response acknowledges that execution guardrails are configured and loaded from the
+        execute section of .claude/sdlc.json (not the plan section). It describes or references
+        guardrail evaluation at pre-wave (5a-pre) and/or post-wave (5c-ter) checkpoints.
+        The response distinguishes execution guardrails from plan guardrails.
+
+- description: "execute-plan-sdlc: proceeds normally when no execution guardrails configured"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-execution-complete.md"
+    user_request: >
+      Run /execute-plan-sdlc --preset B. A plan has been loaded. No execution guardrails are
+      configured in the project. Show how the execution proceeds.
+  assert:
+    - type: not-icontains
+      value: "guardrail violation"
+    - type: llm-rubric
+      value: >
+        The response proceeds with normal plan execution without blocking on guardrails.
+        It may mention "No execution guardrails configured" but does not show guardrail
+        evaluation steps or guardrail violations. Execution flows through the standard
+        wave dispatch, verification, and reporting steps.

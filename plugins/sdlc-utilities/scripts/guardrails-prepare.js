@@ -5,11 +5,12 @@
  * Guardrails are constraints that plan-sdlc evaluates during its critique phases.
  *
  * Usage:
- *   node guardrails-prepare.js --project-root <path> [--mode init|add] [--json]
+ *   node guardrails-prepare.js --project-root <path> [--mode init|add] [--target plan|execute] [--json]
  *
  * Options:
  *   --project-root <path>   Project root (default: cwd)
  *   --mode init|add         init = propose all; add = filter out existing (default: init)
+ *   --target plan|execute   Target context: plan = plan-phase guardrails; execute = execution-phase guardrails (default: plan)
  *   --json                  Output JSON (always on; flag is for convention consistency)
  *
  * Exit codes: 0 = success, 1 = expected/config error, 2 = unexpected crash
@@ -35,6 +36,7 @@ function parseArgs(argv) {
   const args = argv.slice(2);
   let projectRoot = process.cwd();
   let mode = 'init';
+  let target = 'plan';
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -42,6 +44,8 @@ function parseArgs(argv) {
       projectRoot = path.resolve(args[++i]);
     } else if (a === '--mode' && args[i + 1]) {
       mode = args[++i];
+    } else if (a === '--target' && args[i + 1]) {
+      target = args[++i];
     }
     // --json is accepted for convention; no action needed
   }
@@ -51,23 +55,28 @@ function parseArgs(argv) {
     process.exit(1);
   }
 
-  return { projectRoot, mode };
+  if (target !== 'plan' && target !== 'execute') {
+    process.stderr.write(`guardrails-prepare: invalid --target "${target}". Valid: plan, execute\n`);
+    process.exit(1);
+  }
+
+  return { projectRoot, mode, target };
 }
 
 // ---------------------------------------------------------------------------
 // Existing guardrails
 // ---------------------------------------------------------------------------
 
-function readExisting(projectRoot) {
-  let planSection = null;
+function readExisting(projectRoot, target) {
+  let section = null;
   try {
-    planSection = readSection(projectRoot, 'plan');
+    section = readSection(projectRoot, target);
   } catch (err) {
-    return { error: `Failed to read plan config: ${err.message}`, count: 0, guardrails: [], ids: [] };
+    return { error: `Failed to read ${target} config: ${err.message}`, count: 0, guardrails: [], ids: [] };
   }
 
-  const guardrails = (planSection && Array.isArray(planSection.guardrails))
-    ? planSection.guardrails
+  const guardrails = (section && Array.isArray(section.guardrails))
+    ? section.guardrails
     : [];
 
   return {
@@ -374,9 +383,11 @@ function extractClaudeMdRules(projectRoot, signals) {
 /**
  * Build proposals from detected signals.
  * @param {object} signals
+ * @param {string} target  'plan' or 'execute'
  * @returns {Array<{id, description, severity, category, evidence}>}
  */
-function buildProposals(signals) {
+function buildProposals(signals, target) {
+  const isPlan = (target || 'plan') === 'plan';
   const proposals = [];
   const dirs = signals.directories;
 
@@ -388,7 +399,9 @@ function buildProposals(signals) {
   if (signals.hasDatabase && repoPath) {
     proposals.push({
       id: 'no-direct-db-access',
-      description: `All database access must go through ${repoLabel}. No direct SQL or ORM calls in controllers/handlers.`,
+      description: isPlan
+        ? `Plans must route all database operations through ${repoLabel}. No direct SQL or ORM calls in controllers/handlers.`
+        : `Code changes must not introduce direct database queries outside ${repoLabel}.`,
       severity: 'error',
       category: 'architecture',
       evidence: `Detected ${signals.dbType || 'database'} with repositories/ directory at "${repoPath}".`,
@@ -398,7 +411,9 @@ function buildProposals(signals) {
   if (signals.hasApi) {
     proposals.push({
       id: 'api-backward-compatibility',
-      description: 'API changes must maintain backward compatibility or document breaking changes in Key Decisions.',
+      description: isPlan
+        ? 'Plans must version or deprecate changed APIs. Breaking changes must be documented in Key Decisions.'
+        : 'API changes must maintain backward compatibility — no breaking changes to existing endpoints or contracts without versioning.',
       severity: 'error',
       category: 'architecture',
       evidence: `Detected API (format: ${signals.apiFormat || 'unknown'}).`,
@@ -408,7 +423,9 @@ function buildProposals(signals) {
   if (signals.hasTests) {
     proposals.push({
       id: 'test-coverage-required',
-      description: 'Every task that creates or modifies source code must include corresponding tests.',
+      description: isPlan
+        ? 'Every task that creates or modifies source code must include corresponding test cases.'
+        : 'Code changes must include corresponding test coverage — verify tests exist and pass after each wave.',
       severity: 'error',
       category: 'testing',
       evidence: `Detected test infrastructure${signals.testFramework ? ` (${signals.testFramework})` : ''}.`,
@@ -418,7 +435,9 @@ function buildProposals(signals) {
   if (signals.hasDatabase) {
     proposals.push({
       id: 'database-migration-review',
-      description: 'Tasks modifying database schema must be flagged as High risk.',
+      description: isPlan
+        ? 'Tasks modifying database schema must be flagged as High risk.'
+        : 'Database migration files must be reviewed — schema changes are flagged for manual verification.',
       severity: 'warning',
       category: 'architecture',
       evidence: `Detected ${signals.dbType || 'database'} integration.`,
@@ -428,7 +447,9 @@ function buildProposals(signals) {
   if (signals.hasCi) {
     proposals.push({
       id: 'no-ci-bypass',
-      description: 'Plans must not include steps that skip or disable CI checks.',
+      description: isPlan
+        ? 'Plans must not include steps that skip or disable CI checks.'
+        : 'Implemented code must not disable, skip, or weaken CI checks, linters, or pre-commit hooks.',
       severity: 'error',
       category: 'security',
       evidence: `Detected CI platform: ${signals.ciPlatform}.`,
@@ -438,7 +459,9 @@ function buildProposals(signals) {
   if (signals.hasMonorepo) {
     proposals.push({
       id: 'monorepo-boundary-respect',
-      description: 'Tasks must not create cross-package dependencies without explicit justification.',
+      description: isPlan
+        ? 'Tasks must not create cross-package dependencies without explicit justification.'
+        : 'Code changes must respect monorepo package boundaries — no cross-package imports outside declared dependencies.',
       severity: 'warning',
       category: 'architecture',
       evidence: 'Detected monorepo configuration (lerna.json / pnpm-workspace.yaml / nx.json).',
@@ -448,7 +471,9 @@ function buildProposals(signals) {
   if (signals.hasOpenSpec) {
     proposals.push({
       id: 'spec-compliance',
-      description: 'Functional changes must reference an OpenSpec change for traceability.',
+      description: isPlan
+        ? 'Changes must reference an OpenSpec change for traceability.'
+        : 'Implementation must comply with OpenSpec delta spec requirements when available.',
       severity: 'warning',
       category: 'architecture',
       evidence: 'Detected openspec/config.yaml.',
@@ -458,7 +483,9 @@ function buildProposals(signals) {
   // Always-on guardrails
   proposals.push({
     id: 'no-scope-creep',
-    description: 'Tasks must only address stated requirements; no gold-plating.',
+    description: isPlan
+      ? 'Tasks must only address stated requirements; no gold-plating.'
+      : 'Implementation must stay within the task\'s stated scope — no additional features, refactoring, or cleanup beyond what was specified.',
     severity: 'warning',
     category: 'scope',
     evidence: 'Universal guardrail — always applicable.',
@@ -466,7 +493,9 @@ function buildProposals(signals) {
 
   proposals.push({
     id: 'single-responsibility-tasks',
-    description: 'Each task must have exactly one clear deliverable.',
+    description: isPlan
+      ? 'Each task must have exactly one clear deliverable.'
+      : 'Each implemented change must address exactly one concern — no bundled fixes or unrelated modifications.',
     severity: 'warning',
     category: 'scope',
     evidence: 'Universal guardrail — always applicable.',
@@ -480,13 +509,13 @@ function buildProposals(signals) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const { projectRoot, mode } = parseArgs(process.argv);
+  const { projectRoot, mode, target } = parseArgs(process.argv);
 
   const errors = [];
   const warnings = [];
 
   // 1. Read existing guardrails
-  const existingResult = readExisting(projectRoot);
+  const existingResult = readExisting(projectRoot, target);
   if (existingResult.error) {
     errors.push(existingResult.error);
   }
@@ -521,7 +550,7 @@ function main() {
   extractClaudeMdRules(projectRoot, signals);
 
   // 3. Build proposals
-  let proposals = buildProposals(signals);
+  let proposals = buildProposals(signals, target);
 
   // 4. In add mode, filter out already-existing ids
   if (mode === 'add' && existing.ids.length > 0) {
@@ -549,4 +578,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildProposals, detectLanguagesAndFrameworks, detectStructure };
+module.exports = { buildProposals, detectLanguagesAndFrameworks, detectStructure, readExisting };

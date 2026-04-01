@@ -24,6 +24,7 @@ Configures the SDLC plugin for a project in one interactive flow. Creates `.clau
 | `--dimensions` | Jump directly to review dimensions sub-flow (skip config builder) | — |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | — |
 | `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | — |
+| `--execution-guardrails` | Jump directly to execution guardrails sub-flow (skip config builder) | — |
 | `--add` | Expansion mode with `--dimensions` or `--guardrails` (propose only new items) | — |
 | `--no-copilot` | Skip GitHub Copilot instructions with `--dimensions` | — |
 

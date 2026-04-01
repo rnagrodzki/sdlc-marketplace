@@ -48,6 +48,25 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
 
 **Hook context fast-path:** If the session-start system-reminder contains an `Active execution:` line, note the state file details. When the user does not pass `--resume` explicitly but the hook reported an active execution, use this to inform the resume prompt — skip the filesystem scan since the hook already found the state file. The hook context is a session-start snapshot.
 
+**Guardrail loading:** Load execution guardrails from project config:
+
+> **VERBATIM** — Run this bash block exactly as written.
+
+```bash
+SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
+[ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
+[ -z "$SCRIPT_DIR" ] && { echo "[]"; exit 0; }
+node -e "
+const { readSection } = require('$SCRIPT_DIR/config.js');
+const execute = readSection(process.cwd(), 'execute');
+console.log(JSON.stringify(execute?.guardrails || []));
+"
+```
+
+Parse the JSON output. If the array is non-empty, store as `activeGuardrails` and print: "Loaded N execution guardrails." If empty or config not found: "No execution guardrails configured." This is backward compatible — no guardrails means no change in behavior.
+
+Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrails` (planning-time critique). They are independent sets configured separately in `.claude/sdlc.json`.
+
 **Resume detection:** Before reading the plan content, resolve the main working tree path: run `git worktree list --porcelain` and extract the path from the first `worktree <path>` line. All state file operations use `<main-worktree>/.sdlc/execution/`. Then check if `--resume` was passed or if a state file exists at `<main-worktree>/.sdlc/execution/execute-<branch>-*.json` (where `<branch>` is the current branch name with `/` replaced by `-`).
 
 - If `--resume` was passed:
@@ -166,7 +185,11 @@ After classifying tasks, apply complexity routing before wave building:
 **If total tasks ≤ 3 AND all tasks are Trivial or Standard AND no high-risk tasks:**
 Print: `Small plan — executing directly without wave orchestration.`
 
-Execute each task sequentially in the main context (no agent dispatch). Run verification after each task. Skip Steps 3–4 (wave critique and confirmation). Apply the 2-retry budget and Step 6 recovery if a task fails. **No state file is written** — small plans are fast enough to re-run from scratch.
+Execute each task sequentially in the main context (no agent dispatch). Run verification after each task.
+
+After all tasks complete in the small-plan path, if `activeGuardrails` is non-empty, perform a single guardrail evaluation (same as Step 5c-ter) against the cumulative `git diff --stat`. Error violations prompt the user; warning violations are reported.
+
+Skip Steps 3–4 (wave critique and confirmation). Apply the 2-retry budget and Step 6 recovery if a task fails. **No state file is written** — small plans are fast enough to re-run from scratch.
 
 **If total tasks 4–8:** Standard wave execution with state persistence after every wave — proceed to Step 3.
 
@@ -231,6 +254,26 @@ Always present all 3 presets. Default is Balanced. When the user selects a prese
 **Pre-wave:** If there is 1 pre-wave trivial task, execute it inline in the main context. If there are 2+ pre-wave trivials, dispatch them as a single batch agent (haiku) using the Batched Trivial Tasks Prompt Template in `./classifying-and-waving-tasks.md`. Mark each complete in TodoWrite after inline execution or after the batch agent returns.
 
 **For each wave:**
+
+**5a-pre. Pre-wave guardrail check (error-severity only)** — Skip if `activeGuardrails` is empty.
+
+Before dispatching any agents in this wave, evaluate each error-severity guardrail against the wave's task descriptions. For each guardrail with `severity: "error"` (or no severity, defaulting to error):
+
+- Read the guardrail's `description` (natural language)
+- Assess whether the tasks about to execute in this wave would violate the guardrail
+- Context for evaluation: the full task text for every task in this wave, plus the cumulative `git diff --stat` from prior waves (if any)
+
+**Verdicts:**
+- All guardrails PASS → proceed to 5a (high-risk gate)
+- Any guardrail FAIL → use AskUserQuestion:
+  > Wave N would violate guardrail `<id>`: <description>
+  > Rationale: <one-line explanation>
+  >
+  > Options: **override** (proceed anyway) | **cancel** (stop execution)
+
+  If `--auto` is set, treat error-severity violations as blocking — do NOT auto-override. Print the violation and stop execution. Guardrails exist to prevent drift; auto-mode should not silently bypass them.
+
+Warning-severity guardrails are not evaluated pre-wave — they are checked post-wave in Step 5c-ter.
 
 **5a. High-risk gate** — If the wave contains high-risk tasks:
 
@@ -298,6 +341,32 @@ The reviewer reads actual code and returns per-task verdicts:
 If issues found:
 - 1–2 minor issues → fix inline in main context
 - Major spec gaps → re-dispatch the original agent with specific fix instructions (counts toward 2-retry budget)
+
+**5c-ter. Post-wave guardrail check** — Skip if `activeGuardrails` is empty.
+
+After mechanical verification and spec compliance review, evaluate ALL guardrails (both error and warning severity) against the actual changes produced by this wave.
+
+For each guardrail in `activeGuardrails`:
+- Read the guardrail's `description`
+- Assess whether the wave's actual output violates the guardrail
+- Context for evaluation: the `git diff --stat` output from Step 5c.1, the agent completion checklists, and the cumulative context of prior waves
+
+**Verdicts per guardrail:**
+- PASS → no action
+- FAIL (error severity) → use AskUserQuestion:
+  > Wave N output violates guardrail `<id>`: <description>
+  > Rationale: <one-line explanation of what specifically violated it>
+  >
+  > Options: **fix** (attempt inline fix before proceeding) | **override** (accept and continue) | **cancel** (stop execution)
+
+  On "fix": attempt to fix the violation inline (no agent dispatch). After fixing, re-evaluate the specific guardrail. If still failing after one fix attempt, escalate to user with override/cancel options.
+
+  If `--auto` is set: print the violation and stop execution (same as pre-wave — do not auto-override).
+
+- FAIL (warning severity) → report but do not block:
+  > ⚠ Guardrail warning `<id>`: <description> — <rationale>
+
+  Include in the progress report (Step 5d). No user prompt required.
 
 **5d. Progress report** — After each wave:
 ```
@@ -409,6 +478,11 @@ Files changed:    N files (N added, N modified, N deleted)
 ────────────────────────────────────────────
 ```
 
+If `activeGuardrails` is non-empty, append to the report:
+```
+Guardrails:       N/N passed (M warnings, K overridden)
+```
+
 If `openspecSpecs` was loaded in Step 1, append to the report:
 ```
 OpenSpec:         openspec/changes/<name>/ — run /opsx:verify to validate
@@ -434,6 +508,8 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 | No orphans | All created files are referenced/used |
 | Spec compliance reviewed | Non-trivial waves pass spec review (unless Speed preset selected) |
 | Final spec completeness | All delta spec requirements covered across all waves (when openspecSpecs available) |
+| Pre-wave guardrail check | Error-severity guardrails pass or user overrides (Step 5a-pre) |
+| Post-wave guardrail check | Error-severity guardrails pass, fixed, or user overrides; warnings reported (Step 5c-ter) |
 | Completion checklists valid | Each agent's COMPLETE/VERIFY/STATUS block is present and cross-checked |
 
 ## When to Ask the User
@@ -463,6 +539,8 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 - Dispatch a separate agent per trivial task — execute a single trivial inline; batch 2+ trivials into one haiku agent using the Batched Trivial Tasks Prompt Template
 - Delete the execution state file on failure or interruption — it is needed for `--resume`
 - Write state files for small-plan direct execution (≤3 tasks) — they execute without waves and are fast enough to re-run
+- Auto-override error-severity guardrail violations in `--auto` mode — guardrails exist to prevent drift; always block
+- Evaluate warning-severity guardrails pre-wave — warnings are assessed post-wave against actual changes, not intent
 
 ## Gotchas
 
@@ -501,6 +579,12 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 **Resume context object enables fresh-session resume.** The `context` object in the state file exists for cross-session resume where the new session has no conversation history. It must contain enough information (plan summary, completed task IDs, file manifests, interface names, key decisions) for the orchestrator to construct meaningful agent prompts for remaining waves. Omitting context fields degrades agent output quality on resume.
 
 **State file and ship-sdlc coexistence.** Both `execute-plan-sdlc` and `ship-sdlc` write state files to `.sdlc/execution/`. They are distinguished by filename prefix (`execute-` vs `ship-`). Each skill manages its own state file lifecycle — execute-plan-sdlc never reads or writes ship-sdlc state files, and vice versa.
+
+**Guardrail evaluation is LLM-based, not programmatic.** Guardrails are natural-language descriptions evaluated by the orchestrator against task descriptions (pre-wave) and `git diff` output (post-wave). They catch semantic drift (e.g., "no direct DB access" when a task adds raw SQL), not syntactic violations. False positives are possible — the override option exists for this reason.
+
+**Guardrails complement spec compliance review.** Step 5c-bis checks spec compliance; Step 5c-ter checks guardrail compliance. They are complementary: spec review ensures tasks match their descriptions, guardrails ensure tasks match project-wide constraints. Do not merge them — they evaluate different things.
+
+**Empty guardrails are the happy path for existing projects.** If `activeGuardrails` is empty (no guardrails configured in `.claude/sdlc.json` under `execute`), all guardrail steps are skipped. This is backward compatible — no existing behavior changes. Execution guardrails (`execute.guardrails`) and plan guardrails (`plan.guardrails`) are independent — configuring one does not affect the other.
 
 ## Learning Capture
 
