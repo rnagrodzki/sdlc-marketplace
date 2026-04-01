@@ -493,7 +493,9 @@ function buildProposals(signals, target) {
 
   proposals.push({
     id: 'single-responsibility-tasks',
-    description: 'Each task must have exactly one clear deliverable.',
+    description: isPlan
+      ? 'Each task must have exactly one clear deliverable.'
+      : 'Each implemented change must address exactly one concern — no bundled fixes or unrelated modifications.',
     severity: 'warning',
     category: 'scope',
     evidence: 'Universal guardrail — always applicable.',
