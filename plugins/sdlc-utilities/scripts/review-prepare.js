@@ -39,6 +39,7 @@ const {
   getCommitCount,
   fetchPrMetadata,
   ensureGhAccount,
+  splitDiffByFile,
 } = require('./lib/git');
 const { readSection, writeLocalConfig } = require('./lib/config');
 const { writeOutput } = require('./lib/output');
@@ -239,16 +240,7 @@ function fetchAndSplitDiff(base, projectRoot, scope = 'all') {
   const raw = exec(cmd, { cwd: projectRoot });
   if (!raw) return new Map();
 
-  const fileDiffs = new Map();
-  const chunks    = raw.split(/(?=^diff --git )/m);
-
-  for (const chunk of chunks) {
-    if (!chunk.trim()) continue;
-    const m = chunk.match(/^diff --git a\/.+ b\/(.+)/m);
-    if (m) fileDiffs.set(m[1].trim(), chunk);
-  }
-
-  return fileDiffs;
+  return splitDiffByFile(raw);
 }
 
 /**

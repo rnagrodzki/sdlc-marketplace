@@ -25,9 +25,59 @@
 
 'use strict';
 
-const { exec, checkGitState } = require('./lib/git');
+const { exec, checkGitState, splitDiffByFile } = require('./lib/git');
 const { readSection } = require('./lib/config');
 const { writeOutput } = require('./lib/output');
+
+// ---------------------------------------------------------------------------
+// Diff truncation
+// ---------------------------------------------------------------------------
+
+const MAX_DIFF_CHARS = 8000;
+
+/**
+ * Truncates a staged diff to MAX_DIFF_CHARS by dropping the largest files first.
+ * Always includes at least one file's diff even if it exceeds the budget.
+ *
+ * @param {string} fullDiff
+ * @returns {{ diff: string, diffTruncated: boolean, truncatedFiles: string[] }}
+ */
+function truncateStagedDiff(fullDiff) {
+  if (fullDiff.length <= MAX_DIFF_CHARS) {
+    return { diff: fullDiff, diffTruncated: false, truncatedFiles: [] };
+  }
+
+  const fileChunks = splitDiffByFile(fullDiff); // Map<filePath, diffChunk>
+
+  // Sort descending by chunk size (largest first — most signal)
+  const sorted = [...fileChunks.entries()].sort((a, b) => b[1].length - a[1].length);
+
+  const included = [];
+  const truncatedFiles = [];
+  let totalChars = 0;
+
+  for (const [filePath, chunk] of sorted) {
+    if (included.length === 0) {
+      // Always include at least one file
+      included.push(chunk);
+      totalChars += chunk.length;
+    } else if (totalChars + chunk.length <= MAX_DIFF_CHARS) {
+      included.push(chunk);
+      totalChars += chunk.length;
+    } else {
+      truncatedFiles.push(filePath);
+    }
+  }
+
+  const footer = [
+    `# --- Truncated ---`,
+    `# The following ${truncatedFiles.length} file(s) were omitted (see diffStat for summary):`,
+    ...truncatedFiles.map(f => `# - ${f}`),
+  ].join('\n');
+
+  const diff = included.join('') + '\n' + footer;
+  return { diff, diffTruncated: true, truncatedFiles };
+}
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -124,6 +174,7 @@ function main() {
 
   // Step 6: Get staged diff (may be empty when --amend with nothing staged)
   const stagedDiff = exec('git diff --cached', { cwd: projectRoot }) || '';
+  const { diff: finalDiff, diffTruncated, truncatedFiles } = truncateStagedDiff(stagedDiff);
 
   // Step 7: Get staged diff stat
   const stagedDiffStat = exec('git diff --cached --stat', { cwd: projectRoot }) || '';
@@ -159,10 +210,12 @@ function main() {
     flags,
     commitConfig,
     staged: {
-      files:     stagedFiles,
-      fileCount: stagedFiles.length,
-      diff:      stagedDiff,
-      diffStat:  stagedDiffStat,
+      files:          stagedFiles,
+      fileCount:      stagedFiles.length,
+      diff:           finalDiff,
+      diffStat:       stagedDiffStat,
+      diffTruncated,
+      truncatedFiles,
     },
     unstaged: {
       files:      unstagedFiles,

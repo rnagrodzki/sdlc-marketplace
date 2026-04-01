@@ -77,6 +77,8 @@ Extract these fields from `COMMIT_CONTEXT_JSON`:
 | `staged.fileCount` | Number of staged files |
 | `staged.diff` | Full unified diff of staged changes |
 | `staged.diffStat` | Diff stat summary line |
+| `staged.diffTruncated` | Boolean: true when diff exceeded context budget and was truncated |
+| `staged.truncatedFiles` | File paths whose full diffs were omitted (diffstat still available) |
 | `unstaged.files` | Modified tracked files not staged |
 | `unstaged.hasChanges` | Whether unstaged changes exist |
 | `recentCommits` | Last 15 commits (oneline format) for style detection |
@@ -85,7 +87,7 @@ Extract these fields from `COMMIT_CONTEXT_JSON`:
 
 ### Step 2 (PLAN): Generate Commit Message
 
-1. Analyze `staged.diff` to understand what changed. Read the full diff — do not rely on file names alone.
+1. Analyze `staged.diff` to understand what changed. Read the full diff — do not rely on file names alone. When `staged.diffTruncated` is true, the diff includes only the largest file changes within the context budget. For files in `staged.truncatedFiles`, use `staged.diffStat` and file names to infer the nature of changes.
 2. Analyze `recentCommits` to detect project commit style:
    - Conventional commits: `type(scope): description`?
    - Plain imperative English?
@@ -218,7 +220,7 @@ Omit the `Stash:` line if no stash was used.
 | ---- | ----- | ------------- |
 | Style match | Message follows project's commit style | Consistent with `recentCommits` patterns |
 | Subject length | Subject ≤ 72 characters | `len(subject) <= 72` |
-| Accuracy | Message describes the actual staged diff | Every claim traceable to `staged.diff` |
+| Accuracy | Message describes the actual staged diff | Every claim traceable to `staged.diff` or `staged.diffStat` (when `diffTruncated` is true) |
 | Type correctness | Commit type matches the change | `feat`=new feature, `fix`=bug fix, `refactor`=restructure, `chore`=maintenance |
 | Imperative mood | Subject uses imperative form | "add" not "adds" or "added" |
 | No fabrication | Nothing invented beyond the diff | Every claim backed by staged changes |
@@ -229,7 +231,7 @@ Omit the `Stash:` line if no stash was used.
 
 ## Best Practices
 
-1. Read the full staged diff, not just file names
+1. Read the full staged diff when available; when `staged.diffTruncated` is true, combine included diffs with diffstat for truncated files
 2. Match the project's commit style from `recentCommits`
 3. Prefer conventional commits when the project uses them
 4. Keep the subject concise — details go in the body
