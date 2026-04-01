@@ -400,6 +400,24 @@ function getDiffContent(base, projectRoot) {
   return exec(`git diff ${base}..HEAD`, { cwd: projectRoot }) || '';
 }
 
+/**
+ * Split a raw unified diff string into per-file chunks.
+ * @param {string} rawDiff  Full unified diff output from git
+ * @returns {Map<string, string>}  Map of file path → diff chunk
+ */
+function splitDiffByFile(rawDiff) {
+  const fileDiffs = new Map();
+  const chunks    = rawDiff.split(/(?=^diff --git )/m);
+
+  for (const chunk of chunks) {
+    if (!chunk.trim()) continue;
+    const m = chunk.match(/^diff --git a\/.+ b\/(.+)/m);
+    if (m) fileDiffs.set(m[1].trim(), chunk);
+  }
+
+  return fileDiffs;
+}
+
 // ---------------------------------------------------------------------------
 // Version-specific helpers (used by version-prepare.js only)
 // ---------------------------------------------------------------------------
@@ -660,6 +678,7 @@ module.exports = {
   getCommitsStructured,
   getDiffStat,
   getDiffContent,
+  splitDiffByFile,
   // Version-specific
   getTagList,
   getCommitsSinceRef,

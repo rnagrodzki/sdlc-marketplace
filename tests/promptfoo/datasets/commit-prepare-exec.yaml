@@ -128,3 +128,38 @@
   assert:
     - type: icontains
       value: '"errors": []'
+
+- description: "commit-prepare: large diff triggers truncation"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-large-diff"
+  assert:
+    - type: icontains
+      value: '"diffTruncated": true'
+    - type: icontains
+      value: '"truncatedFiles"'
+    - type: icontains
+      value: '# --- Truncated ---'
+
+- description: "commit-prepare: truncated diff preserves complete file list and diffstat"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-large-diff"
+  assert:
+    - type: icontains
+      value: '"fileCount": 25'
+    - type: icontains
+      value: '"diffStat"'
+
+- description: "commit-prepare: small diff is not truncated"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: '"diffTruncated": false'
+    - type: icontains
+      value: '"truncatedFiles": []'

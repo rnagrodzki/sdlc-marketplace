@@ -118,3 +118,27 @@
         (Reviewed-by in this case). The quality gate validates the presence of required
         trailers before allowing the commit. The critique output indicates trailer validation
         or requirement checking.
+
+- description: "commit-sdlc: generates accurate message from truncated diff"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-large-diff-truncated.md"
+    user_request: >
+      Run /commit-sdlc. The commit-prepare.js output is provided in the project
+      context above. Note that staged.diffTruncated is true — the diff was truncated
+      to fit the context budget. 20 files are staged but only 5 file diffs are included.
+      Use the available diff content and diffstat for the remaining 15 truncated files
+      to generate an accurate commit message.
+  assert:
+    - type: regex
+      value: '(feat|fix|chore|refactor)(\(.+\))?:'
+    - type: llm-rubric
+      value: >
+        The commit message accurately reflects the staged changes: a refactor of
+        validation modules to return structured results with error codes. Since the diff
+        was truncated (only 5 of 20 file diffs included), the message appropriately
+        summarizes the overall change pattern rather than listing individual file details
+        for files whose diffs were not available. The message does NOT fabricate specific
+        code-level details (like function names, variable names, or line changes) for
+        files that were in the truncated set. The message follows conventional commit
+        format with an imperative subject line.
