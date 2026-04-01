@@ -221,7 +221,7 @@ function computeSteps(flags, flagSources) {
     const src = flagSources && flagSources.skip;
     if (src === 'cli') return 'cli';
     if (src === 'config') return 'config';
-    return 'none';
+    return 'default';
   }
 
   const steps = [

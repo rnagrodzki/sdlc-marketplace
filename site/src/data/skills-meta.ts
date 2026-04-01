@@ -85,7 +85,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'build-pipeline', label: 'Build pipeline plan', type: 'llm', description: 'Determines which steps run, builds routing table with conditions' },
       { id: 'validate', label: 'Validate pipeline', type: 'critique', description: 'Checks prerequisites, warns about interactive pauses' },
       { id: 'confirm', label: 'Present and confirm', type: 'user', description: 'Shows full pipeline table; proceeds automatically in --auto mode' },
-      { id: 'execute-steps', label: 'Execute pipeline steps', type: 'dispatch', description: 'Invokes sub-skills sequentially with flag forwarding' },
+      { id: 'execute-steps', label: 'Execute pipeline steps', type: 'dispatch', description: 'Dispatches sub-skills as Agents sequentially; each Agent returns a structured result' },
       { id: 'review-gate', label: 'Review verdict gate', type: 'llm', description: 'Evaluates review findings; triggers fix loop for critical/high' },
       { id: 'report', label: 'Pipeline summary', type: 'verify', description: 'Prints results, decisions log, deferred findings, cleanup' },
     ],

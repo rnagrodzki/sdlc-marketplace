@@ -301,7 +301,7 @@ For each step that will run:
 
 3. **Dispatch Agent** with: skill name, args from `step.invocation`, and brief pipeline context (branch, previous step results needed for this step). Agent prompt template:
    ```
-   You are executing the <skill-name> skill. Read `plugins/sdlc-utilities/skills/<skill-name>/SKILL.md` and follow it with args: <args>. Return a structured result:
+   You are executing the <skill-name> skill. Invoke `/<skill-name> <args>` using the Skill tool — this loads the SKILL.md automatically. Return a structured result:
    (1) status — success or failure
    (2) result summary — 2-3 lines
    (3) artifacts — commit hash, tag, PR URL, verdict, etc.
@@ -595,7 +595,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Sub-skill loading and agent isolation.** Each sub-skill's SKILL.md is 200–550 lines. Agent dispatch is the primary mitigation: each Agent loads SKILL.md in its own context and returns only a structured result (5–10 lines). The ship pipeline's context receives structured data, not sub-skill definitions. Without agent dispatch, the Skill tool would load all definitions into the pipeline's context (2000+ lines), degrading context quality in later steps (version, PR) and increasing the risk of hallucination or skipped logic.
 
-**skipSource tracks provenance.** Each step's `skipSource` field records why a step was skipped: `"none"` (not skipped), `"cli"` (user `--skip` flag), `"config"` (from `.sdlc/local.json`), `"auto"` (auto-skipped by `computeSteps` logic), `"condition"` (conditional step not triggered). If `flags.skip.length > 0` but `flagSources.skip === 'default'`, the skip set was fabricated — warn before proceeding.
+**skipSource tracks provenance.** Each step's `skipSource` field records why a step was skipped: `"none"` (not skipped), `"cli"` (user `--skip` flag), `"config"` (from `.sdlc/local.json`), `"auto"` (auto-skipped by `computeSteps` logic), `"condition"` (conditional step not triggered), `"default"` (skip source unresolved — likely fabricated). If a step has `skipSource: "default"`, the fabrication guard in `runValidation` fires a warning. The per-step `skipSource` and the fabrication guard are complementary: `skipSource` makes the issue visible per step, the guard makes it visible at the pipeline level.
 
 ---
 
