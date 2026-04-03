@@ -69,6 +69,11 @@
         "id": "kiss",
         "description": "Prefer the simplest implementation that satisfies the requirements. Avoid unnecessary abstractions, premature generalization, and over-engineered solutions.",
         "severity": "warning"
+      },
+      {
+        "id": "spec-first",
+        "description": "Any task that modifies a skill's behavior (SKILL.md changes) must first update the corresponding spec in docs/specs/<skill-name>.md. The spec is the source of truth — implementation follows spec, not the other way around. Plans that change SKILL.md without a matching spec update task (ordered before the SKILL.md task) fail this guardrail.",
+        "severity": "error"
       }
     ]
   },
