@@ -27,7 +27,7 @@ scripts/                     # Node.js helper scripts (optional; invoked via Bas
 
 ## Architecture Principles
 
-1. **Spec-driven development** — design before implementation
+1. **Spec-driven development** — every skill has a specification at `docs/specs/<skill-name>.md` that defines WHAT the skill must do (behavioral contract, testable requirements). The spec is the source of truth for behavior. SKILL.md (HOW) implements the spec; `docs/skills/` (usage reference) documents it for users. Changes to SKILL.md must reference spec requirement numbers (e.g., "implements R3"). New skills need an accepted spec before writing SKILL.md. Use `docs/spec-template.md` as the starting point.
 2. **Plan → Critique → Improve → Do → Critique → Improve** — mandatory dual critique gates in every pipeline (critique the plan, then critique the output)
 3. **Parallel execution** — always run independent steps concurrently
 4. **Specificity over generics** — every skill targets a concrete task
@@ -71,7 +71,11 @@ When plan mode is active, **always invoke plan-sdlc** via the Skill tool for pla
 
 ## Documenting Skills
 
-Every skill must have a dedicated reference doc in `docs/skills/<skill-name>.md`. Use `docs/skill-doc-template.md` as the starting point.
+Every skill requires three artifacts:
+
+1. **Specification** at `docs/specs/<skill-name>.md` — behavioral contract (WHAT). Use `docs/spec-template.md`.
+2. **SKILL.md** at `plugins/<plugin>/skills/<skill-name>/SKILL.md` — implementation (HOW). Must reference spec requirement numbers.
+3. **Reference doc** at `docs/skills/<skill-name>.md` — usage reference for end users. Use `docs/skill-doc-template.md`.
 
 Each skill doc must include:
 

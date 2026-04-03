@@ -28,7 +28,15 @@ Use lowercase and hyphens only. Avoid vague names (`setup`, `utils`) — names s
 > **Name resolution:** User-invocable skills are callable directly by their directory name with
 > no prefix. A skill in `skills/pr-sdlc/` is invoked as `/pr-sdlc`.
 
-### Step 2: Create SKILL.md
+### Step 2: Create the Specification
+
+Create the behavioral specification at `docs/specs/<skill-name>.md` using `docs/spec-template.md` as the starting point.
+
+The spec defines **WHAT** the skill must do — testable requirements, quality gates, error handling, and integration points. SKILL.md (Step 3) defines **HOW** the skill implements these requirements. Each requirement uses a prefix scheme: R (requirement), A (argument), G (quality gate), P (prepare contract), E (error handling), C (constraint), I (integration).
+
+Changes to SKILL.md should reference spec requirement numbers (e.g., "implements R3") to maintain traceability.
+
+### Step 3: Create SKILL.md
 
 ```markdown
 ---
@@ -66,7 +74,7 @@ Brief introduction of what this skill does.
 - [Anti-pattern two]
 ```
 
-### Step 3: Add Supporting Files (Optional)
+### Step 4: Add Supporting Files (Optional)
 
 Place additional `.md` files alongside `SKILL.md` for:
 - **Templates** — Reusable file templates referenced from SKILL.md

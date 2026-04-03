@@ -1,0 +1,76 @@
+<!-- 
+  Skill Specification Template
+  
+  Three-layer relationship:
+  - Spec (docs/specs/<name>.md)  — WHAT the skill must do (behavioral contract, testable requirements)
+  - SKILL.md (plugins/.../skills/<name>/SKILL.md) — HOW the skill does it (implementation steps, prompts, tool usage)
+  - Docs (docs/skills/<name>.md) — Usage reference for end users (flags, examples, prerequisites)
+  
+  The spec is the source of truth. Changes to SKILL.md must reference spec requirement numbers.
+  New skills need an accepted spec before writing SKILL.md.
+  
+  Prefix legend:
+    R = Core Requirement    A = Argument       G = Quality Gate
+    P = Prepare Contract    E = Error Handling  C = Constraint
+    I = Integration
+  
+  Omit sections that have no entries (e.g., no prepare script → omit Prepare Script Contract).
+-->
+
+# <skill-name> Specification
+
+> One-line purpose statement describing what this skill does and why it exists.
+
+**User-invocable:** yes | no
+**Model:** haiku | sonnet | opus
+**Prepare script:** `<name>.js` | none
+
+## Arguments
+
+<!-- List every flag and positional argument the skill accepts. -->
+
+- A1: `--flag` — behavior description (default: value)
+
+## Core Requirements
+
+<!-- Testable behavioral requirements. Each must be verifiable — if you can't write a test assertion for it, it's too vague. Focus on WHAT, not HOW. -->
+
+- R1: [Testable behavioral requirement]
+- R2: [Testable behavioral requirement]
+
+## Workflow Phases
+
+<!-- Name the phases the skill follows. Describe what each phase accomplishes, not the step-by-step procedure (that belongs in SKILL.md). -->
+
+1. CONSUME — [what inputs are consumed and validated]
+2. DO — [what transformation or action is performed]
+
+## Quality Gates
+
+<!-- Pass/fail criteria that must hold before the skill reports success. -->
+
+- G1: [Gate name] — [pass/fail criteria]
+
+## Prepare Script Contract
+
+<!-- Output fields from the prepare script that the skill depends on. This is an interface boundary — if the script changes output shape, the skill breaks. -->
+
+- P1: `fieldName` (type) — [what the skill uses this field for]
+
+## Error Handling
+
+<!-- How the skill behaves under specific failure conditions. -->
+
+- E1: [condition] → [behavior]
+
+## Constraints
+
+<!-- What the skill must NOT do. Explicit prohibitions. -->
+
+- C1: [What the skill must not do]
+
+## Integration
+
+<!-- How this skill interacts with other skills, tools, or external systems. -->
+
+- I1: [Other skill/tool] — [nature of interaction]
