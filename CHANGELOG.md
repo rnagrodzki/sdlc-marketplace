@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.10] - 2026-04-04
+
+### Added
+- Specification files for all SDLC skills as authoritative source of truth for workflows and requirements (#133)
+- Spec-compliance review dimension and plan guardrail enforcing spec-first development (#133)
+
+### Changed
+- Scripts reorganized from flat `scripts/` directory into logical subdirectories (`skill/`, `ci/`, `state/`, `util/`) with backward-compatible installation paths (#141)
+
 ## [0.17.9] - 2026-04-03
 
 ### Fixed
