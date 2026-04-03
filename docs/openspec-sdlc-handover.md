@@ -24,6 +24,22 @@ OpenSpec owns the "what to build" — specs, proposals, and design decisions. SD
 
 ---
 
+## Stage-Aware Handoff
+
+`session-start.js` detects the current OpenSpec stage using `lib/openspec.js` and suggests the appropriate SDLC command at each point. This eliminates the guardrail bypass gap where users would skip spec steps or invoke the wrong skill for their current stage.
+
+| OpenSpec Stage | Artifact State | SDLC Action | Suggested By |
+|---|---|---|---|
+| Proposing | `proposal.md` only | None — spec in progress | session-start: "Continue spec: /opsx:continue" |
+| Speccing | proposal + specs, no tasks | None — still spec work | session-start: "Continue spec: /opsx:ff" |
+| Tasks ready | All artifacts, 0 tasks done | **Handoff** → `/plan-sdlc --from-openspec <name>` | session-start: "Plan with: /plan-sdlc --from-openspec \<name\>" |
+| Implementing | Some tasks done, not all | Mixed ownership — OpenSpec apply or SDLC execute may be running | session-start: "Continue: /opsx:apply" or "/commit-sdlc" |
+| Tasks complete | All checkboxes checked | `/ship-sdlc` (commit → review → PR) | session-start: "Ship: /ship-sdlc" |
+
+**Note on `implementation-in-progress`:** This stage has mixed ownership. The user may be running `/opsx:apply` (OpenSpec-driven sequential execution) or `/execute-plan-sdlc` (SDLC wave-based execution). Session-start suggests both paths — the user chooses based on their workflow.
+
+---
+
 ## End-to-End Workflow
 
 ### Step 1: Propose (OpenSpec)
@@ -149,7 +165,7 @@ For detection mechanics and per-skill behavior details, see [OpenSpec Integratio
 
 **When:** Requirements benefit from structured specification before implementation.
 
-**Flow:** `/opsx:propose` → `/opsx:continue` → `/plan-sdlc --spec` → `/execute-plan-sdlc` → `/review-sdlc` → `/commit-sdlc` → `/pr-sdlc` → `/opsx:verify` → `/opsx:archive`
+**Flow:** `/opsx:propose` → `/opsx:continue` → `/plan-sdlc --from-openspec <name>` → `/ship-sdlc` → `/opsx:verify` → `/opsx:archive`
 
 **Example:** Adding a new notification system with multiple channels, user preferences, and delivery guarantees.
 
@@ -173,9 +189,17 @@ For detection mechanics and per-skill behavior details, see [OpenSpec Integratio
 
 **When:** Spec work was done earlier or by a teammate.
 
-**Flow:** `/plan-sdlc --spec` or `/plan-sdlc openspec/changes/<name>/` → picks up existing artifacts.
+**Flow:** `/plan-sdlc --from-openspec <name>` → picks up existing artifacts directly.
 
 **Example:** Designer wrote specs last week, developer picks up implementation today.
+
+### Pattern 5: Speed Run to SDLC
+
+**When:** You want the fastest path from idea to shipped code with spec traceability.
+
+**Flow:** `/opsx:new` → `/opsx:ff` → `/plan-sdlc --from-openspec <name>` → `/ship-sdlc` → `/opsx:archive`
+
+**Example:** Small feature with clear scope — spec it quickly, plan from the spec, ship in one pipeline.
 
 ---
 

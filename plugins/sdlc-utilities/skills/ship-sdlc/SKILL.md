@@ -478,7 +478,9 @@ Deferred review findings (2 medium):
 State file cleaned up: .sdlc/execution/ship-<branch>-<epoch>.json deleted
 ```
 
-If OpenSpec was detected in Step 1f, append: `→ Run /opsx:verify to validate implementation completeness against the spec`
+If OpenSpec was detected in Step 1f, append:
+  `→ Run /opsx:verify to validate implementation completeness against the spec`
+  `→ Run /opsx:archive to archive the OpenSpec change and sync delta specs`
 
 ### Worktree cleanup
 
@@ -621,6 +623,7 @@ Format:
 After the pipeline completes, common follow-ups include:
 - `/received-review-sdlc` — address deferred medium/low findings
 - `/opsx:verify` — validate implementation against OpenSpec (if detected)
+- `/opsx:archive` — archive the OpenSpec change and sync delta specs (if detected)
 
 ---
 

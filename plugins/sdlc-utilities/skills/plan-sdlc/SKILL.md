@@ -2,7 +2,7 @@
 name: plan-sdlc
 description: "Use when writing an implementation plan from requirements, a spec, a design doc, or a user description. ALWAYS use when plan mode is active — this is the designated plan-mode skill. Analyzes scope, maps file structure, decomposes into classified tasks with dependencies, and produces a plan ready for execute-plan-sdlc. Triggers on: write plan, create plan, plan this, break this into tasks, implementation plan, plan mode."
 user-invocable: true
-argument-hint: "[--spec] [spec-file-path]"
+argument-hint: "[--spec] [--from-openspec <change-name>] [spec-file-path]"
 ---
 
 # Plan (SDLC)
@@ -81,22 +81,43 @@ Wait for explicit response. If "resume", re-read the plan file and skip to Step 
 ---
 ```
 
-**Guardrail loading:** Load plan guardrails from project config:
+**Context detection and guardrail loading (plan-prepare.js):**
 
 > **VERBATIM** — Run this bash block exactly as written.
 
 ```bash
-SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
-[ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
-[ -z "$SCRIPT_DIR" ] && { echo "[]"; exit 0; }
-node -e "
-const { readSection } = require('$SCRIPT_DIR/config.js');
-const plan = readSection(process.cwd(), 'plan');
-console.log(JSON.stringify(plan?.guardrails || []));
-"
+SCRIPT=$(find ~/.claude/plugins -name "plan-prepare.js" -path "*/sdlc*/scripts/plan-prepare.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/plan-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/plan-prepare.js"
+[ -z "$SCRIPT" ] && { echo "{}"; exit 0; }
+
+PLAN_OUTPUT_FILE=$(node "$SCRIPT" --output-file)
+echo "PLAN_OUTPUT_FILE=$PLAN_OUTPUT_FILE"
 ```
 
-Parse the JSON output. If the array is non-empty, store as `activeGuardrails` and print: "Loaded N plan guardrails." If empty or config not found: "No plan guardrails configured." This is backward compatible — no guardrails means no change in behavior.
+If `--from-openspec <name>` was passed to plan-sdlc, include it in the node command: `node "$SCRIPT" --output-file --from-openspec <name>`.
+
+Read the JSON output file. Print context detection summary:
+```
+Context detection (from plan-prepare.js):
+  OpenSpec:          [detected, N active changes | not present]
+  Branch match:      [yes (<name>) | no]
+  --from-openspec:   [valid, N delta specs, tasks.md present | not passed | invalid: <error>]
+  Guardrails:        N loaded (N error, N warning)
+```
+
+Extract `guardrails` from the output → store as `activeGuardrails`. If the array is non-empty, print: "Loaded N plan guardrails." If empty: "No plan guardrails configured."
+
+**`--from-openspec` handling (after prepare output, before gate check):**
+
+If `fromOpenspec.valid` is true in the prepare output:
+1. Read in parallel: `openspec/changes/<name>/proposal.md`, `openspec/changes/<name>/design.md` (optional), all `openspec/changes/<name>/specs/*.md`, `openspec/changes/<name>/tasks.md` (optional)
+2. Store as `openspecContext`. Set `fromOpenspecDirect = true`
+3. Skip to Step 1 — bypass the gate check entirely
+
+If `fromOpenspec` is present but `valid` is false and errors exist: display errors and stop.
+
+**Gate check enhancement:** When no `--from-openspec` but prepare output shows `openspec.branchMatch` with a matching change at stage `ready-for-plan`, update the existing gate check Option 3 text:
+> 3. **Use existing spec** — re-invoke with `/plan-sdlc --from-openspec <matched-change-name>`
 
 **Normal mode path resolution:** Resolve the output path before writing:
 1. User-specified path (if provided in conversation)
@@ -109,6 +130,11 @@ Naming convention: `YYYY-MM-DD-<feature-name>.md`. Create the directory if neede
 **Plan mode:** Write to the designated plan file path. Skip path resolution.
 
 ## Step 1 (CONSUME): Requirements Discovery and Exploration
+
+**`fromOpenspecDirect` enrichment:** When `fromOpenspecDirect` is true (set by `--from-openspec` handling in Step 0):
+- Use `tasks.md` as the PRIMARY decomposition skeleton — OpenSpec tasks were deliberately authored
+- Skip the "Structured discovery" AskUserQuestion below — the proposal and delta specs already provide scope, integration, and success criteria
+- Delta specs remain the authoritative requirements for Step 3 coverage validation
 
 **Structured discovery:** When requirements are vague (a single sentence or ambiguous goal), use AskUserQuestion with 2–3 targeted questions at once:
 1. **Scope** — what's in, what's explicitly out?
@@ -150,6 +176,11 @@ Wait for answer.
 - Files to create (path + one-line responsibility)
 - Files to modify (path + what changes)
 - Test files (aligned with source files)
+
+**`fromOpenspecDirect` decomposition:** When `fromOpenspecDirect` is true:
+- Adopt the task structure from `tasks.md` as the starting skeleton
+- For each OpenSpec task: map to one plan task (or split if > 5 files), add Complexity/Risk/Depends on/Verify metadata, and expand the description to be self-contained for agent dispatch
+- If `tasks.md` is absent (prepare output shows `hasTasks: false`), fall back to standard decomposition from delta specs below
 
 **Task decomposition rules:**
 - Each task = one independently completable unit with a clear deliverable
