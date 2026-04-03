@@ -9,7 +9,7 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
 
 ## 0. JSON Manifest Schema
 
-`review-prepare.js` outputs this JSON to stdout. The orchestrator agent reads it.
+`skill/review.js` outputs this JSON to stdout. The orchestrator agent reads it.
 
 ```json
 {
@@ -175,7 +175,7 @@ No commit context available (reviewing {scope} changes — no commits to referen
 {end if}
 
 ## Diff to Review
-{content of dimension.diff_file — pre-computed by review-prepare.js}
+{content of dimension.diff_file — pre-computed by skill/review.js}
 
 ## Default Severity
 Unless the review instructions specify otherwise, classify findings as: {dimension.severity}

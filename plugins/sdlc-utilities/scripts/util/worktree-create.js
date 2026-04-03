@@ -21,7 +21,9 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { exec } = require('./lib/git');
+const LIB = path.join(__dirname, '..', 'lib');
+
+const { exec } = require(path.join(LIB, 'git'));
 
 // ---------------------------------------------------------------------------
 // Helpers

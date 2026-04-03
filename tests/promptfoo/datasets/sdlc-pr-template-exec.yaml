@@ -10,7 +10,7 @@
 
 - description: "sdlc-pr-template: valid template passes all V1-V5 checks"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/validate-pr-template.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-pr-template.js"
     script_args: "--project-root {{project_root}} --json"
     project_root: "file://fixtures-fs/project-with-pr-template"
   assert:
@@ -26,7 +26,7 @@
 
 - description: "sdlc-pr-template: missing template fails V1"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/validate-pr-template.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-pr-template.js"
     script_args: "--project-root {{project_root}} --json"
     project_root: "file://fixtures-fs/project-no-pr-template"
   assert:
@@ -44,7 +44,7 @@
 
 - description: "sdlc-pr-template: empty template fails V2"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/validate-pr-template.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-pr-template.js"
     script_args: "--project-root {{project_root}} --json"
     project_root: "file://fixtures-fs/project-empty-pr-template"
   assert:
@@ -62,7 +62,7 @@
 
 - description: "sdlc-pr-template: duplicate sections fail V4"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/validate-pr-template.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-pr-template.js"
     script_args: "--project-root {{project_root}} --json"
     project_root: "file://fixtures-fs/project-duplicate-sections"
   assert:

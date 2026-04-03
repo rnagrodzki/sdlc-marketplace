@@ -1,13 +1,13 @@
 ---
 name: version-sdlc
-description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow, updating an existing changelog entry for the current version. Consumes pre-computed context from version-prepare.js and handles the complete release process. Use --changelog without a bump type to update the changelog for the already-tagged current version. Arguments: [major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix] [--auto]. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate. Use --auto to skip interactive approval prompts (release plan is still displayed)."
+description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow, updating an existing changelog entry for the current version. Consumes pre-computed context from skill/version.js and handles the complete release process. Use --changelog without a bump type to update the changelog for the already-tagged current version. Arguments: [major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix] [--auto]. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate. Use --auto to skip interactive approval prompts (release plan is still displayed)."
 user-invocable: true
 argument-hint: "[major|minor|patch] [--pre <label>] [--changelog] [--hotfix] [--auto]"
 ---
 
 # Versioning Releases Skill
 
-Consume pre-computed version context from `version-prepare.js` and execute either
+Consume pre-computed version context from `skill/version.js` and execute either
 the one-time init setup or a full semantic release: version bump, annotated git tag,
 optional CHANGELOG entry, release commit, and push to origin.
 
@@ -20,7 +20,7 @@ optional CHANGELOG entry, release commit, and push to origin.
 - Generating a Keep a Changelog entry for a release
 - Running a full semantic release workflow end-to-end
 - Creating or incrementing pre-release versions (alpha, beta, rc)
-- When the `/version` command delegates here after running `version-prepare.js`
+- When the `/version` command delegates here after running `skill/version.js`
 - Updating a CHANGELOG entry for an already-tagged release (e.g., after a squash merge added commits not captured in the original entry)
 
 ## Workflow
@@ -34,14 +34,14 @@ If the system context contains "Plan mode is active":
 
 ---
 
-### Step 0: Resolve and Run version-prepare.js
+### Step 0: Resolve and Run skill/version.js
 
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "version-prepare.js" -path "*/sdlc*/scripts/version-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/version-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/version-prepare.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate version-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+SCRIPT=$(find ~/.claude/plugins -name "version.js" -path "*/sdlc*/scripts/skill/version.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/version.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/version.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/version.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 VERSION_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
@@ -58,7 +58,7 @@ rm -f "$VERSION_CONTEXT_FILE"
 - Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
 - Exit code 2: Show `Script error — see output above` and stop.
 
-**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=version-sdlc, step=Step 0 — version-prepare.js execution, error=stderr.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=version-sdlc, step=Step 0 — skill/version.js execution, error=stderr.
 
 **If `VERSION_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
@@ -295,8 +295,8 @@ If `flags.hotfix === true`, show instead:
 
 | Error | Recovery | Invoke error-report-sdlc? |
 |-------|----------|---------------------------|
-| `version-prepare.js` exit 1 | Show `errors[]`, stop | No — user input error |
-| `version-prepare.js` exit 2 (crash) | Show stderr, stop | Yes |
+| `skill/version.js` exit 1 | Show `errors[]`, stop | No — user input error |
+| `skill/version.js` exit 2 (crash) | Show stderr, stop | Yes |
 | Tag already exists (`conflictsWithNext` true) | Suggest next patch/minor/major; let user choose | No — user decision |
 | `git commit` fails | Show error; check for uncommitted changes or hook failure | Yes if non-hook failure |
 | `git tag` fails | Show error; check for duplicate tag or missing git identity | Yes if non-duplicate failure |
@@ -305,7 +305,7 @@ If `flags.hotfix === true`, show instead:
 When invoking `error-report-sdlc`, provide:
 - **Skill**: version-sdlc
 - **Step**: Step 0 (script crash) or Step 8 (git command failure)
-- **Operation**: `version-prepare.js` execution or `git commit`/`git tag`/`git push`
+- **Operation**: `skill/version.js` execution or `git commit`/`git tag`/`git push`
 - **Error**: exit code 2 + stderr, or git error output
 - **Suggested investigation**: Check installed plugin version; verify git identity is configured; confirm remote is accessible
 

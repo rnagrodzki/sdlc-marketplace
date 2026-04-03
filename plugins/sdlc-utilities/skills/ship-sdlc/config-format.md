@@ -105,7 +105,7 @@ Running `ship-sdlc --init-config` launches an interactive sequence that writes t
    - `high` = blockers + high-severity findings (recommended)
    - `medium` = blockers + high + medium-severity findings
 
-9. **Write and confirm** — The tool runs `ship-init.js` with the collected answers to write the `ship` section to `.sdlc/local.json` and create `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the ship section already exists, you are asked whether to overwrite it.
+9. **Write and confirm** — The tool runs `util/ship-init.js` with the collected answers to write the `ship` section to `.sdlc/local.json` and create `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the ship section already exists, you are asked whether to overwrite it.
 
 ---
 

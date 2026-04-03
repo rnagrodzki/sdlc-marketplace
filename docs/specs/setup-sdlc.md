@@ -4,7 +4,7 @@
 
 **User-invocable:** yes
 **Model:** sonnet
-**Prepare script:** `setup-prepare.js`
+**Prepare script:** `skill/setup.js`
 
 ## Arguments
 
@@ -36,8 +36,8 @@
 
 ## Workflow Phases
 
-1. PRE-FLIGHT — run `setup-prepare.js` to detect current config state, legacy files, content status
-   - **Script:** `setup-prepare.js`
+1. PRE-FLIGHT — run `skill/setup.js` to detect current config state, legacy files, content status
+   - **Script:** `skill/setup.js`
    - **Params:** none
    - **Output:** JSON → P1-P6 (project config state/sections/path, local config state, legacy file detection, content counts, detected version file/tag prefix/default branch, migration flag)
 2. STATUS REPORT — display what is configured vs missing
@@ -51,14 +51,14 @@
    - **Output:** config files written to `.claude/sdlc.json` (project) and `.sdlc/local.json` (local/ship)
 5. CONTENT SETUP — delegate to sub-flows for review dimensions, PR template, guardrails
 6. SUMMARY — display what was created, updated, or migrated
-   - **Script:** `setup-prepare.js` (re-run for G2 validation)
+   - **Script:** `skill/setup.js` (re-run for G2 validation)
    - **Params:** none
    - **Output:** JSON → P1-P6 (re-read to verify correctness of written config)
 
 ## Quality Gates
 
-- G1: Pre-flight passed — `setup-prepare.js` exits successfully
-- G2: Config validation — re-run `setup-prepare.js` after writing config to verify correctness
+- G1: Pre-flight passed — `skill/setup.js` exits successfully
+- G2: Config validation — re-run `skill/setup.js` after writing config to verify correctness
 - G3: No direct file writes — all config writes go through `lib/config.js` functions
 - G4: Version mode present — version section always includes `mode` field
 - G5: Migration consent — legacy files only deleted after explicit user confirmation
@@ -74,7 +74,7 @@
 
 ## Error Handling
 
-- E1: `setup-prepare.js` exit non-zero → display error, stop
+- E1: `skill/setup.js` exit non-zero → display error, stop
 - E2: Config write fails → warn user, offer to retry
 - E3: Migration conflict (unified config and legacy both have same section) → unified wins; report conflict to user
 - E4: `lib/config.js` not found → show installation error
@@ -94,7 +94,7 @@
 
 ## Integration
 
-- I1: `setup-prepare.js` — detects current config state and legacy files
+- I1: `skill/setup.js` — detects current config state and legacy files
 - I2: `lib/config.js` — `writeProjectConfig`, `writeLocalConfig`, `migrateConfig` functions
 - I3: `setup-dimensions.md` — sub-flow for review dimension configuration
 - I4: `setup-pr-template.md` — sub-flow for PR template creation

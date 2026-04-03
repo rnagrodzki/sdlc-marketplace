@@ -23,7 +23,10 @@
 
 'use strict';
 
-const { slugifyBranch, readState, writeState, initState, deleteState, resolveBranch } = require('./lib/state');
+const path = require('node:path');
+const LIB = path.join(__dirname, '..', 'lib');
+
+const { slugifyBranch, readState, writeState, initState, deleteState, resolveBranch } = require(path.join(LIB, 'state'));
 
 // ---------------------------------------------------------------------------
 // Arg parsing

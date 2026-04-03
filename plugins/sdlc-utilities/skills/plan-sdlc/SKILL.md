@@ -81,13 +81,13 @@ Wait for explicit response. If "resume", re-read the plan file and skip to Step 
 ---
 ```
 
-**Context detection and guardrail loading (plan-prepare.js):**
+**Context detection and guardrail loading (skill/plan.js):**
 
 > **VERBATIM** — Run this bash block exactly as written.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "plan-prepare.js" -path "*/sdlc*/scripts/plan-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/plan-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/plan-prepare.js"
+SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan.js"
 [ -z "$SCRIPT" ] && { echo "{}"; exit 0; }
 
 PLAN_OUTPUT_FILE=$(node "$SCRIPT" --output-file)
@@ -100,7 +100,7 @@ If `--from-openspec <name>` was passed to plan-sdlc, include it in the node comm
 
 If `EXIT_CODE` is non-zero, print the errors from the JSON output and stop. If `EXIT_CODE` is 0, read the JSON output file. Print context detection summary:
 ```
-Context detection (from plan-prepare.js):
+Context detection (from skill/plan.js):
   OpenSpec:          [detected, N active changes | not present]
   Branch match:      [yes (<name>) | no]
   --from-openspec:   [valid, N delta specs, tasks.md present | not passed | invalid: <error>]

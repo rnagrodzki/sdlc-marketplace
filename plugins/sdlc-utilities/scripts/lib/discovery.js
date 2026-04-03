@@ -104,20 +104,35 @@ function parseSimpleYaml(yamlStr) {
 // Excludes placeholder patterns like "<script>.js" (containing < or >).
 const RE_FIND_SCRIPT = /find\s[^`\n]*?-name\s+["']([^"'<>]+\.js)["']/g;
 
+// Extract relative path from `-path "*/sdlc*/scripts/<subdir>/<name>.js"` patterns.
+// Captures the portion after `scripts/` (e.g., `skill/commit.js`).
+const RE_PATH_SCRIPT = /-path\s+["']\*\/sdlc\*\/scripts\/([^\s"'<>]+\.js)["']/g;
+
 // Extract script filenames from direct-path fallback pattern:
-// plugins/sdlc-utilities/scripts/<script>.js
+// plugins/sdlc-utilities/scripts/<subdir>/<script>.js
 const RE_DIRECT_SCRIPT = /plugins\/sdlc-utilities\/scripts\/([^\s"'<>]+\.js)/g;
 
 function extractScriptRefs(content) {
   const names = new Set();
   let m;
-  const reFindScript = new RegExp(RE_FIND_SCRIPT.source, 'g');
-  while ((m = reFindScript.exec(content)) !== null) {
+  // Prefer -path match (includes subdirectory) over -name match (bare filename)
+  const rePathScript = new RegExp(RE_PATH_SCRIPT.source, 'g');
+  while ((m = rePathScript.exec(content)) !== null) {
     names.add(m[1]);
   }
   const reDirectScript = new RegExp(RE_DIRECT_SCRIPT.source, 'g');
   while ((m = reDirectScript.exec(content)) !== null) {
     names.add(m[1]);
+  }
+  // Fall back to -name for patterns that lack -path (e.g., lib/config.js lookups)
+  const reFindScript = new RegExp(RE_FIND_SCRIPT.source, 'g');
+  while ((m = reFindScript.exec(content)) !== null) {
+    // Skip if we already captured this script via -path or direct pattern
+    const basename = m[1];
+    const alreadyCaptured = [...names].some(n => n === basename || n.endsWith('/' + basename));
+    if (!alreadyCaptured) {
+      names.add(m[1]);
+    }
   }
   return [...names];
 }

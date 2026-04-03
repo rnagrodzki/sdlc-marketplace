@@ -4,7 +4,7 @@
 
 **User-invocable:** yes
 **Model:** sonnet
-**Prepare script:** `jira-prepare.js`
+**Prepare script:** `skill/jira.js`
 
 ## Arguments
 
@@ -29,17 +29,17 @@
 ## Workflow Phases
 
 1. CONSUME — parse arguments, resolve project key, run prepare script to check cache status
-   - **Script:** `jira-prepare.js --check`
+   - **Script:** `skill/jira.js --check`
    - **Params:** A1 forwarded (`--project <KEY>`)
    - **Output:** JSON → P1-P3 (cache exists, missing sections, freshness)
 2. INIT (conditional) — deterministic 6-phase cache initialization when cache is missing, incomplete, or refresh requested
-   - **Script:** `jira-prepare.js --load`
+   - **Script:** `skill/jira.js --load`
    - **Params:** `--project <KEY>`
    - **Output:** JSON → P4 (full cache object: cloudId, issue types, field schemas, workflows, link types, user mappings)
 3. CLASSIFY — parse user intent into an operation type
 4. DO — execute the classified operation using cached metadata
 5. UPDATE — incrementally update cache with newly discovered data (user mappings, workflow states)
-   - **Script:** `jira-prepare.js --save`
+   - **Script:** `skill/jira.js --save`
    - **Params:** `--project <KEY>`, updated cache data piped via stdin
    - **Output:** JSON confirmation of save
 
@@ -63,8 +63,8 @@
 
 ## Error Handling
 
-- E1: `jira-prepare.js` exit 1 → show `errors[]`, stop (no error report)
-- E2: `jira-prepare.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
+- E1: `skill/jira.js` exit 1 → show `errors[]`, stop (no error report)
+- E2: `skill/jira.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
 - E3: HTTP 400 on create/edit → verify field key/shape against cached `fieldSchemas`; auto-refresh and retry once; invoke error-report-sdlc if still failing
 - E4: HTTP 400 on transition → check `requiredFields` in cached workflows; auto-refresh and retry once
 - E5: HTTP 401 → report auth token expired; cannot recover programmatically
@@ -91,7 +91,7 @@
 
 ## Integration
 
-- I1: `jira-prepare.js` — manages cache file operations (check, load, save, init-templates)
+- I1: `skill/jira.js` — manages cache file operations (check, load, save, init-templates)
 - I2: Atlassian MCP tools — all Jira API calls go through the MCP tool layer
 - I3: `error-report-sdlc` — invoked on script crashes and persistent API failures after auto-refresh
 - I4: `plan-sdlc` — common follow-up to plan work from a Jira ticket

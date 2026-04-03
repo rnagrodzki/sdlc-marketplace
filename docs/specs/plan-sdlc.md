@@ -4,7 +4,7 @@
 
 **User-invocable:** yes
 **Model:** sonnet
-**Prepare script:** `plan-prepare.js`
+**Prepare script:** `skill/plan.js`
 
 ## Arguments
 
@@ -32,8 +32,8 @@
 
 ## Workflow Phases
 
-1. SETUP — mode detection, routing, OpenSpec integration, complexity routing, guardrail loading via `plan-prepare.js`
-   - **Script:** `plan-prepare.js`
+1. SETUP — mode detection, routing, OpenSpec integration, complexity routing, guardrail loading via `skill/plan.js`
+   - **Script:** `skill/plan.js`
    - **Params:** `--from-openspec <name>` (from A2) when applicable
    - **Output:** JSON → P1-P7 (openspec detection/active changes/branch match, from-openspec validation/delta spec count/tasks presence, plan guardrails array)
 2. CONSUME — requirements discovery, codebase exploration, OpenSpec enrichment
@@ -96,7 +96,7 @@
 
 ## Integration
 
-- I1: `plan-prepare.js` — context detection (OpenSpec, guardrails, branch matching)
+- I1: `skill/plan.js` — context detection (OpenSpec, guardrails, branch matching)
 - I2: `execute-plan-sdlc` — consumes the plan this skill produces
 - I3: `ship-sdlc` — can invoke execute-plan-sdlc with this plan
 - I4: OpenSpec — optional spec-driven planning via `--spec` or `--from-openspec`

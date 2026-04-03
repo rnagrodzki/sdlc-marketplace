@@ -4,7 +4,7 @@
 
 **User-invocable:** yes
 **Model:** sonnet
-**Prepare script:** `received-review-prepare.js`
+**Prepare script:** `skill/received-review.js`
 
 ## Arguments
 
@@ -32,7 +32,7 @@
 ## Workflow Phases
 
 1. READ — gather review feedback via prepare script (PR threads) or manual input
-   - **Script:** `received-review-prepare.js`
+   - **Script:** `skill/received-review.js`
    - **Params:** A1-A2 forwarded (`--pr <number>`, `--auto`); internal params: `--owner <owner>`, `--repo <repo>`, `--project-root <path>`
    - **Output:** JSON → P1-P7 (threads with status classification, comment chains, auto flag, PR number/owner/repo)
 2. UNDERSTAND — categorize items; flag and block on unclear items
@@ -77,8 +77,8 @@ Critique #2 (responses):
 
 ## Error Handling
 
-- E1: `received-review-prepare.js` exit 1 → no PR found, fall back to manual feedback gathering
-- E2: `received-review-prepare.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
+- E1: `skill/received-review.js` exit 1 → no PR found, fall back to manual feedback gathering
+- E2: `skill/received-review.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
 - E3: `gh api` fails fetching PR comments → check auth, show error, ask user to supply feedback directly
 - E4: Comment references file/line that no longer exists → verify against current HEAD
 - E5: Cannot verify reviewer's claim → state limitation, ask user for direction
@@ -103,7 +103,7 @@ Critique #2 (responses):
 
 ## Integration
 
-- I1: `received-review-prepare.js` — pre-computes PR thread state with incremental processing
+- I1: `skill/received-review.js` — pre-computes PR thread state with incremental processing
 - I2: `gh` CLI / GitHub API — used for fetching comments, posting replies, resolving threads
 - I3: `review-sdlc` — source of findings this skill may respond to
 - I4: `commit-sdlc` — common follow-up to commit fixes

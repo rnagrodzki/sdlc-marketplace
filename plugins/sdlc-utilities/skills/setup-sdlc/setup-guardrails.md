@@ -1,6 +1,6 @@
 # Guardrails Sub-Flow
 
-Sub-flow of `/setup-sdlc --guardrails`. Runs guardrails-prepare.js to scan the project and generate proposals, then lets the user review and select. Writes guardrails to `.claude/sdlc.json` via lib/config.js.
+Sub-flow of `/setup-sdlc --guardrails`. Runs skill/guardrails.js to scan the project and generate proposals, then lets the user review and select. Writes guardrails to `.claude/sdlc.json` via lib/config.js.
 
 ## Arguments
 
@@ -12,12 +12,12 @@ Sub-flow of `/setup-sdlc --guardrails`. Runs guardrails-prepare.js to scan the p
 
 ### Step 0 — Prepare
 
-Run guardrails-prepare.js:
+Run skill/guardrails.js:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "guardrails-prepare.js" -path "*/sdlc*/scripts/guardrails-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/guardrails-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/guardrails-prepare.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate guardrails-prepare.js" >&2; exit 2; }
+SCRIPT=$(find ~/.claude/plugins -name "guardrails.js" -path "*/sdlc*/scripts/skill/guardrails.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/guardrails.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/guardrails.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/guardrails.js" >&2; exit 2; }
 
 PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --project-root . --mode {init|add} --json)
 EXIT_CODE=$?
@@ -81,9 +81,9 @@ Replace `<GUARDRAILS_JSON>` with the JSON array of selected guardrails. In `--ad
 ### Step 4 (VALIDATE) — Run Validation Script
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "guardrails-validate.js" -path "*/sdlc*/scripts/guardrails-validate.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/guardrails-validate.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/guardrails-validate.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate guardrails-validate.js" >&2; exit 2; }
+SCRIPT=$(find ~/.claude/plugins -name "validate-guardrails.js" -path "*/sdlc*/scripts/ci/validate-guardrails.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-guardrails.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ci/validate-guardrails.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ci/validate-guardrails.js" >&2; exit 2; }
 
 node "$SCRIPT" --project-root . --json
 ```
@@ -99,7 +99,7 @@ Parse output. If `overall` is "pass", report success with count. If "fail", show
 
 ## Gotchas
 
-- **guardrails-prepare.js is the source of truth for scanning.** Do not duplicate its Glob/Read logic. The skill reviews the script's output.
+- **skill/guardrails.js is the source of truth for scanning.** Do not duplicate its Glob/Read logic. The skill reviews the script's output.
 - **Config write is read-merge-write.** `writeSection` handles merging. In `--add` mode, the skill must read existing guardrails from the prepare output and prepend them to the selection before writing.
 - **Custom guardrails need ID validation.** The kebab-case pattern `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` must be enforced before writing.
 

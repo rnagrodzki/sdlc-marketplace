@@ -4,7 +4,7 @@
 
 - description: "commit-prepare: default flags with no args"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
   assert:
@@ -17,7 +17,7 @@
 
 - description: "commit-prepare: --type feat parses correctly"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--type feat"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
@@ -27,7 +27,7 @@
 
 - description: "commit-prepare: --scope auth parses correctly"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--scope auth"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
@@ -37,7 +37,7 @@
 
 - description: "commit-prepare: --no-stash flag"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--no-stash"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
@@ -47,7 +47,7 @@
 
 - description: "commit-prepare: --amend flag"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--amend"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
@@ -57,7 +57,7 @@
 
 - description: "commit-prepare: --auto flag"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--auto"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
@@ -67,7 +67,7 @@
 
 - description: "commit-prepare: config present includes commitConfig"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-config"
   assert:
@@ -78,7 +78,7 @@
 
 - description: "commit-prepare: no config sets commitConfig null"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
   assert:
@@ -87,7 +87,7 @@
 
 - description: "commit-prepare: --type chore violates allowedTypes"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--type chore"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-config"
@@ -99,7 +99,7 @@
 
 - description: "commit-prepare: --scope ui violates allowedScopes"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--scope ui"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-config"
@@ -111,7 +111,7 @@
 
 - description: "commit-prepare: --type feat passes allowedTypes validation"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--type feat"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-config"
@@ -121,7 +121,7 @@
 
 - description: "commit-prepare: --scope auth passes allowedScopes validation"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--scope auth"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-config"
@@ -131,7 +131,7 @@
 
 - description: "commit-prepare: large diff triggers truncation"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-large-diff"
   assert:
@@ -144,7 +144,7 @@
 
 - description: "commit-prepare: truncated diff preserves complete file list and diffstat"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-large-diff"
   assert:
@@ -155,7 +155,7 @@
 
 - description: "commit-prepare: small diff is not truncated"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/commit-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
   assert:

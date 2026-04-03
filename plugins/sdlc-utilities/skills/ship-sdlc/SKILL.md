@@ -31,9 +31,9 @@ If `--init-config` was passed:
 1. Read `./config-format.md` and run the interactive walkthrough to collect the user's answers (preset, skip set, bump type, auto, threshold, workspace isolation).
 2. Locate and call `ship-init.js` via Bash with the collected answers:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" -path "*/sdlc*/scripts/ship-init.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-init.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
+SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" -path "*/sdlc*/scripts/util/ship-init.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/ship-init.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate util/ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 INIT_OUTPUT_FILE=$(node "$SCRIPT" --output-file --preset balanced --skip version --bump patch --auto --threshold high --workspace prompt)
 EXIT_CODE=$?
@@ -47,9 +47,9 @@ echo "EXIT_CODE=$EXIT_CODE"
 
 ### 1b. Load ship config
 
-**Hook context fast-path:** If the session-start system-reminder contains a `Ship config:` line, note it for display. The prepare script (`ship-prepare.js`) remains the authoritative source for config values — the hook line is a user-facing heads-up, not a data source.
+**Hook context fast-path:** If the session-start system-reminder contains a `Ship config:` line, note it for display. The prepare script (`skill/ship.js`) remains the authoritative source for config values — the hook line is a user-facing heads-up, not a data source.
 
-Check for ship config via ship-prepare.js output (reads from `.sdlc/local.json` → `ship` section, with legacy `.sdlc/ship-config.json` fallback). If found, read and merge. Print loaded config verbosely:
+Check for ship config via skill/ship.js output (reads from `.sdlc/local.json` → `ship` section, with legacy `.sdlc/ship-config.json` fallback). If found, read and merge. Print loaded config verbosely:
 ```
 Ship config loaded from .sdlc/local.json
   preset: balanced, skip: [version], draft: false, bump: patch
@@ -59,11 +59,11 @@ If not found: `No ship config found — using built-in defaults. Run /setup-sdlc
 
 ### 1c. Prepare pipeline context
 
-Locate and run `ship-prepare.js` with all CLI flags to pre-compute flags, context, and step statuses:
+Locate and run `skill/ship.js` with all CLI flags to pre-compute flags, context, and step statuses:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship-prepare.js" -path "*/sdlc*/scripts/ship-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-prepare.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ship-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --skip version --preset balanced --bump patch --workspace branch)
 EXIT_CODE=$?
@@ -81,9 +81,9 @@ Parse the output JSON from `$PREPARE_OUTPUT_FILE`. If `errors` is non-empty, dis
 
 ### 1d. Parse flags
 
-Print the `flags` object from the `ship-prepare.js` output, including the `sources` map showing where each value came from (CLI, config, or default):
+Print the `flags` object from the `skill/ship.js` output, including the `sources` map showing where each value came from (CLI, config, or default):
 ```
-Flag resolution (from ship-prepare.js):
+Flag resolution (from skill/ship.js):
   auto:    true  (source: cli)
   preset:  C     (source: cli, overrides config B)
   skip:    [version]  (source: config)
@@ -95,15 +95,15 @@ Flag resolution (from ship-prepare.js):
 
 **Hook context fast-path:** If the session-start system-reminder contains an `Active pipeline:` line, note the state file path and resume point. When the user does not pass `--resume` explicitly but the hook reported an active pipeline, use this to inform the resume prompt — skip the filesystem scan since the hook already found the state file. The hook context is a session-start snapshot.
 
-Print `resume.found` and `resume.stateFile` from the `ship-prepare.js` output. If `resume.found` is `true`, print the state file path and resume point. If `false`, print that no state file was found and the pipeline will start fresh.
+Print `resume.found` and `resume.stateFile` from the `skill/ship.js` output. If `resume.found` is `true`, print the state file path and resume point. If `false`, print that no state file was found and the pipeline will start fresh.
 
 Read `./state-format.md` when resuming from a state file.
 
 ### 1f. Context detection
 
-Print the `context` object values from the `ship-prepare.js` output:
+Print the `context` object values from the `skill/ship.js` output:
 ```
-Context detection (from ship-prepare.js):
+Context detection (from skill/ship.js):
   Plan in context:     yes
   Uncommitted changes: 14 files modified
   Current branch:      feat/ship-sdlc
@@ -115,9 +115,9 @@ Context detection (from ship-prepare.js):
 
 ### 1g. Auto-skip logic
 
-Print each step from the `steps` array in the `ship-prepare.js` output with its `status`, `reason`, and `skipSource`:
+Print each step from the `steps` array in the `skill/ship.js` output with its `status`, `reason`, and `skipSource`:
 ```
-Auto-skip decisions (from ship-prepare.js):
+Auto-skip decisions (from skill/ship.js):
   execute: will_run — plan detected in context
   commit:  will_run — uncommitted changes detected
   review:  will_run — not in skip set
@@ -135,13 +135,13 @@ The parenthetical after `skipped` reflects the step's `skipSource` field:
 
 Steps with `skipSource: "none"` are not skipped and show no parenthetical.
 
-The LLM does not compute these statuses — `ship-prepare.js` is the source of truth.
+The LLM does not compute these statuses — `skill/ship.js` is the source of truth.
 
 ---
 
 ## Step 2 (PLAN): Build Pipeline Plan
 
-The pipeline table is generated from the `steps` array in the `ship-prepare.js` output. Each row maps:
+The pipeline table is generated from the `steps` array in the `skill/ship.js` output. Each row maps:
 - Step number: array index + 1
 - Skill: `step.skill`
 - Status: `step.status`
@@ -268,7 +268,7 @@ On **edit**: ask what to change, update flags, rebuild the pipeline table, and r
 
 ### Pre-step validation
 
-Before dispatching each step, read its `status` from the ship-prepare.js output:
+Before dispatching each step, read its `status` from the skill/ship.js output:
 1. `"will_run"` → dispatch as Agent. No exceptions. This is non-negotiable.
 2. `"conditional"` → evaluate the runtime condition (e.g., review verdict). If condition met → dispatch as Agent. If not → print why with the specific condition that was not met.
 3. `"skipped"` → print "skipped" with the `reason` and `skipSource` from the script output.
@@ -285,7 +285,7 @@ This is why all sub-skills are dispatched as Agents. Do not fall back to the Ski
 
 All pipeline steps use the same dispatch protocol. No branching between simple and complex steps — uniform pattern for every sub-skill.
 
-**Invocation source:** Each step in the ship-prepare.js output includes an `invocation` field containing the skill name and computed args. Use `step.invocation` verbatim — do not construct invocations from the examples below.
+**Invocation source:** Each step in the skill/ship.js output includes an `invocation` field containing the skill name and computed args. Use `step.invocation` verbatim — do not construct invocations from the examples below.
 
 For each step that will run:
 
@@ -297,7 +297,7 @@ For each step that will run:
      Reason: --auto forwarded from ship --auto mode
    ```
 
-2. **Record step start** via ship-state.js.
+2. **Record step start** via state/ship.js.
 
 3. **Dispatch Agent** with: skill name, args from `step.invocation`, and brief pipeline context (branch, previous step results needed for this step). Agent prompt template:
    ```
@@ -314,7 +314,7 @@ For each step that will run:
      State saved to .sdlc/execution/ship-<branch>-<timestamp>.json
    ```
 
-5. **Record step completion/failure** via ship-state.js.
+5. **Record step completion/failure** via state/ship.js.
 
 6. **Use result to determine next step** (e.g., review verdict → received-review decision). Print decision reasoning:
    ```
@@ -333,7 +333,7 @@ Ship-sdlc retains full control of: pipeline table display, validation output, st
 
 ship-sdlc does not manage execute-plan-sdlc's state file — execute-plan-sdlc handles its own creation, updates, and cleanup.
 
-**Worktree re-entry on resume:** Check `context.worktree.inLinkedWorktree` from the ship-prepare.js output. If true, already in the worktree — proceed normally.
+**Worktree re-entry on resume:** Check `context.worktree.inLinkedWorktree` from the skill/ship.js output. If true, already in the worktree — proceed normally.
 
 If false (resuming from the main worktree but the pipeline originally ran in a worktree), find the worktree for the resume branch:
 ```bash
@@ -427,10 +427,10 @@ Note: in a worktree, all of this is safe — main working tree is untouched.
 
 ### State persistence
 
-After each step, update pipeline state via `ship-state.js`. Locate the script:
+After each step, update pipeline state via `state/ship.js`. Locate the script:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship-state.js" -path "*/sdlc*/scripts/ship-state.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ship-state.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ship-state.js"
+SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/state/ship.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/state/ship.js"
 ```
 
 At pipeline start (after Step 1 completes), initialize the state file:
@@ -551,9 +551,9 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Run pipeline steps in parallel — the pipeline is strictly sequential
 - Delete the state file on failure — it is needed for `--resume`
 - Proceed past a failed sub-skill — stop, save state, inform user
-- Skip pipeline steps that were marked "will run" in the pipeline plan. The pipeline plan is a contract with the user. If a step was planned to run and the user confirmed the pipeline, it MUST run. The LLM does not have authority to skip planned steps based on its own assessment of change complexity or risk. Only the skip set and auto-skip rules (computed by ship-prepare.js) control which steps run.
-- Copy example args from this document when dispatching sub-skill Agents — use the `invocation` field from the ship-prepare.js output, which contains the exact computed args
-- Add `--skip` flags not present in the user's original invocation or ship config. The skip set is user/config-controlled. If ship-prepare.js output shows `skipSource` as unexpected (e.g., `flags.skip.length > 0` but `flagSources.skip === 'default'`), warn before proceeding.
+- Skip pipeline steps that were marked "will run" in the pipeline plan. The pipeline plan is a contract with the user. If a step was planned to run and the user confirmed the pipeline, it MUST run. The LLM does not have authority to skip planned steps based on its own assessment of change complexity or risk. Only the skip set and auto-skip rules (computed by skill/ship.js) control which steps run.
+- Copy example args from this document when dispatching sub-skill Agents — use the `invocation` field from the skill/ship.js output, which contains the exact computed args
+- Add `--skip` flags not present in the user's original invocation or ship config. The skip set is user/config-controlled. If skill/ship.js output shows `skipSource` as unexpected (e.g., `flags.skip.length > 0` but `flagSources.skip === 'default'`), warn before proceeding.
 
 ---
 
@@ -575,11 +575,11 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **.sdlc/ must be gitignored.** The `.sdlc/` directory contains developer-local config (`local.json`) and ephemeral pipeline state (`execution/`). `--init-config` creates `.sdlc/.gitignore` automatically via `ship-init.js`. If `.sdlc/` is not gitignored, the staging command (`git add -A -- ':!.sdlc/'`) provides a fallback exclusion, but the gitignore is the primary defense.
 
-**Pipeline plan is binding.** The pipeline table displayed in Step 4 and confirmed by the user is a contract. Step statuses (`will_run`, `skipped`, `conditional`) are computed by `ship-prepare.js` — the LLM follows them, it does not override them. Steps with `status: "will_run"` must be dispatched as Agents. This was added after an incident where the review step was skipped because the LLM judged the changes to be "just docs/config" (issue #68). The pipeline's value is precisely in catching cases where the developer thinks changes are low-risk but the review disagrees.
+**Pipeline plan is binding.** The pipeline table displayed in Step 4 and confirmed by the user is a contract. Step statuses (`will_run`, `skipped`, `conditional`) are computed by `skill/ship.js` — the LLM follows them, it does not override them. Steps with `status: "will_run"` must be dispatched as Agents. This was added after an incident where the review step was skipped because the LLM judged the changes to be "just docs/config" (issue #68). The pipeline's value is precisely in catching cases where the developer thinks changes are low-risk but the review disagrees.
 
-**State files are script-managed.** Use ship-state.js / execute-state.js for all state operations. Don't hand-write JSON to `.sdlc/execution/`.
+**State files are script-managed.** Use state/ship.js / state/execute.js for all state operations. Don't hand-write JSON to `.sdlc/execution/`.
 
-**Worktree lifecycle uses git commands.** `git worktree add` to create (via worktree-create.js), `git worktree remove` to clean up. No EnterWorktree/ExitWorktree. No session-scoping issues.
+**Worktree lifecycle uses git commands.** `git worktree add` to create (via util/worktree-create.js), `git worktree remove` to clean up. No EnterWorktree/ExitWorktree. No session-scoping issues.
 
 **Worktree state is not persisted.** Git is the source of truth. Branch name + `git worktree list --porcelain` = worktree path. No worktree fields in state files.
 
@@ -589,9 +589,9 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Rebase is skipped when main is already an ancestor.** `git merge-base --is-ancestor` is a fast check. No fetch + rebase overhead when the branch is already up to date.
 
-**Version step is auto-skipped in worktree mode.** `computeSteps` in ship-prepare.js skips the version step when `workspace === 'worktree'`. Tags are repo-global — creating them from an isolated worktree risks collisions with parallel pipelines. The pipeline prints a post-merge advisory: run `/version-sdlc` on main after the PR merges. This also handles changelog — `version-sdlc` generates changelog from `previousTag..HEAD`, capturing all commits from all merged branches regardless of their source worktree.
+**Version step is auto-skipped in worktree mode.** `computeSteps` in skill/ship.js skips the version step when `workspace === 'worktree'`. Tags are repo-global — creating them from an isolated worktree risks collisions with parallel pipelines. The pipeline prints a post-merge advisory: run `/version-sdlc` on main after the PR merges. This also handles changelog — `version-sdlc` generates changelog from `previousTag..HEAD`, capturing all commits from all merged branches regardless of their source worktree.
 
-**Worktree PRs auto-label `skip-version-check`.** When `workspace === 'worktree'` causes the version step to be auto-skipped, `ship-prepare.js` adds `--label skip-version-check` to the PR step args. The label is included in `gh pr create` from the start (not added post-creation), so `check-version-bump.yml` sees it on the `opened` event. Only fires for worktree auto-skip, not manual `--skip version`. Prerequisite: the label must exist in the repository (pr-sdlc creates it automatically if missing).
+**Worktree PRs auto-label `skip-version-check`.** When `workspace === 'worktree'` causes the version step to be auto-skipped, `skill/ship.js` adds `--label skip-version-check` to the PR step args. The label is included in `gh pr create` from the start (not added post-creation), so `check-version-bump.yml` sees it on the `opened` event. Only fires for worktree auto-skip, not manual `--skip version`. Prerequisite: the label must exist in the repository (pr-sdlc creates it automatically if missing).
 
 **Auto mode does not auto-resume without --resume.** When `--auto` is set but `--resume` is not, the pipeline starts fresh even if a state file exists for the current branch. This prevents accidental continuation from stale state. The state file is preserved (not deleted) so the user can explicitly `--resume` later.
 

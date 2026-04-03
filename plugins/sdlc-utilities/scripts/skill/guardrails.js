@@ -24,9 +24,10 @@
 
 const fs   = require('fs');
 const path = require('path');
+const LIB = path.join(__dirname, '..', 'lib');
 
-const { readSection } = require('./lib/config');
-const { writeOutput } = require('./lib/output');
+const { readSection } = require(path.join(LIB, 'config'));
+const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing

@@ -28,8 +28,9 @@
 const fs   = require('node:fs');
 const path = require('node:path');
 const os   = require('node:os');
+const LIB = path.join(__dirname, '..', 'lib');
 
-const { validateAll, extractFrontmatter, extractBody, parseSimpleYaml } = require('./lib/dimensions');
+const { validateAll, extractFrontmatter, extractBody, parseSimpleYaml } = require(path.join(LIB, 'dimensions'));
 const {
   exec,
   checkGitState,
@@ -40,9 +41,9 @@ const {
   fetchPrMetadata,
   ensureGhAccount,
   splitDiffByFile,
-} = require('./lib/git');
-const { readSection, writeLocalConfig } = require('./lib/config');
-const { writeOutput } = require('./lib/output');
+} = require(path.join(LIB, 'git'));
+const { readSection, writeLocalConfig } = require(path.join(LIB, 'config'));
+const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // Review config (.sdlc/review.json)

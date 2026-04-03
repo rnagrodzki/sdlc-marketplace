@@ -22,7 +22,9 @@
 'use strict';
 
 const path = require('node:path');
-const { validateAll } = require('./lib/discovery');
+const LIB = path.join(__dirname, '..', 'lib');
+
+const { validateAll } = require(path.join(LIB, 'discovery'));
 
 // ---------------------------------------------------------------------------
 // CLI parsing

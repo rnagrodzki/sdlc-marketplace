@@ -4,7 +4,7 @@
 
 - description: "ship-prepare: .sdlc/.gitignore inner pattern sets sdlcGitignored true"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
@@ -14,7 +14,7 @@
 
 - description: "ship-prepare: --auto defaults workspace to branch"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan --auto"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
@@ -24,7 +24,7 @@
 
 - description: "ship-prepare: --auto with explicit --workspace prompt keeps prompt"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan --auto --workspace prompt"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
@@ -34,7 +34,7 @@
 
 - description: "ship-prepare: --auto with config workspace=worktree keeps config value"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan --auto"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-ship-auto-workspace"
@@ -46,7 +46,7 @@
 
 - description: "ship-prepare: --preset B normalizes to balanced"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan --preset B"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
@@ -56,7 +56,7 @@
 
 - description: "ship-prepare: --preset A normalizes to full"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan --preset A"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
@@ -66,7 +66,7 @@
 
 - description: "ship-prepare: --preset full passes through as full"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan --preset full"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
@@ -76,7 +76,7 @@
 
 - description: "ship-prepare: config with legacy preset B normalizes to balanced"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/ship-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-ship-legacy-preset"

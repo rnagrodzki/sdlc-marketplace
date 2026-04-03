@@ -27,14 +27,14 @@ If the system context contains "Plan mode is active":
 
 ## Step 1 — READ: Gather Review Feedback
 
-### Step 1a — Run received-review-prepare.js (when PR number available)
+### Step 1a — Run skill/received-review.js (when PR number available)
 
 When a PR number or URL is provided (via arguments or user input), run the prepare script to pre-compute review thread state:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "received-review-prepare.js" -path "*/sdlc*/scripts/received-review-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/received-review-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/received-review-prepare.js"
-[ -z "$SCRIPT" ] && { echo "WARNING: Could not locate received-review-prepare.js" >&2; }
+SCRIPT=$(find ~/.claude/plugins -name "received-review.js" -path "*/sdlc*/scripts/skill/received-review.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/received-review.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/received-review.js"
+[ -z "$SCRIPT" ] && { echo "WARNING: Could not locate skill/received-review.js" >&2; }
 
 if [ -n "$SCRIPT" ]; then
   MANIFEST_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --pr <PR_NUMBER>)
@@ -58,7 +58,7 @@ Use only threads with `status: "outstanding"` for Steps 2–11. Store the full m
 **On exit code 2:** Script error. Invoke `error-report-sdlc` with:
 - **Skill:** received-review-sdlc
 - **Step:** Step 1 — READ
-- **Operation:** received-review-prepare.js execution
+- **Operation:** skill/received-review.js execution
 - **Error:** stderr output from the script
 
 ### Step 1b — Manual feedback gathering (fallback)
@@ -417,7 +417,7 @@ Replied to N threads:
 | Comment references file/line that no longer exists | Note the discrepancy; verify against current HEAD diff | No — expected with rebased PRs |
 | Cannot verify reviewer's claim (no runtime data/external context) | State limitation explicitly; ask user for direction | No — expected limitation |
 | `gh api` 5xx or unexpected server error when posting reply | Retry once; if still failing, show the drafted response for manual posting | Yes if second attempt also fails |
-| `received-review-prepare.js` exit 2 (script crash) | Show stderr output, invoke error-report-sdlc | Yes |
+| `skill/received-review.js` exit 2 (script crash) | Show stderr output, invoke error-report-sdlc | Yes |
 | GraphQL resolve mutation fails | Retry once; if still failing, list which threads were not resolved | Yes if second attempt fails |
 | Thread ID not found during resolve | Skip that thread, warn user | No — expected with race conditions |
 

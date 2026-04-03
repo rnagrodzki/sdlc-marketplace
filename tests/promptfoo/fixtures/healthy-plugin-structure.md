@@ -23,9 +23,11 @@ plugins/
     hooks/
       hooks.json          ← SessionStart hook registered, valid JSON
     scripts/
-      pr-prepare.js
-      review-prepare.js
-      validate-discovery.js
+      skill/
+        pr.js
+        review.js
+      ci/
+        validate-discovery.js
 ```
 
 ## validate-discovery.js Output

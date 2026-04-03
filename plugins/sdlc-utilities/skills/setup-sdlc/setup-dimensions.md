@@ -50,8 +50,8 @@ In `--add` (expansion) mode:
 
 - Locate the validation script:
   ```bash
-  SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/sdlc*/scripts/validate-dimensions.js" 2>/dev/null | head -1)
-  [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/validate-dimensions.js"
+  SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/sdlc*/scripts/ci/validate-dimensions.js" 2>/dev/null | head -1)
+  [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ci/validate-dimensions.js"
   ```
 - Run: `node "$SCRIPT" --project-root . --json`
 - Extract installed dimension names and their trigger patterns (new proposals must avoid identical globs).
@@ -59,8 +59,8 @@ In `--add` (expansion) mode:
 Also check for uncovered file suggestions from a recent review run:
 
 ```bash
-PREP=$(find ~/.claude/plugins -name "review-prepare.js" -path "*/sdlc*/scripts/review-prepare.js" 2>/dev/null | head -1)
-[ -z "$PREP" ] && [ -f "plugins/sdlc-utilities/scripts/review-prepare.js" ] && PREP="plugins/sdlc-utilities/scripts/review-prepare.js"
+PREP=$(find ~/.claude/plugins -name "review.js" -path "*/sdlc*/scripts/skill/review.js" 2>/dev/null | head -1)
+[ -z "$PREP" ] && [ -f "plugins/sdlc-utilities/scripts/skill/review.js" ] && PREP="plugins/sdlc-utilities/scripts/skill/review.js"
 [ -n "$PREP" ] && node "$PREP" --project-root . --json 2>/dev/null
 ```
 
@@ -141,8 +141,8 @@ For each selected dimension:
 Run the validation script (use `SCRIPT` resolved in Step 2, or re-resolve if Step 2 was skipped):
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/sdlc*/scripts/validate-dimensions.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/validate-dimensions.js"
+SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/sdlc*/scripts/ci/validate-dimensions.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ci/validate-dimensions.js"
 node "$SCRIPT" --project-root . --markdown
 EXIT_CODE=$?
 ```
@@ -245,7 +245,7 @@ Present the markdown output table. If any file has errors, show the error detail
 - **Glob pattern count explosion.** Step 1 runs ~35 glob patterns. On large monorepos this can produce thousands of matches — if Glob returns >500 paths, sample the first 20.
 - **Copilot step gated on gh auth.** Check `gh auth status` at the start of Step 8; skip gracefully if unauthenticated rather than failing mid-workflow.
 - **validate-dimensions.js YAML parser limitations.** The script uses a hand-rolled parser for simple key-value frontmatter only. Multi-line or nested YAML produces a misleading "malformed frontmatter" error. Use flat key-value frontmatter only.
-- **review-prepare.js not available at init time.** If not found via standard resolution in `--add` mode, skip the dimension matching step and proceed with manual scan.
+- **skill/review.js not available at init time.** If not found via standard resolution in `--add` mode, skip the dimension matching step and proceed with manual scan.
 - **GitHub hosting detection is multi-signal.** The primary `git remote -v` check may miss custom SSH aliases (e.g., `github-rn:org/repo`), but `gh repo view` (Signal 2) resolves the actual remote URL regardless of local SSH config. The `.github/` directory fallback (Signal 3) is a weak heuristic — it can false-positive for repos that have GitHub Actions config but are hosted elsewhere. If all three signals fail, use `--no-copilot` to bypass.
 
 ---

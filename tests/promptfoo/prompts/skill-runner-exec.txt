@@ -9,8 +9,8 @@ You are Claude Code, an AI coding assistant. You have been configured with the f
 - **Plugin repo root** (contains plugin scripts): {{repo_root}}
 - **Test project root** (the project to operate on): {{project_root}}
 
-The plugin scripts (e.g., `validate-discovery.js`) are located at:
-`{{repo_root}}/plugins/sdlc-utilities/scripts/`
+The plugin scripts are organized under:
+`{{repo_root}}/plugins/sdlc-utilities/scripts/` (subdirectories: `skill/`, `ci/`, `state/`, `util/`)
 
 Use `{{project_root}}` as the `--project-root` argument when running scripts.
 

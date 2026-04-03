@@ -22,7 +22,8 @@ plugins/
     hooks/
       hooks.json          ← INVALID JSON (parse error)
     scripts/
-      pr-prepare.js
+      skill/
+        pr.js
 ```
 
 ## validate-discovery.js Output

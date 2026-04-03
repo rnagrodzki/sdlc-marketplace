@@ -44,14 +44,14 @@ If the system context contains "Plan mode is active":
 
 ### Step 0 -- Pre-flight
 
-Run `setup-prepare.js` via Bash to get current state:
+Run `skill/setup.js` via Bash to get current state:
 
 > **VERBATIM** -- Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "setup-prepare.js" -path "*/sdlc*/scripts/setup-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/setup-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/setup-prepare.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate setup-prepare.js" >&2; exit 2; }
+SCRIPT=$(find ~/.claude/plugins -name "setup.js" -path "*/sdlc*/scripts/skill/setup.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/setup.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/setup.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/setup.js" >&2; exit 2; }
 
 PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file)
 EXIT_CODE=$?
@@ -74,7 +74,7 @@ If `--pr-template` was passed:
 3. Jump to Step 5 (summary). Skip Steps 1–4.
 
 If `--guardrails` was passed:
-1. Read and follow `@setup-guardrails.md` (it runs its own guardrails-prepare.js script internally). Pass through `--add` if present.
+1. Read and follow `@setup-guardrails.md` (it runs its own skill/guardrails.js script internally). Pass through `--add` if present.
 2. Jump to Step 5 (summary). Skip Steps 1–4.
 
 If `--execution-guardrails` was passed:
@@ -190,7 +190,7 @@ Options:
 
 On **yes**: delete each file listed in `migrated` using Bash `rm`. Do NOT delete files listed in `conflicts`.
 
-After migration, re-run `setup-prepare.js` (same bash block as Step 0) to refresh the state before proceeding to Step 3.
+After migration, re-run `skill/setup.js` (same bash block as Step 0) to refresh the state before proceeding to Step 3.
 
 On **no** (configure from scratch): proceed directly to Step 3 without migration.
 
@@ -204,7 +204,7 @@ Write config files via inline Node.js that calls `writeProjectConfig` and `write
 
 #### 3a. Version section
 
-Use the `detected` values from setup-prepare.js output to pre-fill. Use AskUserQuestion:
+Use the `detected` values from skill/setup.js output to pre-fill. Use AskUserQuestion:
 
 > Version configuration detected:
 >   Version file: {detected.versionFile} ({detected.fileType})
@@ -448,7 +448,7 @@ Replace the placeholder values with the actual collected answers. The `writeProj
 
 ### Step 3b -- Validate Written Config
 
-Re-run `setup-prepare.js` to verify the config files were written correctly:
+Re-run `skill/setup.js` to verify the config files were written correctly:
 
 ```bash
 node "$SCRIPT" > "$PREPARE_OUTPUT_FILE"
@@ -507,7 +507,7 @@ On **review-dimensions**: Read and follow `@setup-dimensions.md`, passing the sc
 
 On **pr-template**: Read and follow `@setup-pr-template.md`, passing the scan results as "Scan Input".
 
-On **plan-guardrails**: Read and follow `@setup-guardrails.md` (it runs guardrails-prepare.js internally).
+On **plan-guardrails**: Read and follow `@setup-guardrails.md` (it runs skill/guardrails.js internally).
 
 On **all**: Run sequentially in this order: read and follow `@setup-dimensions.md` (passing scan results), then `@setup-guardrails.md`, then `@setup-pr-template.md` (passing scan results).
 
@@ -561,7 +561,7 @@ This skill is safe to re-run. Already-configured sections are skipped unless `--
 
 ## Gotchas
 
-**setup-prepare.js must run from the project root.** It uses `process.cwd()` to locate config files. If the working directory is wrong, detection will silently return empty results.
+**skill/setup.js must run from the project root.** It uses `process.cwd()` to locate config files. If the working directory is wrong, detection will silently return empty results.
 
 **The version section requires `mode` as a required field.** The JSON schema enforces this. When `detected.versionFile` is present, default to `mode: "file"`. When null, default to `mode: "tag"`. Always include `mode` in the written config.
 

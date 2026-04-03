@@ -1,13 +1,13 @@
 ---
 name: pr-sdlc
-description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from pr-prepare.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Auto-labels PRs based on context signals (branch, commits, diff, Jira) with mandatory approval. Arguments: [--draft] [--update] [--base <branch>] [--auto] [--label <name>]. Use --auto to skip interactive approval. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
+description: "Use this skill when creating or updating a pull request, updating a PR description, or generating PR content from commits and diffs. Handles the full PR workflow: consumes pre-computed context from skill/pr.js, generates description with plan-critique-improve-do-critique-improve, user review, and gh CLI execution. Auto-labels PRs based on context signals (branch, commits, diff, Jira) with mandatory approval. Arguments: [--draft] [--update] [--base <branch>] [--auto] [--label <name>]. Use --auto to skip interactive approval. Triggers on: create PR, open pull request, update PR, write PR description, PR summary, describe changes for a pull request."
 user-invocable: true
 argument-hint: "[--draft] [--update] [--base <branch>] [--auto] [--label <name>]"
 ---
 
 # Creating Pull Requests
 
-Consume pre-computed git context from `pr-prepare.js` and generate an 8-section
+Consume pre-computed git context from `skill/pr.js` and generate an 8-section
 PR description readable by both technical and non-technical stakeholders.
 
 **Announce at start:** "I'm using pr-sdlc (sdlc v{sdlc_version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
@@ -27,7 +27,7 @@ If the system context contains "Plan mode is active":
 - Updating an existing PR title or description
 - Writing or rewriting a PR description
 - Summarizing branch changes for review
-- When the `/pr` command delegates here after running `pr-prepare.js`
+- When the `/pr` command delegates here after running `skill/pr.js`
 
 ## PR Template
 
@@ -93,14 +93,14 @@ If no tests added, explain why.]
 
 ## Workflow
 
-### Step 0: Resolve and Run pr-prepare.js
+### Step 0: Resolve and Run skill/pr.js
 
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" -path "*/sdlc*/scripts/pr-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/pr-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/pr-prepare.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate pr-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+SCRIPT=$(find ~/.claude/plugins -name "pr.js" -path "*/sdlc*/scripts/skill/pr.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/pr.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/pr.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/pr.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 PR_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
@@ -117,7 +117,7 @@ rm -f "$PR_CONTEXT_FILE"
 - Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
 - Exit code 2: Show `Script error — see output above` and stop.
 
-**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=pr-sdlc, step=Step 0 — pr-prepare.js execution, error=stderr.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=pr-sdlc, step=Step 0 — skill/pr.js execution, error=stderr.
 
 **If `PR_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
@@ -470,8 +470,8 @@ Title: <title>
 
 | Error | Recovery | Invoke error-report-sdlc? |
 |-------|----------|---------------------------|
-| `pr-prepare.js` exit 1 (`errors[]` present) | Show each error, stop | No — user input error |
-| `pr-prepare.js` exit 2 (crash) | Show stderr, stop | Yes |
+| `skill/pr.js` exit 1 (`errors[]` present) | Show each error, stop | No — user input error |
+| `skill/pr.js` exit 2 (crash) | Show stderr, stop | Yes |
 | `gh pr create` / `gh pr edit` fails with 5xx or unexpected error | Show error; offer manual fallback (copy title + description) | Yes |
 | `gh` unavailable | Show install instructions | No — user setup |
 | `gh` auth failure | Show `gh auth login` instructions | No — auth, not a bug |
@@ -479,7 +479,7 @@ Title: <title>
 When invoking `error-report-sdlc`, provide:
 - **Skill**: pr-sdlc
 - **Step**: Step 0 (script crash) or Step 6 (gh CLI failure)
-- **Operation**: `pr-prepare.js` execution or `gh pr create` / `gh pr edit`
+- **Operation**: `skill/pr.js` execution or `gh pr create` / `gh pr edit`
 - **Error**: exit code 2 + stderr, or gh error output
 - **Suggested investigation**: Check installed plugin version; verify git remote is configured and branch is pushed
 
@@ -487,14 +487,14 @@ When invoking `error-report-sdlc`, provide:
 
 ## Gotchas
 
-- **Large diff output**: `pr-prepare.js` embeds full `diffContent` inline in its JSON. For repos
+- **Large diff output**: `skill/pr.js` embeds full `diffContent` inline in its JSON. For repos
   with many changed files this easily exceeds 100KB — too large to pipe through a shell command
   without truncation (failure manifests as "Unterminated string in JSON at position N"). The
   `pr.md` command already prescribes writing to a temp file (`mktemp`). If you ever need to
-  re-run the script manually, always use `node pr-prepare.js > /tmp/pr-context-$$.json` and
+  re-run the script manually, always use `node skill/pr.js > /tmp/pr-context-$$.json` and
   read from the file rather than piping output to a parser.
 
-- **Installed plugin version skew silently suppresses custom template**: `pr-prepare.js` is
+- **Installed plugin version skew silently suppresses custom template**: `skill/pr.js` is
   resolved from the installed plugin, which may be older than the project's local copy. An
   older installed version may lack `customTemplate` support entirely, returning the field as
   absent or `null` even when `.claude/pr-template.md` exists on disk. **Always cross-check**:

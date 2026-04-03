@@ -27,10 +27,15 @@ sdlc-marketplace/
 │       ├── hooks/
 │       │   └── hooks.json        # Hook configuration
 │       └── scripts/
-│           ├── pr-prepare.js          # Pre-computes git data for PR descriptions
-│           ├── review-prepare.js      # Pre-computes git data for code reviews
-│           ├── validate-dimensions.js # Validates .claude/review-dimensions/ files
-│           └── lib/                   # Shared modules (git, dimensions)
+│           ├── skill/                 # Invoked by skills to pre-compute context
+│           │   ├── commit.js, pr.js, review.js, ...
+│           ├── ci/                    # CI validation and maintenance
+│           │   ├── validate-dimensions.js, validate-discovery.js, ...
+│           ├── state/                 # State persistence CLIs
+│           │   ├── execute.js, ship.js
+│           ├── util/                  # Action utilities
+│           │   ├── ship-init.js, worktree-create.js
+│           └── lib/                   # Shared modules (git, config, state, ...)
 └── docs/                         # Documentation
 ```
 
@@ -182,11 +187,11 @@ tests/promptfoo/
 
 ### Script Execution Tests (`promptfooconfig-exec.yaml`)
 
-Test prepare scripts and utilities directly — no LLM involved. Uses the `script-runner.js` provider to execute Node.js scripts against fixture directories.
+Test scripts directly — no LLM involved. Uses the `script-runner.js` provider to execute Node.js scripts against fixture directories.
 
 ### Adding Tests
 
-When adding or modifying a skill or prepare script:
+When adding or modifying a skill or script:
 1. Add test cases to `tests/promptfoo/datasets/<skill-name>.yaml`
 2. Create fixtures in `tests/promptfoo/fixtures/` if existing ones don't cover the scenario
 3. Do **not** create unit test files — all testing goes through promptfoo datasets

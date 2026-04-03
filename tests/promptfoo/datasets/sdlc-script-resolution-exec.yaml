@@ -15,7 +15,7 @@
 - description: "script-resolution: installed plugin path is found"
   vars:
     script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
-    script_args: "--script-name pr-prepare.js --project-root {{project_root}}"
+    script_args: "--script-name pr.js --script-path skill/pr.js --project-root {{project_root}}"
     project_root: "file://fixtures-fs/resolution-installed-only"
   assert:
     # Source must be "installed"
@@ -34,7 +34,7 @@
 - description: "script-resolution: dev fallback path is found when plugin not installed"
   vars:
     script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
-    script_args: "--script-name pr-prepare.js --project-root {{project_root}}"
+    script_args: "--script-name pr.js --script-path skill/pr.js --project-root {{project_root}}"
     project_root: "file://fixtures-fs/resolution-dev-only"
   assert:
     # Source must be "local"
@@ -53,7 +53,7 @@
 - description: "script-resolution: installed path wins when both paths exist"
   vars:
     script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
-    script_args: "--script-name pr-prepare.js --project-root {{project_root}}"
+    script_args: "--script-name pr.js --script-path skill/pr.js --project-root {{project_root}}"
     project_root: "file://fixtures-fs/resolution-both"
   assert:
     # Source must be "installed" (find runs before local fallback)
@@ -69,7 +69,7 @@
 - description: "script-resolution: error when script not found in either location"
   vars:
     script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
-    script_args: "--script-name pr-prepare.js --project-root {{project_root}}"
+    script_args: "--script-name pr.js --script-path skill/pr.js --project-root {{project_root}}"
     project_root: "file://fixtures-fs/resolution-neither"
   assert:
     # Source must be "error"

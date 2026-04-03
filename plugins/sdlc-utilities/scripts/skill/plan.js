@@ -20,9 +20,12 @@
 
 'use strict';
 
-const { detectActiveChanges, validateChange } = require('./lib/openspec');
-const { readSection } = require('./lib/config');
-const { writeOutput } = require('./lib/output');
+const path = require('node:path');
+const LIB = path.join(__dirname, '..', 'lib');
+
+const { detectActiveChanges, validateChange } = require(path.join(LIB, 'openspec'));
+const { readSection } = require(path.join(LIB, 'config'));
+const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing

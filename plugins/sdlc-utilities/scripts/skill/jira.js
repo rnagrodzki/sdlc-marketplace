@@ -26,7 +26,9 @@
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
-const { writeOutput } = require('./lib/output');
+const LIB = path.join(__dirname, '..', 'lib');
+
+const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing

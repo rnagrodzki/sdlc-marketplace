@@ -9,7 +9,7 @@ model: haiku
 
 # Smart Commit Skill
 
-Consume pre-computed commit context from `commit-prepare.js`, generate a commit message
+Consume pre-computed commit context from `skill/commit.js`, generate a commit message
 matching the project's style, optionally stash unstaged changes, commit after user
 confirmation, and auto-restore the stash.
 
@@ -33,14 +33,14 @@ If the system context contains "Plan mode is active":
 
 ---
 
-### Step 0: Resolve and Run commit-prepare.js
+### Step 0: Resolve and Run skill/commit.js
 
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "commit-prepare.js" -path "*/sdlc*/scripts/commit-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/commit-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/commit-prepare.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate commit-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+SCRIPT=$(find ~/.claude/plugins -name "commit.js" -path "*/sdlc*/scripts/skill/commit.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/commit.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/commit.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/commit.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 COMMIT_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
@@ -57,7 +57,7 @@ rm -f "$COMMIT_CONTEXT_FILE"
 - Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
 - Exit code 2: Show `Script error — see output above` and stop.
 
-**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=commit-sdlc, step=Step 0 — commit-prepare.js execution, error=stderr.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=commit-sdlc, step=Step 0 — skill/commit.js execution, error=stderr.
 
 **If `COMMIT_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
@@ -254,8 +254,8 @@ Omit the `Stash:` line if no stash was used.
 
 | Error | Recovery | Invoke error-report-sdlc? |
 | ----- | -------- | ------------------------- |
-| `commit-prepare.js` exit 1 | Show `errors[]`, stop | No — user input error |
-| `commit-prepare.js` exit 2 (crash) | Show stderr, stop | Yes |
+| `skill/commit.js` exit 1 | Show `errors[]`, stop | No — user input error |
+| `skill/commit.js` exit 2 (crash) | Show stderr, stop | Yes |
 | No staged changes (exit 1) | Inform user, suggest `git add` | No — user action needed |
 | `git stash push` fails | Abort commit, show error | Yes if non-trivial failure |
 | `git commit` fails (hook) | Show hook output; inform user stash is still in place; suggest recovery | No — hook failure is expected |
@@ -265,7 +265,7 @@ Omit the `Stash:` line if no stash was used.
 When invoking `error-report-sdlc`, provide:
 - **Skill**: commit-sdlc
 - **Step**: Step 0 (script crash) or Step 5 (commit execution)
-- **Operation**: `commit-prepare.js` execution or `git stash`/`git commit`/`git stash pop`
+- **Operation**: `skill/commit.js` execution or `git stash`/`git commit`/`git stash pop`
 - **Error**: exit code + stderr or git error output
 - **Suggested investigation**: Check git identity; verify no branch protection rules; inspect hook scripts
 

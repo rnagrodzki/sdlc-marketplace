@@ -30,7 +30,7 @@
 - R11: Spec compliance review after each wave for non-trivial tasks (skip for Speed preset)
 - R12: Inter-wave critique: detect when actual output differs from what downstream tasks assumed
 - R13: Maximum 2 retries per task; model escalation on failure (haiku→sonnet, sonnet→opus, opus→user)
-- R14: State persistence after every wave via `execute-state.js`; cleanup on success, preserve on failure for `--resume`
+- R14: State persistence after every wave via `state/execute.js`; cleanup on success, preserve on failure for `--resume`
 - R15: Resume verifies plan hash; mismatch offers resume-with-existing or restart
 - R16: Workspace isolation when on default branch: derive branch name or create worktree
 - R17: Pre-execution rebase when `--rebase auto`: fetch, check ancestor, attempt rebase, abort on conflict
@@ -42,7 +42,7 @@
 ## Workflow Phases
 
 1. LOAD — load and validate plan (≥2 tasks, clear deliverables, no cycles); detect resume state; workspace isolation; rebase; load guardrails
-   - **Script:** `execute-state.js read` (when `--resume`)
+   - **Script:** `state/execute.js read` (when `--resume`)
    - **Params:** state file path (auto-resolved from branch name in `.sdlc/execution/`)
    - **Output:** JSON state object (completed waves/tasks, plan hash, context with file manifests and decisions)
    - **Script:** `lib/config.js` → `readSection()` via inline Node.js
@@ -53,14 +53,14 @@
 4. CRITIQUE — critique wave structure (file conflicts, dependencies, risk clustering, trivial aggregation)
 5. IMPROVE — fix critique issues; present final wave structure with preset (auto-selected or interactive)
 6. DO — execute waves sequentially: pre-wave guardrail check → high-risk gate → dispatch agents → collect and verify → spec compliance review → post-wave guardrails → progress report → inter-wave critique → state persistence
-   - **Script:** `execute-state.js` (per-wave lifecycle)
+   - **Script:** `state/execute.js` (per-wave lifecycle)
    - **Params:** subcommands: `init --branch --preset --total-tasks` (first wave), `wave-start --wave N`, `task-done/task-fail --wave --task --name --complexity --risk --files-changed`, `wave-done/wave-fail --wave N`, `context --data '<json>'`
    - **Output:** JSON state object persisted to `.sdlc/execution/execute-<branch>-<timestamp>.json` after each wave
 7. RECOVER — error recovery per failure type (model escalation, conflict resolution, inline fix, user escalation)
 8. VERIFY — final verification: full test suite, build, lint, `git diff --stat`
 9. CRITIQUE — final output critique: completeness, orphans, drift, TODO markers
 10. REPORT — summary with task count, waves, retries, verification status, guardrail results
-   - **Script:** `execute-state.js cleanup` (on success) or state preserved (on failure)
+   - **Script:** `state/execute.js cleanup` (on success) or state preserved (on failure)
    - **Params:** none (operates on current branch's state file)
    - **Output:** state file removed on success; preserved on failure for `--resume`
 
@@ -111,8 +111,8 @@
 
 ## Integration
 
-- I1: `execute-state.js` — state file management for pause/resume
-- I2: `worktree-create.js` — worktree creation for workspace isolation
+- I1: `state/execute.js` — state file management for pause/resume
+- I2: `util/worktree-create.js` — worktree creation for workspace isolation
 - I3: `config.js` — reads `execute.guardrails` from `.claude/sdlc.json`
 - I4: Agent tool — dispatches task agents with per-task model assignment
 - I5: `spec-compliance-reviewer.md` — post-wave spec review template

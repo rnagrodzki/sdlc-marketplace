@@ -1,8 +1,15 @@
 #!/usr/bin/env node
+/**
+ * @file ci/validate-guardrails.js
+ * @description Validates guardrail definitions in .claude/sdlc.json: checks schema
+ *   compliance, id uniqueness, severity values, and description quality.
+ * @exit 0 all checks pass, 1 validation issues found
+ */
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
+const LIB = path.join(__dirname, '..', 'lib');
 
 /**
  * Parse command-line flags
@@ -31,9 +38,7 @@ function parseArgs(args) {
  * Import readSection from lib/config.js
  */
 function loadReadSection() {
-  // Try to find config.js in the plugin scripts directory (relative to this file)
-  const scriptDir = __dirname;
-  const configPath = path.join(scriptDir, 'lib', 'config.js');
+  const configPath = path.join(LIB, 'config.js');
 
   if (!fs.existsSync(configPath)) {
     throw new Error(`Could not find lib/config.js at ${configPath}`);

@@ -32,10 +32,12 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { exec, checkGitState, detectBaseBranch } = require('./lib/git');
-const { resolveMainWorktree } = require('./lib/state');
-const { readSection, normalizePreset } = require('./lib/config');
-const { writeOutput } = require('./lib/output');
+const LIB = path.join(__dirname, '..', 'lib');
+
+const { exec, checkGitState, detectBaseBranch } = require(path.join(LIB, 'git'));
+const { resolveMainWorktree } = require(path.join(LIB, 'state'));
+const { readSection, normalizePreset } = require(path.join(LIB, 'config'));
+const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // Constants

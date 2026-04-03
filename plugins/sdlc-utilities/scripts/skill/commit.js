@@ -25,9 +25,12 @@
 
 'use strict';
 
-const { exec, checkGitState, splitDiffByFile } = require('./lib/git');
-const { readSection } = require('./lib/config');
-const { writeOutput } = require('./lib/output');
+const path = require('node:path');
+const LIB = path.join(__dirname, '..', 'lib');
+
+const { exec, checkGitState, splitDiffByFile } = require(path.join(LIB, 'git'));
+const { readSection } = require(path.join(LIB, 'config'));
+const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // Diff truncation

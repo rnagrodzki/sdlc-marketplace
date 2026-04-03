@@ -7,7 +7,7 @@
 
 - description: "pr-prepare: default flags with no args"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-no-config"
   assert:
@@ -18,7 +18,7 @@
 
 - description: "pr-prepare: --draft flag"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_args: "--draft"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-no-config"
@@ -28,7 +28,7 @@
 
 - description: "pr-prepare: --update flag"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_args: "--update"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-no-config"
@@ -38,7 +38,7 @@
 
 - description: "pr-prepare: --base main override"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_args: "--base main"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-no-config"
@@ -48,7 +48,7 @@
 
 - description: "pr-prepare: --auto flag"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_args: "--auto"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-no-config"
@@ -58,7 +58,7 @@
 
 - description: "pr-prepare: --label bug --label feature adds both labels"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_args: "--label bug --label feature"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-no-config"
@@ -70,7 +70,7 @@
 
 - description: "pr-prepare: --label bug --label bug deduplicates"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_args: "--label bug --label bug"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-no-config"
@@ -80,7 +80,7 @@
 
 - description: "pr-prepare: config present includes prConfig"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-config"
   assert:
@@ -91,7 +91,7 @@
 
 - description: "pr-prepare: no config sets prConfig null"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/pr-prepare.js"
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-no-config"
   assert:

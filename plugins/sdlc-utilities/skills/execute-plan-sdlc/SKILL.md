@@ -72,7 +72,7 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
 - If `--resume` was passed:
   1. Find the most recent state file for the current branch in `<main-worktree>/.sdlc/execution/`. If none found, warn: "No state file found for branch `<branch>`. Starting fresh." and proceed to plan loading below.
   2. Read `./state-format.md` for the schema reference.
-  3. Read the state file using `node "$SCRIPT" read` (locate `execute-state.js` as described in the State persistence section). Load `planPath` and read the plan file. If `planPath` is null (plan was from conversation context), use AskUserQuestion to request the plan file path.
+  3. Read the state file using `node "$SCRIPT" read` (locate `state/execute.js` as described in the State persistence section). Load `planPath` and read the plan file. If `planPath` is null (plan was from conversation context), use AskUserQuestion to request the plan file path.
   4. Compute the SHA-256 hash of the plan content and compare against `planHash`. If mismatch, use AskUserQuestion:
      > Plan content has changed since execution started. Resume with the existing wave structure, or restart from scratch?
      Options: **resume** | **restart**
@@ -115,8 +115,8 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
 
    - **If `--workspace worktree`:** Create worktree without prompting:
      ```bash
-     SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/worktree-create.js" 2>/dev/null | head -1)
-     [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/worktree-create.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/worktree-create.js"
+     SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/util/worktree-create.js" 2>/dev/null | head -1)
+     [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/worktree-create.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/worktree-create.js"
      result=$(node "$SCRIPT" --name <derived-name>)
      cd $(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
      ```
@@ -131,7 +131,7 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
      > 2. Create a worktree for isolated execution
      > 3. Continue on `<branch>` anyway
    - **Option 1:** Run `git checkout -b <name>`. If the user provides a custom name, use it instead of the suggestion.
-   - **Option 2:** Create worktree using `worktree-create.js` as shown above.
+   - **Option 2:** Create worktree using `util/worktree-create.js` as shown above.
    - **Option 3:** Proceed without changes.
 4. If the current branch is NOT the default branch, skip this check entirely — no warning, no prompt.
 
@@ -377,10 +377,10 @@ Running verification... [status]
 Proceeding to Wave N+1 (N tasks)
 ```
 
-**State persistence:** After each wave completes, update the execution state via `execute-state.js`. Locate the script:
+**State persistence:** After each wave completes, update the execution state via `state/execute.js`. Locate the script:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "execute-state.js" -path "*/sdlc*/scripts/execute-state.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/execute-state.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/execute-state.js"
+SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/execute.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/execute.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/state/execute.js"
 ```
 
 On the very first wave dispatch, initialize the state file:
@@ -570,9 +570,9 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 
 **Workspace isolation can use a stale branch.** The conversation-level `gitStatus` snapshot is frozen at session start. If the user switches branches mid-session, `gitStatus` still reports the original branch. The workspace isolation check in Step 1 must run `git branch --show-current` via Bash — never read the branch from `gitStatus` or any other cached context.
 
-**Worktree lifecycle uses git commands, not harness tools.** `worktree-create.js` for creation (handles branch collision), `git worktree remove` for cleanup. No EnterWorktree/ExitWorktree. When invoked from ship-sdlc, skip cleanup — ship-sdlc owns the worktree lifecycle.
+**Worktree lifecycle uses git commands, not harness tools.** `util/worktree-create.js` for creation (handles branch collision), `git worktree remove` for cleanup. No EnterWorktree/ExitWorktree. When invoked from ship-sdlc, skip cleanup — ship-sdlc owns the worktree lifecycle.
 
-**State files are script-managed.** Use execute-state.js for all state operations. Don't hand-write JSON to `.sdlc/execution/`.
+**State files are script-managed.** Use state/execute.js for all state operations. Don't hand-write JSON to `.sdlc/execution/`.
 
 **State file timestamp is set once at execution start.** The `<timestamp>` in the filename is established when execution begins and does not change across waves. The same file is overwritten after each wave. This keeps the filename stable for resume detection and ship-sdlc integration.
 

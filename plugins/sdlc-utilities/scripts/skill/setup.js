@@ -1,13 +1,21 @@
 #!/usr/bin/env node
+/**
+ * @file skill/setup.js
+ * @description Pre-computes project state for the setup-sdlc skill: detects version
+ *   files, existing config, legacy settings, and outputs a JSON manifest.
+ * @skill setup-sdlc
+ * @exit 0 success (JSON on stdout), 1 error
+ */
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const LIB = path.join(__dirname, '..', 'lib');
 
-const { detectVersionFile } = require('./lib/version');
-const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH, PROJECT_SECTIONS } = require('./lib/config');
-const { writeOutput } = require('./lib/output');
+const { detectVersionFile } = require(path.join(LIB, 'version'));
+const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH, PROJECT_SECTIONS } = require(path.join(LIB, 'config'));
+const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // Helpers

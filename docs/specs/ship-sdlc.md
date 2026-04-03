@@ -4,7 +4,7 @@
 
 **User-invocable:** yes
 **Model:** opus
-**Prepare script:** `ship-prepare.js`
+**Prepare script:** `skill/ship.js`
 
 ## Arguments
 
@@ -23,13 +23,13 @@
 - R1: 7-step pipeline sequence: execute-plan-sdlc → commit-sdlc → review-sdlc → received-review-sdlc (conditional) → commit-sdlc fixes (conditional) → version-sdlc → pr-sdlc
 - R2: All sub-skills dispatched as Agents (never Skill tool) to maintain context isolation — each Agent loads its SKILL.md independently
 - R3: Pipeline plan is a binding contract: steps with `status: "will_run"` must execute; LLM cannot override
-- R4: Step statuses computed by `ship-prepare.js`: `will_run`, `skipped`, `conditional`
+- R4: Step statuses computed by `skill/ship.js`: `will_run`, `skipped`, `conditional`
 - R5: Skip set provenance tracked via `skipSource`: `cli`, `config`, `auto`, `condition`, `none`; fabrication guard warns on `default` source
 - R6: Review verdict conditional logic: CHANGES REQUESTED (critical or ≥3 high) → pause, invoke received-review; APPROVED WITH NOTES (high or ≥5 medium) → invoke received-review if high exists; APPROVED → continue
 - R7: `--auto` forwarding audit: only forwarded to commit-sdlc, received-review-sdlc, version-sdlc, pr-sdlc (not execute-plan-sdlc, not review-sdlc)
 - R8: Staging gap between execute and commit: `git add -A -- ':!.sdlc/'` required
 - R9: Rebase onto default branch after all commits, before version step; abort and pause on conflict
-- R10: State persistence after each step via `ship-state.js`; cleanup on success, preserve on failure
+- R10: State persistence after each step via `state/ship.js`; cleanup on success, preserve on failure
 - R11: Resume via `--resume`: re-enter worktree if applicable, continue from first incomplete step
 - R12: Version step auto-skipped in worktree mode (tags are repo-global); advisory printed post-pipeline
 - R13: Worktree PRs auto-label `skip-version-check` when version auto-skipped
@@ -42,18 +42,18 @@
 
 ## Workflow Phases
 
-1. CONSUME — load config, parse flags, run `ship-prepare.js` for context detection and step computation
-   - **Script:** `ship-prepare.js`
+1. CONSUME — load config, parse flags, run `skill/ship.js` for context detection and step computation
+   - **Script:** `skill/ship.js`
    - **Params:** A1-A8 forwarded (`--auto`, `--skip <csv>`, `--preset`, `--bump`, `--draft`, `--resume`, `--workspace`); internal: `--has-plan` (from plan context detection)
    - **Output:** JSON → P1-P6 (flags with per-flag provenance sources, resume detection, context with branch/auth/openspec/worktree, pipeline steps with status/reason/skipSource/invocation, config)
-2. PLAN — build pipeline table from `ship-prepare.js` steps array; display flag resolution and auto-skip decisions
+2. PLAN — build pipeline table from `skill/ship.js` steps array; display flag resolution and auto-skip decisions
 3. CRITIQUE — validate pipeline: gh auth, branch safety, skip values, flag coherence
 4. DO — present pipeline for confirmation (or auto/dry-run); execute steps sequentially via Agent dispatch
-   - **Script:** `ship-state.js`
+   - **Script:** `state/ship.js`
    - **Params:** subcommands per step lifecycle: `init`, `start`, `complete`, `skip`, `fail`, `decide`, `defer`
    - **Output:** JSON state object persisted to `.sdlc/execution/ship-<branch>-<timestamp>.json` for `--resume` support
 5. REPORT — summary table with per-step results, decisions log, deferred findings, worktree cleanup
-   - **Script:** `ship-state.js`
+   - **Script:** `state/ship.js`
    - **Params:** subcommand `cleanup` (on success) or `read` (on failure, state preserved)
    - **Output:** state file removed on success; preserved on failure for `--resume`
 
@@ -99,7 +99,7 @@
 - C6: Must not delete state file on failure — needed for `--resume`
 - C7: Must not proceed past a failed sub-skill — stop, save state, inform user
 - C8: Must not skip steps marked `will_run` in the pipeline plan — the plan is a binding contract
-- C9: Must not copy example args from SKILL.md — use `step.invocation` from ship-prepare.js
+- C9: Must not copy example args from SKILL.md — use `step.invocation` from skill/ship.js
 - C10: Must not add `--skip` flags not present in user invocation or ship config
 - C11: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
 - C12: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
@@ -108,9 +108,9 @@
 
 ## Integration
 
-- I1: `ship-prepare.js` — pre-computes flags, context, step statuses, and invocations
-- I2: `ship-state.js` — pipeline state management for pause/resume
-- I3: `ship-init.js` — interactive config wizard for `--init-config`
+- I1: `skill/ship.js` — pre-computes flags, context, step statuses, and invocations
+- I2: `state/ship.js` — pipeline state management for pause/resume
+- I3: `util/ship-init.js` — interactive config wizard for `--init-config`
 - I4: `execute-plan-sdlc` — step 1: plan execution
 - I5: `commit-sdlc` — steps 2 and 5: feature commit and review fix commit
 - I6: `review-sdlc` — step 3: multi-dimension code review
@@ -118,5 +118,5 @@
 - I8: `version-sdlc` — step 6: semantic versioning and release tag
 - I9: `pr-sdlc` — step 7: pull request creation
 - I10: `setup-sdlc` — redirect target for `--init-config`
-- I11: `worktree-create.js` — worktree creation for workspace isolation
+- I11: `util/worktree-create.js` — worktree creation for workspace isolation
 - I12: OpenSpec — optional; suggests `/opsx:verify` and `/opsx:archive` post-pipeline when detected

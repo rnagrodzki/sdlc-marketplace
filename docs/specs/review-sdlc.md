@@ -4,7 +4,7 @@
 
 **User-invocable:** yes
 **Model:** sonnet
-**Prepare script:** `review-prepare.js`
+**Prepare script:** `skill/review.js`
 
 ## Arguments
 
@@ -19,7 +19,7 @@
 
 ## Core Requirements
 
-- R1: Run `review-prepare.js` to produce a manifest file; do NOT read the manifest into main context
+- R1: Run `skill/review.js` to produce a manifest file; do NOT read the manifest into main context
 - R2: Scope flags (`--committed`, `--staged`, `--working`, `--worktree`) are mutually exclusive
 - R3: When `--dry-run` is passed, read the manifest, display the review plan in the specified format, clean up, and stop
 - R4: Delegate to the `review-orchestrator` agent (via Agent tool, NOT Skill tool) with the manifest file path and project root
@@ -32,7 +32,7 @@
 ## Workflow Phases
 
 1. CONSUME — run prepare script to produce manifest file
-   - **Script:** `review-prepare.js`
+   - **Script:** `skill/review.js`
    - **Params:** A1-A7 forwarded (`--base <branch>`, `--committed`, `--staged`, `--working`, `--worktree`, `--set-default`, `--dimensions <list>`)
    - **Output:** manifest file path → P1-P8 (base branch, changed files, dimension counts/entries, plan critique); also writes per-dimension `.diff` files to tmpdir. Skill must NOT read manifest into main context
 2. DO — dispatch review-orchestrator agent (or display dry-run plan)
@@ -41,7 +41,7 @@
 
 ## Quality Gates
 
-- G1: Manifest file produced — `review-prepare.js` exits successfully and produces a valid file path
+- G1: Manifest file produced — `skill/review.js` exits successfully and produces a valid file path
 - G2: Orchestrator dispatched — agent is spawned (not via Skill tool) with manifest path and project root
 - G3: Manifest cleaned up — temp file is deleted after completion or cancellation
 
@@ -58,8 +58,8 @@
 
 ## Error Handling
 
-- E1: `review-prepare.js` exit 1 → show stderr message, stop (no error report)
-- E2: `review-prepare.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
+- E1: `skill/review.js` exit 1 → show stderr message, stop (no error report)
+- E2: `skill/review.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
 - E3: Orchestrator fails once → re-dispatch with same inputs
 - E4: Orchestrator fails twice → invoke error-report-sdlc
 
@@ -76,7 +76,7 @@
 
 ## Integration
 
-- I1: `review-prepare.js` — produces the review manifest with all git data
+- I1: `skill/review.js` — produces the review manifest with all git data
 - I2: `review-orchestrator` agent — performs the actual multi-dimension review
 - I3: `received-review-sdlc` — invoked to address review findings when verdict warrants
 - I4: `setup-sdlc --dimensions` — creates the review dimension configuration

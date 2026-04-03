@@ -4,7 +4,7 @@
 
 **User-invocable:** yes
 **Model:** haiku
-**Prepare script:** `commit-prepare.js`
+**Prepare script:** `skill/commit.js`
 
 ## Arguments
 
@@ -30,8 +30,8 @@
 
 ## Workflow Phases
 
-1. CONSUME — read pre-computed context from `commit-prepare.js` output (staged diff, recent commits, branch, config, flags)
-   - **Script:** `commit-prepare.js`
+1. CONSUME — read pre-computed context from `skill/commit.js` output (staged diff, recent commits, branch, config, flags)
+   - **Script:** `skill/commit.js`
    - **Params:** A1-A5 forwarded (`--no-stash`, `--scope <s>`, `--type <t>`, `--amend`, `--auto`)
    - **Output:** JSON → P1-P13 (branch, flags, staged diff/stat/files, unstaged state, recent commits, last commit message, commit config)
 2. PLAN — analyze diff and recent commits to generate commit message (type, scope, subject, body, trailers)
@@ -71,8 +71,8 @@
 
 ## Error Handling
 
-- E1: `commit-prepare.js` exit 1 → show `errors[]` array to user, stop (no error report)
-- E2: `commit-prepare.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
+- E1: `skill/commit.js` exit 1 → show `errors[]` array to user, stop (no error report)
+- E2: `skill/commit.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
 - E3: No staged changes → inform user, suggest `git add`, stop (no error report)
 - E4: `git stash push` fails → abort commit, show error, invoke error-report-sdlc if non-trivial
 - E5: `git commit` fails (pre-commit hook) → show hook output, inform user stash is still in place, provide recovery instructions (no error report)
@@ -95,7 +95,7 @@
 
 ## Integration
 
-- I1: `commit-prepare.js` — provides all pre-computed context (diff, history, config)
+- I1: `skill/commit.js` — provides all pre-computed context (diff, history, config)
 - I2: `error-report-sdlc` — invoked on script crashes and persistent git failures
 - I3: `review-sdlc` — common follow-up after committing
 - I4: `pr-sdlc` — common follow-up after committing

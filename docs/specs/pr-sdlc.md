@@ -4,7 +4,7 @@
 
 **User-invocable:** yes
 **Model:** sonnet
-**Prepare script:** `pr-prepare.js`
+**Prepare script:** `skill/pr.js`
 
 ## Arguments
 
@@ -34,7 +34,7 @@
 ## Workflow Phases
 
 1. CONSUME — run prepare script, read PR context JSON (commits, diff, labels, config, custom template)
-   - **Script:** `pr-prepare.js`
+   - **Script:** `skill/pr.js`
    - **Params:** A1-A5 forwarded (`--draft`, `--update`, `--base <branch>`, `--auto`, `--label <name>`)
    - **Output:** JSON → P1-P18 (mode, branches, draft flag, existing PR, jira ticket, commits, diff stats/content, changed files, repo labels, custom template, PR config, auth, remote state, warnings)
 2. PLAN — draft all sections of the active template, draft title, infer labels
@@ -80,8 +80,8 @@
 
 ## Error Handling
 
-- E1: `pr-prepare.js` exit 1 → show `errors[]`, stop (no error report)
-- E2: `pr-prepare.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
+- E1: `skill/pr.js` exit 1 → show `errors[]`, stop (no error report)
+- E2: `skill/pr.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
 - E3: `gh pr create` / `gh pr edit` fails with 5xx → show error, offer manual fallback, invoke error-report-sdlc
 - E4: `gh` unavailable → show install instructions (no error report)
 - E5: `gh` auth failure → show `gh auth login` instructions (no error report)
@@ -104,7 +104,7 @@
 
 ## Integration
 
-- I1: `pr-prepare.js` — provides all pre-computed PR context
+- I1: `skill/pr.js` — provides all pre-computed PR context
 - I2: `gh` CLI — used for PR creation, update, and label creation
 - I3: `error-report-sdlc` — invoked on script crashes and persistent gh failures
 - I4: OpenSpec — optional enrichment for Business Context/Benefits and Technical Design

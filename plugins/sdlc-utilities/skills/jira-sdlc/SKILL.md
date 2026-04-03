@@ -64,9 +64,9 @@ removed entirely — the API call is never made with raw placeholder text.
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "jira-prepare.js" -path "*/sdlc*/scripts/jira-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/jira-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/jira-prepare.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate jira-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+SCRIPT=$(find ~/.claude/plugins -name "jira.js" -path "*/sdlc*/scripts/skill/jira.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/jira.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/jira.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/jira.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 JIRA_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --check)
 EXIT_CODE=$?
@@ -85,7 +85,7 @@ rm -f "$JIRA_CONTEXT_FILE"
 
 ### Cache Status Evaluation
 
-**Hook context fast-path:** If the session-start system-reminder contains a `Jira cache:` line with `stale`, use it to skip the `jira-prepare.js --check` cache status check and immediately prompt for `--force-refresh`. If the line shows the cache as current, proceed with `jira-prepare.js` as normal — the prepare script validates more deeply than the hook's age check. The hook context is a session-start snapshot.
+**Hook context fast-path:** If the session-start system-reminder contains a `Jira cache:` line with `stale`, use it to skip the `skill/jira.js --check` cache status check and immediately prompt for `--force-refresh`. If the line shows the cache as current, proceed with `skill/jira.js` as normal — the prepare script validates more deeply than the hook's age check. The hook context is a session-start snapshot.
 
 Read the check output:
 

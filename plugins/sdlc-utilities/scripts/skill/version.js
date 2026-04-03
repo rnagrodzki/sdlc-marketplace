@@ -31,14 +31,15 @@
 
 const fs   = require('node:fs');
 const path = require('node:path');
+const LIB = path.join(__dirname, '..', 'lib');
 
-const { checkGitState, getTagList, getCommitsSinceRef, getCommitsBetweenRefs, getRemoteState } = require('./lib/git');
+const { checkGitState, getTagList, getCommitsSinceRef, getCommitsBetweenRefs, getRemoteState } = require(path.join(LIB, 'git'));
 const {
   detectVersionFile, readVersion, validateSemver,
   computeNextVersions, computePreRelease, parseConventionalCommit,
   readConfig,
-} = require('./lib/version');
-const { writeOutput } = require('./lib/output');
+} = require(path.join(LIB, 'version'));
+const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing

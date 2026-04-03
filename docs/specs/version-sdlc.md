@@ -4,7 +4,7 @@
 
 **User-invocable:** yes
 **Model:** sonnet
-**Prepare script:** `version-prepare.js`
+**Prepare script:** `skill/version.js`
 
 ## Arguments
 
@@ -35,8 +35,8 @@
 
 ## Workflow Phases
 
-1. CONSUME — read pre-computed context from `version-prepare.js` output (current version, commits, config, flags, bump options)
-   - **Script:** `version-prepare.js`
+1. CONSUME — read pre-computed context from `skill/version.js` output (current version, commits, config, flags, bump options)
+   - **Script:** `skill/version.js`
    - **Params:** A1 positional bump type (`major|minor|patch`), A2-A7 forwarded (`--pre <label>`, `--changelog`, `--hotfix`, `--auto`, `--init`, `--no-push`)
    - **Output:** JSON → P1-P12 (version source, config mode/changelog/ticket prefix, requested bump, conventional summary with suggested bump and breaking changes, bump options, latest tag, commits, flags, tag conflicts)
 2. PLAN — determine bump type, compute new version, draft CHANGELOG entry if enabled
@@ -72,8 +72,8 @@
 
 ## Error Handling
 
-- E1: `version-prepare.js` exit 1 → show `errors[]`, stop (no error report)
-- E2: `version-prepare.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
+- E1: `skill/version.js` exit 1 → show `errors[]`, stop (no error report)
+- E2: `skill/version.js` exit 2 (crash) → show stderr, invoke error-report-sdlc
 - E3: Tag already exists → suggest next available version, let user choose (no error report)
 - E4: `git commit` fails → show error, invoke error-report-sdlc if non-hook failure
 - E5: `git tag` fails → show error, invoke error-report-sdlc if non-duplicate failure
@@ -95,9 +95,9 @@
 
 ## Integration
 
-- I1: `version-prepare.js` — provides all pre-computed version context
+- I1: `skill/version.js` — provides all pre-computed version context
 - I2: `error-report-sdlc` — invoked on script crashes and persistent git failures
 - I3: `commit-sdlc` — can be invoked when uncommitted changes need committing first
 - I4: `jira-sdlc` — common follow-up to update ticket status after release
 - I5: `retag-release.yml` — CI workflow scaffolded during init to handle squash-merge tag relocation
-- I6: `check-changelog.js` — CI script scaffolded during init to validate changelog presence
+- I6: `ci/check-changelog.js` — CI script scaffolded during init to validate changelog presence

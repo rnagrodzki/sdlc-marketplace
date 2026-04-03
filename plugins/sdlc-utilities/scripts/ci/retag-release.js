@@ -29,7 +29,9 @@ const fs   = require('node:fs');
 const path = require('node:path');
 const os   = require('node:os');
 const { execSync } = require('node:child_process');
-const { readSection } = require('./lib/config');
+const LIB = path.join(__dirname, '..', 'lib');
+
+const { readSection } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Helpers

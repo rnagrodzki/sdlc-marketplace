@@ -28,6 +28,7 @@
 'use strict';
 
 const path = require('node:path');
+const LIB = path.join(__dirname, '..', 'lib');
 
 const {
   detectBaseBranch,
@@ -36,8 +37,8 @@ const {
   ensureGhAccount,
   getCurrentUser,
   fetchPrReviewThreads,
-} = require('./lib/git');
-const { writeOutput } = require('./lib/output');
+} = require(path.join(LIB, 'git'));
+const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing

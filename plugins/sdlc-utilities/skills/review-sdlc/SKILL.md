@@ -1,6 +1,6 @@
 ---
 name: review-sdlc
-description: "Use this skill when reviewing code changes across project-defined dimensions (security, performance, docs, concurrency, etc.). Runs review-prepare.js to pre-compute all git data, then delegates to the review-orchestrator agent. Arguments: [--base <branch>] [--committed] [--staged] [--working] [--worktree] [--set-default] [--dimensions <name,...>] [--dry-run]. Triggers on: review changes, code review, review PR, multi-dimension review, run review."
+description: "Use this skill when reviewing code changes across project-defined dimensions (security, performance, docs, concurrency, etc.). Runs skill/review.js to pre-compute all git data, then delegates to the review-orchestrator agent. Arguments: [--base <branch>] [--committed] [--staged] [--working] [--worktree] [--set-default] [--dimensions <name,...>] [--dry-run]. Triggers on: review changes, code review, review PR, multi-dimension review, run review."
 user-invocable: true
 argument-hint: "[--base <branch>] [--committed] [--staged] [--dimensions <name,...>]"
 ---
@@ -14,14 +14,14 @@ Thin dispatcher — runs the prepare script, then delegates everything to the
 
 ---
 
-## Step 0 — Resolve and Run review-prepare.js
+## Step 0 — Resolve and Run skill/review.js
 
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "review-prepare.js" -path "*/sdlc*/scripts/review-prepare.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/review-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/review-prepare.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate review-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+SCRIPT=$(find ~/.claude/plugins -name "review.js" -path "*/sdlc*/scripts/skill/review.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/review.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/review.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/review.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 MANIFEST_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --json)
 EXIT_CODE=$?
@@ -34,7 +34,7 @@ echo "EXIT_CODE=$EXIT_CODE"
 - Exit code 1: show the stderr message to the user and stop.
 - Exit code 2: show `Script error — see output above` and stop.
 
-**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=review-sdlc, step=Step 0 — review-prepare.js execution, error=stderr.
+**On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=review-sdlc, step=Step 0 — skill/review.js execution, error=stderr.
 
 **Do NOT read the manifest file contents into the main context.** The orchestrator will read it.
 
