@@ -100,6 +100,10 @@ const base = import.meta.env.BASE_URL;
             <span class="wd-path-label">Set up spec compliance review</span>
             <span class="wd-path-desc">Install the spec-compliance-review dimension for ongoing spec adherence checks</span>
           </a>
+          <a href={`${base}/openspec/`} class="wd-after-path" style="--path-color: var(--color-integrations);">
+            <span class="wd-path-label">OpenSpec Documentation</span>
+            <span class="wd-path-desc">Installation, concepts, CLI commands, and configuration reference</span>
+          </a>
         </div>
       </div>
     </div>
@@ -266,7 +270,7 @@ const base = import.meta.env.BASE_URL;
 
   .wd-after-paths {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
   }
 

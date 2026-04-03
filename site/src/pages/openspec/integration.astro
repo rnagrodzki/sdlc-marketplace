@@ -1,0 +1,17 @@
+---
+import { render, getEntry } from 'astro:content';
+import GuideLayout from '../../layouts/GuideLayout.astro';
+
+const entry = await getEntry('guides', 'openspec-integration');
+if (!entry) throw new Error('openspec-integration.md not found in guides collection');
+const { Content } = await render(entry);
+---
+
+<GuideLayout
+  title="SDLC Integration"
+  description="How OpenSpec artifacts integrate with SDLC skills — plan-sdlc, execute-plan-sdlc, commit-sdlc, pr-sdlc, and review-sdlc."
+  parentHref="/sdlc-marketplace/openspec/"
+  parentLabel="OpenSpec"
+>
+  <Content />
+</GuideLayout>

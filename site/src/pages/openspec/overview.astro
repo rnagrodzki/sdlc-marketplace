@@ -1,0 +1,17 @@
+---
+import { render, getEntry } from 'astro:content';
+import GuideLayout from '../../layouts/GuideLayout.astro';
+
+const entry = await getEntry('guides', 'openspec-overview');
+if (!entry) throw new Error('openspec-overview.md not found in guides collection');
+const { Content } = await render(entry);
+---
+
+<GuideLayout
+  title="OpenSpec Overview"
+  description="AI-native spec-driven development framework — installation, concepts, commands, and workflows."
+  parentHref="/sdlc-marketplace/openspec/"
+  parentLabel="OpenSpec"
+>
+  <Content />
+</GuideLayout>

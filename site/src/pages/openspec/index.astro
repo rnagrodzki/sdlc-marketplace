@@ -1,0 +1,480 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const base = import.meta.env.BASE_URL;
+
+const docCards = [
+  {
+    title: 'Overview',
+    href: `${base}/openspec/overview/`,
+    description: 'Core concepts, CLI commands, project structure, and configuration reference.',
+  },
+  {
+    title: 'SDLC Integration',
+    href: `${base}/openspec/integration/`,
+    description: 'How OpenSpec artifacts flow into plan-sdlc, execute-plan-sdlc, and review-sdlc.',
+  },
+  {
+    title: 'Handover Workflow',
+    href: `${base}/openspec/handover/`,
+    description: 'The spec-to-implementation handover — from proposals through delta specs to verified code.',
+  },
+];
+---
+
+<BaseLayout title="OpenSpec" description="AI-native spec-driven development framework — documentation, integration guides, and workflow reference.">
+  <section class="os-hero">
+    <div class="os-hero-grid" aria-hidden="true"></div>
+    <div class="os-hero-inner">
+      <span class="os-overline">Integration</span>
+      <h1 class="os-title">OpenSpec</h1>
+      <p class="os-subtitle">
+        An AI-native specification framework that turns proposals into structured delta specs.
+        Pair it with SDLC skills for spec-driven planning, execution, and review.
+      </p>
+      <div class="os-hero-ctas">
+        <a href="#docs" class="os-cta-primary">
+          Read the Docs
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M3 7h8m0 0L7 3m4 4L7 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <a href={`${base}/workflows/openspec/`} class="os-cta-secondary">See the Workflow</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="os-install">
+    <div class="os-install-inner">
+      <div class="os-install-block">
+        <div class="os-install-bar">
+          <span class="os-install-dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+          <span class="os-install-label">Terminal</span>
+        </div>
+        <div class="os-install-body">
+          <div class="os-install-line">
+            <span class="os-prompt">$</span>
+            <code>npm install -g @fission-ai/openspec@latest</code>
+          </div>
+          <div class="os-install-line">
+            <span class="os-prompt">$</span>
+            <code>openspec init</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="os-docs" id="docs">
+    <div class="os-docs-inner">
+      <h2 class="os-section-heading">Documentation</h2>
+      <div class="os-docs-grid">
+        {docCards.map((card) => (
+          <a href={card.href} class="os-doc-card">
+            <div class="os-doc-card-header">
+              <h3 class="os-doc-card-title">{card.title}</h3>
+              <svg class="os-doc-card-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M4 8h8m0 0l-3-3m3 3l-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <p class="os-doc-card-desc">{card.description}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="os-workflow">
+    <div class="os-workflow-inner">
+      <h2 class="os-section-heading">In Practice</h2>
+      <a href={`${base}/workflows/openspec/`} class="os-workflow-card">
+        <div class="os-workflow-card-body">
+          <h3 class="os-workflow-card-title">Spec-Driven Development Workflow</h3>
+          <p class="os-workflow-card-desc">
+            See how OpenSpec proposals, delta specs, and design documents combine with
+            plan-sdlc, execute-plan-sdlc, and review-sdlc for end-to-end spec-driven implementation.
+          </p>
+        </div>
+        <svg class="os-workflow-card-arrow" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M5 10h10m0 0l-4-4m4 4l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  /* --- Hero --- */
+  .os-hero {
+    position: relative;
+    padding: 4.5rem 1.5rem 3rem;
+    overflow: hidden;
+  }
+
+  .os-hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--color-integrations) 12%, transparent) 0%, transparent 55%),
+      radial-gradient(circle, var(--color-border) 0.5px, transparent 0.5px);
+    background-size: auto, 20px 20px;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .os-hero-inner {
+    position: relative;
+    max-width: 40rem;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .os-overline {
+    display: inline-block;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-integrations);
+    margin-bottom: 0.75rem;
+    padding: 3px 10px;
+    border: 1px solid color-mix(in srgb, var(--color-integrations) 30%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-integrations) 8%, transparent);
+  }
+
+  .os-title {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: clamp(2rem, 5vw, 2.75rem);
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  .os-subtitle {
+    font-size: 0.9375rem;
+    line-height: 1.65;
+    color: var(--color-text-muted);
+    margin: 0 0 2rem;
+    max-width: 36rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .os-hero-ctas {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .os-cta-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.375rem;
+    background: var(--color-integrations);
+    color: #fff;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+  }
+
+  .os-cta-primary:hover {
+    background: color-mix(in srgb, var(--color-integrations) 85%, #fff);
+    box-shadow: 0 4px 20px -4px color-mix(in srgb, var(--color-integrations) 50%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .os-cta-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.625rem 1.25rem;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .os-cta-secondary:hover {
+    color: var(--color-text);
+    border-color: color-mix(in srgb, var(--color-text) 40%, transparent);
+    background: var(--color-surface);
+  }
+
+  /* --- Install --- */
+  .os-install {
+    padding: 0 1.5rem 2.5rem;
+  }
+
+  .os-install-inner {
+    max-width: 32rem;
+    margin: 0 auto;
+  }
+
+  .os-install-block {
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-surface);
+    overflow: hidden;
+    box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.35);
+  }
+
+  .os-install-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--color-surface-2);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .os-install-dots {
+    display: flex;
+    gap: 5px;
+  }
+
+  .os-install-dots span {
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .os-install-dots span:nth-child(1) { background: #ef4444; }
+  .os-install-dots span:nth-child(2) { background: #f59e0b; }
+  .os-install-dots span:nth-child(3) { background: #22c55e; }
+
+  .os-install-label {
+    flex: 1;
+    text-align: center;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+    letter-spacing: 0.05em;
+  }
+
+  .os-install-body {
+    padding: 1rem 1.125rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .os-install-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.625rem;
+  }
+
+  .os-prompt {
+    color: var(--color-integrations);
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .os-install-line code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    color: var(--color-text);
+    word-break: break-all;
+  }
+
+  /* --- Docs --- */
+  .os-docs {
+    padding: 2.5rem 1.5rem 2.5rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .os-docs-inner {
+    max-width: 52rem;
+    margin: 0 auto;
+  }
+
+  .os-section-heading {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin: 0 0 1.25rem;
+  }
+
+  .os-docs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+  }
+
+  .os-doc-card {
+    display: block;
+    padding: 1.25rem 1.25rem 1.25rem 1.5rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-integrations);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--color-text);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+
+  .os-doc-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 24px -4px color-mix(in srgb, var(--color-integrations) 20%, transparent);
+    border-color: color-mix(in srgb, var(--color-integrations) 50%, var(--color-border));
+  }
+
+  .os-doc-card:focus-visible {
+    outline: 2px solid var(--color-integrations);
+    outline-offset: 2px;
+  }
+
+  .os-doc-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .os-doc-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0;
+  }
+
+  .os-doc-card-arrow {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+    transition: transform 0.15s ease, color 0.15s ease;
+  }
+
+  .os-doc-card:hover .os-doc-card-arrow {
+    transform: translateX(3px);
+    color: var(--color-integrations);
+  }
+
+  .os-doc-card-desc {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  /* --- Workflow --- */
+  .os-workflow {
+    padding: 0 1.5rem 3rem;
+  }
+
+  .os-workflow-inner {
+    max-width: 52rem;
+    margin: 0 auto;
+  }
+
+  .os-workflow-card {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem 1.5rem 1.5rem 1.75rem;
+    background: color-mix(in srgb, var(--color-integrations) 6%, var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--color-integrations) 25%, var(--color-border));
+    border-left: 3px solid var(--color-integrations);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--color-text);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .os-workflow-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 24px -4px color-mix(in srgb, var(--color-integrations) 25%, transparent);
+  }
+
+  .os-workflow-card:focus-visible {
+    outline: 2px solid var(--color-integrations);
+    outline-offset: 2px;
+  }
+
+  .os-workflow-card-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .os-workflow-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0 0 0.375rem;
+  }
+
+  .os-workflow-card-desc {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  .os-workflow-card-arrow {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+    transition: transform 0.15s ease, color 0.15s ease;
+  }
+
+  .os-workflow-card:hover .os-workflow-card-arrow {
+    transform: translateX(3px);
+    color: var(--color-integrations);
+  }
+
+  /* --- Mobile --- */
+  @media (max-width: 640px) {
+    .os-hero {
+      padding: 3rem 1rem 2rem;
+    }
+
+    .os-hero-ctas {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .os-cta-primary,
+    .os-cta-secondary {
+      justify-content: center;
+    }
+
+    .os-install {
+      padding: 0 1rem 2rem;
+    }
+
+    .os-docs,
+    .os-workflow {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .os-docs-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .os-workflow-card {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+  }
+</style>

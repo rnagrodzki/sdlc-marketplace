@@ -4,6 +4,9 @@ const docRoutes = {
   'adding-skills.md': '/sdlc-marketplace/guides/adding-skills/',
   'adding-hooks.md': '/sdlc-marketplace/guides/adding-hooks/',
   'plugin-installation.md': '/sdlc-marketplace/guides/plugin-installation/',
+  'openspec-overview.md': '/sdlc-marketplace/openspec/overview/',
+  'openspec-integration.md': '/sdlc-marketplace/openspec/integration/',
+  'openspec-sdlc-handover.md': '/sdlc-marketplace/openspec/handover/',
 };
 
 function visitLinks(node, fn) {
@@ -44,6 +47,16 @@ export default function remarkRewriteLinks() {
       if (Object.prototype.hasOwnProperty.call(docRoutes, mdPath)) {
         node.url = docRoutes[mdPath] + anchor;
         return;
+      }
+
+      // Handle ../ prefixed links: strip prefix and re-check docRoutes
+      const parentPrefixMatch = mdPath.match(/^\.\.\/(.+\.md)$/);
+      if (parentPrefixMatch) {
+        const basename = parentPrefixMatch[1];
+        if (Object.prototype.hasOwnProperty.call(docRoutes, basename)) {
+          node.url = docRoutes[basename] + anchor;
+          return;
+        }
       }
 
       // Handle skill-to-skill links: bare <slug>.md not in docRoutes

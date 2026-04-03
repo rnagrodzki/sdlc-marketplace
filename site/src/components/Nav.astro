@@ -26,6 +26,16 @@ const navItems: NavItem[] = [
     label: 'Workflows',
     href: `${base}/workflows/`,
   },
+  {
+    label: 'OpenSpec',
+    href: `${base}/openspec/`,
+    children: [
+      { label: 'View All', href: `${base}/openspec/` },
+      { label: 'Overview', href: `${base}/openspec/overview/` },
+      { label: 'SDLC Integration', href: `${base}/openspec/integration/` },
+      { label: 'Handover Workflow', href: `${base}/openspec/handover/` },
+    ],
+  },
 ];
 
 function isActive(href: string): boolean {

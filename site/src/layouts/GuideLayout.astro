@@ -4,9 +4,11 @@ import BaseLayout from './BaseLayout.astro';
 interface Props {
   title: string;
   description: string;
+  parentHref?: string;
+  parentLabel?: string;
 }
 
-const { title, description } = Astro.props;
+const { title, description, parentHref, parentLabel } = Astro.props;
 const base = import.meta.env.BASE_URL;
 ---
 
@@ -15,6 +17,9 @@ const base = import.meta.env.BASE_URL;
     <nav class="breadcrumb" aria-label="Breadcrumb">
       <ol>
         <li><a href={`${base}/`}>Home</a></li>
+        {parentHref && parentLabel && (
+          <li><a href={parentHref}>{parentLabel}</a></li>
+        )}
         <li aria-current="page">{title}</li>
       </ol>
     </nav>

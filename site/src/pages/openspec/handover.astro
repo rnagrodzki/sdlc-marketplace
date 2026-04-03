@@ -1,0 +1,17 @@
+---
+import { render, getEntry } from 'astro:content';
+import GuideLayout from '../../layouts/GuideLayout.astro';
+
+const entry = await getEntry('guides', 'openspec-sdlc-handover');
+if (!entry) throw new Error('openspec-sdlc-handover.md not found in guides collection');
+const { Content } = await render(entry);
+---
+
+<GuideLayout
+  title="Handover Workflow"
+  description="The spec-to-implementation handover — from OpenSpec proposals through delta specs to verified, reviewed code."
+  parentHref="/sdlc-marketplace/openspec/"
+  parentLabel="OpenSpec"
+>
+  <Content />
+</GuideLayout>
