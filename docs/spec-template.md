@@ -34,6 +34,9 @@
 ## Core Requirements
 
 <!-- Testable behavioral requirements. Each must be verifiable — if you can't write a test assertion for it, it's too vague. Focus on WHAT, not HOW. -->
+<!-- MANDATORY when Prepare script is not "none" — include the following as the last R-item:
+- R[N]: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
+-->
 
 - R1: [Testable behavioral requirement]
 - R2: [Testable behavioral requirement]
@@ -66,6 +69,12 @@
 ## Constraints
 
 <!-- What the skill must NOT do. Explicit prohibitions. -->
+<!-- MANDATORY when Prepare script is not "none" — include the following four constraints (renumber to follow existing C-items):
+- C[N]:   Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
+- C[N+1]: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
+- C[N+2]: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
+- C[N+3]: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
+-->
 
 - C1: [What the skill must not do]
 

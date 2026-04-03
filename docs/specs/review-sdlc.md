@@ -27,6 +27,7 @@
 - R6: After orchestrator returns, offer self-fix via `received-review-sdlc` when verdict is CHANGES REQUESTED or APPROVED WITH NOTES
 - R7: When verdict is APPROVED, skip the self-fix offer
 - R8: Clean up the manifest temp file after completion
+- R9: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 
 ## Workflow Phases
 
@@ -65,6 +66,10 @@
 - C2: Must not read REFERENCE.md in main context (orchestrator resolves it)
 - C3: Must not invoke the orchestrator via the Skill tool — must use Agent tool
 - C4: Must not invoke error-report-sdlc for user errors — only for script crashes (exit 2) and repeated orchestrator failures
+- C5: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
+- C6: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
+- C7: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
+- C8: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 
 ## Integration
 

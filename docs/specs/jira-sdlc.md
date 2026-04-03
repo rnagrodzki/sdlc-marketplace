@@ -24,6 +24,7 @@
 - R8: Custom templates at `.claude/jira-templates/<Type>.md` override default templates when present
 - R9: On stale cache errors (invalid transition IDs, changed field schemas), auto-refresh cache and retry once
 - R10: When `--init-templates` is passed, initialize templates and stop — do not execute any Jira operation
+- R11: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 
 ## Workflow Phases
 
@@ -74,6 +75,10 @@
 - C6: Must not use values not in cache `allowedValues` — never fabricate enum values
 - C7: Must not retry a failed operation more than once without diagnosing the cause first
 - C8: Must not leave raw `{placeholder}` syntax in issue descriptions
+- C9: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
+- C10: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
+- C11: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
+- C12: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 
 ## Integration
 

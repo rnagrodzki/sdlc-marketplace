@@ -26,6 +26,7 @@
 - R8: When `--auto` is set, skip AskUserQuestion approval but still display the commit plan and run all critique gates
 - R9: OpenSpec scope hint: when `flags.scope` is not set, check for an active OpenSpec change and use its directory name as a candidate scope (style precedence applies)
 - R10: OpenSpec change trailer: when an active OpenSpec change is identified and a body is present, append an `OpenSpec-Change: <name>` trailer
+- R11: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 
 ## Workflow Phases
 
@@ -84,6 +85,10 @@
 - C5: Must not run `git stash` when `--no-stash` is true
 - C6: Must not run `git commit --amend` unless `--amend` was explicitly passed
 - C7: Must not stash untracked files — only stash modified tracked files (`--keep-index`, no `--include-untracked`)
+- C8: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
+- C9: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
+- C10: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
+- C11: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 
 ## Integration
 

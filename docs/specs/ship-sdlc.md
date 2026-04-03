@@ -38,6 +38,7 @@
 - R16: `--init-config` redirects to `/setup-sdlc`; runs interactive wizard if user insists
 - R17: Deferred review findings (medium/low) collected and displayed in final summary
 - R18: Ship config is optional and developer-local (`.sdlc/local.json`); pipeline runs with built-in defaults
+- R19: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 
 ## Workflow Phases
 
@@ -91,6 +92,10 @@
 - C8: Must not skip steps marked `will_run` in the pipeline plan — the plan is a binding contract
 - C9: Must not copy example args from SKILL.md — use `step.invocation` from ship-prepare.js
 - C10: Must not add `--skip` flags not present in user invocation or ship config
+- C11: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
+- C12: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
+- C13: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
+- C14: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 
 ## Integration
 

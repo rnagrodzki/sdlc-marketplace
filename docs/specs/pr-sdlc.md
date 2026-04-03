@@ -29,6 +29,7 @@
 - R11: In update mode, existing labels are preserved; only new labels are added via `--add-label`
 - R12: When `--auto` is set, skip AskUserQuestion approval and apply labels directly; critique gates still run
 - R13: OpenSpec enrichment: when an active OpenSpec change is detected, use proposal.md for Business Context/Benefits and design.md for Technical Design
+- R14: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 
 ## Workflow Phases
 
@@ -93,6 +94,10 @@
 - C6: Must not skip the critique-improve cycle
 - C7: Must not run git or gh bash commands to gather data — all context from `PR_CONTEXT_JSON`
 - C8: Must not suggest labels not in `repoLabels`
+- C9: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
+- C10: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
+- C11: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
+- C12: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 
 ## Integration
 

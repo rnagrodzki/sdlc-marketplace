@@ -27,6 +27,7 @@
 - R12: Thread resolution uses GraphQL `resolveReviewThread` mutation — only for "agree, will fix" items; pushback and won't-fix threads are left open
 - R13: Forbidden openers: no performative language ("Great catch!", "You're right!", "Thanks!")
 - R14: YAGNI check for feature requests: grep codebase for actual usage before accepting
+- R15: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 
 ## Workflow Phases
 
@@ -92,6 +93,10 @@ Critique #2 (responses):
 - C7: Must not batch implement without testing each change individually
 - C8: Must not display output from internal critique steps (Steps 5-6, 8-9) to user
 - C9: Must not skip Step 10 consent gate without explicit `--auto` flag
+- C10: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
+- C11: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
+- C12: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
+- C13: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 
 ## Integration
 

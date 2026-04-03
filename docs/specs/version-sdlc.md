@@ -31,6 +31,7 @@
 - R11: Push requires both `git push` and `git push --tags` (two separate commands)
 - R12: When `--auto` is set, skip AskUserQuestion prompts but display the release plan and run all critique gates
 - R13: Verify pre-conditions before execution: version file exists (file mode), tag does not conflict, no uncommitted changes, git identity configured
+- R14: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 
 ## Workflow Phases
 
@@ -84,6 +85,10 @@
 - C4: Must not push to remote when `--no-push` is set
 - C5: Must not modify the version file when `config.mode === "tag"` (version lives in git only)
 - C6: Must not omit pre-condition verification before execution
+- C7: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
+- C8: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
+- C9: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
+- C10: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 
 ## Integration
 

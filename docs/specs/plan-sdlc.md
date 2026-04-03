@@ -28,6 +28,7 @@
 - R12: Plans with fewer than 2 tasks should not be created — just do the work directly
 - R13: After exploration, re-read the plan file's Requirements section before decomposition (re-anchor to counter attention drift)
 - R14: Remove the `## Requirements` working section after task decomposition (temporary scaffolding)
+- R15: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 
 ## Workflow Phases
 
@@ -85,6 +86,10 @@
 - C6: Must not use absolute file paths that only work on one machine
 - C7: Must not put plans in `$TMPDIR` — plans must survive session boundaries
 - C8: Must not ignore plan mode's designated file path when plan mode is active
+- C9: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
+- C10: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
+- C11: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
+- C12: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 
 ## Integration
 
