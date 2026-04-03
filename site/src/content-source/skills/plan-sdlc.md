@@ -28,6 +28,7 @@ When Claude Code's plan mode is active, this skill activates automatically — n
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--spec` | Include OpenSpec artifacts (proposal, delta specs, design, tasks) in planning context. Without this flag, OpenSpec presence is detected but artifacts are not read. | Off |
+| `--from-openspec <change-name>` | Direct bridge from OpenSpec to planning. Validates the named change, loads all artifacts, and uses `tasks.md` as the primary decomposition skeleton. Bypasses the gate check entirely. | Off |
 
 Providing an explicit `openspec/changes/<name>/` path as the spec-file-path argument implicitly enables spec context loading — `--spec` is not needed in that case.
 
@@ -57,7 +58,7 @@ When Claude Code's [plan mode](https://docs.anthropic.com/en/docs/claude-code/pl
 - **All interaction via AskUserQuestion:** Requirements gathering, scope clarification, and approval prompts all go through `AskUserQuestion`, which is compatible with plan mode constraints.
 - **TodoWrite for progress tracking:** In full-pipeline runs, `TodoWrite` items are created for Steps 1–7 so you can see planning progress.
 - **Handoff:** The skill calls `ExitPlanMode` at the end — Claude Code presents the plan for your review. No manual exit needed.
-- **After approval:** Once you approve the plan in Claude Code's review UI, invoke `/execute-plan-sdlc` to start execution.
+- **After approval:** Once you approve the plan in Claude Code's review UI, invoke `/ship-sdlc` for the full pipeline (execute, commit, review, version, PR), or `/execute-plan-sdlc` for execution only.
 
 ---
 
@@ -75,7 +76,7 @@ receive a token, and include that token in subsequent API requests. The middlewa
 attach the decoded user to req.user and reject invalid or expired tokens with 401.
 ```
 
-The skill explores the codebase and presents a requirements checklist with task mappings, followed by the full plan and an estimated wave preview:
+The skill explores the codebase and presents a requirements checklist with task mappings, followed by the full plan for approval:
 
 ```
 Requirements:
@@ -83,11 +84,6 @@ Requirements:
   - [ ] Token validation middleware             → Task 3
   - [ ] Attach decoded user to req.user         → Task 3
   - [ ] Reject invalid/expired tokens with 401  → Task 3, Task 4
-
-Wave preview:
-  Pre-wave: Task 1 [Trivial]
-  Wave 1:   Task 2 [Standard], Task 3 [Standard]
-  Wave 2:   Task 4 [Complex]
 
 Approve this plan, or describe changes?
 ```
@@ -99,6 +95,14 @@ Approve this plan, or describe changes?
 ```
 
 Reads OpenSpec artifacts from the active change and uses them as authoritative requirements for the plan.
+
+### Direct bridge from OpenSpec change
+
+```text
+/plan-sdlc --from-openspec add-resource-indicators
+```
+
+Validates the named change (`openspec/changes/add-resource-indicators/`), loads all artifacts (proposal, design, delta specs, tasks), and uses `tasks.md` as the primary decomposition skeleton. Skips the gate check and structured discovery — the OpenSpec artifacts provide scope, integration, and success criteria directly. This is the recommended path when session-start reports a change at stage `ready-for-plan`.
 
 ### OpenSpec flow proposal for functional changes
 
@@ -206,7 +210,8 @@ When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this 
 - **Reads:** `proposal.md` (goal/scope), `specs/*.md` (delta specs as requirements), `design.md` (architecture), `tasks.md` (coarse decomposition reference)
 - **Behavior change:** Skips structured discovery questions when OpenSpec artifacts provide sufficient scope. Maps every ADDED/MODIFIED delta spec requirement to at least one task.
 - **Plan header:** Sets `**Source:**` to `openspec/changes/<name>/` instead of "conversation context"
-- **Functional change routing:** When OpenSpec is detected but `--spec` is not passed, the skill classifies the user's request. For functional changes (new features, behavior modifications, API changes), it checks for a matching active OpenSpec change — if found, it auto-loads the spec context. If no match exists, it proposes three options: start the OpenSpec flow with `/opsx:propose`, continue planning directly without specs, or load an existing spec. Non-functional changes (refactoring, config, docs) receive a passive hint only.
+- **Direct bridge (`--from-openspec <name>`):** Validates the named change, loads all artifacts, and uses `tasks.md` as the primary decomposition skeleton. Bypasses the gate check entirely. This is the recommended path when `session-start.js` reports a change at stage `ready-for-plan`.
+- **Functional change routing:** When OpenSpec is detected but neither `--spec` nor `--from-openspec` is passed, the skill classifies the user's request. For functional changes (new features, behavior modifications, API changes), it checks for a matching active OpenSpec change — if found, it auto-loads the spec context. If no match exists, it proposes three options: start the OpenSpec flow with `/opsx:propose`, continue planning directly without specs, or re-invoke with `/plan-sdlc --from-openspec <name>`. Non-functional changes (refactoring, config, docs) receive a passive hint only.
 
 See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
 

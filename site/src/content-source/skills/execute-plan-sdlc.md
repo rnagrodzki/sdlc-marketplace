@@ -134,7 +134,7 @@ After each wave completes, execution state is written to `.sdlc/execution/execut
 
 **Resuming:** Pass `--resume` to pick up from the last completed wave. The state file contains enough context for a new session to continue without prior conversation history. If the plan file has changed since execution started (detected via content hash), you are prompted to resume with the old structure or restart.
 
-**Automatic detection:** Even without `--resume`, if a state file exists for the current branch, the skill offers to resume.
+**Automatic detection:** Even without `--resume`, if a state file exists for the current branch, the skill offers to resume in interactive mode. In `--auto` mode, it starts a fresh run instead (pass `--resume` explicitly to auto-resume).
 
 **Cleanup:** The state file is deleted on successful completion and preserved on failure or interruption.
 
@@ -238,6 +238,7 @@ Retries needed:   1
 Verification:     tests ✓  build ✓  lint ✓
 
 Files changed:    12 files (4 added, 8 modified, 0 deleted)
+Guardrails:       3/3 passed (1 warning, 0 overridden)
 ────────────────────────────────────────────
 ```
 
@@ -274,6 +275,22 @@ When executing a plan whose `**Source:**` header points to an OpenSpec change pa
 - **Inter-wave critique** checks for contradictions between implementations and delta spec requirements not captured in task descriptions
 
 See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+## Guardrail Enforcement
+
+When execution guardrails are configured in `.claude/sdlc.json` under `execute.guardrails[]`, this skill enforces them at runtime to prevent drift between plan acceptance and execution. Execution guardrails are separate from plan guardrails (`plan.guardrails[]`) — they use the same item format (`id`, `description`, `severity`) but are configured independently and evaluated at different stages.
+
+**Loading:** Guardrails are loaded in Step 1 using `readSection(root, 'execute')`. If no execution guardrails are configured, all guardrail checks are skipped — backward compatible with existing projects.
+
+**Pre-wave check (Step 5a-pre):** Before each wave, error-severity guardrails are evaluated against the wave's task descriptions. Violations prompt the user to override or cancel. In `--auto` mode, error violations are blocking — the pipeline stops.
+
+**Post-wave check (Step 5c-ter):** After each wave's verification and spec compliance review, all guardrails (error and warning) are evaluated against the actual `git diff` output. Error violations offer fix/override/cancel; warnings are reported but non-blocking.
+
+**Small plans:** Plans with 3 or fewer tasks run a single guardrail evaluation after all tasks complete.
+
+**Report:** The final summary includes a guardrail pass/warn/override breakdown when guardrails are configured.
+
+Configure execution guardrails via `/setup-sdlc --execution-guardrails`. See [plan-sdlc](plan-sdlc.md) for how plan guardrails are evaluated during planning.
 
 ---
 

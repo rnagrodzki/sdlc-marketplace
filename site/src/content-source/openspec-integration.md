@@ -143,7 +143,7 @@ Executes the plan with wave-based parallel dispatch. When the plan's Source poin
 
 | Skill | Without OpenSpec | With OpenSpec |
 | --- | --- | --- |
-| `/plan-sdlc` | Asks for requirements via conversation | Detects presence. For functional changes without a matching active change, proposes starting the OpenSpec flow. For non-functional changes, prints a passive hint. With `--spec` or matching active change: reads proposal, delta specs, design, and tasks |
+| `/plan-sdlc` | Asks for requirements via conversation | Detects presence via `plan-prepare.js` (uses shared `lib/openspec.js`). With `--from-openspec <name>`: validates change, loads all artifacts, uses `tasks.md` as primary skeleton, bypasses gate check. For functional changes without `--spec` or `--from-openspec`, proposes starting the OpenSpec flow. For non-functional changes, prints a passive hint. With `--spec` or matching active change: reads proposal, delta specs, design, and tasks |
 | `/execute-plan-sdlc` | Spec compliance checks task acceptance criteria only | Additionally checks implementations against delta spec requirements (per-wave in Step 5c-bis, holistic in Step 8-bis). Suggests `/opsx:verify` and `/opsx:archive` after completion |
 | `/pr-sdlc` | Asks user for Business Context/Benefits | Auto-detects active change and pre-fills Business Context/Benefits from `proposal.md` intent and scope. Suggests `/opsx:verify` and `/opsx:archive` in What's Next after merge. Silently skips if ambiguous |
 | `/commit-sdlc` | Infers scope from changed files | Uses change directory name as scope candidate. Adds `OpenSpec-Change` trailer to commit body when active change detected |
@@ -171,6 +171,8 @@ OpenSpec provides its own execution command (`/opsx:apply`) that works through `
 - Use `/plan-sdlc` + `/execute-plan-sdlc` for complex changes that benefit from finer-grained task decomposition, parallel execution, and automated verification.
 
 Both paths are valid — the choice depends on the complexity of the change.
+
+For stage-aware handoff protocol — which command to use at each OpenSpec stage — see [OpenSpec → SDLC Handover Workflow: Stage-Aware Handoff](openspec-sdlc-handover.md#stage-aware-handoff).
 
 ---
 
