@@ -32,6 +32,9 @@
 ## Workflow Phases
 
 1. READ — gather review feedback via prepare script (PR threads) or manual input
+   - **Script:** `received-review-prepare.js`
+   - **Params:** A1-A2 forwarded (`--pr <number>`, `--auto`); internal params: `--owner <owner>`, `--repo <repo>`, `--project-root <path>`
+   - **Output:** JSON → P1-P7 (threads with status classification, comment chains, auto flag, PR number/owner/repo)
 2. UNDERSTAND — categorize items; flag and block on unclear items
 3. VERIFY — check each item against full codebase context (callers, dependents, architecture)
 4. EVALUATE — determine verdict per item (agree fix / agree won't fix / disagree / needs discussion)

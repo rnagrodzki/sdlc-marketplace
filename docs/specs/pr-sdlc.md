@@ -34,6 +34,9 @@
 ## Workflow Phases
 
 1. CONSUME — run prepare script, read PR context JSON (commits, diff, labels, config, custom template)
+   - **Script:** `pr-prepare.js`
+   - **Params:** A1-A5 forwarded (`--draft`, `--update`, `--base <branch>`, `--auto`, `--label <name>`)
+   - **Output:** JSON → P1-P18 (mode, branches, draft flag, existing PR, jira ticket, commits, diff stats/content, changed files, repo labels, custom template, PR config, auth, remote state, warnings)
 2. PLAN — draft all sections of the active template, draft title, infer labels
 3. CRITIQUE — self-review against all 12 quality gates
 4. IMPROVE — fix failing gates (max 2 iterations per gate); ask clarifying questions for Business Context/Benefits if needed

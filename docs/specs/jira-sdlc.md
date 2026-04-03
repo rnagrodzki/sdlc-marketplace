@@ -29,10 +29,19 @@
 ## Workflow Phases
 
 1. CONSUME — parse arguments, resolve project key, run prepare script to check cache status
+   - **Script:** `jira-prepare.js --check`
+   - **Params:** A1 forwarded (`--project <KEY>`)
+   - **Output:** JSON → P1-P3 (cache exists, missing sections, freshness)
 2. INIT (conditional) — deterministic 6-phase cache initialization when cache is missing, incomplete, or refresh requested
+   - **Script:** `jira-prepare.js --load`
+   - **Params:** `--project <KEY>`
+   - **Output:** JSON → P4 (full cache object: cloudId, issue types, field schemas, workflows, link types, user mappings)
 3. CLASSIFY — parse user intent into an operation type
 4. DO — execute the classified operation using cached metadata
 5. UPDATE — incrementally update cache with newly discovered data (user mappings, workflow states)
+   - **Script:** `jira-prepare.js --save`
+   - **Params:** `--project <KEY>`, updated cache data piped via stdin
+   - **Output:** JSON confirmation of save
 
 ## Quality Gates
 

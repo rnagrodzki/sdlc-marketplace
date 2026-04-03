@@ -32,6 +32,9 @@
 ## Workflow Phases
 
 1. CONSUME — run prepare script to produce manifest file
+   - **Script:** `review-prepare.js`
+   - **Params:** A1-A7 forwarded (`--base <branch>`, `--committed`, `--staged`, `--working`, `--worktree`, `--set-default`, `--dimensions <list>`)
+   - **Output:** manifest file path → P1-P8 (base branch, changed files, dimension counts/entries, plan critique); also writes per-dimension `.diff` files to tmpdir. Skill must NOT read manifest into main context
 2. DO — dispatch review-orchestrator agent (or display dry-run plan)
 3. REPORT — display orchestrator summary, clean up manifest
 4. OFFER — conditionally offer self-fix based on review verdict

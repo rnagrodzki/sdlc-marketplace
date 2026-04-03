@@ -43,9 +43,17 @@
 
 ## Workflow Phases
 
-<!-- Name the phases the skill follows. Describe what each phase accomplishes, not the step-by-step procedure (that belongs in SKILL.md). -->
+<!-- Name the phases the skill follows. Describe what each phase accomplishes, not the step-by-step procedure (that belongs in SKILL.md).
+     When a phase executes a script, add indented sub-items documenting the execution:
+       - **Script:** `script-name.js` (or `script-name.js --subcommand` for multi-mode scripts)
+       - **Params:** reference A-fields forwarded + any internal params
+       - **Output:** JSON → P-field range (brief summary of key fields)
+     Phases that do not execute scripts have no sub-items. -->
 
 1. CONSUME — [what inputs are consumed and validated]
+   - **Script:** `example-prepare.js`
+   - **Params:** A1-A3 forwarded (`--flag1`, `--flag2`, `--flag3`)
+   - **Output:** JSON → P1-P5 (field summary)
 2. DO — [what transformation or action is performed]
 
 ## Quality Gates

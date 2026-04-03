@@ -31,6 +31,9 @@
 ## Workflow Phases
 
 1. CONSUME — read pre-computed context from `commit-prepare.js` output (staged diff, recent commits, branch, config, flags)
+   - **Script:** `commit-prepare.js`
+   - **Params:** A1-A5 forwarded (`--no-stash`, `--scope <s>`, `--type <t>`, `--amend`, `--auto`)
+   - **Output:** JSON → P1-P13 (branch, flags, staged diff/stat/files, unstaged state, recent commits, last commit message, commit config)
 2. PLAN — analyze diff and recent commits to generate commit message (type, scope, subject, body, trailers)
 3. CRITIQUE — self-review message against all 10 quality gates
 4. IMPROVE — fix failing gates (max 2 iterations per gate)

@@ -43,10 +43,19 @@
 ## Workflow Phases
 
 1. CONSUME — load config, parse flags, run `ship-prepare.js` for context detection and step computation
+   - **Script:** `ship-prepare.js`
+   - **Params:** A1-A8 forwarded (`--auto`, `--skip <csv>`, `--preset`, `--bump`, `--draft`, `--resume`, `--workspace`); internal: `--has-plan` (from plan context detection)
+   - **Output:** JSON → P1-P6 (flags with per-flag provenance sources, resume detection, context with branch/auth/openspec/worktree, pipeline steps with status/reason/skipSource/invocation, config)
 2. PLAN — build pipeline table from `ship-prepare.js` steps array; display flag resolution and auto-skip decisions
 3. CRITIQUE — validate pipeline: gh auth, branch safety, skip values, flag coherence
 4. DO — present pipeline for confirmation (or auto/dry-run); execute steps sequentially via Agent dispatch
+   - **Script:** `ship-state.js`
+   - **Params:** subcommands per step lifecycle: `init`, `start`, `complete`, `skip`, `fail`, `decide`, `defer`
+   - **Output:** JSON state object persisted to `.sdlc/execution/ship-<branch>-<timestamp>.json` for `--resume` support
 5. REPORT — summary table with per-step results, decisions log, deferred findings, worktree cleanup
+   - **Script:** `ship-state.js`
+   - **Params:** subcommand `cleanup` (on success) or `read` (on failure, state preserved)
+   - **Output:** state file removed on success; preserved on failure for `--resume`
 
 ## Quality Gates
 

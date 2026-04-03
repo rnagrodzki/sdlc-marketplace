@@ -37,11 +37,23 @@
 ## Workflow Phases
 
 1. PRE-FLIGHT — run `setup-prepare.js` to detect current config state, legacy files, content status
+   - **Script:** `setup-prepare.js`
+   - **Params:** none
+   - **Output:** JSON → P1-P6 (project config state/sections/path, local config state, legacy file detection, content counts, detected version file/tag prefix/default branch, migration flag)
 2. STATUS REPORT — display what is configured vs missing
 3. MIGRATION (conditional) — migrate legacy config files to unified format
+   - **Script:** `lib/config.js` → `migrateConfig()` via inline Node.js
+   - **Params:** project root, legacy config paths
+   - **Output:** merged config written to `.claude/sdlc.json`
 4. CONFIG BUILDER — interactively configure missing sections (version, ship, jira, review, commit, PR)
+   - **Script:** `lib/config.js` → `writeProjectConfig()`, `writeLocalConfig()` via inline Node.js
+   - **Params:** section name, config values (per interactive session)
+   - **Output:** config files written to `.claude/sdlc.json` (project) and `.sdlc/local.json` (local/ship)
 5. CONTENT SETUP — delegate to sub-flows for review dimensions, PR template, guardrails
 6. SUMMARY — display what was created, updated, or migrated
+   - **Script:** `setup-prepare.js` (re-run for G2 validation)
+   - **Params:** none
+   - **Output:** JSON → P1-P6 (re-read to verify correctness of written config)
 
 ## Quality Gates
 

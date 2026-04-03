@@ -36,6 +36,9 @@
 ## Workflow Phases
 
 1. CONSUME — read pre-computed context from `version-prepare.js` output (current version, commits, config, flags, bump options)
+   - **Script:** `version-prepare.js`
+   - **Params:** A1 positional bump type (`major|minor|patch`), A2-A7 forwarded (`--pre <label>`, `--changelog`, `--hotfix`, `--auto`, `--init`, `--no-push`)
+   - **Output:** JSON → P1-P12 (version source, config mode/changelog/ticket prefix, requested bump, conventional summary with suggested bump and breaking changes, bump options, latest tag, commits, flags, tag conflicts)
 2. PLAN — determine bump type, compute new version, draft CHANGELOG entry if enabled
 3. CRITIQUE — self-review against all 7 quality gates
 4. IMPROVE — fix failing gates (max 2 iterations per gate)

@@ -33,6 +33,9 @@
 ## Workflow Phases
 
 1. SETUP — mode detection, routing, OpenSpec integration, complexity routing, guardrail loading via `plan-prepare.js`
+   - **Script:** `plan-prepare.js`
+   - **Params:** `--from-openspec <name>` (from A2) when applicable
+   - **Output:** JSON → P1-P7 (openspec detection/active changes/branch match, from-openspec validation/delta spec count/tasks presence, plan guardrails array)
 2. CONSUME — requirements discovery, codebase exploration, OpenSpec enrichment
 3. PLAN — decompose into tasks with per-task metadata, key decisions, file structure mapping
 4. CRITIQUE — self-review against all 14 quality gates
