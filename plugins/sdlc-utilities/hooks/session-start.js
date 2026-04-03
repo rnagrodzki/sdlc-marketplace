@@ -164,63 +164,56 @@ try {
 
 try {
   const projectRoot = process.cwd();
-  const openspecConfig = path.join(projectRoot, 'openspec', 'config.yaml');
+  const { detectActiveChanges, STAGE_LABELS } = require('../scripts/lib/openspec');
+  const openspec = detectActiveChanges(projectRoot);
 
-  if (fs.existsSync(openspecConfig)) {
-    const changesDir = path.join(projectRoot, 'openspec', 'changes');
-    const activeChanges = [];
+  if (!openspec.present) {
+    // No openspec/config.yaml — skip
+  } else if (openspec.activeChanges.length === 0) {
+    resumeLines.push('OpenSpec: configured, no active changes');
+  } else if (openspec.activeChanges.length === 1) {
+    const change = openspec.activeChanges[0];
+    const stageLabel = typeof STAGE_LABELS[change.stage] === 'function'
+      ? STAGE_LABELS[change.stage](change)
+      : STAGE_LABELS[change.stage];
+    const specLabel = `${change.deltaSpecCount} delta spec${change.deltaSpecCount !== 1 ? 's' : ''}`;
+    resumeLines.push(`OpenSpec active: change "${change.name}" (${stageLabel}, ${specLabel})`);
 
-    if (fs.existsSync(changesDir)) {
-      const changeDirs = fs.readdirSync(changesDir, { withFileTypes: true });
-      for (const entry of changeDirs) {
-        if (!entry.isDirectory()) continue;
-        if (entry.name === 'archive') continue;
-        const changeDir = path.join(changesDir, entry.name);
-        const proposalPath = path.join(changeDir, 'proposal.md');
-        if (!fs.existsSync(proposalPath)) continue;
-
-        const specsDir = path.join(changeDir, 'specs');
-        let deltaSpecCount = 0;
-        if (fs.existsSync(specsDir)) {
-          const specFiles = fs.readdirSync(specsDir, { withFileTypes: true });
-          deltaSpecCount = specFiles.filter(f => f.isFile()).length;
-        }
-
-        const hasDesign = fs.existsSync(path.join(changeDir, 'design.md'));
-        activeChanges.push({ name: entry.name, deltaSpecCount, hasDesign });
-      }
-    }
-
-    if (activeChanges.length === 0) {
-      resumeLines.push('OpenSpec: configured, no active changes');
-    } else if (activeChanges.length === 1) {
-      const change = activeChanges[0];
-      const specLabel = `${change.deltaSpecCount} delta spec${change.deltaSpecCount !== 1 ? 's' : ''}`;
-      const designLabel = change.hasDesign ? 'design.md present' : 'no design.md';
-      resumeLines.push(`OpenSpec active: change "${change.name}" (${specLabel}, ${designLabel})`);
-
-      // Attempt branch matching — use slug comparison to avoid false positives
+    // Branch match (from shared module)
+    if (openspec.branchMatch === change.name) {
       try {
         const { exec } = require('../scripts/lib/git');
         const branch = exec('git branch --show-current');
         if (branch) {
-          const branchSlug = branch.toLowerCase().replace(/^(feat|fix|chore|refactor|docs)\//, '');
-          const nameSlug = change.name.toLowerCase();
-          // Match when the branch slug equals the change name, or one is a
-          // prefix of the other followed by a separator (-, /)
-          const slugRe = new RegExp(`(^|[/-])${nameSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[/-])`);
-          if (branchSlug === nameSlug || slugRe.test(branchSlug)) {
-            resumeLines.push(`  Branch match: ${branch} -> auto-linked`);
-          }
+          resumeLines.push(`  Branch match: ${branch} -> auto-linked`);
         }
       } catch {
-        // Graceful degradation — skip branch matching
+        // Graceful degradation — skip branch display
       }
-    } else {
-      const names = activeChanges.map(c => c.name).join(', ');
-      resumeLines.push(`OpenSpec active: ${activeChanges.length} changes (${names})`);
-      resumeLines.push('  No branch match — pass --spec to select');
     }
+
+    // Stage-aware SDLC suggestions
+    switch (change.stage) {
+      case 'spec-in-progress':
+        resumeLines.push('  Continue spec: /opsx:continue or /opsx:ff');
+        break;
+      case 'ready-for-plan':
+        resumeLines.push(`  Plan with: /plan-sdlc --from-openspec ${change.name}`);
+        resumeLines.push('  Or full pipeline: /ship-sdlc (after planning)');
+        break;
+      case 'implementation-in-progress':
+        resumeLines.push('  Continue: /opsx:apply');
+        resumeLines.push('  Or commit progress: /commit-sdlc');
+        break;
+      case 'tasks-complete':
+        resumeLines.push('  Ship: /ship-sdlc (commit -> review -> PR)');
+        resumeLines.push('  Verify first: /opsx:verify');
+        break;
+    }
+  } else {
+    const names = openspec.activeChanges.map(c => c.name).join(', ');
+    resumeLines.push(`OpenSpec active: ${openspec.activeChanges.length} changes (${names})`);
+    resumeLines.push('  Pass --spec or --from-openspec <name> to select');
   }
 } catch {
   // Graceful degradation — skip OpenSpec context injection on any error

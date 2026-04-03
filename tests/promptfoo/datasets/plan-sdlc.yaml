@@ -1,5 +1,7 @@
 # Fixture appropriateness:
 #   plan-written                   -- CORRECT: simulates a written plan file, triggers Step 7 handoff
+#   plan-from-openspec             -- CORRECT: simulates --from-openspec with ready-for-plan stage, tasks.md present
+#   plan-from-openspec-no-tasks    -- CORRECT: simulates --from-openspec with spec-in-progress stage, no tasks.md
 
 - description: "plan-sdlc: asks whether to execute after plan is written"
   vars:
@@ -26,3 +28,63 @@
         choice rather than a passive suggestion. The menu includes at minimum: execute
         (/execute-plan-sdlc), commit (/commit-sdlc), and done. The response mentions the plan
         file path and waits for the user to select an option before proceeding.
+
+- description: "plan-sdlc: --from-openspec adopts tasks.md as primary skeleton"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. The plan-prepare.js output
+      and OpenSpec artifacts are provided in the project context above. The --from-openspec
+      flag was passed, fromOpenspec.valid is true, and tasks.md is present with 5 tasks.
+      Process Step 0 (context detection, fromOpenspecDirect handling) and Step 1
+      (fromOpenspecDirect enrichment). Show how you would begin decomposition in Step 2,
+      using tasks.md as the primary skeleton.
+  assert:
+    # Must use tasks.md as skeleton
+    - type: icontains
+      value: "tasks.md"
+    # Must include SDLC metadata in tasks
+    - type: icontains
+      value: "Complexity"
+    - type: icontains
+      value: "Risk"
+    # Must NOT show the 3-option gate check prompt
+    - type: not-icontains
+      value: "Start OpenSpec flow"
+    # Behavioral: tasks.md drives decomposition, not structured discovery
+    - type: llm-rubric
+      value: >
+        The response uses the OpenSpec tasks.md checklist as the primary decomposition
+        skeleton. It does NOT present a 3-option gate check (Start OpenSpec flow / Continue
+        planning directly / Use existing spec). It does NOT ask structured discovery
+        questions (scope, integration, success). Instead, it adopts the 5 tasks from
+        tasks.md, enriches them with SDLC metadata (Complexity, Risk, Depends on, Verify),
+        and expands descriptions to be self-contained for agent dispatch. The delta specs
+        are referenced as authoritative requirements.
+
+- description: "plan-sdlc: --from-openspec without tasks.md falls back to standard decomposition"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-no-tasks.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-webhooks. The plan-prepare.js output and OpenSpec
+      artifacts are provided in the project context above. The --from-openspec flag was
+      passed, fromOpenspec.valid is true, but hasTasks is false (no tasks.md). Process
+      Step 0 and show how you would proceed with Steps 1 and 2 without a tasks.md skeleton.
+  assert:
+    # Must still load OpenSpec artifacts
+    - type: icontains
+      value: "proposal"
+    # Must mention delta specs as requirements
+    - type: icontains
+      value: "spec"
+    # Must decompose from specs (not from tasks.md)
+    - type: llm-rubric
+      value: >
+        The response processes the --from-openspec flag successfully despite tasks.md being
+        absent. It falls back to standard decomposition using the delta specs
+        (webhook-delivery.md, webhook-registration.md) as authoritative requirements. It
+        reads the proposal for scope and uses the ADDED sections from delta specs to derive
+        tasks. It does NOT error out or ask the user to create tasks.md first. The gate
+        check is still bypassed because --from-openspec was passed.

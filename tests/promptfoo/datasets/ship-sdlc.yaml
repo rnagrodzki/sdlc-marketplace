@@ -292,6 +292,31 @@
         SKILL.md example which shows "--auto --draft". The response correctly reflects
         that draft is false — the PR will not be created as a draft.
 
+- description: "ship-sdlc: OpenSpec pipeline summary includes both /opsx:verify and /opsx:archive"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc. The pipeline has completed successfully: execute, commit, review
+      (approved), version (v1.5.0), and PR (#42) are all done. OpenSpec was detected in
+      Step 1f — the active change is "add-resource-indicators". Show the final Step 6
+      pipeline summary report with the OpenSpec suggestions included.
+  assert:
+    # Must suggest /opsx:verify
+    - type: icontains
+      value: "/opsx:verify"
+    # Must suggest /opsx:archive
+    - type: icontains
+      value: "/opsx:archive"
+    # Behavioral: both verify and archive are suggested in the summary
+    - type: llm-rubric
+      value: >
+        The pipeline summary report includes both /opsx:verify and /opsx:archive as
+        next-step suggestions because OpenSpec was detected. The verify suggestion
+        mentions validating implementation completeness against the spec. The archive
+        suggestion mentions archiving the OpenSpec change and syncing delta specs.
+        Both appear in the final summary, not just one of them.
+
 - description: "ship-sdlc: pr step includes --draft when --draft CLI flag is passed"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
