@@ -167,7 +167,7 @@ Not all sub-skills support `--auto`. This table is the source of truth:
 | execute-plan-sdlc | No | Forwards `--preset` only. Preset selection prompt is skipped when preset is provided. |
 | commit-sdlc | Yes | `--auto` forwarded. Skips commit approval prompt. |
 | review-sdlc | No | No interactive prompts to skip — runs fully automatically already. |
-| received-review-sdlc | No | Always interactive. Pipeline pauses for human fix approval. Deliberate — automated code changes need sign-off. |
+| received-review-sdlc | Yes | `--auto` forwarded. Skips consent prompt. Critique gates and verification still run. Only "will fix" items auto-implemented. |
 | version-sdlc | Yes | `--auto` forwarded. Skips release plan approval prompt. Pre-condition checks and critique gates still run. |
 | pr-sdlc | Yes | `--auto` forwarded. Skips PR approval prompt. |
 
@@ -345,7 +345,7 @@ Example dispatch sequence (use `step.invocation` for actual args):
 - Agent: execute-plan-sdlc, args: `"--preset balanced"`
 - Agent: commit-sdlc, args: `"--auto"`
 - Agent: review-sdlc, args: `"--committed"`
-- Agent: received-review-sdlc (no args — always interactive)
+- Agent: received-review-sdlc, args: `"--auto"` (when `flags.auto`; otherwise no args)
 - Agent: version-sdlc, args: `"patch"`
 - Agent: pr-sdlc, args: `"--auto --draft"`
 
@@ -563,7 +563,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Verdict detection is text-based.** Parse the conversation for a line matching `Verdict: <VERDICT>`. The review-sdlc orchestrator always emits this. If the conversation is compacted between review and verdict parsing, the verdict may be lost — treat missing verdict as APPROVED WITH NOTES and warn the user.
 
-**received-review-sdlc always pauses.** No `--auto` flag exists for it. This is deliberate — automated code changes to fix review findings need human sign-off. The pipeline will pause here even in full `--auto` mode.
+**received-review-sdlc supports `--auto`.** When `--auto` is forwarded, the consent prompt (Step 10) is skipped and only "will fix" items are auto-implemented. "Disagree" and "won't fix" items are displayed but not auto-actioned. Critique gates and verification still run. Without `--auto`, the pipeline pauses for human approval.
 
 **Double commit is intentional.** Feature commit (step 2) and review fix commit (step 5) are separate. This keeps feature work and review fixes distinct in git history. Do not squash them.
 

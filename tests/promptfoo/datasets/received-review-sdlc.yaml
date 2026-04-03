@@ -188,3 +188,58 @@
            flags it as out of scope for this PR, suggests a separate refactoring PR
         The response groups comments by action type and presents a consent gate before
         posting replies. Pushback comments are left open for the reviewer (not auto-resolved).
+
+- description: "received-review-sdlc: --auto mode auto-implements will-fix items without consent gate"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-review-critical.md"
+    user_request: >
+      Run /received-review-sdlc --auto. The skill was invoked with --auto from the
+      ship-sdlc pipeline. The prepare script manifest includes flags: { auto: true }.
+      Process the review findings and auto-implement accepted fixes.
+  assert:
+    # Must display the analysis table (SQL injection finding visible)
+    - type: regex
+      value: "(SQL|injection|finding|analysis)"
+    # Must NOT present implement/edit/skip consent gate
+    - type: not-regex
+      value: "(How to proceed|implement.*edit.*skip|Select.*option)"
+    # Must proceed to implement will-fix items
+    - type: regex
+      value: "(implement|fix|apply|proceed|auto)"
+    # Behavioral: auto-proceed for will-fix items, no consent gate
+    - type: llm-rubric
+      value: >
+        The response demonstrates --auto mode behavior: the full analysis table is displayed
+        for visibility (including the SQL injection finding), "will fix" items are
+        auto-implemented without presenting the Step 10 consent gate (no implement/edit/skip
+        prompt). Critique gates (Steps 5-6, 8-9) are still referenced or executed. Items
+        with "disagree" or "won't fix" verdicts are displayed but not auto-actioned.
+
+- description: "received-review-sdlc: without --auto consent gate is mandatory even in pipeline context"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-review-critical.md"
+    user_request: >
+      Run /received-review-sdlc. The skill was invoked from the ship-sdlc pipeline but
+      WITHOUT the --auto flag. The prepare script manifest does NOT include flags.auto.
+      Process the review findings.
+  assert:
+    # Must present implement/edit/skip consent gate
+    - type: regex
+      value: "(implement|edit|skip|proceed|approve)"
+    # Must NOT auto-implement or skip the consent gate
+    - type: not-regex
+      value: "(auto.implement|auto.proceed|skipping consent|bypassing)"
+    # Must NOT reference pipeline context as a reason to bypass
+    - type: not-regex
+      value: "(pipeline.*context.*bypass|auto.*mode.*inferred|ship.*sdlc.*therefore.*auto)"
+    # Behavioral: consent gate fires regardless of pipeline context
+    - type: llm-rubric
+      value: >
+        The response presents the Step 10 consent gate with implement/edit/skip options,
+        requiring explicit user approval before making any changes. The analysis table is
+        displayed. The user is asked to choose how to proceed. Despite being invoked from
+        the ship-sdlc pipeline, the consent gate is NOT skipped and there is no inference
+        that automatic execution is expected. The response does not reference pipeline
+        context as a reason to bypass the consent gate.

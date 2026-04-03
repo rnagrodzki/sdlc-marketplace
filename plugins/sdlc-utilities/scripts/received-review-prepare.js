@@ -49,6 +49,7 @@ function parseArgs(argv) {
   let owner = null;
   let repo = null;
   let projectRoot = process.cwd();
+  let auto = false;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -56,9 +57,10 @@ function parseArgs(argv) {
     else if (a === '--owner' && args[i + 1])    owner = args[++i];
     else if (a === '--repo' && args[i + 1])     repo = args[++i];
     else if (a === '--project-root' && args[i + 1]) projectRoot = path.resolve(args[++i]);
+    else if (a === '--auto')                    auto = true;
   }
 
-  return { prNumber, owner, repo, projectRoot };
+  return { prNumber, owner, repo, projectRoot, auto };
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +97,7 @@ function classifyThread(thread, currentUser, changedFileSet) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const { prNumber, owner: cliOwner, repo: cliRepo, projectRoot } = parseArgs(process.argv);
+  const { prNumber, owner: cliOwner, repo: cliRepo, projectRoot, auto } = parseArgs(process.argv);
 
   // Validate required --pr argument
   if (prNumber == null || isNaN(prNumber)) {
@@ -184,6 +186,7 @@ function main() {
     timestamp: new Date().toISOString(),
     pr: { number: prNumber, owner, repo },
     currentUser,
+    flags: { auto },
     threads,
     summary,
   };

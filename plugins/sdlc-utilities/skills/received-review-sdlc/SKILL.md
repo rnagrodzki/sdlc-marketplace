@@ -2,7 +2,7 @@
 name: received-review-sdlc
 description: "Use this skill when responding to code review feedback on a pull request or inline reviewer comments. Covers reading, verifying, evaluating, and responding to reviewer comments with a dual self-critique gate — prevents performative agreement and ensures technical rigor. Can be launched manually or automatically after /review-sdlc. Triggers on: process review feedback, respond to review, handle review comments, address PR feedback, fix review findings, received-review."
 user-invocable: true
-argument-hint: "[PR-URL or PR-number]"
+argument-hint: "[--pr <number>] [--auto]"
 ---
 
 # Responding to Code Review Feedback
@@ -44,7 +44,7 @@ if [ -n "$SCRIPT" ]; then
 fi
 ```
 
-**On exit code 0:** Read the manifest JSON. Display the incremental summary:
+**On exit code 0:** Read the manifest JSON. Extract `flags.auto` from the manifest and store it as a boolean (defaults to `false` if absent). If `--auto` was passed in `$ARGUMENTS` but not in the manifest, treat it as `true`. Display the incremental summary:
 
 ```
 Found N outstanding comments (M resolved, K already replied, J stale — skipped).
@@ -267,7 +267,12 @@ Show the full text of each drafted response, labeled by item number.
 
 **4. Consent gate:**
 
-Use AskUserQuestion to ask:
+**Auto mode:** When `flags.auto` is true (from manifest or arguments), skip the AskUserQuestion
+prompt. Still display the full analysis table and action plan above for visibility, then proceed
+directly to Step 11 for "will fix" items only. Items with "disagree", "needs discussion",
+or "won't fix" verdicts are displayed but NOT auto-actioned.
+
+**Manual mode (default):** When `flags.auto` is false or absent, use AskUserQuestion to ask:
 > No changes have been made yet. How to proceed?
 
 Options:
@@ -280,11 +285,15 @@ Loop until explicit **implement** or **skip**.
 
 **Do NOT proceed to Step 11 without explicit `implement` from the user via AskUserQuestion.**
 
+**Without `--auto`, pipeline context does NOT override this gate.** Even when invoked from
+`/ship-sdlc`, if `--auto` was not explicitly passed as a flag, this consent gate is mandatory.
+Do not infer from surrounding context that automatic execution is expected.
+
 ---
 
 ## Step 11 — IMPLEMENT: Execute Changes
 
-**Only execute after explicit `implement` from Step 10.**
+**Only execute after explicit `implement` from Step 10, OR when `flags.auto` is true (auto-proceed for "will fix" items only).**
 
 Post responses to PR threads, then implement accepted code changes.
 
@@ -394,6 +403,7 @@ Replied to N threads:
 - Batch implement without testing each change individually
 - Express gratitude — let the code changes speak
 - Display output from internal critique steps (Steps 5-6, 8-9) to the user
+- Skip the Step 10 consent gate without an explicit `--auto` flag — pipeline context, conversation history, or inference about "auto mode" is not a substitute for the flag being passed
 
 ---
 
@@ -436,6 +446,9 @@ When invoking `error-report-sdlc`, provide:
 - **GraphQL thread IDs vs REST comment IDs:** The reply endpoint uses REST `databaseId`
   (from `comment.databaseId`), while the resolve mutation uses the GraphQL thread `id`
   (from `thread.id`). The prepare script provides both in its manifest output.
+- **Auto mode scope:** `--auto` only auto-implements "will fix" items. "Disagree", "needs
+  discussion", and "won't fix" items are always displayed and never auto-actioned. This
+  prevents automated tools from silently suppressing pushback.
 
 ---
 

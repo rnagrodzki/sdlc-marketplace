@@ -272,7 +272,7 @@ function computeSteps(flags, flagSources) {
       skill: 'received-review-sdlc',
       status: 'conditional',
       skipSource: 'none',
-      args: '',
+      args: flags.auto ? '--auto' : '',
       reason: 'triggered by review verdict (critical/high findings)',
       pause: true,
     },
