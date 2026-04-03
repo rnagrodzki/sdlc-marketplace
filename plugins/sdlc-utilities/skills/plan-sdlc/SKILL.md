@@ -91,12 +91,14 @@ SCRIPT=$(find ~/.claude/plugins -name "plan-prepare.js" -path "*/sdlc*/scripts/p
 [ -z "$SCRIPT" ] && { echo "{}"; exit 0; }
 
 PLAN_OUTPUT_FILE=$(node "$SCRIPT" --output-file)
+EXIT_CODE=$?
 echo "PLAN_OUTPUT_FILE=$PLAN_OUTPUT_FILE"
+echo "EXIT_CODE=$EXIT_CODE"
 ```
 
 If `--from-openspec <name>` was passed to plan-sdlc, include it in the node command: `node "$SCRIPT" --output-file --from-openspec <name>`.
 
-Read the JSON output file. Print context detection summary:
+If `EXIT_CODE` is non-zero, print the errors from the JSON output and stop. If `EXIT_CODE` is 0, read the JSON output file. Print context detection summary:
 ```
 Context detection (from plan-prepare.js):
   OpenSpec:          [detected, N active changes | not present]
