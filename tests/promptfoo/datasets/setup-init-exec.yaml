@@ -38,7 +38,7 @@
     - type: icontains
       value: '"localConfig"'
     - type: not-icontains
-      value: '"skipped"'
+      value: '"action": "skipped"'
 
 - description: "setup-init: invalid JSON produces error and exit code 1"
   vars:

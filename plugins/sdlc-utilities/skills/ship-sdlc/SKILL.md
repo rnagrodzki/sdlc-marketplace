@@ -76,7 +76,7 @@ Parse the output JSON from `$PREPARE_OUTPUT_FILE`. If `errors` is non-empty, dis
 **Gitignore warning:** If `context.sdlcGitignored` is `false` in the output, print:
 ```
 ⚠ Warning: .sdlc/ is not gitignored. Run --init-config to fix, or manually create .sdlc/.gitignore:
-  printf '*\n!.gitignore\n' > .sdlc/.gitignore
+  printf '*\n' > .sdlc/.gitignore
 ```
 
 ### 1d. Parse flags

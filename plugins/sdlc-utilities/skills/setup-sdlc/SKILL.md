@@ -432,7 +432,13 @@ echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
 ```
 
-Parse the output JSON: display created files, check for errors. The `setup-init.js` script deterministically creates `.sdlc/` directory, `.sdlc/.gitignore`, and writes config files via `writeProjectConfig` and `writeLocalConfig` (read-merge-write, so existing sections are preserved).
+Parse the output JSON from `$INIT_OUTPUT_FILE`, then clean up the temp file:
+
+```bash
+rm -f "$INIT_OUTPUT_FILE"
+```
+
+Display created files, check for errors. The `setup-init.js` script deterministically creates `.sdlc/` directory, `.sdlc/.gitignore`, and writes config files via `writeProjectConfig` and `writeLocalConfig` (read-merge-write, so existing sections are preserved).
 
 ### Step 3b -- Validate Written Config
 
