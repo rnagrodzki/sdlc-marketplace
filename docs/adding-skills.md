@@ -89,6 +89,28 @@ See `./templates.md` for language-specific templates.
 See `./checklist.md` for the full verification checklist.
 ```
 
+## Prepare Script Patterns
+
+Skills that use a prepare script can follow one of two patterns:
+
+### One-Shot (Current Default)
+
+The script runs once, returns flat JSON, and the LLM follows SKILL.md instructions to execute the full workflow. Suitable for simple skills where the LLM can handle all sequencing.
+
+### Step-Emitter (Recommended for Complex Skills)
+
+The script becomes a multi-step workflow controller using the universal step-emitter protocol. Each invocation returns a single step for the LLM to execute. After the LLM completes the step, it calls the script again with the result. The script controls sequencing, conditional logic, and error recovery deterministically.
+
+Step-emitter scripts use `lib/stepper.js` for:
+- **`parseArgs()`** — parse `--after`, `--result`, `--result-file`, `--state` from CLI
+- **`createEnvelope(status, step, options)`** — build the universal output envelope
+- **`initState(skill)`** — create and persist initial state
+- **`transition(stateFile, afterStepId, result, nextStepId)`** — process step transitions
+
+SKILL.md for a step-emitter skill contains an execution loop and domain-specific sections keyed by `step.id` rather than a linear workflow.
+
+See [Step-Emitter Architecture](step-emitter-architecture.md) for the full protocol reference and migration guide.
+
 ## Error Recovery (Required)
 
 Every skill that runs a script or calls an external tool **must** include an `## Error Recovery` section. This section ensures that failures are surfaced cleanly and routed to `error-report-sdlc` when appropriate.

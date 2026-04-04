@@ -101,6 +101,20 @@ Critique #2 (responses):
 - C12: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
 - C13: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 
+## Step-Emitter Contract
+
+> Added as foundation for step-emitter migration. P-TRANS-1 transition map to be defined during script migration.
+
+- P-STEP-1: Script returns universal envelope with `status`, `step`, `llm_decision`, `state_file`, `progress`, and `ext` fields on every invocation
+- P-STEP-2: Script accepts `--after <step_id> --result-file <path> --state <state_file>` for subsequent invocations after the initial call
+- P-STEP-3: State file is created on first invocation, updated after each step, and cleaned up when status is `"done"`
+- P-TRANS-1: Step transition map — TBD (to be defined during script migration)
+- P-TRANS-2: Every `step.id` in the transition map has a corresponding `When step.id == X` section in SKILL.md
+- C-STEP-1: The LLM MUST NOT skip steps or reorder the sequence — the script controls progression
+- C-STEP-2: The LLM MUST NOT read or modify the state file directly — it passes the path back to the script via `--state`
+- C-STEP-3: When `llm_decision` is null, the LLM executes the step without asking the user or making judgment calls
+- C-STEP-4: When `llm_decision` is non-null, the LLM MUST resolve it (via domain knowledge or user interaction) before proceeding
+
 ## Integration
 
 - I1: `skill/received-review.js` — pre-computes PR thread state with incremental processing

@@ -46,6 +46,7 @@ scripts/
 | `openspec.js` | `detectActiveChanges`, `validateChange` | OpenSpec change detection |
 | `output.js` | `writeOutput` | Structured JSON output helpers |
 | `state.js` | `readState`, `writeState`, `initState` | Execution state file I/O |
+| `stepper.js` | `parseArgs`, `createEnvelope`, `initState`, `transition`, `readState`, `writeState`, `addHistory`, `cleanupState` | Step-emitter protocol utilities (envelope creation, state lifecycle, CLI parsing) |
 | `version.js` | `detectVersionFile`, `readVersion`, `computeNextVersions` | Semantic versioning utilities |
 
 ## Script Resolution
