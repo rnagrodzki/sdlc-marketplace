@@ -153,6 +153,17 @@ To add another plugin to this marketplace:
 
 3. Follow the same structure: `skills/`, `hooks/` (and optionally `scripts/`, `commands/`)
 
+## Step-Emitter Script Architecture
+
+Skills can use the **step-emitter pattern** where prepare scripts become multi-step workflow controllers. Instead of running once and returning flat JSON, a step-emitter script emits one step at a time via a universal envelope protocol. The LLM executes each step using domain knowledge, then calls the script again with the result. The script controls sequencing; the LLM provides judgment.
+
+Key components:
+- **`lib/stepper.js`** — shared utility for envelope creation, state management, and CLI argument parsing
+- **Universal envelope** — every script invocation returns `{ status, step, llm_decision, state_file, progress, ext }`
+- **Two-call protocol** — initial call returns the first step; subsequent calls use `--after <step_id> --result-file <path> --state <state_file>`
+
+See [Step-Emitter Architecture](step-emitter-architecture.md) for the full protocol reference, migration guide, and testing patterns.
+
 ## Testing
 
 All testing uses [promptfoo](https://promptfoo.dev/) — a framework for evaluating LLM outputs. Two configurations cover different test types:
