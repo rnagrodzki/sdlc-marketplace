@@ -27,7 +27,9 @@ const CHECK_CHANGELOG_SCRIPT_VERSION = 1;
 const fs   = require('node:fs');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
-const { readSection } = require('./lib/config');
+const LIB = path.join(__dirname, '..', 'lib');
+
+const { readSection } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Helpers
