@@ -417,6 +417,30 @@ function migrateConfig(projectRoot) {
 }
 
 // ---------------------------------------------------------------------------
+// ensureSdlcGitignore
+// ---------------------------------------------------------------------------
+
+/**
+ * Create .sdlc/ directory and .sdlc/.gitignore with content `*\n`.
+ * Idempotent: if .gitignore already exists, returns 'existed'.
+ *
+ * @param {string} projectRoot
+ * @returns {'created'|'existed'}
+ */
+function ensureSdlcGitignore(projectRoot) {
+  const sdlcDir = path.join(projectRoot, '.sdlc');
+  fs.mkdirSync(sdlcDir, { recursive: true });
+
+  const gitignorePath = path.join(sdlcDir, '.gitignore');
+  if (fs.existsSync(gitignorePath)) {
+    return 'existed';
+  }
+
+  fs.writeFileSync(gitignorePath, '*\n', 'utf8');
+  return 'created';
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -428,6 +452,7 @@ module.exports = {
   writeLocalConfig,
   writeSection,
   migrateConfig,
+  ensureSdlcGitignore,
   // Preset normalization
   normalizePreset,
   PRESET_NAMES,

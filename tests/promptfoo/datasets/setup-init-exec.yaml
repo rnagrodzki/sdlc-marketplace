@@ -1,0 +1,53 @@
+# Script execution tests for setup-init.js.
+# These tests run setup-init.js directly against fixture directories (no LLM).
+# Covers: deterministic .sdlc/ initialization (issue #134).
+
+- description: "setup-init: creates .sdlc/.gitignore with * content"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/setup-init.js"
+    script_args: "--project-config '{}' --local-config '{\"review\":{\"scope\":\"committed\"}}'"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: icontains
+      value: '"gitignore"'
+    - type: icontains
+      value: '"action": "created"'
+
+- description: "setup-init: idempotent re-run reports existed for gitignore"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/setup-init.js"
+    script_args: "--project-config '{}' --local-config '{\"review\":{\"scope\":\"committed\"}}'"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"existed"'
+    - type: icontains
+      value: ".sdlc/.gitignore already exists"
+
+- description: "setup-init: writes both project and local config"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/setup-init.js"
+    script_args: "--project-config '{\"version\":{\"mode\":\"tag\"}}' --local-config '{\"review\":{\"scope\":\"committed\"}}'"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: icontains
+      value: '"projectConfig"'
+    - type: icontains
+      value: '"localConfig"'
+    - type: not-icontains
+      value: '"skipped"'
+
+- description: "setup-init: invalid JSON produces error and exit code 1"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/setup-init.js"
+    script_args: "--project-config 'not-json'"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: icontains
+      value: "not valid JSON"
+    - type: javascript
+      value: "output.includes('\"errors\"') && !output.includes('\"errors\": []')"

@@ -399,7 +399,7 @@ function runValidation(flags, flagSources, steps, context) {
   // Fabrication guard: skip values present but source is 'default' means the
   // LLM may have hallucinated --skip arguments that were never actually passed.
   if (flags.skip.length > 0 && flagSources.skip === 'default') {
-    warnings.push("Skip flags present but source is 'default' — verify --skip arguments were intentional.");
+    errors.push("Skip flags present but source is 'default' — likely fabricated. Remove --skip or pass explicitly via CLI.");
   }
 
   // At least one non-conditional step must run (conditional steps only
@@ -413,7 +413,7 @@ function runValidation(flags, flagSources, steps, context) {
   let coherentFlags = true;
   const versionStep = steps.find(s => s.name === 'version');
   if (flags.bump && versionStep && versionStep.status === 'skipped') {
-    warnings.push(`--bump "${flags.bump}" specified but version step is skipped.`);
+    errors.push(`--bump "${flags.bump}" specified but version step is skipped — resolve by removing --bump or removing "version" from skip set.`);
     coherentFlags = false;
   }
 
@@ -495,10 +495,10 @@ function main() {
   // Merge flags
   const { merged: flags, sources: flagSources } = mergeFlags(cli, fileConfig);
 
-  // Auto mode: override workspace default from 'prompt' to 'branch'
-  if (flags.auto && flags.workspace === 'prompt' && flagSources.workspace === 'default') {
+  // Auto mode: override workspace default/config from 'prompt' to 'branch'
+  if (flags.auto && flags.workspace === 'prompt' && flagSources.workspace !== 'cli') {
     flags.workspace = 'branch';
-    flagSources.workspace = 'default (auto)';
+    flagSources.workspace = `${flagSources.workspace} (auto)`;
   }
 
   // Check git state

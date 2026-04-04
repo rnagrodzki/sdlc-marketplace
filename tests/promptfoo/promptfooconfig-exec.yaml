@@ -24,3 +24,4 @@ tests:
   - file://datasets/pr-prepare-exec.yaml
   - file://datasets/ship-prepare-exec.yaml
   - file://datasets/guardrails-prepare-exec.yaml
+  - file://datasets/setup-init-exec.yaml

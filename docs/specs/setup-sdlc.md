@@ -26,13 +26,15 @@
 - R3: Migration logic: detect legacy config files (version.json, ship-config.json, review.json), offer merge into unified config, optionally delete originals
 - R4: Config builder walks through missing sections interactively: version, ship, jira, review, commit patterns, PR title patterns
 - R5: Idempotent: re-run safe via read-merge-write (`writeProjectConfig`, `writeLocalConfig` from `lib/config.js`)
-- R6: Config writes go through `lib/config.js` functions via inline Node.js — never use Edit/Write tools directly on config files
+- R6: Config writes go through `util/setup-init.js` which calls `lib/config.js` functions. The script deterministically creates `.sdlc/` directory, `.sdlc/.gitignore`, and config files — never use Edit/Write tools directly on config files
 - R7: Early exit when everything is configured, no migration needed, and `--force` not passed
 - R8: Ship config is developer-local (`.sdlc/local.json`, gitignored), not project-level
 - R9: Content setup sub-flows: review dimensions (`setup-dimensions.md`), PR template (`setup-pr-template.md`), plan guardrails (`setup-guardrails.md`), execution guardrails (`setup-execution-guardrails.md`)
 - R10: Project scan phase runs before content sub-flows to collect signals (dependencies, framework, CI, DB, tests, etc.)
 - R11: Version section requires `mode` field (required by schema): `"file"` when version file detected, `"tag"` when not
 - R12: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
+- R13: Content sub-flows (setup-dimensions, setup-pr-template, setup-guardrails) inherit the parent skill's permission mode. Sub-flows MUST NOT call ExitPlanMode, change permission settings, or exit any mode.
+- R14: Scan phase (R10) MUST use the Glob tool for all file/directory existence checks. Bash MUST NOT be used with glob patterns — zsh errors on unmatched globs. Bash is permitted only for `git`, `gh`, and `which` commands.
 
 ## Workflow Phases
 

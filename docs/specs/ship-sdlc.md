@@ -16,6 +16,7 @@
 - A6: `--dry-run` — display pipeline plan without executing (default: false)
 - A7: `--resume` — resume pipeline from saved state file (default: false)
 - A8: `--workspace branch|worktree|prompt` — workspace isolation mode (default: from config or prompt)
+- A8a: In `--auto` mode, `workspace: "prompt"` is overridden to `"branch"` when the source is not `'cli'`. Explicit CLI `--workspace prompt` with `--auto` is preserved (intentional override).
 - A9: `--init-config` — run interactive config wizard, no pipeline execution (default: false)
 
 ## Core Requirements
@@ -24,7 +25,7 @@
 - R2: All sub-skills dispatched as Agents (never Skill tool) to maintain context isolation — each Agent loads its SKILL.md independently
 - R3: Pipeline plan is a binding contract: steps with `status: "will_run"` must execute; LLM cannot override
 - R4: Step statuses computed by `skill/ship.js`: `will_run`, `skipped`, `conditional`
-- R5: Skip set provenance tracked via `skipSource`: `cli`, `config`, `auto`, `condition`, `none`; fabrication guard warns on `default` source
+- R5: Skip set provenance tracked via `skipSource`: `cli`, `config`, `auto`, `condition`, `none`; fabrication guard blocks (error, exit code 1) on `default` source
 - R6: Review verdict conditional logic: CHANGES REQUESTED (critical or ≥3 high) → pause, invoke received-review; APPROVED WITH NOTES (high or ≥5 medium) → invoke received-review if high exists; APPROVED → continue
 - R7: `--auto` forwarding audit: only forwarded to commit-sdlc, received-review-sdlc, version-sdlc, pr-sdlc (not execute-plan-sdlc, not review-sdlc)
 - R8: Staging gap between execute and commit: `git add -A -- ':!.sdlc/'` required
@@ -63,7 +64,7 @@
 - G2: Not on default branch — warn if on main/master (do not block)
 - G3: Skip values valid — all `--skip` values are recognized step names
 - G4: At least one step will run — pipeline is not entirely skipped
-- G5: Flag coherence — `--bump` without version step produces warning
+- G5: Flag coherence — `--bump` without version step produces error (exit code 1, blocking)
 - G6: Pipeline contract — every `will_run` step was dispatched as Agent
 - G7: Staging gap filled — `git add -A -- ':!.sdlc/'` ran between execute and commit
 - G8: Rebase attempted — rebase ran after commits, before version (when applicable)

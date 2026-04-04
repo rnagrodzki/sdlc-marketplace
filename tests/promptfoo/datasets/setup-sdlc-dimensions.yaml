@@ -206,3 +206,22 @@
         skips or does not mention the GitHub Copilot instructions generation step
         (Step 8 in the skill). It does NOT create .github/instructions/ files. The
         dimension creation and validation proceed as normal despite --no-copilot.
+
+- description: "setup-sdlc --dimensions: does not exit plan mode or change permissions during file writes"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-tech-stack.md"
+    user_request: >
+      Run /setup-sdlc --dimensions on this project. Write the dimension files.
+      Show me the exact steps you would take to create the dimension files.
+  assert:
+    - type: not-icontains
+      value: "ExitPlanMode"
+    - type: not-regex
+      value: "(exit.*plan.*mode|change.*permission|switch.*mode)"
+    - type: llm-rubric
+      value: >
+        The response creates dimension files without calling ExitPlanMode, changing
+        permission settings, or exiting any mode. The dimension creation workflow
+        inherits the parent skill's permission mode and does not attempt to manage
+        permissions independently. File writes are batched or done in rapid sequence.

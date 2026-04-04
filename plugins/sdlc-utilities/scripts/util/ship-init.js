@@ -31,7 +31,7 @@ const fs   = require('fs');
 const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { readSection, writeSection, normalizePreset, PRESET_NAMES } = require(path.join(LIB, 'config'));
+const { readSection, writeSection, normalizePreset, PRESET_NAMES, ensureSdlcGitignore } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
@@ -133,15 +133,10 @@ function main() {
   // Create .sdlc/ directory
   fs.mkdirSync(sdlcDir, { recursive: true });
 
-  // Write .sdlc/.gitignore — skip if already exists
-  const gitignorePath = path.join(sdlcDir, '.gitignore');
-  let gitignoreAction;
-  if (fs.existsSync(gitignorePath)) {
-    gitignoreAction = 'existed';
+  // Write .sdlc/.gitignore via shared helper
+  const gitignoreAction = ensureSdlcGitignore(projectRoot);
+  if (gitignoreAction === 'existed') {
     warnings.push('.sdlc/.gitignore already exists — skipped');
-  } else {
-    fs.writeFileSync(gitignorePath, '*\n!.gitignore\n', 'utf8');
-    gitignoreAction = 'created';
   }
 
   // Build config object (no $schema or version — handled by unified config system)

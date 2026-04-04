@@ -9,6 +9,11 @@ and validates with the validation script.
 > complete above", "see my previous response", or any similar deferral. If no files can be
 > written (simulation context), still emit the full proposed dimension YAML/Markdown inline.
 
+> **Permission context:** This sub-flow inherits the parent skill's permission mode.
+> Do NOT call ExitPlanMode, change permission settings, or exit any mode during this sub-flow.
+> Do NOT ask the user to approve file writes individually — the parent (setup-sdlc) manages mode transitions.
+> Write all dimension files in a single Bash block or rapid sequence to minimize permission prompts.
+
 Supporting references (dimension format spec, 5 example dimensions) are in
 `review-sdlc/REFERENCE.md` and `review-sdlc/EXAMPLES.md`. Locate them using Glob
 with `path: ~/.claude` and pattern `**/review-sdlc/REFERENCE.md`. If not found, retry

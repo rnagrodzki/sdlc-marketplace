@@ -83,3 +83,45 @@
   assert:
     - type: icontains
       value: '"preset": "balanced"'
+
+# Auto-mode workspace override for config source (issue #133)
+
+- description: "ship-prepare: --auto with config workspace=prompt overrides to branch"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-config-workspace-prompt"
+  assert:
+    - type: icontains
+      value: '"workspace": "branch"'
+    - type: icontains
+      value: "config (auto)"
+
+# Fabrication guard blocking error (issue #129)
+
+- description: "ship-prepare: fabricated --skip flags produce error and exit code 1"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --skip version"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: "likely fabricated"
+    - type: javascript
+      value: "output.includes('\"errors\"') && !output.includes('\"errors\": []')"
+
+# Bump+skip contradiction blocking error (issue #146)
+
+- description: "ship-prepare: --bump with skipped version step produces error"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --bump minor --skip version"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: "version step is skipped"
+    - type: icontains
+      value: "resolve by removing"

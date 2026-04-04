@@ -417,34 +417,22 @@ Store the assembled `pr` config for use in the "Writing config files" step.
 
 #### Writing config files
 
-After collecting all answers, write project config and local config in a single Bash call:
+After collecting all answers, write project config and local config via `util/setup-init.js`:
 
 ```bash
-SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
-[ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
-[ -z "$SCRIPT_DIR" ] && { echo "ERROR: Could not locate lib/config.js" >&2; exit 2; }
+INIT_SCRIPT=$(find ~/.claude/plugins -name "setup-init.js" -path "*/sdlc*/scripts/util/setup-init.js" 2>/dev/null | head -1)
+[ -z "$INIT_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/setup-init.js" ] && INIT_SCRIPT="plugins/sdlc-utilities/scripts/util/setup-init.js"
+[ -z "$INIT_SCRIPT" ] && { echo "ERROR: Could not locate util/setup-init.js" >&2; exit 2; }
 
-node -e "
-const { writeProjectConfig, writeLocalConfig } = require('$SCRIPT_DIR/config.js');
-const projectRoot = process.cwd();
-
-// Only include sections that were configured (not skipped)
-const projectConfig = {};
-// ... add version, jira, commit, pr sections as collected ...
-
-if (Object.keys(projectConfig).length > 0) {
-  writeProjectConfig(projectRoot, projectConfig);
-  console.log('Wrote .claude/sdlc.json');
-}
-
-const localConfig = { review: { scope: 'committed' } }; // use actual collected value
-// ... add ship section to localConfig as collected ...
-writeLocalConfig(projectRoot, localConfig);
-console.log('Wrote .sdlc/local.json');
-"
+# Replace <PROJECT_CONFIG_JSON> and <LOCAL_CONFIG_JSON> with the actual config objects
+# assembled from Steps 3a–3f. Only include sections that were configured (not skipped).
+INIT_OUTPUT_FILE=$(node "$INIT_SCRIPT" --output-file --project-config '<PROJECT_CONFIG_JSON>' --local-config '<LOCAL_CONFIG_JSON>')
+EXIT_CODE=$?
+echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
+echo "EXIT_CODE=$EXIT_CODE"
 ```
 
-Replace the placeholder values with the actual collected answers. The `writeProjectConfig` and `writeLocalConfig` functions handle read-merge-write, so existing sections are preserved.
+Parse the output JSON: display created files, check for errors. The `setup-init.js` script deterministically creates `.sdlc/` directory, `.sdlc/.gitignore`, and writes config files via `writeProjectConfig` and `writeLocalConfig` (read-merge-write, so existing sections are preserved).
 
 ### Step 3b -- Validate Written Config
 
@@ -466,22 +454,26 @@ If validation fails (sections missing or file unreadable), warn the user and off
 
 #### Scan Phase
 
-Before presenting the content menu, collect all project signals needed by the sub-flows. Run the following in a single Bash block (or parallel where noted):
+Before presenting the content menu, collect all project signals needed by the sub-flows:
 
-- **Dependency manifests:** Read `package.json`, `requirements.txt`, `Pipfile`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle` if present.
-- **Framework config:** Check for `.eslintrc*`, `tsconfig.json`, `openapi.yaml`/`openapi.json`, `.prettierrc*`, `jest.config.*`, `vitest.config.*`.
-- **Directory structure:** List top-level dirs and check for `src/`, `lib/`, `controllers/`, `services/`, `middleware/`, `models/`, `routes/`, `api/`, `pkg/`, `cmd/`, `internal/`.
-- **CI/CD config:** Check for `.github/workflows/`, `Jenkinsfile`, `.circleci/`, `.gitlab-ci.yml`.
-- **Database presence:** Check for ORM config files (`prisma/`, `migrations/`, `alembic.ini`, `db/migrate/`, `sequelize`, `typeorm`, `sqlalchemy`).
-- **Test structure:** Check for `test/`, `tests/`, `spec/`, `__tests__/`, `cypress/`, `playwright.config.*`.
-- **Existing review dimensions:** List files in `.claude/review-dimensions/` (count and names).
-- **Existing guardrails:** Read `sdlc.json` → `plan.guardrails` array if present.
-- **GitHub hosting detection:** Check `git remote -v` for `github.com`, check if `gh` CLI is available, check for `.github/` directory.
-- **CLAUDE.md / AGENTS.md:** Read if present at project root or `.claude/`.
-- **GitHub PR template:** Check for `.github/PULL_REQUEST_TEMPLATE.md` or `.github/pull_request_template.md`.
-- **Recent PRs:** Run `gh pr list --limit 5 --json title,body` if `gh` CLI is available.
-- **Existing PR template:** Check for `.claude/pr-template.md`.
-- **JIRA evidence:** Check current branch name and recent commit subjects for ticket patterns (e.g., `[A-Z]{2,10}-\d+`).
+> **Shell safety:** Use the **Glob** tool for all file/directory existence checks.
+> Do NOT use Bash `ls` with glob patterns — zsh (macOS default) errors on unmatched globs.
+> Use Bash only for `git` commands, `gh` CLI, and `which`.
+
+- **Dependency manifests:** Use Glob for `package.json`, `requirements.txt`, `Pipfile`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle`. Read each found file.
+- **Framework config:** Use Glob for `**/jest.config.*`, `**/vitest.config.*`, `**/.eslintrc*`, `**/tsconfig.json`, `**/openapi.yaml`, `**/openapi.json`, `**/.prettierrc*`.
+- **Directory structure:** Use Glob for `src/`, `lib/`, `controllers/`, `services/`, `middleware/`, `models/`, `routes/`, `api/`, `pkg/`, `cmd/`, `internal/` and patterns from `@scan-patterns.md`.
+- **CI/CD config:** Use Glob for `.github/workflows/*.yml`, `Jenkinsfile`, `.circleci/config.yml`, `.gitlab-ci.yml`.
+- **Database presence:** Use Glob for `prisma/`, `migrations/`, `alembic.ini`, `db/migrate/`, `**/sequelize*`, `**/typeorm*`, `**/sqlalchemy*`.
+- **Test structure:** Use Glob for `test/`, `tests/`, `spec/`, `__tests__/`, `cypress/`, `**/playwright.config.*`.
+- **Existing review dimensions:** Use Glob for `.claude/review-dimensions/*` (count and names).
+- **Existing guardrails:** Use Read on `.claude/sdlc.json` → `plan.guardrails` array if present.
+- **GitHub hosting detection:** Bash for `git remote -v` and `gh repo view` (safe). Use Glob for `.github/`.
+- **CLAUDE.md / AGENTS.md:** Use Read on `CLAUDE.md`, `AGENTS.md`, `.claude/CLAUDE.md` if present.
+- **PR template:** Use Glob for `.github/PULL_REQUEST_TEMPLATE.md`, `.github/pull_request_template.md`.
+- **Recent PRs:** Bash for `gh pr list --limit 5 --json title,body` (safe).
+- **Existing PR template:** Use Glob for `.claude/pr-template.md`.
+- **JIRA evidence:** Bash for `git log --oneline -20` and `git rev-parse --abbrev-ref HEAD` (safe).
 
 Collect all signals into a "Scan Input" object to pass to sub-flows.
 
