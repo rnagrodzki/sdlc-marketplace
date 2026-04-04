@@ -1,0 +1,13 @@
+{
+  "name": "project-lambda-worker-no-api",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@middy/core": "^5.0.0",
+    "@aws-sdk/client-sqs": "^3.500.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/aws-lambda": "^8.10.0"
+  }
+}

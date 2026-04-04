@@ -1,0 +1,16 @@
+{
+  "name": "project-validation-observability",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "express": "^4.18.0",
+    "zod": "^3.22.0",
+    "@sentry/node": "^8.0.0",
+    "dd-trace": "^5.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "esbuild": "^0.20.0",
+    "vitest": "^1.0.0"
+  }
+}

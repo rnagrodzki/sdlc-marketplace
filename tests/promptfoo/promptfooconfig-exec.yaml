@@ -23,3 +23,4 @@ tests:
   - file://datasets/commit-prepare-exec.yaml
   - file://datasets/pr-prepare-exec.yaml
   - file://datasets/ship-prepare-exec.yaml
+  - file://datasets/guardrails-prepare-exec.yaml

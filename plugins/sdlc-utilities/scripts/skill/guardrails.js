@@ -169,10 +169,44 @@ function detectLanguagesAndFrameworks(projectRoot, signals) {
       svelte:   'svelte',
       hapi:     'hapi',
       koa:      'koa',
+      // Serverless / IaC
+      'serverless':       'serverless-framework',
+      'aws-cdk-lib':      'aws-cdk',
+      'sst':              'sst',
+      // Observability
+      'dd-trace':         'datadog',
+      'newrelic':         'newrelic',
+      'aws-xray-sdk-core':'aws-xray',
+      // Validation
+      'zod':              'zod',
+      'joi':              'joi',
+      'yup':              'yup',
+      'class-validator':  'class-validator',
+      'ajv':              'ajv',
+      // Build tools
+      'webpack':          'webpack',
+      'esbuild':          'esbuild',
+      'vite':             'vite',
+      'rollup':           'rollup',
     };
     for (const [dep, framework] of Object.entries(frameworkMap)) {
       if (dep in allDeps && !signals.frameworks.includes(framework)) {
         signals.frameworks.push(framework);
+      }
+    }
+
+    // Scoped package prefix matching
+    const prefixMap = {
+      '@middy/':          'middy',
+      '@sentry/':         'sentry',
+      '@pulumi/':         'pulumi',
+      '@opentelemetry/':  'opentelemetry',
+    };
+    for (const dep of Object.keys(allDeps)) {
+      for (const [prefix, framework] of Object.entries(prefixMap)) {
+        if (dep.startsWith(prefix) && !signals.frameworks.includes(framework)) {
+          signals.frameworks.push(framework);
+        }
       }
     }
   }
@@ -247,12 +281,51 @@ function detectStructure(projectRoot, signals) {
         signals.hasDatabase = true;
         signals.dbType = 'typeorm';
       }
+      // NoSQL / driver-based database detection
+      if (!signals.hasDatabase) {
+        const driverMap = {
+          '@aws-sdk/client-dynamodb': 'dynamodb',
+          '@aws-sdk/lib-dynamodb':    'dynamodb',
+          'serverless-dynamodb':      'dynamodb',
+          'mongoose':                 'mongodb',
+          'mongodb':                  'mongodb',
+          'redis':                    'redis',
+          'ioredis':                  'redis',
+          '@google-cloud/firestore':  'firestore',
+          'firebase-admin':           'firestore',
+          'cassandra-driver':         'cassandra',
+          'neo4j-driver':             'neo4j',
+        };
+        for (const [dep, dbType] of Object.entries(driverMap)) {
+          if (dep in allDeps) {
+            signals.hasDatabase = true;
+            signals.dbType = dbType;
+            break;
+          }
+        }
+      }
     }
   }
   // Migrations dir also implies database
   if ('migrations' in dirs && !signals.hasDatabase) {
     signals.hasDatabase = true;
     signals.dbType = 'migrations';
+  }
+  // Serverless resources with DynamoDB table definitions
+  if (!signals.hasDatabase) {
+    const resourcesPath = path.join(projectRoot, 'serverless', 'resources.yml');
+    const resourcesContent = readFileSafe(resourcesPath);
+    if (resourcesContent && resourcesContent.includes('AWS::DynamoDB::Table')) {
+      signals.hasDatabase = true;
+      signals.dbType = 'dynamodb';
+    }
+  }
+  // persistence/ directory as a weaker database hint
+  if (!signals.hasDatabase) {
+    if (findDir(projectRoot, 'persistence', path.join('src', 'persistence'))) {
+      signals.hasDatabase = true;
+      signals.dbType = 'unknown';
+    }
   }
 
   // API signals
@@ -269,6 +342,43 @@ function detectStructure(projectRoot, signals) {
   } else if (existsRel(projectRoot, 'routes') || existsRel(projectRoot, 'src', 'routes')) {
     signals.hasApi = true;
     signals.apiFormat = 'rest';
+  }
+
+  // Lambda / Serverless HTTP API detection
+  if (!signals.hasApi) {
+    const pkgPath = path.join(projectRoot, 'package.json');
+    const pkg = parseJsonSafe(pkgPath);
+    if (pkg) {
+      const allDeps = { ...((pkg.dependencies) || {}), ...((pkg.devDependencies) || {}) };
+      // @middy/http-* or http-status-codes → lambda-http
+      const hasMiddyHttp = Object.keys(allDeps).some(dep => dep.startsWith('@middy/http-'));
+      if (hasMiddyHttp || 'http-status-codes' in allDeps) {
+        signals.hasApi = true;
+        signals.apiFormat = 'lambda-http';
+      }
+    }
+  }
+  if (!signals.hasApi) {
+    // Serverless Framework config files
+    if (
+      existsRel(projectRoot, 'serverless', 'functions.yml') ||
+      existsRel(projectRoot, 'serverless.yml') ||
+      existsRel(projectRoot, 'serverless.ts')
+    ) {
+      signals.hasApi = true;
+      signals.apiFormat = 'serverless';
+    }
+  }
+  if (!signals.hasApi) {
+    // src/function/ or src/functions/ with handler files
+    const fnDir = findDir(projectRoot, 'src/function', 'src/functions');
+    if (fnDir) {
+      const fullFnDir = path.join(projectRoot, fnDir);
+      if (anyFileMatches(fullFnDir, f => f.toLowerCase().includes('handler'))) {
+        signals.hasApi = true;
+        signals.apiFormat = 'lambda-http';
+      }
+    }
   }
 
   // Tests

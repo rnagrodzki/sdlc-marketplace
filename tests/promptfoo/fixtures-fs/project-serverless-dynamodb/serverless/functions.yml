@@ -1,0 +1,13 @@
+getItem:
+  handler: src/handlers/get-item.handler
+  events:
+    - http:
+        path: /items/{id}
+        method: get
+
+createItem:
+  handler: src/handlers/create-item.handler
+  events:
+    - http:
+        path: /items
+        method: post

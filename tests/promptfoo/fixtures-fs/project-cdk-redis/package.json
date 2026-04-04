@@ -1,0 +1,12 @@
+{
+  "name": "project-cdk-redis",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "aws-cdk-lib": "^2.130.0",
+    "ioredis": "^5.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

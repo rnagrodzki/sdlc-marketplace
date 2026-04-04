@@ -1,0 +1,13 @@
+{
+  "name": "project-serverless-dynamodb",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.500.0",
+    "@aws-sdk/lib-dynamodb": "^3.500.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "serverless": "^3.38.0"
+  }
+}

@@ -1,0 +1,152 @@
+# Script execution tests for guardrails-prepare.js detection gaps (Issues #137, #138, #139).
+# These tests run guardrails-prepare.js directly against fixture directories (no LLM).
+# They validate expanded framework, database, and API signal detection.
+#
+# Fixture appropriateness:
+#   project-lambda-middy-http         -- #137 Lambda HTTP API + #139 middy/esbuild frameworks
+#   project-serverless-dynamodb       -- #137 Serverless API + #138 DynamoDB + #139 serverless-framework
+#   project-mongodb-express           -- #138 MongoDB + regression (express/routes still works)
+#   project-lambda-worker-no-api      -- #137 negative test (middy core alone != API)
+#   project-validation-observability  -- #139 breadth test (zod, sentry, datadog, esbuild)
+#   project-cdk-redis                 -- #138 Redis + #139 aws-cdk framework
+
+# --- API detection (#137) ---
+
+- description: "guardrails-prepare: middy-http deps trigger lambda-http API detection"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-lambda-middy-http"
+  assert:
+    - type: icontains
+      value: '"hasApi": true'
+    - type: icontains
+      value: '"apiFormat": "lambda-http"'
+
+- description: "guardrails-prepare: serverless dir triggers serverless API detection"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-serverless-dynamodb"
+  assert:
+    - type: icontains
+      value: '"hasApi": true'
+    - type: icontains
+      value: '"apiFormat": "serverless"'
+
+- description: "guardrails-prepare: middy core alone does NOT trigger API detection (negative)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-lambda-worker-no-api"
+  assert:
+    - type: icontains
+      value: '"hasApi": false'
+
+- description: "guardrails-prepare: handler file in src/function/ triggers lambda-http"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-lambda-middy-http"
+  assert:
+    - type: icontains
+      value: '"hasApi": true'
+    # handler.ts exists in src/function/ — but middy-http dep already triggers earlier
+    - type: icontains
+      value: '"apiFormat": "lambda-http"'
+
+# --- Database detection (#138) ---
+
+- description: "guardrails-prepare: DynamoDB SDK triggers dynamodb database detection"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-serverless-dynamodb"
+  assert:
+    - type: icontains
+      value: '"hasDatabase": true'
+    - type: icontains
+      value: '"dbType": "dynamodb"'
+
+- description: "guardrails-prepare: mongoose triggers mongodb database detection"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-mongodb-express"
+  assert:
+    - type: icontains
+      value: '"hasDatabase": true'
+    - type: icontains
+      value: '"dbType": "mongodb"'
+
+- description: "guardrails-prepare: ioredis triggers redis database detection"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-cdk-redis"
+  assert:
+    - type: icontains
+      value: '"hasDatabase": true'
+    - type: icontains
+      value: '"dbType": "redis"'
+
+# --- Framework detection (#139) ---
+
+- description: "guardrails-prepare: @middy/ prefix triggers middy framework detection"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-lambda-middy-http"
+  assert:
+    - type: icontains
+      value: '"middy"'
+    - type: icontains
+      value: '"esbuild"'
+
+- description: "guardrails-prepare: zod, sentry, datadog, esbuild detected as frameworks"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-validation-observability"
+  assert:
+    - type: icontains
+      value: '"zod"'
+    - type: icontains
+      value: '"sentry"'
+    - type: icontains
+      value: '"datadog"'
+    - type: icontains
+      value: '"esbuild"'
+
+- description: "guardrails-prepare: aws-cdk-lib triggers aws-cdk framework detection"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-cdk-redis"
+  assert:
+    - type: icontains
+      value: '"aws-cdk"'
+
+- description: "guardrails-prepare: serverless in devDeps triggers serverless-framework detection"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-serverless-dynamodb"
+  assert:
+    - type: icontains
+      value: '"serverless-framework"'
+
+# --- Regression ---
+
+- description: "guardrails-prepare: express + routes still triggers rest API (regression)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-mongodb-express"
+  assert:
+    - type: icontains
+      value: '"hasApi": true'
+    - type: icontains
+      value: '"apiFormat": "rest"'
+    - type: icontains
+      value: '"express"'
