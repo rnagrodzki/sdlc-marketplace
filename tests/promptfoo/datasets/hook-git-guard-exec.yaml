@@ -1,0 +1,143 @@
+# Script execution tests for pre-tool-git-guard.js.
+# These tests pipe JSON via stdin using the hook-runner provider (no LLM, no fixtures).
+# They validate that the git guard blocks dangerous commands and allows safe ones.
+
+- description: "git guard: non-git command exits 0"
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"npm install express"}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 0'
+    - type: icontains
+      value: '"stderr": ""'
+
+- description: "git guard: git status exits 0 silently"
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"git status"}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 0'
+    - type: icontains
+      value: '"stderr": ""'
+
+- description: "git guard: blocks git push --force"
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"git push --force origin main"}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 2'
+    - type: icontains
+      value: "Blocked"
+    - type: icontains
+      value: "--force-with-lease"
+
+- description: "git guard: blocks git push -f"
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"git push -f origin feat/branch"}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 2'
+    - type: icontains
+      value: "Blocked"
+
+- description: "git guard: allows git push --force-with-lease"
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"git push --force-with-lease origin feat/branch"}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 0'
+    - type: not-icontains
+      value: "Blocked"
+
+- description: "git guard: blocks git reset --hard"
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"git reset --hard HEAD~1"}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 2'
+    - type: icontains
+      value: "Blocked"
+    - type: icontains
+      value: "git stash"
+
+- description: "git guard: blocks git checkout ."
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"git checkout ."}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 2'
+    - type: icontains
+      value: "Blocked"
+
+- description: "git guard: blocks git checkout -- ."
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"git checkout -- ."}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 2'
+    - type: icontains
+      value: "Blocked"
+
+- description: "git guard: blocks git clean -f"
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"git clean -fd"}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 2'
+    - type: icontains
+      value: "Blocked"
+    - type: icontains
+      value: "dry run"
+
+- description: "git guard: warns on git push origin main"
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"git push origin main"}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 0'
+    - type: icontains
+      value: "Warning"
+    - type: icontains
+      value: "main/master"
+
+- description: "git guard: empty/invalid stdin exits 0"
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: "not valid json"
+  assert:
+    - type: icontains
+      value: '"exitCode": 0'
+    - type: not-icontains
+      value: "Blocked"
+
+- description: "git guard: multi-command with force push blocked"
+  provider: file://providers/hook-runner.js
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
+    script_stdin: '{"tool_input":{"command":"git add . && git push --force origin main"}}'
+  assert:
+    - type: icontains
+      value: '"exitCode": 2'
+    - type: icontains
+      value: "Blocked"

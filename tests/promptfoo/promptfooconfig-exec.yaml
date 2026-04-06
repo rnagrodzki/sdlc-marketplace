@@ -7,6 +7,7 @@ evaluateOptions:
 # The prompt is unused for script tests but required by the promptfoo config schema.
 providers:
   - id: file://providers/script-runner.js
+  - id: file://providers/hook-runner.js
 
 prompts:
   - "run"
@@ -25,3 +26,6 @@ tests:
   - file://datasets/ship-prepare-exec.yaml
   - file://datasets/guardrails-prepare-exec.yaml
   - file://datasets/setup-init-exec.yaml
+  - file://datasets/plan-format-exec.yaml
+  - file://datasets/hook-git-guard-exec.yaml
+  - file://datasets/hook-error-report-exec.yaml
