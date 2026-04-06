@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.14] - 2026-04-06
+
+### Added
+- Pipeline safety validation hooks: stop-state-save, post-failure-error-report, pre-tool-git-guard, and validate-plan-format (#148)
+
 ## [0.17.13] - 2026-04-04
 
 ### Fixed
