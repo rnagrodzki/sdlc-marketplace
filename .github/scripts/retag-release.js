@@ -22,16 +22,13 @@
 
 'use strict';
 
-/** @version 3 — retag script version. Bump when behavior changes (e.g. message preservation). */
-const RETAG_SCRIPT_VERSION = 3;
+/** @version 4 — retag script version. Bump when behavior changes (e.g. message preservation). */
+const RETAG_SCRIPT_VERSION = 4;
 
 const fs   = require('node:fs');
 const path = require('node:path');
 const os   = require('node:os');
 const { execSync } = require('node:child_process');
-const LIB = path.join(__dirname, '..', 'lib');
-
-const { readSection } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,16 +47,38 @@ function execOrThrow(cmd, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Config
+// Config (self-contained — no external lib dependency)
 // ---------------------------------------------------------------------------
 
-function readConfig(repoRoot) {
-  try {
-    return readSection(repoRoot, 'version');
-  } catch (err) {
-    process.stderr.write(`Error parsing version config: ${err.message}\n`);
-    process.exit(1);
+/**
+ * Read the version section from .claude/sdlc.json, with legacy .claude/version.json fallback.
+ * Returns the version config object or null if neither file exists.
+ */
+function readVersionConfig(repoRoot) {
+  // Primary: .claude/sdlc.json → .version
+  const sdlcPath = path.join(repoRoot, '.claude', 'sdlc.json');
+  if (fs.existsSync(sdlcPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(sdlcPath, 'utf8'));
+      return config.version || null;
+    } catch (err) {
+      process.stderr.write(`Error parsing .claude/sdlc.json: ${err.message}\n`);
+      process.exit(1);
+    }
   }
+
+  // Legacy fallback: .claude/version.json
+  const legacyPath = path.join(repoRoot, '.claude', 'version.json');
+  if (fs.existsSync(legacyPath)) {
+    try {
+      return JSON.parse(fs.readFileSync(legacyPath, 'utf8'));
+    } catch (err) {
+      process.stderr.write(`Error parsing .claude/version.json: ${err.message}\n`);
+      process.exit(1);
+    }
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +209,7 @@ function retagOnHead(tag, repoRoot) {
 function main() {
   const repoRoot = process.cwd();
 
-  const config = readConfig(repoRoot);
+  const config = readVersionConfig(repoRoot);
   if (!config) {
     console.log('No .claude/version.json found. Skipping retag.');
     process.exit(0);

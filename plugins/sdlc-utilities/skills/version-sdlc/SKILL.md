@@ -201,13 +201,27 @@ Resolve any issues found in Step 6 before proceeding. If a blocking issue cannot
 Before executing, check whether the project's installed CI scripts need updating.
 This ensures projects that ran `--init` in a prior session get notified about improvements.
 
-1. Check retag scripts — same version check as described in Branch A Step 4 (retag script version check).
-2. If `config.changelog === true`: check check-changelog scripts — same version check as described in Branch A Step 4 (changelog script version check).
-3. If any scripts are outdated or missing (and `config.changelog === true` for the check-changelog check):
-   - Show what changed and which files would be updated
+Locate and run the scaffold script in check-only mode:
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "scaffold-ci.js" -path "*/sdlc*/scripts/util/scaffold-ci.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/scaffold-ci.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/scaffold-ci.js"
+[ -z "$SCRIPT" ] && { echo "WARN: Could not locate util/scaffold-ci.js — skipping CI script check" >&2; exit 0; }
+```
+
+Run the check (include `--changelog` only when `config.changelog === true`):
+
+```bash
+SCAFFOLD_OUTPUT_FILE=$(node "$SCRIPT" --check-only --output-file)
+# Add --changelog if config.changelog === true:
+# SCAFFOLD_OUTPUT_FILE=$(node "$SCRIPT" --check-only --changelog --output-file)
+```
+
+Read the JSON output. If any files have `action: "outdated"` or `action: "missing"`:
+   - Show what changed and which files would be updated (use `installedVersion` / `currentVersion` from the output)
    - Use AskUserQuestion to ask: "Update CI scripts? (yes / no) — this does not block the release."
    - **Auto mode:** When `flags.auto` is true, skip the AskUserQuestion and treat the response as `yes` — update outdated CI scripts automatically.
-   - On `yes`: scaffold/overwrite the outdated files
+   - On `yes`: run `node "$SCRIPT" --force` (add `--changelog` if applicable) to overwrite the outdated files
    - On `no`: warn and continue with the release
 
 The release proceeds regardless of the user's answer. This is informational, not a gate.
