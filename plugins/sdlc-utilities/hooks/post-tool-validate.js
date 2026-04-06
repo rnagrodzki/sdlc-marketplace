@@ -10,6 +10,7 @@
  * Patterns:
  *   .claude/review-dimensions/*.ya?ml → validate-dimensions.js
  *   .claude/pr-template.md            → validate-pr-template.js
+ *   plans/*.md                        → validate-plan-format.js
  *
  * Exit codes:
  *   0 = clean or no match (always safe to continue)
@@ -55,13 +56,15 @@ if (!filePath) {
 // Pattern matching
 // ---------------------------------------------------------------------------
 
-const DIMENSION_RE  = /[/\\]\.claude[/\\]review-dimensions[/\\][^/\\]+\.ya?ml$/;
+const DIMENSION_RE   = /[/\\]\.claude[/\\]review-dimensions[/\\][^/\\]+\.ya?ml$/;
 const PR_TEMPLATE_RE = /[/\\]\.claude[/\\]pr-template\.md$/;
+const PLAN_RE        = /[/\\]plans[/\\][^/\\]+\.md$/;
 
 const isDimension  = DIMENSION_RE.test(filePath);
 const isPrTemplate = PR_TEMPLATE_RE.test(filePath);
+const isPlan       = PLAN_RE.test(filePath);
 
-if (!isDimension && !isPrTemplate) {
+if (!isDimension && !isPrTemplate && !isPlan) {
   process.exit(0);
 }
 
@@ -71,9 +74,14 @@ if (!isDimension && !isPrTemplate) {
 
 const scriptsDir = path.resolve(__dirname, '..', 'scripts');
 
-const validatorScript = isDimension
-  ? path.join(scriptsDir, 'validate-dimensions.js')
-  : path.join(scriptsDir, 'validate-pr-template.js');
+let validatorScript;
+if (isDimension) {
+  validatorScript = path.join(scriptsDir, 'ci', 'validate-dimensions.js');
+} else if (isPrTemplate) {
+  validatorScript = path.join(scriptsDir, 'ci', 'validate-pr-template.js');
+} else {
+  validatorScript = path.join(scriptsDir, 'ci', 'validate-plan-format.js');
+}
 
 // Use the project root from cwd (where Claude runs the hook)
 const projectRoot = process.cwd();
@@ -83,7 +91,8 @@ const projectRoot = process.cwd();
 // ---------------------------------------------------------------------------
 
 try {
-  const cmd = `node "${validatorScript}" --project-root "${projectRoot}" --markdown`;
+  const fileArg = isPlan ? ` --file "${filePath}"` : '';
+  const cmd = `node "${validatorScript}" --project-root "${projectRoot}" --markdown${fileArg}`;
   execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   // Exit 0 from validator — all good
   process.exit(0);
