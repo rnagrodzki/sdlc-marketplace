@@ -42,19 +42,26 @@ Options:
 On `yes` or `changelog`, write the version section to `.claude/sdlc.json` using `writeSection` from lib/config.js with
 the content from `suggestedConfig` (adjusted if `changelog` was chosen).
 
-Then scaffold the retag workflow into the project:
+Then scaffold CI scripts and workflows using `scaffold-ci.js`:
 
-1. Copy `plugins/sdlc-utilities/scripts/retag-release.js` → `.github/scripts/retag-release.js` (create `.github/scripts/` if it doesn't exist)
-2. Copy `plugins/sdlc-utilities/templates/retag-release.yml` → `.github/workflows/retag-release.yml` (create `.github/workflows/` if it doesn't exist)
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "scaffold-ci.js" -path "*/sdlc*/scripts/util/scaffold-ci.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/scaffold-ci.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/scaffold-ci.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate util/scaffold-ci.js" >&2; exit 2; }
+```
 
-If either target file already exists, skip copying it (do not overwrite).
+Run the scaffold (include `--changelog` when `config.changelog === true`):
 
-**When `config.changelog === true`** (i.e., user chose `changelog` option, or changelog was already enabled):
+```bash
+# Without changelog:
+SCAFFOLD_OUTPUT_FILE=$(node "$SCRIPT" --output-file)
+# With changelog:
+SCAFFOLD_OUTPUT_FILE=$(node "$SCRIPT" --changelog --output-file)
+```
 
-3. Copy `plugins/sdlc-utilities/scripts/check-changelog.js` → `.github/scripts/check-changelog.js` (reuse the same `.github/scripts/` directory)
-4. Copy `plugins/sdlc-utilities/templates/check-changelog.yml` → `.github/workflows/check-changelog.yml`
-
-If either target file already exists, skip copying it (do not overwrite).
+Read the JSON output. For each file in the `files` array:
+- `action: "created"` → show `✓ <path> added (<description>).`
+- `action: "skipped"` → show `✓ <path> (already exists — skipped).`
 
 Display:
 
@@ -67,38 +74,29 @@ Display:
 Run /version-sdlc patch to create your first release.
 ```
 
-If a file was skipped because it already existed, show `(already exists — skipped)` instead of `added`.
 The check-changelog lines are only shown when `config.changelog === true`.
 
-**Retag script version check** — after scaffolding (whether files were added or skipped), check if the installed files are up to date:
+**Version check** — after scaffolding, check if any installed files are outdated. Run the scaffold script again in check-only mode:
 
-1. Read the installed `.github/scripts/retag-release.js` (if it exists) and look for `const RETAG_SCRIPT_VERSION = (\d+);`. If absent, treat as version 1.
-2. Read the installed `.github/workflows/retag-release.yml` (if it exists) and look for `# retag-release-version: (\d+)`. If absent, treat as version 1.
-3. Read the plugin's current copies of those files (from the same paths used for scaffolding) and extract their version numbers the same way.
-4. If either installed file's version is less than the plugin's current version, show an update prompt:
+```bash
+CHECK_OUTPUT_FILE=$(node "$SCRIPT" --check-only --output-file)
+# With changelog:
+CHECK_OUTPUT_FILE=$(node "$SCRIPT" --check-only --changelog --output-file)
+```
+
+Read the JSON output. If any files have `action: "outdated"`:
 
 ```
-⚠  Outdated retag files detected:
-   .github/scripts/retag-release.js   (installed: v1, current: v2)
-   .github/workflows/retag-release.yml (installed: v1, current: v2)
-
-Changes in v2:
-- Retag now preserves original tag message metadata (required for --hotfix DORA annotations)
+⚠  Outdated CI files detected:
+   .github/scripts/retag-release.js   (installed: v<N>, current: v<M>)
 
 Update these files? (yes / no)
 ```
 
-On `yes`, overwrite the outdated files with the plugin's current copies. On `no`, warn:
+On `yes`, run `node "$SCRIPT" --force` (add `--changelog` if applicable) to overwrite the outdated files. On `no`, warn:
 ```
-⚠  Skipped update. Note: hotfix tag metadata (Type: hotfix) will not survive retagging until you update these files.
+⚠  Skipped update. Outdated CI scripts may miss bug fixes or new features.
 ```
-
-**Changelog script version check** — after checking retag files, if `config.changelog === true`:
-
-1. Read `.github/scripts/check-changelog.js` (if it exists) and look for `const CHECK_CHANGELOG_SCRIPT_VERSION = (\d+);`. If absent, treat as version 1.
-2. Read `.github/workflows/check-changelog.yml` (if it exists) and look for `# check-changelog-version: (\d+)`. If absent, treat as version 1.
-3. Read the plugin's current copies and extract their version numbers.
-4. If either installed file's version is less than the plugin's current version, include them in the update prompt alongside outdated retag files.
 
 On `tag-only`, update `suggestedConfig.mode` to `"tag"` before writing. Apply the same workflow scaffolding.
 

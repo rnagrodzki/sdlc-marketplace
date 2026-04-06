@@ -21,15 +21,12 @@
 
 'use strict';
 
-/** @version 1 — check-changelog script version. Bump when behavior changes. */
-const CHECK_CHANGELOG_SCRIPT_VERSION = 1;
+/** @version 2 — check-changelog script version. Bump when behavior changes. */
+const CHECK_CHANGELOG_SCRIPT_VERSION = 2;
 
 const fs   = require('node:fs');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
-const LIB = path.join(__dirname, '..', 'lib');
-
-const { readSection } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,15 +41,36 @@ function exec(cmd, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Config
+// Config (self-contained — no external lib dependency)
 // ---------------------------------------------------------------------------
 
-function readConfig(repoRoot) {
-  try {
-    return readSection(repoRoot, 'version');
-  } catch (_) {
-    return null;
+/**
+ * Read the version section from .claude/sdlc.json, with legacy .claude/version.json fallback.
+ * Returns the version config object or null if neither file exists.
+ */
+function readVersionConfig(repoRoot) {
+  // Primary: .claude/sdlc.json → .version
+  const sdlcPath = path.join(repoRoot, '.claude', 'sdlc.json');
+  if (fs.existsSync(sdlcPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(sdlcPath, 'utf8'));
+      return config.version || null;
+    } catch (_) {
+      return null;
+    }
   }
+
+  // Legacy fallback: .claude/version.json
+  const legacyPath = path.join(repoRoot, '.claude', 'version.json');
+  if (fs.existsSync(legacyPath)) {
+    try {
+      return JSON.parse(fs.readFileSync(legacyPath, 'utf8'));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +126,7 @@ function main() {
   const repoRoot = process.cwd();
 
   // Step 1: Read config — exit 0 silently if not present or unparseable
-  const config = readConfig(repoRoot);
+  const config = readVersionConfig(repoRoot);
   if (!config) {
     process.exit(0);
   }
