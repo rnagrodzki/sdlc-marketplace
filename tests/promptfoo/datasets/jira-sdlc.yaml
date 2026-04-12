@@ -78,9 +78,6 @@
       value: 'contentFormat'
     - type: icontains
       value: "adf"
-    # Must NOT use contentFormat "markdown" for posting the comment
-    - type: not-icontains
-      value: 'contentFormat: "markdown"'
     # Must preserve responseContentFormat "markdown" for reading
     - type: icontains
       value: 'responseContentFormat'

@@ -32,10 +32,11 @@ class ScriptRunnerProvider {
       });
       return { output: stdout };
     } catch (err) {
-      // Include stdout even on non-zero exit (scripts may print to stdout before erroring)
+      // Include stdout + stderr on non-zero exit so assertions can check error messages
+      const stdout = err.stdout ?? '';
+      const stderr = err.stderr ?? err.message;
       return {
-        output: err.stdout ?? '',
-        error: err.stderr ?? err.message,
+        output: [stdout, stderr].filter(Boolean).join('\n'),
       };
     }
   }

@@ -60,7 +60,7 @@ Returns a table of matching issues.
 Add a comment to PROJ-147 with the root cause analysis
 ```
 
-Posts a properly formatted markdown comment.
+Converts the markdown to Atlassian Document Format (ADF) via `markdown-to-adf.js` and posts the comment.
 
 ### Edit issue fields
 

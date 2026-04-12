@@ -424,6 +424,8 @@ COMMENT_MD="Reviewed the implementation. Token refresh is working in staging. Re
 
 # Step 2: Convert to ADF
 SCRIPT=$(find ~/.claude/plugins -name "markdown-to-adf.js" -path "*/sdlc*/scripts/lib/markdown-to-adf.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: markdown-to-adf.js not found"; exit 2; }
 ADF_JSON=$(echo "$COMMENT_MD" | node "$SCRIPT")
 
 # Step 3: Post with ADF format
@@ -444,6 +446,8 @@ COMMENT_MD="## Root Cause Analysis\n\nThe blank page is caused by the SAML callb
 
 # Step 2: Convert to ADF
 SCRIPT=$(find ~/.claude/plugins -name "markdown-to-adf.js" -path "*/sdlc*/scripts/lib/markdown-to-adf.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: markdown-to-adf.js not found"; exit 2; }
 ADF_JSON=$(echo -e "$COMMENT_MD" | node "$SCRIPT")
 
 # Step 3: Post with ADF format
