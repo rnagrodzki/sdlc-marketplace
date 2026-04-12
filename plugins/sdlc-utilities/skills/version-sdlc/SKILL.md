@@ -350,9 +350,9 @@ The automated changelog is a **draft, not a source of truth**. Correctness is th
 
 ### Mitigation: 4-Layer Defense
 
-1. **CI validates presence** — `check-changelog.js` (scaffolded during init when changelog is enabled) fails on push to main if no `## [version]` heading exists. Ensures at least a placeholder entry.
+1. **CI validates presence** — `check-changelog.cjs` (scaffolded during init when changelog is enabled) fails on push to main if no `## [version]` heading exists. Ensures at least a placeholder entry.
 2. **`/version-sdlc --changelog` on main** — After merge, switch to main and run this command. It re-derives the changelog from the actual `previousTag..currentTag` range (not the feature branch), shows a diff against the existing entry, and lets you approve or edit the update without creating a new tag.
-3. **Retag script advisory** — After retagging, `retag-release.js` prints a warning if `changelog: true` and no entry exists for the tag. Reminds developers to verify.
+3. **Retag script advisory** — After retagging, `retag-release.cjs` prints a warning if `changelog: true` and no entry exists for the tag. Reminds developers to verify.
 4. **Manual review** — Before release communications, treat the CHANGELOG as a draft to review, not a finished document.
 
 ## Learning Capture

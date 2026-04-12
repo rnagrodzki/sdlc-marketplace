@@ -68,9 +68,9 @@ Display:
 ```
 ✓ .claude/sdlc.json → version section written.
 ✓ .github/workflows/retag-release.yml added (auto-fixes tags after squash merge to main).
-✓ .github/scripts/retag-release.js added.
+✓ .github/scripts/retag-release.cjs added.
 ✓ .github/workflows/check-changelog.yml added (validates changelog entry exists after each push to main).
-✓ .github/scripts/check-changelog.js added.
+✓ .github/scripts/check-changelog.cjs added.
 Run /version-sdlc patch to create your first release.
 ```
 
@@ -88,7 +88,7 @@ Read the JSON output. If any files have `action: "outdated"`:
 
 ```
 ⚠  Outdated CI files detected:
-   .github/scripts/retag-release.js   (installed: v<N>, current: v<M>)
+   .github/scripts/retag-release.cjs   (installed: v<N>, current: v<M>)
 
 Update these files? (yes / no)
 ```

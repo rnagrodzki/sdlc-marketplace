@@ -41,8 +41,9 @@ const PLUGIN_ROOT = path.resolve(__dirname, '..', '..');
  */
 const MANIFEST = [
   {
-    src:  path.join('scripts', 'ci', 'retag-release.js'),
-    dest: path.join('.github', 'scripts', 'retag-release.js'),
+    src:  path.join('scripts', 'ci', 'retag-release.cjs'),
+    dest: path.join('.github', 'scripts', 'retag-release.cjs'),
+    legacyDest: path.join('.github', 'scripts', 'retag-release.js'),
     versionRegex: /const\s+RETAG_SCRIPT_VERSION\s*=\s*(\d+)/,
     versionConst: 'RETAG_SCRIPT_VERSION',
     group: 'retag',
@@ -55,8 +56,9 @@ const MANIFEST = [
     group: 'retag',
   },
   {
-    src:  path.join('scripts', 'ci', 'check-changelog.js'),
-    dest: path.join('.github', 'scripts', 'check-changelog.js'),
+    src:  path.join('scripts', 'ci', 'check-changelog.cjs'),
+    dest: path.join('.github', 'scripts', 'check-changelog.cjs'),
+    legacyDest: path.join('.github', 'scripts', 'check-changelog.js'),
     versionRegex: /const\s+CHECK_CHANGELOG_SCRIPT_VERSION\s*=\s*(\d+)/,
     versionConst: 'CHECK_CHANGELOG_SCRIPT_VERSION',
     group: 'changelog',
@@ -122,19 +124,28 @@ function main() {
     const srcContent = fs.readFileSync(srcPath, 'utf8');
     const currentVersion = extractVersion(srcContent, entry.versionRegex);
 
-    // Check destination
+    // Check destination (and legacy path for .js → .cjs migration)
     const destExists = fs.existsSync(destPath);
+    const legacyPath = entry.legacyDest ? path.join(projectRoot, entry.legacyDest) : null;
+    const legacyExists = legacyPath ? fs.existsSync(legacyPath) : false;
     let installedVersion = null;
     let action = 'none';
 
     if (destExists) {
       const destContent = fs.readFileSync(destPath, 'utf8');
       installedVersion = extractVersion(destContent, entry.versionRegex);
+    } else if (legacyExists) {
+      // Legacy .js file present but new .cjs file missing — read version from legacy
+      const legacyContent = fs.readFileSync(legacyPath, 'utf8');
+      installedVersion = extractVersion(legacyContent, entry.versionRegex);
     }
 
     if (cli.checkOnly) {
       // Report-only mode
-      if (!destExists) {
+      if (!destExists && legacyExists) {
+        action = 'outdated';
+        warnings.push(`Legacy file found: ${entry.legacyDest} → will be replaced by ${entry.dest}`);
+      } else if (!destExists) {
         action = 'missing';
       } else if (installedVersion < currentVersion) {
         action = 'outdated';
@@ -143,7 +154,14 @@ function main() {
       }
     } else {
       // Write mode
-      if (!destExists) {
+      if (!destExists && legacyExists && cli.force) {
+        // Migration: delete legacy .js, install new .cjs
+        fs.unlinkSync(legacyPath);
+        action = 'migrated';
+      } else if (!destExists && legacyExists) {
+        action = 'outdated';
+        warnings.push(`Legacy file found: ${entry.legacyDest} → use --force to migrate to ${entry.dest}`);
+      } else if (!destExists) {
         action = 'created';
       } else if (cli.force) {
         action = 'overwritten';
@@ -154,7 +172,7 @@ function main() {
         action = 'skipped';
       }
 
-      if (action === 'created' || action === 'overwritten') {
+      if (action === 'created' || action === 'overwritten' || action === 'migrated') {
         const destDir = path.dirname(destPath);
         if (!fs.existsSync(destDir)) {
           fs.mkdirSync(destDir, { recursive: true });

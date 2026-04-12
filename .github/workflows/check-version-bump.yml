@@ -30,6 +30,6 @@ jobs:
 
       - name: Check version bumps
         if: steps.skip-check.outputs.skip != 'true'
-        run: node .github/scripts/check-version-bump.js
+        run: node .github/scripts/check-version-bump.cjs
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha }}

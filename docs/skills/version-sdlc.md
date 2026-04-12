@@ -311,7 +311,7 @@ The automated changelog is a **draft**, not a source of truth. Squash merges, pa
 1. Merge to main
 2. `git checkout main && git pull`
 3. Run `/version-sdlc --changelog` to reconcile the changelog with the actual tag-to-tag commits
-4. The CI `check-changelog.js` (scaffolded during `--init` when changelog is enabled) validates that an entry exists on every push to main
+4. The CI `check-changelog.cjs` (scaffolded during `--init` when changelog is enabled) validates that an entry exists on every push to main
 
 ## Related Skills
 

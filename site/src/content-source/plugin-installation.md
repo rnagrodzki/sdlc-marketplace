@@ -257,7 +257,7 @@ uses a literal `[ -f "..." ]` check with no globbing — impossible to corrupt.
 
 ## Version Bump Enforcement
 
-The CI workflow (`.github/scripts/check-version-bump.js`) automatically enforces
+The CI workflow (`.github/scripts/check-version-bump.cjs`) automatically enforces
 version bumps on pull requests:
 
 1. Reads `.claude-plugin/marketplace.json` to discover all plugins
