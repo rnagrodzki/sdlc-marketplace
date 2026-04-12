@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * retag-release.js
+ * retag-release.cjs
  * CI script: ensures the current version's git tag points to HEAD on the main branch.
  *
  * Fixes orphaned tags that result from squash-merging a release branch:
@@ -8,7 +8,7 @@
  * unreachable from main after squash. This script moves it to HEAD.
  *
  * Usage (GitHub Actions — runs on push to main):
- *   node .github/scripts/retag-release.js
+ *   node .github/scripts/retag-release.cjs
  *
  * Reads: .claude/version.json  (sdlc versioning config)
  * Modes:
@@ -22,8 +22,8 @@
 
 'use strict';
 
-/** @version 4 — retag script version. Bump when behavior changes (e.g. message preservation). */
-const RETAG_SCRIPT_VERSION = 4;
+/** @version 5 — retag script version. Bump when behavior changes (e.g. .cjs rename for ESM compat). */
+const RETAG_SCRIPT_VERSION = 5;
 
 const fs   = require('node:fs');
 const path = require('node:path');

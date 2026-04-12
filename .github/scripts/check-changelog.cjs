@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * check-changelog.js
+ * check-changelog.cjs
  * CI script: validates that CHANGELOG.md contains an entry for the current version.
  *
  * Only runs when `changelog: true` is set in `.claude/version.json`.
  * Designed to be copied into user projects under `.github/scripts/`.
  *
  * Usage (GitHub Actions — runs on push to main or in a PR check):
- *   node .github/scripts/check-changelog.js
+ *   node .github/scripts/check-changelog.cjs
  *
  * Reads: .claude/version.json  (sdlc versioning config)
  * Modes:
@@ -21,8 +21,8 @@
 
 'use strict';
 
-/** @version 2 — check-changelog script version. Bump when behavior changes. */
-const CHECK_CHANGELOG_SCRIPT_VERSION = 2;
+/** @version 3 — check-changelog script version. Bump when behavior changes (e.g. .cjs rename for ESM compat). */
+const CHECK_CHANGELOG_SCRIPT_VERSION = 3;
 
 const fs   = require('node:fs');
 const path = require('node:path');
@@ -184,7 +184,7 @@ function main() {
 try {
   main();
 } catch (err) {
-  process.stderr.write(`Unexpected error in check-changelog.js: ${err.message}\n${err.stack}\n`);
+  process.stderr.write(`Unexpected error in check-changelog.cjs: ${err.message}\n${err.stack}\n`);
   process.exit(2);
 }
 

@@ -114,4 +114,4 @@
 - I3: `commit-sdlc` — can be invoked when uncommitted changes need committing first
 - I4: `jira-sdlc` — common follow-up to update ticket status after release
 - I5: `retag-release.yml` — CI workflow scaffolded during init to handle squash-merge tag relocation
-- I6: `ci/check-changelog.js` — CI script scaffolded during init to validate changelog presence
+- I6: `ci/check-changelog.cjs` — CI script scaffolded during init to validate changelog presence

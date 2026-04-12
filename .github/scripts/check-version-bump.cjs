@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * check-version-bump.js
+ * check-version-bump.cjs
  * CI script: verifies that modified plugins have their version bumped.
  *
  * Usage:
- *   node check-version-bump.js [--base <ref>]
+ *   node check-version-bump.cjs [--base <ref>]
  *
  * Environment variables (set by GitHub Actions):
  *   BASE_REF  — base commit SHA (from PR base)
@@ -112,7 +112,7 @@ function main() {
 
   if (!baseRef) {
     process.stderr.write('Error: BASE_REF environment variable or --base argument required\n');
-    process.stderr.write('Usage: node check-version-bump.js --base <ref>\n');
+    process.stderr.write('Usage: node check-version-bump.cjs --base <ref>\n');
     process.exit(2);
   }
 

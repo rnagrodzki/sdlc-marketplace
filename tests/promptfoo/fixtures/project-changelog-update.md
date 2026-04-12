@@ -30,7 +30,7 @@ src/
 - Current version: **1.3.0** (already tagged as v1.3.0)
 - Previous version: **1.2.0** (tagged as v1.2.0)
 - The release was tagged on the feature branch before a late fix was added
-- After squash-merge, v1.3.0 tag was moved to the squash commit by retag-release.js
+- After squash-merge, v1.3.0 tag was moved to the squash commit by retag-release.cjs
 
 ## Existing CHANGELOG.md (partial)
 

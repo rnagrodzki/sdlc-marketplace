@@ -1,4 +1,4 @@
-# check-changelog-version: 1
+# check-changelog-version: 2
 name: Validate Changelog Entry
 
 on:
@@ -14,4 +14,4 @@ jobs:
           fetch-depth: 0
 
       - name: Check changelog entry for current version
-        run: node .github/scripts/check-changelog.js
+        run: node .github/scripts/check-changelog.cjs

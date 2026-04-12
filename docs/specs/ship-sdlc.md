@@ -40,6 +40,7 @@
 - R17: Deferred review findings (medium/low) collected and displayed in final summary
 - R18: Ship config is optional and developer-local (`.sdlc/local.json`); pipeline runs with built-in defaults
 - R19: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
+- R20: `--auto` suppresses pipeline pauses: when `--auto` is active, `pause` must be `false` for every step that accepts `--auto` (per R7 forwarding audit: commit-sdlc, received-review-sdlc, version-sdlc, pr-sdlc). The sub-skill's consent gate is skipped via the forwarded flag, so the pipeline has no reason to pause at that step.
 
 ## Workflow Phases
 
