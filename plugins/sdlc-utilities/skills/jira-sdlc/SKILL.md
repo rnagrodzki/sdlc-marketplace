@@ -361,7 +361,7 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 | Gate | Check |
 |------|-------|
 | Cache loaded | `cloudId`, `project`, `issueTypes`, `fieldSchemas` all present before any operation |
-| Content format | Every description/comment call uses `contentFormat: "markdown"` |
+| Content format | Comment calls use `contentFormat: "adf"` with ADF body from conversion script; description/create calls use `contentFormat: "markdown"` |
 | Response format | Every content-returning call uses `responseContentFormat: "markdown"` |
 | No raw placeholders | All `{placeholder}` markers in templates filled or section removed |
 | Required fields | All required fields per `fieldSchemas` have values before create |
@@ -373,7 +373,7 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 
 ## DO NOT
 
-- Use ADF format — always `contentFormat: "markdown"` and `responseContentFormat: "markdown"`
+- Post comments with `contentFormat: "markdown"` — always convert to ADF via `markdown-to-adf.js` first and use `contentFormat: "adf"`
 - Call `getAccessibleAtlassianResources` after cache init — use cached `cloudId`
 - Call `getJiraIssueTypeMetaWithFields` after cache init — use cached `fieldSchemas`
 - Call `getIssueLinkTypes` after cache init — use cached `linkTypes`

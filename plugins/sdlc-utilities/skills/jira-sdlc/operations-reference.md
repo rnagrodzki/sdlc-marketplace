@@ -4,7 +4,8 @@ Per-operation execution procedures for the `jira-sdlc` skill. This file is loade
 conditionally after Step 2 classifies the operation type.
 
 > **Universal rules — apply to EVERY MCP call:**
-> - Always pass `contentFormat: "markdown"` on calls that accept description/comment
+> - **Comments:** convert markdown to ADF via `scripts/lib/markdown-to-adf.js`, then pass `contentFormat: "adf"` with the ADF JSON body
+> - **Descriptions/create:** pass `contentFormat: "markdown"` (no conversion needed)
 > - Always pass `responseContentFormat: "markdown"` on calls that return content
 > - Always use `cloudId` from cache — never call `getAccessibleAtlassianResources` again
 > - Never guess field IDs, transition IDs, or user accountIds
@@ -113,13 +114,19 @@ conditionally after Step 2 classifies the operation type.
 
 ```
 1. Compose comment in markdown (use REFERENCE.md Section 4 safe syntax only)
-2. Call mcp__atlassian__addCommentToJiraIssue({
-     cloudId, issueKey,
-     comment: "<markdown text>",
-     contentFormat: "markdown",
+2. Convert to ADF — resolve the lib directory and run the conversion script:
+   SCRIPT=$(find ~/.claude/plugins -name "markdown-to-adf.js" -path "*/sdlc*/scripts/lib/markdown-to-adf.js" 2>/dev/null | head -1)
+   [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+   cat <<'COMMENT_MD' | node "$SCRIPT"
+   <markdown text>
+   COMMENT_MD
+3. Call mcp__atlassian__addCommentToJiraIssue({
+     cloudId, issueIdOrKey,
+     commentBody: <ADF JSON from step 2>,
+     contentFormat: "adf",
      responseContentFormat: "markdown"
    })
-3. Never use HTML tags, task lists (- [ ]), or footnotes in comments
+4. Never use HTML tags, task lists (- [ ]), or footnotes in source markdown
 ```
 
 ## Link Operation

@@ -1,0 +1,200 @@
+# Script execution tests for markdown-to-adf.js.
+# Verifies ADF output structure for each supported markdown element.
+# Runs the script with --file against fixture markdown files (no LLM).
+
+- description: "markdown-to-adf: simple paragraph"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/simple-paragraph.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"version":1'
+    - type: icontains
+      value: '"type":"doc"'
+    - type: icontains
+      value: '"type":"paragraph"'
+    - type: icontains
+      value: "simple paragraph with plain text"
+
+- description: "markdown-to-adf: headings h1-h3"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/headings.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"heading"'
+    - type: icontains
+      value: '"level":1'
+    - type: icontains
+      value: '"level":2'
+    - type: icontains
+      value: '"level":3'
+
+- description: "markdown-to-adf: bold and italic inline marks"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/bold-italic.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"strong"'
+    - type: icontains
+      value: '"type":"em"'
+    - type: icontains
+      value: "bold text"
+    - type: icontains
+      value: "italic text"
+
+- description: "markdown-to-adf: unordered list"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/unordered-list.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"bulletList"'
+    - type: icontains
+      value: '"type":"listItem"'
+    - type: icontains
+      value: "First item"
+    - type: icontains
+      value: "Third item"
+
+- description: "markdown-to-adf: ordered list"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/ordered-list.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"orderedList"'
+    - type: icontains
+      value: '"type":"listItem"'
+    - type: icontains
+      value: "First item"
+
+- description: "markdown-to-adf: fenced code block with language"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/fenced-code.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"codeBlock"'
+    - type: icontains
+      value: '"language":"javascript"'
+    - type: icontains
+      value: "const x = 1"
+
+- description: "markdown-to-adf: inline code"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/inline-code.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"code"'
+    - type: icontains
+      value: "convert()"
+
+- description: "markdown-to-adf: link"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/link.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"link"'
+    - type: icontains
+      value: '"href":"https://atlassian.com"'
+    - type: icontains
+      value: "Atlassian"
+
+- description: "markdown-to-adf: table with header row"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/table.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"table"'
+    - type: icontains
+      value: '"type":"tableHeader"'
+    - type: icontains
+      value: '"type":"tableCell"'
+    - type: icontains
+      value: "Bug fix"
+
+- description: "markdown-to-adf: blockquote"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/blockquote.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"blockquote"'
+    - type: icontains
+      value: "important information"
+
+- description: "markdown-to-adf: horizontal rule"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/horizontal-rule.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"rule"'
+    - type: icontains
+      value: "Above the rule"
+    - type: icontains
+      value: "Below the rule"
+
+- description: "markdown-to-adf: mixed realistic comment"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/mixed-realistic.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"heading"'
+    - type: icontains
+      value: '"type":"codeBlock"'
+    - type: icontains
+      value: '"type":"table"'
+    - type: icontains
+      value: '"type":"bulletList"'
+    - type: icontains
+      value: "Test Results Summary"
+
+- description: "markdown-to-adf: empty input produces minimal doc"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/empty.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"version":1'
+    - type: icontains
+      value: '"type":"doc"'
+    - type: icontains
+      value: '"type":"paragraph"'
+
+- description: "markdown-to-adf: code block preserves markdown syntax"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
+    script_args: "--file {{project_root}}/code-with-markdown.md"
+    project_root: "file://fixtures-fs/markdown-to-adf"
+  assert:
+    - type: icontains
+      value: '"type":"codeBlock"'
+    # Must NOT contain heading, strong, bulletList — code block content is literal
+    - type: not-icontains
+      value: '"type":"heading"'
+    - type: not-icontains
+      value: '"type":"strong"'
+    - type: not-icontains
+      value: '"type":"bulletList"'
+    - type: icontains
+      value: "# Not a heading"

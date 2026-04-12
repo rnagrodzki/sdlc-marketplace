@@ -29,3 +29,4 @@ tests:
   - file://datasets/plan-format-exec.yaml
   - file://datasets/hook-git-guard-exec.yaml
   - file://datasets/hook-error-report-exec.yaml
+  - file://datasets/markdown-to-adf-exec.yaml

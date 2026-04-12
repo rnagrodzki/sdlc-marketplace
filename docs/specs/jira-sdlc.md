@@ -25,6 +25,7 @@
 - R9: On stale cache errors (invalid transition IDs, changed field schemas), auto-refresh cache and retry once
 - R10: When `--init-templates` is passed, initialize templates and stop — do not execute any Jira operation
 - R11: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
+- R12: Comments must be converted from markdown to ADF via `scripts/lib/markdown-to-adf.js` before posting to Jira — compose in markdown using REFERENCE.md Section 4 safe syntax, pipe through the conversion script, then call `addCommentToJiraIssue` with `contentFormat: "adf"` and the ADF JSON body
 
 ## Workflow Phases
 
@@ -46,7 +47,7 @@
 ## Quality Gates
 
 - G1: Cache loaded — `cloudId`, `project`, `issueTypes`, `fieldSchemas` all present before any operation
-- G2: Content format — every description/comment call uses `contentFormat: "markdown"`
+- G2: Content format — comment calls use `contentFormat: "adf"` with ADF body from `scripts/lib/markdown-to-adf.js`; description/create calls use `contentFormat: "markdown"`
 - G3: Response format — every content-returning call uses `responseContentFormat: "markdown"`
 - G4: No raw placeholders — all `{placeholder}` markers in templates filled or section removed
 - G5: Required fields — all required fields per `fieldSchemas` have values before create
@@ -76,7 +77,7 @@
 
 ## Constraints
 
-- C1: Must not use ADF format — always `contentFormat: "markdown"` and `responseContentFormat: "markdown"`
+- C1: Must convert markdown to ADF via `scripts/lib/markdown-to-adf.js` for comment posting; must keep `responseContentFormat: "markdown"` for reading
 - C2: Must not call discovery endpoints after cache initialization (getAccessibleAtlassianResources, getJiraIssueTypeMetaWithFields, getIssueLinkTypes)
 - C3: Must not pass transition name to `transitionJiraIssue` — requires `{ id: "..." }` object
 - C4: Must not pass display name as assignee — requires `{ accountId: "..." }`

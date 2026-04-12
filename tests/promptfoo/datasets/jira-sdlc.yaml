@@ -1,6 +1,7 @@
 # Fixture appropriateness:
 #   jira-ticket-created            -- CORRECT: simulates a created Jira ticket, triggers workflow continuation
 #   jira-create-task               -- CORRECT: simulates Jira cache with project metadata for create operation
+#   jira-comment-adf               -- CORRECT: simulates Jira cache for comment operation with ADF conversion
 
 - description: "jira-sdlc: shows workflow continuation menu after Jira ticket created"
   vars:
@@ -60,3 +61,42 @@
         contentFormat: "markdown" and the cloudId from cache. It does NOT fabricate
         fields not present in the cache (no components, no custom fields unless the
         user asked). The summary matches what the user requested exactly.
+
+- description: "jira-sdlc: converts comment to ADF before posting via addCommentToJiraIssue"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-comment-adf.md"
+    user_request: >
+      Run /jira-sdlc. Add a comment to PROJ-150 with a heading, bullet list, and
+      code block summarizing test results. The Jira cache is loaded in the project context.
+  assert:
+    # Must reference the conversion script
+    - type: icontains
+      value: "markdown-to-adf"
+    # Must use contentFormat "adf" for the comment
+    - type: icontains
+      value: 'contentFormat'
+    - type: icontains
+      value: "adf"
+    # Must NOT use contentFormat "markdown" for posting the comment
+    - type: not-icontains
+      value: 'contentFormat: "markdown"'
+    # Must preserve responseContentFormat "markdown" for reading
+    - type: icontains
+      value: 'responseContentFormat'
+    # Must use correct parameter names
+    - type: icontains
+      value: "commentBody"
+    - type: icontains
+      value: "issueIdOrKey"
+    # Behavioral: follows ADF comment flow from operations-reference.md
+    - type: llm-rubric
+      value: >
+        The response follows the Comment Operation procedure for ADF conversion:
+        (1) It composes the comment in markdown using safe syntax (heading, bullet list,
+        code block). (2) It describes running the markdown-to-adf.js conversion script
+        to convert markdown to ADF JSON. (3) It calls addCommentToJiraIssue with
+        contentFormat: "adf" and the ADF JSON as commentBody (not "comment"), using
+        issueIdOrKey (not "issueKey"). (4) It uses responseContentFormat: "markdown"
+        for reading. It does NOT post raw markdown with contentFormat: "markdown" for
+        the comment. The cloudId comes from the cache.

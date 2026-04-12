@@ -158,11 +158,13 @@ full initialization sequence.
 
 ```
 ALWAYS:
-  contentFormat: "markdown"           — on every call that accepts description/comment input
-  responseContentFormat: "markdown"   — on every call that returns content
+  Comments:     convert markdown to ADF via scripts/lib/markdown-to-adf.js,
+                then pass contentFormat: "adf" with the ADF JSON body
+  Descriptions: contentFormat: "markdown"  — on create/edit calls (no conversion needed)
+  Reading:      responseContentFormat: "markdown"   — on every call that returns content
 
 NEVER:
-  Use ADF (Atlassian Document Format) — it produces garbled output
+  Post raw markdown comments without ADF conversion — always pipe through markdown-to-adf.js
   Call getAccessibleAtlassianResources after cache init
   Call getJiraIssueTypeMetaWithFields after cache init
   Call getIssueLinkTypes after cache init
@@ -361,9 +363,9 @@ open-ended discovery.
 | Parameter | Type | Required | Notes |
 |-----------|------|----------|-------|
 | `cloudId` | string | Yes | From `cache.cloudId` |
-| `issueKey` | string | Yes | E.g., `"PROJ-123"` |
-| `comment` | string | Yes | Markdown string |
-| `contentFormat` | string | No | Always pass `"markdown"` |
+| `issueIdOrKey` | string | Yes | E.g., `"PROJ-123"` |
+| `commentBody` | string | Yes | ADF JSON string from `markdown-to-adf.js` |
+| `contentFormat` | string | No | Pass `"adf"` for comments (compose in markdown, convert via script) |
 | `responseContentFormat` | string | No | Always pass `"markdown"` |
 
 #### `mcp__atlassian__addWorklogToJiraIssue`
@@ -479,8 +481,12 @@ Required fields on create produce 400 if omitted.
 
 ## Section 4: Markdown Content Rules
 
-All descriptions and comments must be submitted with `contentFormat: "markdown"`. The
-Jira markdown renderer is a subset of CommonMark. The following tables define what is
+Compose all content (descriptions and comments) in markdown following the rules below.
+For **comments**, the markdown is then converted to ADF via `scripts/lib/markdown-to-adf.js`
+before posting — the conversion is automatic, but the source must use only the safe syntax
+defined here. For **descriptions**, markdown is submitted directly with `contentFormat: "markdown"`.
+
+The Jira markdown renderer is a subset of CommonMark. The following tables define what is
 safe to use and what to avoid.
 
 ### Supported Syntax

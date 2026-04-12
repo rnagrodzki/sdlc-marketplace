@@ -4,8 +4,9 @@ Copy-paste MCP call examples for every operation. Values marked with `← cache.
 come from the project cache at `.claude/jira-cache/<PROJECT_KEY>.json`. Replace
 `PROJ` with the actual project key and adjust IDs to match the cache.
 
-All examples use `contentFormat: "markdown"` and `responseContentFormat: "markdown"`.
-Never use ADF format.
+Comment examples use `contentFormat: "adf"` with the body converted via `markdown-to-adf.js`.
+All other write operations use `contentFormat: "markdown"`.
+All read operations use `responseContentFormat: "markdown"`.
 
 ---
 
@@ -418,11 +419,19 @@ mcp__atlassian__transitionJiraIssue({
 ### 6a. Plain Comment
 
 ```
+# Step 1: Compose comment in markdown
+COMMENT_MD="Reviewed the implementation. Token refresh is working in staging. Ready for QA sign-off."
+
+# Step 2: Convert to ADF
+SCRIPT=$(find ~/.claude/plugins -name "markdown-to-adf.js" -path "*/sdlc*/scripts/lib/markdown-to-adf.js" 2>/dev/null | head -1)
+ADF_JSON=$(echo "$COMMENT_MD" | node "$SCRIPT")
+
+# Step 3: Post with ADF format
 mcp__atlassian__addCommentToJiraIssue({
-  cloudId:   "a1b2c3d4-e5f6-7890-abcd-ef1234567890",  ← cache.cloudId
-  issueKey:  "PROJ-147",
-  comment:   "Reviewed the implementation. Token refresh is working in staging. Ready for QA sign-off.",
-  contentFormat:         "markdown",
+  cloudId:        "a1b2c3d4-e5f6-7890-abcd-ef1234567890",  ← cache.cloudId
+  issueIdOrKey:   "PROJ-147",
+  commentBody:    <ADF_JSON>,
+  contentFormat:         "adf",
   responseContentFormat: "markdown"
 })
 ```
@@ -430,11 +439,19 @@ mcp__atlassian__addCommentToJiraIssue({
 ### 6b. Comment with Code Block and Table
 
 ```
+# Step 1: Compose comment in markdown (use REFERENCE.md Section 4 safe syntax)
+COMMENT_MD="## Root Cause Analysis\n\nThe blank page is caused by the SAML callback handler returning early when \`RelayState\` is empty.\n\n\`\`\`js\n// Before fix:\nif (!relayState) return; // silently drops the response\n\n// After fix:\nif (!relayState) relayState = '/dashboard';\n\`\`\`\n\n## Test Results\n\n| Browser | Status |\n|---------|--------|\n| Chrome  | Pass   |\n| Firefox | Pass   |\n| Safari  | Pass   |"
+
+# Step 2: Convert to ADF
+SCRIPT=$(find ~/.claude/plugins -name "markdown-to-adf.js" -path "*/sdlc*/scripts/lib/markdown-to-adf.js" 2>/dev/null | head -1)
+ADF_JSON=$(echo -e "$COMMENT_MD" | node "$SCRIPT")
+
+# Step 3: Post with ADF format
 mcp__atlassian__addCommentToJiraIssue({
-  cloudId:  "a1b2c3d4-e5f6-7890-abcd-ef1234567890",  ← cache.cloudId
-  issueKey: "PROJ-148",
-  comment: "## Root Cause Analysis\n\nThe blank page is caused by the SAML callback handler returning early when `RelayState` is empty.\n\n```js\n// Before fix:\nif (!relayState) return; // silently drops the response\n\n// After fix:\nif (!relayState) relayState = '/dashboard';\n```\n\n## Test Results\n\n| Browser | Status |\n|---------|--------|\n| Chrome  | Pass   |\n| Firefox | Pass   |\n| Safari  | Pass   |",
-  contentFormat:         "markdown",
+  cloudId:        "a1b2c3d4-e5f6-7890-abcd-ef1234567890",  ← cache.cloudId
+  issueIdOrKey:   "PROJ-148",
+  commentBody:    <ADF_JSON>,
+  contentFormat:         "adf",
   responseContentFormat: "markdown"
 })
 ```

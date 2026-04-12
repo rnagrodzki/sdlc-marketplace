@@ -1,0 +1,1 @@
+This has **bold text** and *italic text* together.
