@@ -15,6 +15,7 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
 {
   "version": 1,
   "timestamp": "ISO-8601",
+  "subagent_model": "sonnet",
   "scope": "all",
   "base_branch": "main",
   "current_branch": "feat/xyz",

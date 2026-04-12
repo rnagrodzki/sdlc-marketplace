@@ -55,6 +55,7 @@
 - P6: `plan_critique.uncovered_files` (string[]) — files not covered by any dimension
 - P7: `plan_critique.over_broad_dimensions` (string[]) — dimensions reviewing too many files
 - P8: `plan_critique.uncovered_suggestions` (array) — suggested additional dimensions
+- P9: `subagent_model` (string) — model for dimension subagent dispatch (default: `"sonnet"`)
 
 ## Error Handling
 
@@ -69,6 +70,7 @@
 - C2: Must not read REFERENCE.md in main context (orchestrator resolves it)
 - C3: Must not invoke the orchestrator via the Skill tool — must use Agent tool
 - C4: Must not invoke error-report-sdlc for user errors — only for script crashes (exit 2) and repeated orchestrator failures
+- C5: Orchestrator MUST pass `manifest.subagent_model` to each dimension subagent Agent dispatch via the `model:` parameter
 - C5: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
 - C6: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
 - C7: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data

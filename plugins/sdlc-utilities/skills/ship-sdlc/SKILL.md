@@ -299,7 +299,7 @@ For each step that will run:
 
 2. **Record step start** via state/ship.js.
 
-3. **Dispatch Agent** with: skill name, args from `step.invocation`, and brief pipeline context (branch, previous step results needed for this step). Agent prompt template:
+3. **Dispatch Agent** with: skill name, args from `step.invocation`, model from `step.model`, and brief pipeline context (branch, previous step results needed for this step). Pass `model: step.model` to the Agent tool on every dispatch. Agent prompt template:
    ```
    You are executing the <skill-name> skill. Invoke `/<skill-name> <args>` using the Skill tool — this loads the SKILL.md automatically. Return a structured result:
    (1) status — success or failure
@@ -444,6 +444,20 @@ Record decisions: `node "$SCRIPT" decide --step <name> --text "<decision>"`
 Defer findings: `node "$SCRIPT" defer --severity <s> --file <f> --title "<t>"`
 
 On successful completion: `node "$SCRIPT" cleanup`
+
+If cleanup exits with code 1 (pipeline contract violation), read the JSON output. Print:
+
+```
+PIPELINE CONTRACT VIOLATION
+The following steps were not resolved:
+  - <step>: status "<status>" (expected: completed, skipped, or failed)
+
+State file preserved for debugging: <path>
+This is a pipeline bug — all will_run steps must be dispatched.
+```
+
+Do NOT proceed to the success summary. The pipeline did not complete correctly.
+
 On failure: preserve the state file for `--resume`.
 
 ---
@@ -554,6 +568,8 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Skip pipeline steps that were marked "will run" in the pipeline plan. The pipeline plan is a contract with the user. If a step was planned to run and the user confirmed the pipeline, it MUST run. The LLM does not have authority to skip planned steps based on its own assessment of change complexity or risk. Only the skip set and auto-skip rules (computed by skill/ship.js) control which steps run.
 - Copy example args from this document when dispatching sub-skill Agents — use the `invocation` field from the skill/ship.js output, which contains the exact computed args
 - Add `--skip` flags not present in the user's original invocation or ship config. The skip set is user/config-controlled. If skill/ship.js output shows `skipSource` as unexpected (e.g., `flags.skip.length > 0` but `flagSources.skip === 'default'`), warn before proceeding.
+- Dispatch pipeline step Agents without `model: step.model` — the model field is computed by skill/ship.js from each skill's spec. Omitting it defaults all steps to opus.
+- Ignore cleanup validation failures — if `state/ship.js cleanup` exits with code 1, the pipeline contract was violated. Surface the violation and preserve state.
 
 ---
 

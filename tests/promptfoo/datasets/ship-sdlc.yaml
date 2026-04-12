@@ -317,6 +317,27 @@
         suggestion mentions archiving the OpenSpec change and syncing delta specs.
         Both appear in the final summary, not just one of them.
 
+- description: "ship-sdlc: cleanup validation failure surfaces pipeline contract violation"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-validation-violation.md"
+    user_request: >
+      Run /ship-sdlc. The pipeline has reached Step 6 (REPORT). Execute, commit,
+      review, and PR steps completed. The version step was planned as will_run but
+      was never executed. When cleanup runs, it exits with code 1 reporting a
+      violation. Show the Step 6 output.
+  assert:
+    - type: regex
+      value: "(CONTRACT VIOLATION|contract violation|VIOLATION|violation)"
+    - type: icontains
+      value: "version"
+    - type: llm-rubric
+      value: >
+        The response shows that cleanup detected a pipeline contract violation —
+        the version step was not resolved. A violation warning is displayed naming
+        the version step. The state file is preserved. The response does NOT
+        print a normal success summary or delete the state file.
+
 - description: "ship-sdlc: pr step includes --draft when --draft CLI flag is passed"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"

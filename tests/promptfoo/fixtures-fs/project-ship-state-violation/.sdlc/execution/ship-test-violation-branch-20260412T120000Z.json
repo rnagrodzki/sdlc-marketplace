@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "startedAt": "2026-04-12T12:00:00.000Z",
+  "branch": "test-violation-branch",
+  "flags": {},
+  "steps": [
+    { "name": "execute", "status": "completed", "completedAt": "2026-04-12T12:01:00.000Z" },
+    { "name": "commit", "status": "completed", "completedAt": "2026-04-12T12:02:00.000Z" },
+    { "name": "review", "status": "completed", "completedAt": "2026-04-12T12:03:00.000Z" },
+    { "name": "received-review", "status": "skipped", "reason": "no critical/high findings" },
+    { "name": "commit-fixes", "status": "skipped", "reason": "no review fixes" },
+    { "name": "version", "status": "pending" },
+    { "name": "pr", "status": "completed", "completedAt": "2026-04-12T12:05:00.000Z" }
+  ],
+  "decisions": [],
+  "deferredFindings": []
+}

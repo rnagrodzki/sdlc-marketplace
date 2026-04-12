@@ -233,6 +233,7 @@ function computeSteps(flags, flagSources) {
     {
       name: 'execute',
       skill: 'execute-plan-sdlc',
+      model: 'opus',
       status: (!flags.hasPlan || skipSet.has('execute')) ? 'skipped' : 'will_run',
       skipSource: !flags.hasPlan && !skipSet.has('execute')
         ? 'none'
@@ -254,6 +255,7 @@ function computeSteps(flags, flagSources) {
     {
       name: 'commit',
       skill: 'commit-sdlc',
+      model: 'haiku',
       status: skipSet.has('commit') ? 'skipped' : 'will_run',
       skipSource: skipSource('commit'),
       args: flags.auto ? '--auto' : '',
@@ -263,6 +265,7 @@ function computeSteps(flags, flagSources) {
     {
       name: 'review',
       skill: 'review-sdlc',
+      model: 'sonnet',
       status: skipSet.has('review') ? 'skipped' : 'will_run',
       skipSource: skipSource('review'),
       args: '--committed',
@@ -272,6 +275,7 @@ function computeSteps(flags, flagSources) {
     {
       name: 'received-review',
       skill: 'received-review-sdlc',
+      model: 'sonnet',
       status: 'conditional',
       skipSource: 'none',
       args: flags.auto ? '--auto' : '',
@@ -281,6 +285,7 @@ function computeSteps(flags, flagSources) {
     {
       name: 'commit-fixes',
       skill: 'commit-sdlc',
+      model: 'haiku',
       status: 'conditional',
       skipSource: 'none',
       args: flags.auto ? '--auto' : '',
@@ -290,6 +295,7 @@ function computeSteps(flags, flagSources) {
     {
       name: 'version',
       skill: 'version-sdlc',
+      model: 'sonnet',
       status: (skipSet.has('version') || flags.workspace === 'worktree') ? 'skipped' : 'will_run',
       skipSource: skipSet.has('version')
         ? skipSource('version')
@@ -310,6 +316,7 @@ function computeSteps(flags, flagSources) {
     {
       name: 'pr',
       skill: 'pr-sdlc',
+      model: 'sonnet',
       status: skipSet.has('pr') ? 'skipped' : 'will_run',
       skipSource: skipSource('pr'),
       args: [
