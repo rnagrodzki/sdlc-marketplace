@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.16] - 2026-04-12
+
+### Added
+- Jira comment posting now converts markdown to Atlassian Document Format (ADF), supporting headings, bold, italic, code blocks, lists, tables, blockquotes, links, and horizontal rules (#154)
+
+### Fixed
+- jira-sdlc documentation updated and script resolution guards added for markdown-to-ADF conversion (#154)
+
 ## [0.17.15] - 2026-04-06
 
 ### Added
