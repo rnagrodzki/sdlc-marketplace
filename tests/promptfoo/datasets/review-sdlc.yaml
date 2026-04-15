@@ -205,6 +205,22 @@
         changed files, over 80%). It suggests tightening the dimension's trigger patterns
         to be more specific. The review plan still shows it as active, but with a warning.
 
+- description: "review-sdlc: orchestrator dispatched with model from manifest"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-dimensions.md"
+    user_request: >
+      Run /review-sdlc on this project. The review-prepare.js manifest includes
+      subagent_model: sonnet. Show how the orchestrator agent is dispatched.
+  assert:
+    - type: regex
+      value: "(model.*sonnet|sonnet.*model|subagent_model)"
+    - type: llm-rubric
+      value: >
+        The response describes dispatching the review-orchestrator agent. The
+        dispatch indicates that dimension subagents should use sonnet as their
+        model (via manifest.subagent_model or explicit model: sonnet).
+
 - description: "review-sdlc: approved verdict completes cleanly without fix offer"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"

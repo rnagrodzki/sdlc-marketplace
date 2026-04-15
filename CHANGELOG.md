@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.18] - 2026-04-13
+
+### Fixed
+- Pipeline step cleanup now validates all steps reach a terminal state (completed, skipped, or failed), with violations surfaced as JSON for debugging (#159)
+- Per-step model routing assigned across the ship pipeline — subagents now use the correct model for each step rather than defaulting to opus (#159)
+
 ## [0.17.17] - 2026-04-12
 
 ### Fixed

@@ -108,6 +108,7 @@
 - C9: Must not write state files for small-plan direct execution (≤3 tasks)
 - C10: Must not auto-override error-severity guardrail violations in `--auto` mode
 - C11: Must not evaluate warning-severity guardrails pre-wave — warnings are post-wave only
+- C12: Every Agent dispatch MUST include the `model:` parameter per the preset mapping (R2). Omitting `model:` causes the agent to inherit the parent model (opus), violating cost targets.
 
 ## Integration
 

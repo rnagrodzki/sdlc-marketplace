@@ -30,7 +30,7 @@
 - R7: `--auto` forwarding audit: only forwarded to commit-sdlc, received-review-sdlc, version-sdlc, pr-sdlc (not execute-plan-sdlc, not review-sdlc)
 - R8: Staging gap between execute and commit: `git add -A -- ':!.sdlc/'` required
 - R9: Rebase onto default branch after all commits, before version step; abort and pause on conflict
-- R10: State persistence after each step via `state/ship.js`; cleanup on success, preserve on failure
+- R10: State persistence after each step via `state/ship.js`; cleanup validates pipeline contract before deleting state; state preserved on validation failure
 - R11: Resume via `--resume`: re-enter worktree if applicable, continue from first incomplete step
 - R12: Version step auto-skipped in worktree mode (tags are repo-global); advisory printed post-pipeline
 - R13: Worktree PRs auto-label `skip-version-check` when version auto-skipped
@@ -67,6 +67,7 @@
 - G4: At least one step will run — pipeline is not entirely skipped
 - G5: Flag coherence — `--bump` without version step produces error (exit code 1, blocking)
 - G6: Pipeline contract — every `will_run` step was dispatched as Agent
+- G6a: Pipeline completion gate — `state/ship.js cleanup` validates all steps are in terminal state (`completed`, `skipped`, or `failed`) before deleting the state file. Steps still `pending` or `in_progress` cause cleanup to refuse deletion and exit 1.
 - G7: Staging gap filled — `git add -A -- ':!.sdlc/'` ran between execute and commit
 - G8: Rebase attempted — rebase ran after commits, before version (when applicable)
 
@@ -78,6 +79,7 @@
 - P4: `steps` (array) — pipeline steps, each with `{ skill, status, reason, skipSource, args, invocation, pause }`
 - P5: `steps[].invocation` (string) — exact skill name + computed args for Agent dispatch
 - P6: `config` (object | null) — ship config from `.sdlc/local.json` or null if absent
+- P7: `steps[].model` (string) — model for Agent dispatch per step, computed from skill specs (e.g., `"sonnet"` for review-sdlc, `"haiku"` for commit-sdlc)
 
 ## Error Handling
 

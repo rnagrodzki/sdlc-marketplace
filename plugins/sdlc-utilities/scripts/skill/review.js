@@ -533,6 +533,7 @@ function main() {
   const manifest = {
     version:        1,
     timestamp:      new Date().toISOString(),
+    subagent_model: 'sonnet',
     scope,
     base_branch:    base || null,
     current_branch: gitState.currentBranch,

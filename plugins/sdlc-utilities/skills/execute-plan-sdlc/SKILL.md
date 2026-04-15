@@ -296,6 +296,7 @@ Options:
 - Expected deliverable: what changed + how to verify
 - For complex tasks: brief summary of relevant changes from prior waves
 - **Model**: pass `model: "<assigned-model>"` to the Agent tool (haiku, sonnet, or opus per the selected preset)
+  **This is REQUIRED on every dispatch — no exceptions.** Omitting `model:` causes the agent to inherit the parent model (opus), defeating the preset system. Before sending any Agent dispatch message, verify: does every Agent call in this message include `model:`? If not, add it.
 - **Mode**: pass `mode: "bypassPermissions"` to the Agent tool on every dispatch.
 
 **5c. Collect and verify** — After all agents return:
@@ -541,6 +542,7 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 - Write state files for small-plan direct execution (≤3 tasks) — they execute without waves and are fast enough to re-run
 - Auto-override error-severity guardrail violations in `--auto` mode — guardrails exist to prevent drift; always block
 - Evaluate warning-severity guardrails pre-wave — warnings are assessed post-wave against actual changes, not intent
+- Dispatch agents without the `model:` parameter — every agent dispatch must include `model: "<X>"` per the preset table. Omitting it defaults to opus, defeating the cost optimization of the preset system.
 
 ## Gotchas
 

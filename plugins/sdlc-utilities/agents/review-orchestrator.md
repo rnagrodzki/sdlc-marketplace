@@ -107,7 +107,7 @@ For each dimension with `status: "ACTIVE"` or `status: "TRUNCATED"`:
      {end for}
      ```
 
-3. Dispatch via Agent tool (subagent_type: general-purpose)
+3. Dispatch via Agent tool (subagent_type: general-purpose, model: manifest.subagent_model)
 
 **Dispatch ALL active dimensions in a SINGLE message** (multiple Agent tool calls in
 one response). Do not dispatch one at a time.
@@ -230,3 +230,4 @@ Before returning:
 ## DO NOT
 
 - Post the review comment to a PR via `gh api` without explicit user approval
+- Dispatch dimension subagents without `model: manifest.subagent_model` — omitting it defaults to opus

@@ -125,3 +125,49 @@
       value: "version step is skipped"
     - type: icontains
       value: "resolve by removing"
+
+# Pipeline completion validation (issue #159)
+
+- description: "ship-state: cleanup rejects state with pending steps"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/ship.js"
+    script_args: "cleanup"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-state-violation"
+  assert:
+    - type: icontains
+      value: '"valid": false'
+    - type: icontains
+      value: '"pending"'
+    - type: icontains
+      value: "version"
+    - type: icontains
+      value: "contract violation"
+
+- description: "ship-state: cleanup succeeds when all steps are terminal"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/ship.js"
+    script_args: "cleanup"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-state-valid"
+  assert:
+    - type: icontains
+      value: '"valid": true'
+    - type: icontains
+      value: '"cleaned": true'
+
+# Per-step model field (issue #160)
+
+- description: "ship-prepare: computeSteps includes model field per step"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"model": "opus"'
+    - type: icontains
+      value: '"model": "haiku"'
+    - type: icontains
+      value: '"model": "sonnet"'

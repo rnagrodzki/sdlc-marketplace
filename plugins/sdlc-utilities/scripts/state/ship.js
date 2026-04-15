@@ -310,7 +310,30 @@ function cmdCleanup(opts) {
     process.exit(0);
   }
 
+  // Validate pipeline contract: no step should be pending or in_progress at cleanup
+  const violations = [];
+  for (const step of (found.data.steps || [])) {
+    if (step.status === 'pending' || step.status === 'in_progress') {
+      violations.push({ step: step.name, status: step.status });
+    }
+  }
+
+  if (violations.length > 0) {
+    const result = {
+      valid: false,
+      violations: violations.map(v => ({
+        step: v.step,
+        actualStatus: v.status,
+        message: `Step "${v.step}" has status "${v.status}" — expected completed, skipped, or failed`
+      }))
+    };
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    process.stderr.write(`Pipeline contract violation: ${violations.length} step(s) not in terminal state. State file preserved.\n`);
+    process.exit(1);
+  }
+
   deleteState(found.filePath);
+  process.stdout.write(JSON.stringify({ valid: true, cleaned: true }, null, 2) + '\n');
   process.exit(0);
 }
 

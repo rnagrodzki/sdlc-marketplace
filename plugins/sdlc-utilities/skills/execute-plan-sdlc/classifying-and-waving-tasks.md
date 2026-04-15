@@ -66,6 +66,10 @@ Always present 3 presets in Step 4, regardless of plan size:
 | **Balanced** | haiku | sonnet | opus | Default — matches complexity to capability |
 | **Quality** | sonnet | opus | opus | Codebase is unfamiliar, tasks are ambiguous |
 
+### Model Dispatch Enforcement
+
+The `model:` parameter is REQUIRED on every Agent tool dispatch — no exception. Omitting it causes the agent to inherit opus from the parent context, defeating the preset system's cost optimization.
+
 ## Wave-Building Algorithm
 
 1. **Build a dependency graph (DAG)** where an edge A → B means "task B depends on outputs from task A"
