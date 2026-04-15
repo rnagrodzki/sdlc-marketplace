@@ -3,6 +3,13 @@
 This is the append-only learnings log for the `ai-setup-automation` marketplace repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-04-15 — PR #165 (fix/#164 openspec-detection hardening)
+
+The `prConfig.titlePattern` for this repo requires `type(#issue): scope - description` format (e.g. `fix(#164): openspec-detection - harden against contradictory signals`). The dash-separated scope and description is mandatory — titles without the ` - ` separator will fail validation. Conventional commit style alone (without issue number in parens) is not accepted.
+
+## 2026-04-15 — version-sdlc: patch release v0.17.20 via ship pipeline
+Single fix commit for #164 (openspec-detection hardening). Auto mode used; push deferred to ship pipeline's pr step. CI scripts all current. No pre-condition issues.
+
 ## 2026-04-15 — plan-sdlc: fix #152 ship-config missing fields
 Planned a fix for `/setup-sdlc` Step 3b dropping `auto`/`skip`/`bump` questions. Root cause was LLM drift when SKILL.md hand-enumerates 8 `AskUserQuestion` calls — the LLM silently shortens the loop. Fix: emit authoritative field list from `setup.js` (new P7 contract) and make SKILL.md iterate mechanically.
 
