@@ -35,6 +35,7 @@
 - R12: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 - R13: Content sub-flows (setup-dimensions, setup-pr-template, setup-guardrails) inherit the parent skill's permission mode. Sub-flows MUST NOT call ExitPlanMode, change permission settings, or exit any mode.
 - R14: Scan phase (R10) MUST use the Glob tool for all file/directory existence checks. Bash MUST NOT be used with glob patterns — zsh errors on unmatched globs. Bash is permitted only for `git`, `gh`, and `which` commands.
+- R15: Ship config field enumeration (Step 3b) is authoritative from prepare script output P7 (`shipFields`). The skill MUST iterate every entry in `shipFields` and dispatch one `AskUserQuestion` per field — it MUST NOT hand-enumerate the field list or short-circuit the loop. Ship config writes use answers collected in this loop plus defaults for any field the user explicitly deferred.
 
 ## Workflow Phases
 
@@ -73,6 +74,7 @@
 - P4: `content` (object) — `{ reviewDimensions: { count, path }, prTemplate: { exists, path }, jiraTemplates: { count, path } }`
 - P5: `detected` (object) — `{ versionFile, fileType, tagPrefix, defaultBranch }` auto-detected project settings
 - P6: `needsMigration` (boolean) — true when any legacy file exists or any misplaced section found
+- P7: `shipFields` (array) — authoritative list of interactive ship-config fields sourced from `scripts/lib/ship-fields.js`. Each entry: `{ name, label, type, options, default, description }`. `name` is the local-config key; `options` is an array of valid values; `default` is the value applied if the user accepts the default answer.
 
 ## Error Handling
 

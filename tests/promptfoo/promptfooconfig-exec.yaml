@@ -26,6 +26,7 @@ tests:
   - file://datasets/ship-prepare-exec.yaml
   - file://datasets/guardrails-prepare-exec.yaml
   - file://datasets/setup-init-exec.yaml
+  - file://datasets/setup-prepare-exec.yaml
   - file://datasets/plan-format-exec.yaml
   - file://datasets/hook-git-guard-exec.yaml
   - file://datasets/hook-error-report-exec.yaml

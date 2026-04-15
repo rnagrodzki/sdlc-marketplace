@@ -1,0 +1,68 @@
+# Script execution tests for setup.js P7 contract (shipFields).
+# These tests run setup.js directly against fixture directories (no LLM).
+# Covers: P7 shipFields emission, field shape, order, and backward compatibility (issue #152).
+
+- description: "setup-prepare: emits shipFields with 8 entries"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: icontains
+      value: '"shipFields"'
+    - type: javascript
+      value: "JSON.parse(output).shipFields.length === 8"
+
+- description: "setup-prepare: shipFields order is stable (preset → reviewThreshold)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const names = JSON.parse(output).shipFields.map(f => f.name);
+        const expected = ['preset','skip','bump','draft','auto','workspace','rebase','reviewThreshold'];
+        JSON.stringify(names) === JSON.stringify(expected)
+
+- description: "setup-prepare: shipFields entries have the full 6-key descriptor shape"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const keys = ['name','label','type','options','default','description'];
+        JSON.parse(output).shipFields.every(f => keys.every(k => k in f))
+
+- description: "setup-prepare: shipFields.skip has exactly 5 options"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const skip = JSON.parse(output).shipFields.find(f => f.name === 'skip');
+        const expected = ['execute','commit','review','version','pr'];
+        JSON.stringify(skip.options) === JSON.stringify(expected)
+
+- description: "setup-prepare: still emits P1-P6 fields alongside shipFields"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: icontains
+      value: '"projectConfig"'
+    - type: icontains
+      value: '"localConfig"'
+    - type: icontains
+      value: '"legacy"'
+    - type: icontains
+      value: '"content"'
+    - type: icontains
+      value: '"detected"'
+    - type: icontains
+      value: '"needsMigration"'

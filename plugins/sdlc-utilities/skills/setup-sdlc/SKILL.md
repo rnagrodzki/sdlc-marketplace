@@ -244,19 +244,25 @@ On **skip**: do not write a version section.
 
 #### 3b. Ship section
 
-Use AskUserQuestion for each setting. Note to the user: "Ship config is stored in `.sdlc/local.json` (developer-local, gitignored). Each developer has their own ship preferences."
+Note to the user: "Ship config is stored in `.sdlc/local.json` (developer-local, gitignored). Each developer has their own ship preferences."
 
-Ask about each field:
-1. **preset** -- Pipeline variant: full (all steps), balanced (skip version), minimal (execute + commit + PR). Default: balanced
-2. **skip** -- Additional steps to skip (comma-separated). Valid: execute, commit, review, received-review, commit-fixes, version, pr. Default: none
-3. **bump** -- Default version bump level: patch, minor, major. Default: patch
-4. **draft** -- Open PRs as drafts? yes/no. Default: no
-5. **auto** -- Run pipeline non-interactively? yes/no. Default: no
-6. **workspace** -- Working environment: branch (current branch), worktree (isolated git worktree), prompt (ask each time). Default: branch
-7. **rebase** -- Rebase before shipping? yes/no/prompt. Default: prompt
-8. **reviewThreshold** -- Minimum severity that blocks pipeline: critical, high, medium. Default: high
+Iterate over every entry in `prepare.shipFields` (the P7 contract field from Step 0 prepare output). For each entry, dispatch exactly one `AskUserQuestion` using:
+- **Question prompt:** the entry's `label`
+- **Helper text / description:** the entry's `description`
+- **Answer choices:** the entry's `options`
+- **Default answer:** the entry's `default`
 
-Use AskUserQuestion with all options for each field. Collect answers and write the ship section.
+You must issue exactly `prepare.shipFields.length` `AskUserQuestion` calls. Do not skip, reorder, batch, or infer answers. Do not hand-enumerate the field list — the shared lib owns it.
+
+**Answer mapping when writing `.sdlc/local.json`:**
+- `enum` fields → write the selected option string verbatim (no translation)
+- `multi-select` fields → write the selected options as a JSON array
+- `boolean` fields (`draft`, `auto`) → map `yes`→`true`, `no`→`false`
+- For `rebase` specifically, write the selected string (`auto`, `skip`, or `prompt`) verbatim — do NOT translate to `yes`/`no`, as `ship.js` only accepts those three strings or legacy booleans
+
+After the loop, collect answers into a `ship` object (keys = entry `name`, values = normalized per above) and write via the existing `setup-init.js --local-config '{"ship":{...}}'` path.
+
+Implements R15; reads P7.
 
 #### 3c. Jira section
 

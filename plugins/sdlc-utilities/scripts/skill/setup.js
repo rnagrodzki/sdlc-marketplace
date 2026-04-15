@@ -16,6 +16,7 @@ const LIB = path.join(__dirname, '..', 'lib');
 const { detectVersionFile } = require(path.join(LIB, 'version'));
 const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH, PROJECT_SECTIONS } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { SHIP_FIELDS } = require(path.join(LIB, 'ship-fields'));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -144,6 +145,7 @@ function detect(projectRoot) {
       tagPrefix,
       defaultBranch,
     },
+    shipFields: SHIP_FIELDS,
   };
 
   result.needsMigration =

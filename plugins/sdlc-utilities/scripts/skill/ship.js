@@ -38,23 +38,7 @@ const { exec, checkGitState, detectBaseBranch } = require(path.join(LIB, 'git'))
 const { resolveMainWorktree } = require(path.join(LIB, 'state'));
 const { readSection, normalizePreset } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const VALID_SKIP = ['execute', 'commit', 'review', 'version', 'pr'];
-
-const BUILT_IN_DEFAULTS = {
-  preset: 'balanced',
-  skip: [],
-  bump: 'patch',
-  draft: false,
-  auto: false,
-  reviewThreshold: 'high',
-  workspace: 'prompt',
-  rebase: true,
-};
+const { VALID_SKIP, BUILT_IN_DEFAULTS } = require(path.join(LIB, 'ship-fields'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
