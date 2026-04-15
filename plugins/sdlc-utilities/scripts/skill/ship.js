@@ -39,7 +39,7 @@ const { resolveMainWorktree } = require(path.join(LIB, 'state'));
 const { readSection, normalizePreset } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { VALID_SKIP, BUILT_IN_DEFAULTS } = require(path.join(LIB, 'ship-fields'));
-const { detectActiveChanges } = require(path.join(LIB, 'openspec'));
+const { detectActiveChanges, isArchived } = require(path.join(LIB, 'openspec'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -55,8 +55,9 @@ function parseArgs(argv) {
   let draft     = false;
   let dryRun    = false;
   let resume    = false;
-  let workspace = null;
-  let rebase    = null;
+  let workspace       = null;
+  let rebase          = null;
+  let openspecChange  = null;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -80,10 +81,12 @@ function parseArgs(argv) {
       workspace = args[++i];
     } else if (a === '--rebase' && args[i + 1]) {
       rebase = args[++i]; // 'auto' | 'skip' | 'prompt'
+    } else if (a === '--openspec-change' && args[i + 1]) {
+      openspecChange = args[++i];
     }
   }
 
-  return { hasPlan, auto, skip, preset, bump, draft, dryRun, resume, workspace, rebase };
+  return { hasPlan, auto, skip, preset, bump, draft, dryRun, resume, workspace, rebase, openspecChange };
 }
 
 // ---------------------------------------------------------------------------
@@ -191,9 +194,10 @@ function mergeFlags(cli, config) {
   merged.preset = normalizePreset(merged.preset);
 
   // Pass-through flags that don't come from config.
-  merged.hasPlan = cli.hasPlan;
-  merged.dryRun  = cli.dryRun;
-  merged.resume  = cli.resume;
+  merged.hasPlan        = cli.hasPlan;
+  merged.dryRun         = cli.dryRun;
+  merged.resume         = cli.resume;
+  merged.openspecChange = cli.openspecChange || null;
 
   return { merged, sources };
 }
@@ -202,7 +206,7 @@ function mergeFlags(cli, config) {
 // Step computation
 // ---------------------------------------------------------------------------
 
-function computeSteps(flags, flagSources) {
+function computeSteps(flags, flagSources, { openspecContext } = {}) {
   const skipSet = new Set(flags.skip);
 
   // Derive the skip source for a given step name.
@@ -277,6 +281,49 @@ function computeSteps(flags, flagSources) {
       reason: 'triggered if review fixes applied',
       pause: false,
     },
+    // archive-openspec: conditional step between commit-fixes and version
+    (() => {
+      const oc = openspecContext || {};
+      const changeName = flags.openspecChange || oc.branchMatch || null;
+      const archiveActionable = changeName && !oc.isAlreadyArchived;
+
+      if (skipSet.has('archive-openspec')) {
+        return {
+          name: 'archive-openspec',
+          skill: null,
+          model: 'haiku',
+          status: 'skipped',
+          skipSource: skipSource('archive-openspec'),
+          args: '',
+          reason: 'in skip set',
+          pause: false,
+        };
+      }
+      if (!archiveActionable) {
+        return {
+          name: 'archive-openspec',
+          skill: null,
+          model: 'haiku',
+          status: 'skipped',
+          skipSource: 'condition',
+          args: '',
+          reason: !changeName
+            ? 'no matching openspec change for current branch'
+            : 'change already archived',
+          pause: false,
+        };
+      }
+      return {
+        name: 'archive-openspec',
+        skill: null,
+        model: 'haiku',
+        status: 'conditional',
+        skipSource: 'none',
+        args: `--change ${changeName}${flags.auto ? ' --auto' : ''}`,
+        reason: `openspec change "${changeName}" ready for archive`,
+        pause: !flags.auto,
+      };
+    })(),
     {
       name: 'version',
       skill: 'version-sdlc',
@@ -548,6 +595,13 @@ function main() {
   // Detect worktree context
   const worktreeInfo = detectWorktree(projectRoot);
 
+  // Compute openspec archive actionability
+  const openspecBranchMatch = openspecResult.branchMatch || null;
+  const openspecChangeName  = flags.openspecChange || openspecBranchMatch;
+  const openspecIsArchived  = openspecChangeName
+    ? isArchived(projectRoot, openspecChangeName)
+    : false;
+
   // Build context
   const context = {
     currentBranch: gitState.currentBranch,
@@ -558,12 +612,18 @@ function main() {
     ghUser,
     openspecDetected,
     openspecAuthoritative,
+    openspecBranchMatch,
+    openspecArchiveActionable: !!(openspecChangeName && !openspecIsArchived),
     sdlcGitignored,
     worktree: worktreeInfo,
   };
 
-  // Compute steps
-  const steps = computeSteps(flags, flagSources);
+  // Compute steps (pass openspec context for archive-openspec step)
+  const openspecContext = {
+    branchMatch: openspecBranchMatch,
+    isAlreadyArchived: openspecIsArchived,
+  };
+  const steps = computeSteps(flags, flagSources, { openspecContext });
 
   // Run validation
   const validation = runValidation(flags, flagSources, steps, context);
@@ -599,6 +659,7 @@ function main() {
       hasPlan: flags.hasPlan,
       workspace: flags.workspace,
       rebase: flags.rebase,
+      openspecChange: flags.openspecChange,
       sources: flagSources,
     },
     context,

@@ -21,9 +21,9 @@ const SHIP_FIELDS = [
     name: 'skip',
     label: 'Additional steps to skip',
     type: 'multi-select',
-    options: ['execute', 'commit', 'review', 'version', 'pr'],
+    options: ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec'],
     default: [],
-    description: 'Only top-level pipeline steps are user-skippable. received-review and commit-fixes run conditionally based on review verdict and are not in this list by design.',
+    description: 'Top-level pipeline steps plus archive-openspec are user-skippable. received-review and commit-fixes run conditionally based on review verdict and are not in this list by design.',
   },
   {
     name: 'bump',

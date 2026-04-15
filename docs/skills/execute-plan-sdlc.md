@@ -273,6 +273,7 @@ When executing a plan whose `**Source:**` header points to an OpenSpec change pa
 
 - **Spec compliance reviewer** additionally checks implementations against OpenSpec delta spec requirements — not just task acceptance criteria
 - **Inter-wave critique** checks for contradictions between implementations and delta spec requirements not captured in task descriptions
+- **Post-pipeline archive suggestion** — after all waves complete, if the plan was OpenSpec-sourced and `openspec validate <name> --strict` passes, emits a suggestion to archive via `openspec archive <name> --yes` or `/ship-sdlc`. If validation fails, surfaces errors instead. If the CLI is not available, falls back to the existing advisory. The suggestion is never auto-executed.
 
 See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
 

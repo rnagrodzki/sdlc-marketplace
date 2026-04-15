@@ -614,9 +614,33 @@ After completing plan execution, common follow-ups include:
 - `/version-sdlc` — tag a release
 - `/pr-sdlc` — create a pull request
 
-If `openspecSpecs` was loaded in Step 1 (the plan was OpenSpec-sourced), also suggest:
-- `/opsx:verify` — validate implementation completeness against the spec
-- `/opsx:archive` — merge delta specs into main specs after verification passes
+If `openspecSpecs` was loaded in Step 1 (the plan was OpenSpec-sourced), also suggest archive-related next steps — but gate on validation first:
+
+1. Extract the change name from the plan header's `**Source:**` field (the `openspec/changes/<name>/` path).
+2. Call `lib/openspec.js::validateChangeStrict(projectRoot, name)` via Bash:
+   ```bash
+   node -e "
+   const { validateChangeStrict } = require('<LIB>/openspec.js');
+   const result = validateChangeStrict(process.cwd(), '<name>');
+   console.log(JSON.stringify(result));
+   "
+   ```
+3. **If `cliAvailable === false`:** emit the existing static advisory (no fabricated validation claim):
+   - `/opsx:verify` — validate implementation completeness against the spec
+   - `/opsx:archive` — merge delta specs into main specs after verification passes
+4. **If `ok === true`:** emit a validated suggestion:
+   ```
+   OpenSpec validation passed for change "<name>".
+   → Run `openspec archive <name> --yes` to archive, or use `/ship-sdlc` which handles archival as a pipeline step.
+   ```
+5. **If `ok === false`:** emit the validation errors and suppress the archive suggestion:
+   ```
+   OpenSpec validation failed for change "<name>":
+   <stderr output>
+   Fix validation issues before archiving.
+   ```
+
+The archive suggestion is **never auto-executed** — this skill is the "execute only" entry point. Archival is deferred to `/ship-sdlc` or manual invocation.
 
 If execution started in a worktree (Step 1 workspace isolation) and running standalone (not invoked from ship-sdlc), clean up with `git worktree remove <path>` from the main worktree. When invoked from ship-sdlc, skip cleanup — ship-sdlc owns the worktree lifecycle.
 

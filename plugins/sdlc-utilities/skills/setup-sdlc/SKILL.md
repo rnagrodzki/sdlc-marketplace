@@ -1,8 +1,8 @@
 ---
 name: setup-sdlc
-description: "Use this skill when setting up the SDLC plugin for a project, initializing configuration, or when any skill reports missing config. Handles unified config creation (.claude/sdlc.json), local config (.sdlc/local.json), and orchestrates content setup (review dimensions, PR template, plan guardrails, execution guardrails). Supports direct sub-flow entry via --dimensions, --pr-template, --guardrails, --execution-guardrails. Arguments: [--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--add] [--no-copilot]"
+description: "Use this skill when setting up the SDLC plugin for a project, initializing configuration, or when any skill reports missing config. Handles unified config creation (.claude/sdlc.json), local config (.sdlc/local.json), and orchestrates content setup (review dimensions, PR template, plan guardrails, execution guardrails, openspec enrichment). Supports direct sub-flow entry via --dimensions, --pr-template, --guardrails, --execution-guardrails, --openspec-enrich. Arguments: [--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--openspec-enrich] [--remove-openspec] [--add] [--no-copilot]"
 user-invocable: true
-argument-hint: "[--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--add] [--no-copilot]"
+argument-hint: "[--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--openspec-enrich] [--remove-openspec] [--add] [--no-copilot]"
 ---
 
 # SDLC Setup
@@ -26,6 +26,8 @@ delegates content creation to specialized skills.
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | off |
 | `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | off |
 | `--execution-guardrails` | Jump directly to execution guardrails sub-flow (skip config builder) | off |
+| `--openspec-enrich` | Jump directly to openspec config enrichment sub-flow | off |
+| `--remove-openspec` | Remove the managed block from openspec/config.yaml (with --openspec-enrich) | off |
 | `--add` | Expansion mode (with --dimensions or --guardrails) | off |
 | `--no-copilot` | Skip GitHub Copilot instructions (with --dimensions) | off |
 
@@ -81,12 +83,17 @@ If `--execution-guardrails` was passed:
 1. Read and follow `@setup-execution-guardrails.md`. Pass through `--add` if present.
 2. Jump to Step 5 (summary). Skip Steps 1–4.
 
-If none of `--dimensions`, `--pr-template`, `--guardrails`, or `--execution-guardrails` was passed: continue with the full interactive flow (Steps 1–4) as normal.
+If `--openspec-enrich` was passed:
+1. Read and follow `@setup-openspec.md`. Pass through `--remove-openspec` as `--remove` if present.
+2. Jump to Step 5 (summary). Skip Steps 1–4.
+
+If none of `--dimensions`, `--pr-template`, `--guardrails`, `--execution-guardrails`, or `--openspec-enrich` was passed: continue with the full interactive flow (Steps 1–4) as normal.
 
 The JSON contains these top-level keys:
 - `projectConfig` -- `{ exists, sections, misplaced, path }`
 - `localConfig` -- `{ exists, path }`
 - `legacy` -- `{ version, ship, review, reviewLegacy, jira }` each with `{ exists, path }`
+- `openspecConfig` -- `{ exists, path, managedBlockVersion }` state of `openspec/config.yaml`
 - `content` -- `{ reviewDimensions: { count, path }, prTemplate: { exists, path }, jiraTemplates: { count, path } }`
 - `detected` -- `{ versionFile, fileType, tagPrefix, defaultBranch }`
 - `needsMigration` -- boolean: `true` when any legacy file exists OR any misplaced section found in project config
@@ -497,14 +504,16 @@ Use AskUserQuestion with multiSelect:
 >   1. Review dimensions -- required for /review-sdlc
 >   2. PR template -- customized PR descriptions
 >   3. Plan guardrails -- custom rules for /plan-sdlc critique phases
->   4. All (dimensions → guardrails → PR template)
->   5. Skip content setup
+>   4. OpenSpec enrichment -- add sdlc guidance block to openspec/config.yaml (shown only when `openspecConfig.exists` is true)
+>   5. All (dimensions → guardrails → PR template + openspec if detected)
+>   6. Skip content setup
 
 Options:
 - **review-dimensions** -- install review dimensions
 - **pr-template** -- create PR template
 - **plan-guardrails** -- configure plan guardrails
-- **all** -- run all three sequentially
+- **openspec-enrich** -- enrich openspec/config.yaml with managed block (shown only when prepare output `openspecConfig.exists` is true AND `openspecConfig.managedBlockVersion` is null)
+- **all** -- run all sequentially (dimensions → guardrails → PR template → openspec enrichment if detected)
 - **skip** -- skip content setup
 
 On **review-dimensions**: Read and follow `@setup-dimensions.md`, passing the scan results as "Scan Input".
@@ -513,7 +522,9 @@ On **pr-template**: Read and follow `@setup-pr-template.md`, passing the scan re
 
 On **plan-guardrails**: Read and follow `@setup-guardrails.md` (it runs skill/guardrails.js internally).
 
-On **all**: Run sequentially in this order: read and follow `@setup-dimensions.md` (passing scan results), then `@setup-guardrails.md`, then `@setup-pr-template.md` (passing scan results).
+On **openspec-enrich**: Read and follow `@setup-openspec.md`.
+
+On **all**: Run sequentially in this order: read and follow `@setup-dimensions.md` (passing scan results), then `@setup-guardrails.md`, then `@setup-pr-template.md` (passing scan results), then `@setup-openspec.md` (only if `openspecConfig.exists` is true).
 
 On **skip**: proceed to Step 5.
 

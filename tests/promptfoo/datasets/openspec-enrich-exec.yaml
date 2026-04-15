@@ -1,0 +1,64 @@
+# Script execution tests for openspec-enrich.js (issue #162).
+# Tests managed-block append, update, unchanged, remove, and missing-file behavior.
+
+- description: "openspec-enrich: appends managed block to plain config"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/openspec-enrich.js"
+    script_args: "--project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-config-plain"
+  assert:
+    - type: icontains
+      value: '"action": "append"'
+    - type: icontains
+      value: '"changed": true'
+    - type: icontains
+      value: '"ok": true'
+
+- description: "openspec-enrich: unchanged on already-enriched v1 config"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/openspec-enrich.js"
+    script_args: "--project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-config-enriched-v1"
+  assert:
+    - type: icontains
+      value: '"action": "unchanged"'
+    - type: icontains
+      value: '"changed": false'
+
+- description: "openspec-enrich: updates v0 block to current version"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/openspec-enrich.js"
+    script_args: "--project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-config-enriched-v0"
+  assert:
+    - type: icontains
+      value: '"action": "update"'
+    - type: icontains
+      value: '"changed": true'
+
+- description: "openspec-enrich: --remove removes block from enriched config"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/openspec-enrich.js"
+    script_args: "--remove --project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-config-enriched-v1"
+  assert:
+    - type: icontains
+      value: '"action": "removed"'
+
+- description: "openspec-enrich: missing config returns error"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/openspec-enrich.js"
+    script_args: "--project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: icontains
+      value: '"action": "missing"'
+    - type: icontains
+      value: '"ok": false'
+    - type: icontains
+      value: "not found"

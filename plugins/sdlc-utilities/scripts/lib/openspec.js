@@ -11,6 +11,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -234,6 +235,119 @@ function validateChange(projectRoot, changeName) {
   };
 }
 
+/**
+ * Validate a change using the openspec CLI with --strict mode.
+ * Unlike `validateChange` (filesystem-based), this shells out to the CLI.
+ *
+ * @param {string} projectRoot  Absolute path to the project root
+ * @param {string} changeName   Name of the change directory
+ * @returns {{ ok: boolean, stdout: string, stderr: string, cliAvailable: boolean }}
+ */
+function validateChangeStrict(projectRoot, changeName) {
+  const result = spawnSync('openspec', ['validate', changeName, '--strict'], {
+    cwd: projectRoot,
+    encoding: 'utf8',
+    timeout: 30000,
+  });
+
+  if (result.error) {
+    if (result.error.code === 'ENOENT') {
+      return {
+        ok: false,
+        stdout: '',
+        stderr: 'openspec CLI not found on PATH',
+        cliAvailable: false,
+      };
+    }
+    return {
+      ok: false,
+      stdout: '',
+      stderr: result.error.message,
+      cliAvailable: true,
+    };
+  }
+
+  return {
+    ok: result.status === 0,
+    stdout: (result.stdout || '').trim(),
+    stderr: (result.stderr || '').trim(),
+    cliAvailable: true,
+  };
+}
+
+/**
+ * Check whether a change has already been archived.
+ * OpenSpec archives to `openspec/changes/archive/<timestamp>-<name>/` or similar
+ * naming with the change name as a suffix.
+ *
+ * @param {string} projectRoot  Absolute path to the project root
+ * @param {string} changeName   Name of the change
+ * @returns {boolean}
+ */
+function isArchived(projectRoot, changeName) {
+  const archiveDir = path.join(projectRoot, 'openspec', 'changes', 'archive');
+  if (!fs.existsSync(archiveDir)) return false;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(archiveDir, { withFileTypes: true });
+  } catch (_) {
+    return false;
+  }
+
+  const suffix = `-${changeName}`;
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.endsWith(suffix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Run `openspec archive <changeName> --yes` via the CLI.
+ * Callers are responsible for validating before calling this.
+ *
+ * @param {string} projectRoot  Absolute path to the project root
+ * @param {string} changeName   Name of the change
+ * @param {{ yes?: boolean }} [options]
+ * @returns {{ ok: boolean, stdout: string, stderr: string, cliAvailable: boolean }}
+ */
+function runArchive(projectRoot, changeName, { yes = true } = {}) {
+  const args = ['archive', changeName];
+  if (yes) args.push('--yes');
+
+  const result = spawnSync('openspec', args, {
+    cwd: projectRoot,
+    encoding: 'utf8',
+    timeout: 60000,
+  });
+
+  if (result.error) {
+    if (result.error.code === 'ENOENT') {
+      return {
+        ok: false,
+        stdout: '',
+        stderr: 'openspec CLI not found on PATH',
+        cliAvailable: false,
+      };
+    }
+    return {
+      ok: false,
+      stdout: '',
+      stderr: result.error.message,
+      cliAvailable: true,
+    };
+  }
+
+  return {
+    ok: result.status === 0,
+    stdout: (result.stdout || '').trim(),
+    stderr: (result.stderr || '').trim(),
+    cliAvailable: true,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
@@ -241,5 +355,8 @@ function validateChange(projectRoot, changeName) {
 module.exports = {
   detectActiveChanges,
   validateChange,
+  validateChangeStrict,
+  isArchived,
+  runArchive,
   STAGE_LABELS,
 };

@@ -1,0 +1,71 @@
+# Behavioral tests for setup-sdlc openspec enrichment integration (issue #162).
+# Tests: direct-flag path, detect+prompt path, already-enriched no-op path.
+
+- description: "setup-sdlc: --openspec-enrich invokes sub-script and reports result"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/openspec-config-plain.md"
+    user_request: >
+      Run /setup-sdlc --openspec-enrich. The project has openspec/config.yaml without a
+      managed block. The prepare script output includes openspecConfig: { exists: true,
+      path: "openspec/config.yaml", managedBlockVersion: null }.
+  assert:
+    - type: icontains
+      value: "openspec-enrich"
+    - type: llm-rubric
+      value: >
+        The response invokes the openspec enrichment sub-flow (setup-openspec.md) by running
+        the openspec-enrich.js script. It reports the result of the enrichment (e.g., "append"
+        action indicating the managed block was added). The response does NOT walk through the
+        full config builder flow — it jumps directly to the sub-flow via flag routing.
+
+- description: "setup-sdlc: full-interactive offers enrichment when openspec detected"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/openspec-config-plain.md"
+    user_request: >
+      Run /setup-sdlc (no flags). The prepare script output includes openspecConfig:
+      { exists: true, path: "openspec/config.yaml", managedBlockVersion: null }.
+      All config sections are already configured. Show the content setup menu (Step 4).
+  assert:
+    - type: icontains-any
+      value:
+        - "openspec"
+        - "OpenSpec"
+    - type: llm-rubric
+      value: >
+        The response presents a content setup menu that includes an OpenSpec enrichment option
+        (because openspecConfig.exists is true and managedBlockVersion is null). The option
+        is offered alongside review dimensions, PR template, and guardrails.
+
+- description: "setup-sdlc: already-enriched config shows unchanged in sub-flow"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/openspec-config-enriched.md"
+    user_request: >
+      Run /setup-sdlc --openspec-enrich. The project has openspec/config.yaml with a managed
+      block at the current version. The prepare script output includes openspecConfig:
+      { exists: true, path: "openspec/config.yaml", managedBlockVersion: 1 }.
+      The openspec-enrich.js script returned { action: "unchanged", changed: false }.
+  assert:
+    - type: icontains
+      value: "unchanged"
+    - type: llm-rubric
+      value: >
+        The response reports that the openspec/config.yaml is already at the current version
+        and no changes were needed. It does NOT attempt to re-write the file.
+
+- description: "setup-sdlc: no openspec hides enrichment from content menu"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-execution-complete.md"
+    user_request: >
+      Run /setup-sdlc (no flags). The prepare script output includes openspecConfig:
+      { exists: false, path: "openspec/config.yaml", managedBlockVersion: null }.
+      All config sections are configured. Show the content setup menu (Step 4).
+  assert:
+    - type: llm-rubric
+      value: >
+        The response presents a content setup menu that does NOT include an OpenSpec
+        enrichment option (because openspecConfig.exists is false). The menu only shows
+        review dimensions, PR template, and guardrails options.

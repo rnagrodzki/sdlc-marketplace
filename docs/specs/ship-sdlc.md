@@ -18,6 +18,7 @@
 - A8: `--workspace branch|worktree|prompt` — workspace isolation mode (default: from config or prompt)
 - A8a: In `--auto` mode, `workspace: "prompt"` is overridden to `"branch"` when the source is not `'cli'`. Explicit CLI `--workspace prompt` with `--auto` is preserved (intentional override).
 - A9: `--init-config` — run interactive config wizard, no pipeline execution (default: false)
+- A10: `--openspec-change <name>` — explicitly select the OpenSpec change to archive, overriding branch matching (default: null)
 
 ## Core Requirements
 
@@ -42,6 +43,13 @@
 - R19: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 - R20: `--auto` suppresses pipeline pauses: when `--auto` is active, `pause` must be `false` for every step that accepts `--auto` (per R7 forwarding audit: commit-sdlc, received-review-sdlc, version-sdlc, pr-sdlc). The sub-skill's consent gate is skipped via the forwarded flag, so the pipeline has no reason to pause at that step.
 - R21: When `openspec/config.yaml` exists (as reported by `skill/ship.js` via `context.openspecDetected` or the authoritative field) AND the injected session-start `<system-reminder>` contains a contradictory signal (regex matching `not initialized` together with `openspec`), the skill MUST emit a single audit line naming the authoritative file path and note that the contradictory signal is being ignored. The override line is informational only — pipeline flow continues. (Rationale: #164 — defensive hardening against co-installed plugins emitting false-negative OpenSpec detection.)
+- R22: The pipeline includes a conditional `archive-openspec` step between `commit-fixes` and `version`. The step has no dedicated sub-skill — it is dispatched inline via bash (validation + archive + commit).
+- R23: Trigger conditions for `archive-openspec` (all must hold): `openspec/config.yaml` exists; an active non-archived change matches the current branch (`openspec.branchMatch`) OR `--openspec-change <name>` is passed; prior steps completed without halting.
+- R24: The `archive-openspec` step calls `openspec validate <name> --strict` via `lib/openspec.js::validateChangeStrict`; on failure, halts the pipeline and surfaces validation output.
+- R25: On validation success: prompts the user (non-interactive in `--auto`); on approval (or `--auto`), runs `openspec archive <name> --yes` via `lib/openspec.js::runArchive`, then creates a commit `chore(openspec): archive <name>`.
+- R26: `--skip archive-openspec` disables the step. The value is added to `VALID_SKIP` in `ship-fields.js`.
+- R27: The step is idempotent — if `lib/openspec.js::isArchived(projectRoot, changeName)` returns true, the step is skipped with reason "already archived".
+- R28: `--openspec-change <name>` flag explicitly selects the change to archive, overriding branch matching.
 
 ## Workflow Phases
 
@@ -139,3 +147,4 @@
 - I10: `setup-sdlc` — redirect target for `--init-config`
 - I11: `util/worktree-create.js` — worktree creation for workspace isolation
 - I12: OpenSpec — optional; suggests `/opsx:verify` and `/opsx:archive` post-pipeline when detected
+- I13: `lib/openspec.js` — `validateChangeStrict`, `isArchived`, `runArchive` helpers for the `archive-openspec` step

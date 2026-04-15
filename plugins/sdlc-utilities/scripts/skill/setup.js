@@ -70,6 +70,22 @@ function detect(projectRoot) {
   const prTemplatePath = path.join(projectRoot, '.claude', 'pr-template.md');
   const jiraTemplatesDir = path.join(projectRoot, '.claude', 'jira-templates');
 
+  // --- OpenSpec config detection ---
+  const openspecConfigPath = path.join(projectRoot, 'openspec', 'config.yaml');
+  const openspecConfigExists = fs.existsSync(openspecConfigPath);
+  let openspecManagedBlockVersion = null;
+  if (openspecConfigExists) {
+    try {
+      const configContent = fs.readFileSync(openspecConfigPath, 'utf8');
+      const beginMatch = /^# BEGIN MANAGED BY sdlc-utilities \(v(\d+)\)$/m.exec(configContent);
+      if (beginMatch) {
+        openspecManagedBlockVersion = parseInt(beginMatch[1], 10);
+      }
+    } catch (_) {
+      // file exists but unreadable — report exists with null version
+    }
+  }
+
   // --- Version file detection ---
   const versionResult = detectVersionFile(projectRoot);
   let detectedVersionFile = null;
@@ -144,6 +160,11 @@ function detect(projectRoot) {
       fileType: detectedFileType,
       tagPrefix,
       defaultBranch,
+    },
+    openspecConfig: {
+      exists: openspecConfigExists,
+      path: path.join('openspec', 'config.yaml'),
+      managedBlockVersion: openspecManagedBlockVersion,
     },
     shipFields: SHIP_FIELDS,
   };

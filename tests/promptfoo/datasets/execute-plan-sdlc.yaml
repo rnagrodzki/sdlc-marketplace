@@ -105,3 +105,64 @@
         The response shows wave structure with explicit model assignments per task:
         Trivial=haiku, Standard=sonnet, Complex=opus (Balanced preset). The dispatch
         includes model: as a required parameter for each agent.
+
+# OpenSpec post-pipeline archive suggestion tests (issue #162)
+
+- description: "execute-plan-sdlc: emits archive suggestion when OpenSpec plan and validation passes"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-execution-complete.md"
+    user_request: >
+      Run /execute-plan-sdlc. The plan execution has completed — all waves finished, all tasks
+      succeeded, and final verification passed. The plan's **Source:** header points to
+      openspec/changes/add-auth/. The openspecSpecs were loaded in Step 1.
+      validateChangeStrict returned { ok: true, cliAvailable: true }.
+      Now show the What's Next section.
+  assert:
+    - type: icontains
+      value: "archive"
+    - type: icontains
+      value: "/ship-sdlc"
+    - type: llm-rubric
+      value: >
+        The response emits a post-pipeline suggestion that includes archiving the OpenSpec
+        change (mentioning openspec archive or /ship-sdlc). The suggestion is presented as
+        informational — NOT auto-executed. The response acknowledges validation passed.
+
+- description: "execute-plan-sdlc: suppresses archive suggestion when validation fails"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-execution-complete.md"
+    user_request: >
+      Run /execute-plan-sdlc. The plan execution has completed — all waves finished.
+      The plan's **Source:** header points to openspec/changes/add-auth/.
+      validateChangeStrict returned { ok: false, cliAvailable: true, stderr: "Missing required delta spec" }.
+      Now show the What's Next section.
+  assert:
+    - type: not-icontains
+      value: "openspec archive"
+    - type: icontains
+      value: "validation"
+    - type: llm-rubric
+      value: >
+        The response surfaces the validation failure output (mentioning the error or that
+        validation failed) and does NOT suggest running openspec archive. It may suggest
+        fixing the validation issues first.
+
+- description: "execute-plan-sdlc: falls back to static advisory when CLI not available"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-execution-complete.md"
+    user_request: >
+      Run /execute-plan-sdlc. The plan execution has completed — all waves finished.
+      The plan's **Source:** header points to openspec/changes/add-auth/.
+      validateChangeStrict returned { ok: false, cliAvailable: false, stderr: "openspec CLI not found on PATH" }.
+      Now show the What's Next section.
+  assert:
+    - type: icontains
+      value: "verify"
+    - type: llm-rubric
+      value: >
+        The response falls back to a static advisory mentioning /opsx:verify and /opsx:archive
+        (or similar non-CLI suggestions) without fabricating a validation result. It does NOT
+        claim validation passed. It may note that the openspec CLI is not available.

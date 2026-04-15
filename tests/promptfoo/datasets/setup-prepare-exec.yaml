@@ -36,7 +36,7 @@
         const keys = ['name','label','type','options','default','description'];
         JSON.parse(output).shipFields.every(f => keys.every(k => k in f))
 
-- description: "setup-prepare: shipFields.skip has exactly 5 options"
+- description: "setup-prepare: shipFields.skip has exactly 6 options"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
     script_cwd: "{{project_root}}"
@@ -45,7 +45,7 @@
     - type: javascript
       value: |
         const skip = JSON.parse(output).shipFields.find(f => f.name === 'skip');
-        const expected = ['execute','commit','review','version','pr'];
+        const expected = ['execute','commit','review','version','pr','archive-openspec'];
         JSON.stringify(skip.options) === JSON.stringify(expected)
 
 - description: "setup-prepare: still emits P1-P6 fields alongside shipFields"

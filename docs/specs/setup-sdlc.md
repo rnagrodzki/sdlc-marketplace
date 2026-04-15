@@ -17,7 +17,9 @@
 - A7: `--execution-guardrails` — jump directly to execution guardrails sub-flow (default: false)
 - A8: `--add` — expansion mode, used with `--dimensions` or `--guardrails` (default: false)
 - A9: `--no-copilot` — skip GitHub Copilot instructions, used with `--dimensions` (default: false)
-- A10: Unnamed flag routing: `--dimensions`, `--pr-template`, `--guardrails`, `--execution-guardrails` each bypass the main config builder flow and enter their sub-flow directly
+- A10: `--openspec-enrich` — jump directly to openspec enrichment sub-flow (default: false)
+- A11: `--remove-openspec` — remove the managed block from `openspec/config.yaml` and exit (default: false)
+- A12: Unnamed flag routing: `--dimensions`, `--pr-template`, `--guardrails`, `--execution-guardrails`, `--openspec-enrich` each bypass the main config builder flow and enter their sub-flow directly
 
 ## Core Requirements
 
@@ -36,6 +38,13 @@
 - R13: Content sub-flows (setup-dimensions, setup-pr-template, setup-guardrails) inherit the parent skill's permission mode. Sub-flows MUST NOT call ExitPlanMode, change permission settings, or exit any mode.
 - R14: Scan phase (R10) MUST use the Glob tool for all file/directory existence checks. Bash MUST NOT be used with glob patterns — zsh errors on unmatched globs. Bash is permitted only for `git`, `gh`, and `which` commands.
 - R15: Ship config field enumeration (Step 3b) is authoritative from prepare script output P7 (`shipFields`). The skill MUST iterate every entry in `shipFields` and dispatch one `AskUserQuestion` per field — it MUST NOT hand-enumerate the field list or short-circuit the loop. Ship config writes use answers collected in this loop plus defaults for any field the user explicitly deferred.
+- R16: When `openspec/config.yaml` is detected during full-interactive setup (Step 4 content menu), prompt the user to apply managed-block enrichment (default: yes). Detection uses prepare script output field `openspecConfig.exists`.
+- R17: Enrichment uses a string-delimited managed block (`# BEGIN MANAGED BY sdlc-utilities (vN)` … `# END MANAGED BY sdlc-utilities (vN)`) with a plugin-owned version marker. The block is appended, updated, or left unchanged by `scripts/util/openspec-enrich.js`.
+- R18: Re-running setup on an already-enriched config at the current plugin version is a no-op (exit 0, action: `"unchanged"`)
+- R19: Version mismatch between the in-file managed block and the plugin-shipped version triggers an `update` action (block text replaced in place)
+- R20: `--openspec-enrich` flag provides direct entry to the openspec enrichment sub-flow, bypassing the main config builder (same pattern as `--dimensions`, `--pr-template`)
+- R21: `--remove-openspec` flag removes the managed block (restores user-authored content verbatim) and exits
+- R22: Content outside the managed block is never modified. If the config file lacks a section where the block would naturally fit, the managed block is appended at end-of-file with a preceding blank line.
 
 ## Workflow Phases
 
@@ -75,6 +84,7 @@
 - P5: `detected` (object) — `{ versionFile, fileType, tagPrefix, defaultBranch }` auto-detected project settings
 - P6: `needsMigration` (boolean) — true when any legacy file exists or any misplaced section found
 - P7: `shipFields` (array) — authoritative list of interactive ship-config fields sourced from `scripts/lib/ship-fields.js`. Each entry: `{ name, label, type, options, default, description }`. `name` is the local-config key; `options` is an array of valid values; `default` is the value applied if the user accepts the default answer.
+- P8: `openspecConfig` (object) — `{ exists: boolean, path: string, managedBlockVersion: number|null }` state of `openspec/config.yaml` and its managed block
 
 ## Error Handling
 
@@ -122,3 +132,5 @@
 - I8: `ship-sdlc` — consumes ship config written by this skill
 - I9: `review-sdlc` — consumes review dimensions installed by this skill
 - I10: `jira-sdlc` — consumes jira config written by this skill
+- I11: `setup-openspec.md` — sub-flow for openspec config enrichment
+- I12: `util/openspec-enrich.js` — deterministic script for managed-block operations on `openspec/config.yaml`

@@ -25,6 +25,8 @@ Configures the SDLC plugin for a project in one interactive flow. Creates `.clau
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | — |
 | `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | — |
 | `--execution-guardrails` | Jump directly to execution guardrails sub-flow (skip config builder) | — |
+| `--openspec-enrich` | Jump directly to openspec config enrichment sub-flow | — |
+| `--remove-openspec` | Remove the managed block from `openspec/config.yaml` (with `--openspec-enrich`) | — |
 | `--add` | Expansion mode with `--dimensions` or `--guardrails` (propose only new items) | — |
 | `--no-copilot` | Skip GitHub Copilot instructions with `--dimensions` | — |
 
@@ -185,7 +187,13 @@ Scans the project's codebase structure, dependencies, and architecture to propos
 
 **Direct entry:** `/setup-sdlc --guardrails` or `/setup-sdlc --guardrails --add` (expansion mode)
 
-Each option can be individually skipped or accessed later via the `--dimensions`, `--pr-template`, or `--guardrails` flags.
+#### OpenSpec Enrichment
+
+When `openspec/config.yaml` is detected during setup, offers to add a managed block with sdlc-utilities workflow guidance. The block uses string delimiters (`# BEGIN MANAGED BY sdlc-utilities (vN)` / `# END MANAGED BY sdlc-utilities (vN)`) and is idempotent — re-running at the same version is a no-op.
+
+**Direct entry:** `/setup-sdlc --openspec-enrich` or `/setup-sdlc --openspec-enrich --remove-openspec` (removal)
+
+Each option can be individually skipped or accessed later via the `--dimensions`, `--pr-template`, `--guardrails`, or `--openspec-enrich` flags.
 
 ### Step 5: Summary
 
@@ -210,6 +218,7 @@ Plan guardrails    — [N configured via guardrails sub-flow | skipped]
 | `.sdlc/local.json` | User-local config with `review` scope preferences and `ship` settings |
 | `.claude/review-dimensions/*.yaml` | Review dimensions created during dimensions sub-flow (via `--dimensions`) |
 | `.claude/pr-template.md` | PR template created during PR template sub-flow (via `--pr-template`) |
+| `openspec/config.yaml` | Managed block added/updated by openspec enrichment sub-flow (via `--openspec-enrich`). Only the managed block is modified; user-authored content is preserved. |
 
 ---
 

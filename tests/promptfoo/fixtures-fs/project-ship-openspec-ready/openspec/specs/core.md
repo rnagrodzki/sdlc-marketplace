@@ -1,0 +1,3 @@
+# Core Spec
+
+Base architecture.

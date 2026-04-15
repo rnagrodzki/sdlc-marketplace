@@ -1,0 +1,122 @@
+# Script execution tests for lib/openspec.js new helpers (issue #162).
+# Tests validateChangeStrict, isArchived, and runArchive exports.
+# These run inline Node.js against fixture directories (no LLM).
+
+- description: "openspec-lib: isArchived returns true for archived change"
+  vars:
+    script_path: "inline"
+    script_inline: |
+      const path = require('path');
+      const root = process.env.PROJECT_ROOT || process.cwd();
+      const libPath = path.resolve(__dirname, '..', '..', 'plugins', 'sdlc-utilities', 'scripts', 'lib', 'openspec.js');
+      const { isArchived } = require(libPath);
+      const result = isArchived(root, 'add-auth');
+      console.log(JSON.stringify({ isArchived: result }));
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-archived-change"
+  assert:
+    - type: icontains
+      value: '"isArchived": true'
+
+- description: "openspec-lib: isArchived returns false for active (non-archived) change"
+  vars:
+    script_path: "inline"
+    script_inline: |
+      const path = require('path');
+      const root = process.env.PROJECT_ROOT || process.cwd();
+      const libPath = path.resolve(__dirname, '..', '..', 'plugins', 'sdlc-utilities', 'scripts', 'lib', 'openspec.js');
+      const { isArchived } = require(libPath);
+      const result = isArchived(root, 'add-auth');
+      console.log(JSON.stringify({ isArchived: result }));
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-ready-to-archive"
+  assert:
+    - type: icontains
+      value: '"isArchived": false'
+
+- description: "openspec-lib: isArchived returns false when archive dir does not exist"
+  vars:
+    script_path: "inline"
+    script_inline: |
+      const path = require('path');
+      const root = process.env.PROJECT_ROOT || process.cwd();
+      const libPath = path.resolve(__dirname, '..', '..', 'plugins', 'sdlc-utilities', 'scripts', 'lib', 'openspec.js');
+      const { isArchived } = require(libPath);
+      const result = isArchived(root, 'nonexistent');
+      console.log(JSON.stringify({ isArchived: result }));
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: icontains
+      value: '"isArchived": false'
+
+- description: "openspec-lib: validateChangeStrict returns cliAvailable false when openspec not on PATH"
+  vars:
+    script_path: "inline"
+    script_inline: |
+      const path = require('path');
+      const root = process.env.PROJECT_ROOT || process.cwd();
+      const libPath = path.resolve(__dirname, '..', '..', 'plugins', 'sdlc-utilities', 'scripts', 'lib', 'openspec.js');
+      const { validateChangeStrict } = require(libPath);
+      // Use a bogus PATH to ensure openspec is not found
+      const origPath = process.env.PATH;
+      process.env.PATH = '/nonexistent-dir-only';
+      const result = validateChangeStrict(root, 'add-auth');
+      process.env.PATH = origPath;
+      console.log(JSON.stringify(result));
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-ready-to-archive"
+  assert:
+    - type: icontains
+      value: '"cliAvailable": false'
+    - type: icontains
+      value: '"ok": false'
+
+- description: "openspec-lib: runArchive returns cliAvailable false when openspec not on PATH"
+  vars:
+    script_path: "inline"
+    script_inline: |
+      const path = require('path');
+      const root = process.env.PROJECT_ROOT || process.cwd();
+      const libPath = path.resolve(__dirname, '..', '..', 'plugins', 'sdlc-utilities', 'scripts', 'lib', 'openspec.js');
+      const { runArchive } = require(libPath);
+      const origPath = process.env.PATH;
+      process.env.PATH = '/nonexistent-dir-only';
+      const result = runArchive(root, 'add-auth');
+      process.env.PATH = origPath;
+      console.log(JSON.stringify(result));
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-ready-to-archive"
+  assert:
+    - type: icontains
+      value: '"cliAvailable": false'
+    - type: icontains
+      value: '"ok": false'
+
+- description: "openspec-lib: all three new helpers are exported"
+  vars:
+    script_path: "inline"
+    script_inline: |
+      const path = require('path');
+      const libPath = path.resolve(__dirname, '..', '..', 'plugins', 'sdlc-utilities', 'scripts', 'lib', 'openspec.js');
+      const mod = require(libPath);
+      console.log(JSON.stringify({
+        hasValidateChangeStrict: typeof mod.validateChangeStrict === 'function',
+        hasIsArchived: typeof mod.isArchived === 'function',
+        hasRunArchive: typeof mod.runArchive === 'function',
+        hasDetectActiveChanges: typeof mod.detectActiveChanges === 'function',
+        hasValidateChange: typeof mod.validateChange === 'function',
+      }));
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: icontains
+      value: '"hasValidateChangeStrict": true'
+    - type: icontains
+      value: '"hasIsArchived": true'
+    - type: icontains
+      value: '"hasRunArchive": true'
+    - type: icontains
+      value: '"hasDetectActiveChanges": true'
+    - type: icontains
+      value: '"hasValidateChange": true'

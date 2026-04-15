@@ -33,3 +33,5 @@ tests:
   - file://datasets/hook-error-report-exec.yaml
   - file://datasets/session-start-exec.yaml
   - file://datasets/markdown-to-adf-exec.yaml
+  - file://datasets/openspec-lib-exec.yaml
+  - file://datasets/openspec-enrich-exec.yaml

@@ -392,3 +392,40 @@
         output. The context detection section still shows OpenSpec as detected (true).
         The pipeline proceeds normally — the contradictory signal does not cause the
         pipeline to treat OpenSpec as absent.
+
+# OpenSpec archive-openspec step tests (issue #162)
+
+- description: "ship-sdlc: archive-openspec step shown in pipeline table when triggered"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --dry-run --openspec-change add-auth. The project has openspec/config.yaml
+      with an active change "add-auth" that matches. The ship.js output includes an
+      archive-openspec step with status: "conditional" and args: "--change add-auth".
+      Show the pipeline table.
+  assert:
+    - type: icontains
+      value: "archive-openspec"
+    - type: llm-rubric
+      value: >
+        The pipeline table includes an archive-openspec step between commit-fixes and version.
+        The step is shown as conditional (will run if prior steps succeed). The table shows
+        the change name "add-auth" in the step args or description.
+
+- description: "ship-sdlc: archive-openspec step skipped when no openspec match"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --dry-run. No openspec change matches the current branch.
+      The ship.js output shows archive-openspec with status: "skipped" and
+      reason: "no matching openspec change for current branch".
+      Show the pipeline table.
+  assert:
+    - type: icontains
+      value: "archive-openspec"
+    - type: llm-rubric
+      value: >
+        The pipeline table includes the archive-openspec step but shows it as skipped
+        with a reason indicating no matching OpenSpec change was found for the current branch.

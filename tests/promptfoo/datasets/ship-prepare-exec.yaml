@@ -237,3 +237,68 @@
       value: '"openspecDetected": false'
     - type: icontains
       value: '"openspecAuthoritative": null'
+
+# archive-openspec step tests (issue #162)
+
+- description: "ship-prepare: archive-openspec step appears between commit-fixes and version"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const steps = JSON.parse(output).steps.map(s => s.name);
+        const cfIdx = steps.indexOf('commit-fixes');
+        const aoIdx = steps.indexOf('archive-openspec');
+        const vIdx = steps.indexOf('version');
+        cfIdx < aoIdx && aoIdx < vIdx
+
+- description: "ship-prepare: --openspec-change triggers conditional archive-openspec step"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --openspec-change add-auth"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-openspec-ready"
+  assert:
+    - type: icontains
+      value: '"openspecArchiveActionable": true'
+    - type: javascript
+      value: |
+        const step = JSON.parse(output).steps.find(s => s.name === 'archive-openspec');
+        step.status === 'conditional' && step.args.includes('add-auth')
+
+- description: "ship-prepare: archive-openspec skipped when change already archived"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --openspec-change add-auth"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-archived-change"
+  assert:
+    - type: javascript
+      value: |
+        const step = JSON.parse(output).steps.find(s => s.name === 'archive-openspec');
+        step.status === 'skipped' && step.reason === 'change already archived'
+
+- description: "ship-prepare: --skip archive-openspec marks step as skipped"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --skip archive-openspec --openspec-change add-auth"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-openspec-ready"
+  assert:
+    - type: javascript
+      value: |
+        const step = JSON.parse(output).steps.find(s => s.name === 'archive-openspec');
+        step.status === 'skipped' && step.reason === 'in skip set'
+
+- description: "ship-prepare: VALID_SKIP includes archive-openspec"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --skip archive-openspec"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: not-icontains
+      value: "Unrecognized skip value"

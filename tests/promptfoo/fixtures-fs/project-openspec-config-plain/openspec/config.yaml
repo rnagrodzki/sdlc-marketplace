@@ -1,0 +1,7 @@
+version: "1.0"
+project: test-project
+
+# Custom user rules
+rules:
+  - All changes must have a proposal
+  - Delta specs required for behavioral changes

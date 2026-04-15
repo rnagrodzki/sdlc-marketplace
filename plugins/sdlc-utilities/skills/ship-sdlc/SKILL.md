@@ -2,7 +2,7 @@
 name: ship-sdlc
 description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Chains execute-plan-sdlc, commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, and pr-sdlc with conditional review-fix loop. Arguments: [--auto] [--skip <steps>] [--preset full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
-argument-hint: "[--auto] [--skip <steps>] [--preset full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--init-config]"
+argument-hint: "[--auto] [--skip <steps>] [--preset full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--openspec-change <name>] [--init-config]"
 ---
 
 # Ship Pipeline
@@ -377,9 +377,41 @@ Review fixes applied: 3 files modified
 ```
 Then invoke commit-sdlc (step 5) for the fix commit.
 
+### Between commit-fixes and version — archive-openspec (conditional)
+
+If the `archive-openspec` step has `status: "conditional"` in the pipeline plan, execute it inline (no Agent dispatch — this is a deterministic shell operation):
+
+1. Extract the change name from `step.args` (`--change <name>`).
+2. Call `lib/openspec.js::validateChangeStrict(projectRoot, name)` via Bash:
+   ```bash
+   node -e "
+   const { validateChangeStrict } = require('<LIB>/openspec.js');
+   const result = validateChangeStrict(process.cwd(), '<name>');
+   console.log(JSON.stringify(result));
+   "
+   ```
+3. **If `ok === false`:** halt the pipeline. Print the validation errors (`stderr`) and save state for `--resume`.
+4. **If `ok === true`:** prompt the user for approval (skip prompt in `--auto` mode).
+5. On approval, run the archive:
+   ```bash
+   node -e "
+   const { runArchive } = require('<LIB>/openspec.js');
+   const result = runArchive(process.cwd(), '<name>');
+   console.log(JSON.stringify(result));
+   "
+   ```
+6. If archive succeeds, commit:
+   ```bash
+   git add openspec/
+   git commit -m "chore(openspec): archive <name>"
+   ```
+7. If `isArchived(projectRoot, name)` already returns true (idempotence), skip with reason "already archived".
+
+If the step has `status: "skipped"`, print the skip reason from `step.reason`.
+
 ### Between last commit and version — rebase on default branch
 
-After all commits are done (feature commit + optional review-fix commit), rebase onto the latest default branch to ensure a clean merge:
+After all commits are done (feature commit + optional review-fix commit + optional archive commit), rebase onto the latest default branch to ensure a clean merge:
 
 ```bash
 git fetch origin <defaultBranch>
@@ -496,7 +528,10 @@ Deferred review findings (2 medium):
 State file cleaned up: .sdlc/execution/ship-<branch>-<epoch>.json deleted
 ```
 
-If OpenSpec was detected in Step 1f, append:
+If OpenSpec was detected in Step 1f and the archive-openspec step ran successfully, append:
+  `→ OpenSpec change "<name>" archived and committed.`
+
+If OpenSpec was detected but archive-openspec was skipped or not triggered, append:
   `→ Run /opsx:verify to validate implementation completeness against the spec`
   `→ Run /opsx:archive to archive the OpenSpec change and sync delta specs`
 

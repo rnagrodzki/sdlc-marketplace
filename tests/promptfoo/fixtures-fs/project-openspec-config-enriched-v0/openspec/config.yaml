@@ -1,0 +1,10 @@
+version: "1.0"
+project: test-project
+
+# Custom user rules
+rules:
+  - All changes must have a proposal
+
+# BEGIN MANAGED BY sdlc-utilities (v0)
+# Old version of the managed block.
+# END MANAGED BY sdlc-utilities (v0)
