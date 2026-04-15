@@ -87,6 +87,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'confirm', label: 'Present and confirm', type: 'user', description: 'Shows full pipeline table; proceeds automatically in --auto mode' },
       { id: 'execute-steps', label: 'Execute pipeline steps', type: 'dispatch', description: 'Dispatches sub-skills as Agents sequentially; each Agent returns a structured result' },
       { id: 'review-gate', label: 'Review verdict gate', type: 'llm', description: 'Evaluates review findings; triggers fix loop for critical/high' },
+      { id: 'archive-openspec', label: 'Archive OpenSpec change (conditional)', type: 'script', description: 'Runs openspec archive inline when change is tasks-complete; skipped if no OpenSpec or not ready' },
       { id: 'report', label: 'Pipeline summary', type: 'verify', description: 'Prints results, decisions log, deferred findings, cleanup' },
     ],
     connections: [

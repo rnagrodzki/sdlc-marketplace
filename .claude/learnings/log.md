@@ -83,3 +83,8 @@ Key outcome: grouping improvements by target file (not by improvement letter) wa
 
 ## 2026-04-13 — version-sdlc: branch with no upstream requires --set-upstream on first push
 Branch fix/pipeline-contract-enforcement-and-model-assignment had no upstream. First `git push` failed with exit 128; recovered by running `git push --set-upstream origin <branch>` then `git push --tags` separately. Tag pushed successfully.
+
+## 2026-04-15 — openspec-lib-exec: script_path "inline" silently fails in script-runner.js
+**Trigger:** Review finding that 6 test cases in `openspec-lib-exec.yaml` used `script_path: "inline"` + `script_inline` which the provider doesn't support.
+**Rule:** If a promptfoo exec test calls library functions directly, create a real wrapper script in `tests/promptfoo/scripts/` and use `script_path: "repo://tests/promptfoo/scripts/<name>.js"`. Never use `script_path: "inline"` — script-runner.js passes the path string literally to `execFileSync`, so "inline" becomes a file argument and crashes. The `script_inline` var is never read by any provider.
+**Example:** `script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"` with `script_args: "--op isArchived --project-root {{project_root}} --change add-auth"`
