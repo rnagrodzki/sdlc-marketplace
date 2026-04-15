@@ -359,3 +359,36 @@
         the user explicitly passed the --draft CLI flag. The flag resolution shows
         draft: true with source: cli. The pipeline table correctly reflects the
         --draft flag in the pr step's args column.
+
+- description: "ship-sdlc: emits override audit line when contradictory OpenSpec signal present"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-contradictory-signal.md"
+    user_request: >
+      Run /ship-sdlc --dry-run --workspace branch. The ship-prepare.js output and session-start
+      context are provided above. The prepare output shows context.openspecAuthoritative.path
+      is set to "openspec/config.yaml". The session-start system-reminder contains both SDLC's
+      "OpenSpec: INITIALIZED" line and a contradictory "openspec: not initialized" line from a
+      co-installed plugin. Process Step 1 (context detection in 1f) and show how you handle the
+      contradictory signal. Then show the dry-run pipeline table.
+  assert:
+    # Must emit the override audit line
+    - type: icontains
+      value: "Ignoring contradictory"
+    - type: icontains
+      value: "not initialized"
+    # Must reference the authoritative source
+    - type: icontains
+      value: "openspec/config.yaml"
+    # Must still show OpenSpec as detected in context detection
+    - type: regex
+      value: "(openspecDetected.*true|OpenSpec.*detected|INITIALIZED)"
+    # Behavioral: contradictory signal is dismissed, pipeline continues
+    - type: llm-rubric
+      value: >
+        The response detects the contradictory "openspec: not initialized" signal in the
+        session context and emits exactly one audit line noting that it is being ignored,
+        citing openspec/config.yaml as the authoritative source from the ship.js prepare
+        output. The context detection section still shows OpenSpec as detected (true).
+        The pipeline proceeds normally — the contradictory signal does not cause the
+        pipeline to treat OpenSpec as absent.

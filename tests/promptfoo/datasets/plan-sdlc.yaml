@@ -88,3 +88,36 @@
         reads the proposal for scope and uses the ADDED sections from delta specs to derive
         tasks. It does NOT error out or ask the user to create tasks.md first. The gate
         check is still bypassed because --from-openspec was passed.
+
+- description: "plan-sdlc: emits override audit line when contradictory signal present"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-contradictory-signal.md"
+    user_request: >
+      Run /plan-sdlc. The plan-prepare.js output and session-start context are provided above.
+      The prepare output shows openspec.authoritative.path is set to "openspec/config.yaml".
+      The session-start system-reminder contains both SDLC's "OpenSpec: INITIALIZED" line and
+      a contradictory "openspec: not initialized" line from a co-installed plugin. Process
+      Step 0 (context detection) and show how you handle the contradictory signal before
+      proceeding to the gate check.
+  assert:
+    # Must emit the override audit line
+    - type: icontains
+      value: "Ignoring contradictory"
+    - type: icontains
+      value: "not initialized"
+    # Must reference the authoritative source
+    - type: icontains
+      value: "openspec/config.yaml"
+    # Must NOT suggest initializing OpenSpec (it's already initialized)
+    - type: not-icontains
+      value: "Initialize OpenSpec"
+    # Behavioral: contradictory signal is dismissed, not acted upon
+    - type: llm-rubric
+      value: >
+        The response detects the contradictory "openspec: not initialized" signal in the
+        session context and emits exactly one audit line noting that it is being ignored,
+        citing openspec/config.yaml as the authoritative source from the plan.js prepare
+        output. The response does NOT treat OpenSpec as uninitialized, does NOT suggest
+        running openspec init, and does NOT add an "initialize OpenSpec" task to the plan.
+        The skill flow continues normally with OpenSpec detected as present.

@@ -39,6 +39,7 @@ const { resolveMainWorktree } = require(path.join(LIB, 'state'));
 const { readSection, normalizePreset } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { VALID_SKIP, BUILT_IN_DEFAULTS } = require(path.join(LIB, 'ship-fields'));
+const { detectActiveChanges } = require(path.join(LIB, 'openspec'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -530,8 +531,12 @@ function main() {
     }
   }
 
-  // Check OpenSpec
-  const openspecDetected = fs.existsSync(path.join(projectRoot, 'openspec', 'config.yaml'));
+  // Check OpenSpec (use shared lib for consistent detection)
+  const openspecResult = detectActiveChanges(projectRoot);
+  const openspecDetected = openspecResult.present;
+  const openspecAuthoritative = openspecResult.present
+    ? { path: 'openspec/config.yaml', specsCount: openspecResult.specsCount }
+    : null;
 
   // Check .sdlc/ gitignore status
   // git check-ignore returns non-null (empty string) if ignored, null if not ignored.
@@ -552,6 +557,7 @@ function main() {
     ghAuthenticated,
     ghUser,
     openspecDetected,
+    openspecAuthoritative,
     sdlcGitignored,
     worktree: worktreeInfo,
   };

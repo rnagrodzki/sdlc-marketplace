@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.20] - 2026-04-15
+
+### Fixed
+- openspec-detection hardened against contradictory session-start signals; plan-sdlc and ship-sdlc now respect the `openspecAuthoritative` field to override conflicting context (#164)
+
 ## [0.17.19] - 2026-04-15
 
 ### Fixed

@@ -170,14 +170,16 @@ try {
   if (!openspec.present) {
     // No openspec/config.yaml — skip
   } else if (openspec.activeChanges.length === 0) {
-    resumeLines.push('OpenSpec: configured, no active changes');
+    const specPlural = openspec.specsCount !== 1 ? 's' : '';
+    resumeLines.push(`OpenSpec: INITIALIZED — verified via openspec/config.yaml (${openspec.specsCount} spec${specPlural}, 0 active changes)`);
   } else if (openspec.activeChanges.length === 1) {
     const change = openspec.activeChanges[0];
     const stageLabel = typeof STAGE_LABELS[change.stage] === 'function'
       ? STAGE_LABELS[change.stage](change)
       : STAGE_LABELS[change.stage];
     const specLabel = `${change.deltaSpecCount} delta spec${change.deltaSpecCount !== 1 ? 's' : ''}`;
-    resumeLines.push(`OpenSpec active: change "${change.name}" (${stageLabel}, ${specLabel})`);
+    const specPlural = openspec.specsCount !== 1 ? 's' : '';
+    resumeLines.push(`OpenSpec: INITIALIZED (openspec/config.yaml, ${openspec.specsCount} spec${specPlural}) · active: change "${change.name}" (${stageLabel}, ${specLabel})`);
 
     // Branch match (from shared module)
     if (openspec.branchMatch === change.name) {
@@ -212,7 +214,8 @@ try {
     }
   } else {
     const names = openspec.activeChanges.map(c => c.name).join(', ');
-    resumeLines.push(`OpenSpec active: ${openspec.activeChanges.length} changes (${names})`);
+    const specPlural = openspec.specsCount !== 1 ? 's' : '';
+    resumeLines.push(`OpenSpec: INITIALIZED (openspec/config.yaml, ${openspec.specsCount} spec${specPlural}) · active: ${openspec.activeChanges.length} changes (${names})`);
     resumeLines.push('  Pass --spec or --from-openspec <name> to select');
   }
 } catch {

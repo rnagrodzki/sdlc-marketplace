@@ -138,13 +138,17 @@ function analyzeChange(changeDir, name) {
  * Detect all active OpenSpec changes in a project.
  *
  * @param {string} projectRoot  Absolute path to the project root
- * @returns {{ present: boolean, activeChanges: object[], branchMatch: string|null }}
+ * @returns {{ present: boolean, specsCount: number, activeChanges: object[], branchMatch: string|null }}
  */
 function detectActiveChanges(projectRoot) {
   const configPath = path.join(projectRoot, 'openspec', 'config.yaml');
   if (!fs.existsSync(configPath)) {
-    return { present: false, activeChanges: [], branchMatch: null };
+    return { present: false, specsCount: 0, activeChanges: [], branchMatch: null };
   }
+
+  // Count baseline specs in openspec/specs/
+  const specsDir      = path.join(projectRoot, 'openspec', 'specs');
+  const specsCount    = countMdFiles(specsDir);
 
   const changesDir    = path.join(projectRoot, 'openspec', 'changes');
   const activeChanges = [];
@@ -183,7 +187,7 @@ function detectActiveChanges(projectRoot) {
     // Graceful degradation — skip branch matching if git is unavailable
   }
 
-  return { present: true, activeChanges, branchMatch };
+  return { present: true, specsCount, activeChanges, branchMatch };
 }
 
 /**

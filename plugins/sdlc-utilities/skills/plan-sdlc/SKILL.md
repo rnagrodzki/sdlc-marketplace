@@ -109,6 +109,10 @@ Context detection (from skill/plan.js):
 
 Extract `guardrails` from the output → store as `activeGuardrails`. If the array is non-empty, print: "Loaded N plan guardrails." If empty: "No plan guardrails configured."
 
+**Contradictory-signal override (implements R16):** After reading the prepare output, IF `openspec.authoritative.path` is set AND the current session-start `<system-reminder>` contains a line matching `/openspec.*not initialized|not initialized.*openspec/i`, print exactly one line:
+`Ignoring contradictory 'not initialized' signal in session context — openspec/config.yaml exists (authoritative source: SDLC's own check via plan.js prepare output).`
+Then continue the flow. If the contradictory phrase is absent, emit nothing.
+
 **`--from-openspec` handling (after prepare output, before gate check):**
 
 If `fromOpenspec.valid` is true in the prepare output:
