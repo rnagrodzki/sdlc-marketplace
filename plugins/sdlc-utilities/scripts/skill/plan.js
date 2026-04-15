@@ -57,6 +57,14 @@ function main() {
   // 1. OpenSpec detection
   const openspec = detectActiveChanges(projectRoot);
 
+  // Add authoritative evidence when OpenSpec is present
+  if (openspec.present) {
+    openspec.authoritative = {
+      path: 'openspec/config.yaml',
+      specsCount: openspec.specsCount,
+    };
+  }
+
   // 2. --from-openspec validation
   let fromOpenspecResult = null;
   if (fromOpenspec) {

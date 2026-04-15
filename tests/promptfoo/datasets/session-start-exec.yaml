@@ -1,0 +1,47 @@
+# Script execution tests for session-start.js hook.
+# These tests run session-start.js directly against fixture directories (no LLM).
+# Covers: OpenSpec detection output strings (issue #164).
+
+- description: "session-start: no openspec/config.yaml produces no OpenSpec line"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-config"
+  assert:
+    - type: not-icontains
+      value: "OpenSpec"
+
+- description: "session-start: openspec baseline (no active changes) emits INITIALIZED with spec count"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: icontains
+      value: "INITIALIZED"
+    - type: icontains
+      value: "openspec/config.yaml"
+    - type: icontains
+      value: "2 specs, 0 active changes"
+
+- description: "session-start: openspec with active change emits INITIALIZED prefix and change details"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-active"
+  assert:
+    - type: icontains
+      value: "INITIALIZED (openspec/config.yaml"
+    - type: icontains
+      value: "1 spec)"
+    - type: icontains
+      value: "add-auth"
+
+- description: "session-start: openspec baseline returns specsCount 2 from lib"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: icontains
+      value: "2 specs"

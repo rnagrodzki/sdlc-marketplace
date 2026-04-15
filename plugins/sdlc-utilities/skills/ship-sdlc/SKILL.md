@@ -113,6 +113,10 @@ Context detection (from skill/ship.js):
   .sdlc/ gitignored:   yes
 ```
 
+**Contradictory-signal override (implements R21):** After printing the context detection block, IF `context.openspecAuthoritative.path` is set AND the current session-start `<system-reminder>` contains a line matching `/openspec.*not initialized|not initialized.*openspec/i`, print exactly one line:
+`Ignoring contradictory 'not initialized' signal in session context — openspec/config.yaml exists (authoritative source: SDLC's own check via ship.js prepare output).`
+Then continue the flow. If the contradictory phrase is absent, emit nothing.
+
 ### 1g. Auto-skip logic
 
 Print each step from the `steps` array in the `skill/ship.js` output with its `status`, `reason`, and `skipSource`:

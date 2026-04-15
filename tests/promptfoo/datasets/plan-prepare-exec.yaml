@@ -1,0 +1,27 @@
+# Script execution tests for plan-prepare.js (plan.js).
+# These tests run plan.js directly against fixture directories (no LLM).
+# Covers: OpenSpec authoritative output (issue #164).
+
+- description: "plan-prepare: openspec present emits authoritative field with path and specsCount"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: icontains
+      value: '"authoritative"'
+    - type: icontains
+      value: '"path": "openspec/config.yaml"'
+    - type: icontains
+      value: '"specsCount": 2'
+
+- description: "plan-prepare: no openspec omits authoritative field"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-config"
+  assert:
+    - type: icontains
+      value: '"present": false'
+    - type: not-icontains
+      value: '"authoritative"'

@@ -41,6 +41,7 @@
 - R18: Ship config is optional and developer-local (`.sdlc/local.json`); pipeline runs with built-in defaults
 - R19: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 - R20: `--auto` suppresses pipeline pauses: when `--auto` is active, `pause` must be `false` for every step that accepts `--auto` (per R7 forwarding audit: commit-sdlc, received-review-sdlc, version-sdlc, pr-sdlc). The sub-skill's consent gate is skipped via the forwarded flag, so the pipeline has no reason to pause at that step.
+- R21: When `openspec/config.yaml` exists (as reported by `skill/ship.js` via `context.openspecDetected` or the authoritative field) AND the injected session-start `<system-reminder>` contains a contradictory signal (regex matching `not initialized` together with `openspec`), the skill MUST emit a single audit line naming the authoritative file path and note that the contradictory signal is being ignored. The override line is informational only — pipeline flow continues. (Rationale: #164 — defensive hardening against co-installed plugins emitting false-negative OpenSpec detection.)
 
 ## Workflow Phases
 

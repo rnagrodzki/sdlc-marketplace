@@ -65,6 +65,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | [Adding Commands](docs/adding-commands.md) | Create custom slash commands (legacy — prefer skills) |
 | [Adding Hooks](docs/adding-hooks.md) | Set up automated actions on session events |
 | [OpenSpec Integration](docs/openspec-integration.md) | Using SDLC skills with OpenSpec for spec-driven development |
+| [Plugin Interop](docs/plugin-interop.md) | Authority model for OpenSpec detection when multiple plugins coexist |
 
 ## Troubleshooting
 
