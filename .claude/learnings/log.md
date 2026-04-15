@@ -3,6 +3,17 @@
 This is the append-only learnings log for the `ai-setup-automation` marketplace repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-04-15 — plan-sdlc: fix #152 ship-config missing fields
+Planned a fix for `/setup-sdlc` Step 3b dropping `auto`/`skip`/`bump` questions. Root cause was LLM drift when SKILL.md hand-enumerates 8 `AskUserQuestion` calls — the LLM silently shortens the loop. Fix: emit authoritative field list from `setup.js` (new P7 contract) and make SKILL.md iterate mechanically.
+
+Cross-model plan review (sonnet reviewing opus plan) caught two real blockers that self-review missed:
+1. `rebase` field: SKILL.md currently says `yes/no/prompt` but `ship.js` only accepts `auto/skip/prompt` strings (or booleans mapped via legacy logic). Writing `"yes"` would silently fall through to the `'auto'` fallback — user's choice ignored. Lesson: when moving enum field definitions into a new source of truth, verify the runtime consumer's accepted value set, not just the documented-in-SKILL.md set.
+2. Schema path: self-review assumed `plugins/sdlc-utilities/scripts/schemas/` existed (pattern inferred from other plugin layouts) when the actual location is `schemas/` at repo root. Lesson: verify path claims with `ls` even in comments — reviewers flag inaccurate references as noise.
+
+Plan also revealed a pre-existing inconsistency between `ship.js` `VALID_SKIP` (5 items) and SKILL.md Step 3b `skip` options (7 items). Scoped out as follow-up, not fixed.
+
+---
+
 ## 2026-03-19 — execute-plan-sdlc: 7-improvement upgrade + plan-sdlc new skill
 Executed a 9-task, 2-wave plan upgrading execute-plan-sdlc and creating plan-sdlc. All tasks classified Standard/Complex; no Trivial tasks, so no batching or pre-wave needed. Wave 1 (7 parallel agents) completed cleanly. Spec compliance review found 1 minor issue in plan-reviewer-prompt.md (9-row table vs 8 specified — agent added "Decomposition balance" row not in spec); fixed inline. Wave 2 (2 parallel docs agents) completed cleanly. README update was required post-execution per AGENTS.md — add this check to standard plan-sdlc output for skill additions.
 Key outcome: grouping improvements by target file (not by improvement letter) was the right decomposition strategy — avoided wave conflicts without over-splitting.
@@ -62,3 +73,6 @@ Key outcome: grouping improvements by target file (not by improvement letter) wa
 - **Impact**: LOW — confusing to contributors and AI agents reading the file.
 - **Action**: Remove hardcoded branch metadata from AGENTS.md. If branch context is needed, use git commands instead of hardcoding in docs.
 - **Status**: STALE
+
+## 2026-04-13 — version-sdlc: branch with no upstream requires --set-upstream on first push
+Branch fix/pipeline-contract-enforcement-and-model-assignment had no upstream. First `git push` failed with exit 128; recovered by running `git push --set-upstream origin <branch>` then `git push --tags` separately. Tag pushed successfully.
