@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "cloudId": "test-cloud",
+  "siteUrl": "https://mycompany.atlassian.net",
+  "project": {
+    "key": "SAVETEST",
+    "name": "Save Test",
+    "id": "10001"
+  },
+  "currentUser": {
+    "accountId": "u1",
+    "displayName": "Test User",
+    "email": "test@example.com"
+  },
+  "issueTypes": {
+    "Task": {
+      "id": "10001",
+      "subtask": false,
+      "hierarchyLevel": 0
+    }
+  },
+  "fieldSchemas": {
+    "Task": {
+      "summary": {
+        "required": true,
+        "type": "string"
+      }
+    }
+  },
+  "workflows": {
+    "Task": {
+      "unsampled": true
+    }
+  },
+  "linkTypes": [],
+  "userMappings": {}
+}

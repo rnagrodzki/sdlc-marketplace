@@ -35,3 +35,4 @@ tests:
   - file://datasets/markdown-to-adf-exec.yaml
   - file://datasets/openspec-lib-exec.yaml
   - file://datasets/openspec-enrich-exec.yaml
+  - file://datasets/jira-sdlc-exec.yaml

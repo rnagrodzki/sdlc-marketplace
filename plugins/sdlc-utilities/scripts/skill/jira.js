@@ -6,7 +6,8 @@
  * workflow graphs, user mappings) to eliminate repeated discovery calls.
  *
  * Usage:
- *   node jira-prepare.js --project <KEY> [--cache-dir <path>] [subcommand]
+ *   node jira-prepare.js --project <KEY> [--cache-dir <path>] [--site <host>]
+ *                        [--skip-workflow-discovery] [subcommand]
  *
  * Subcommands:
  *   --check          Report cache + template status (default)
@@ -31,19 +32,146 @@ const LIB = path.join(__dirname, '..', 'lib');
 const { writeOutput } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
+// Home-cache path helpers
+// ---------------------------------------------------------------------------
+
+function getHomeCacheRoot() {
+  return path.join(os.homedir(), '.sdlc-cache', 'jira');
+}
+
+function sanitizeSiteHost(siteUrl) {
+  if (!siteUrl || typeof siteUrl !== 'string') return null;
+  let host;
+  try {
+    host = new URL(siteUrl).host;
+  } catch (_) {
+    // Accept bare hosts passed without scheme
+    host = siteUrl.replace(/^https?:\/\//i, '').split('/')[0];
+  }
+  if (!host) return null;
+  return host.toLowerCase().replace(/\./g, '_');
+}
+
+/**
+ * Resolve candidate cache paths for a project key.
+ * - If `explicitSite` is provided, returns a single path under that site subdir
+ *   (whether or not the file exists — caller decides).
+ * - Otherwise scans `~/.sdlc-cache/jira/<site>/<KEY>.json` for every site and
+ *   returns only existing matches.
+ *
+ * Returns an array of { path, site } entries.
+ */
+function resolveCandidatePaths(projectKey, explicitSite) {
+  const root = getHomeCacheRoot();
+  if (explicitSite) {
+    return [{ path: path.join(root, explicitSite, `${projectKey}.json`), site: explicitSite }];
+  }
+  let sites;
+  try {
+    sites = fs.readdirSync(root, { withFileTypes: true });
+  } catch (_) {
+    return [];
+  }
+  const matches = [];
+  for (const entry of sites) {
+    if (!entry.isDirectory()) continue;
+    const candidate = path.join(root, entry.name, `${projectKey}.json`);
+    if (fs.existsSync(candidate)) {
+      matches.push({ path: candidate, site: entry.name });
+    }
+  }
+  return matches;
+}
+
+/**
+ * Load the `jira` section of project config from `.claude/sdlc.json`, falling
+ * back to legacy `.sdlc/jira-config.json` if present. Returns `{}` on any
+ * failure — callers treat missing/invalid config as "no multi-project setup".
+ */
+function loadJiraConfig(projectRoot) {
+  try {
+    const { readSection } = require(path.join(LIB, 'config.js'));
+    const section = readSection(projectRoot, 'jira');
+    if (section && typeof section === 'object') return section;
+  } catch (_) { /* fall through to legacy */ }
+
+  // Legacy location — retained for migration scenarios.
+  const legacy = path.join(projectRoot, '.sdlc', 'jira-config.json');
+  if (fs.existsSync(legacy)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(legacy, 'utf8'));
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch (_) { /* ignore */ }
+  }
+  return {};
+}
+
+/**
+ * Legacy cache probe: check `.sdlc/jira-cache/<KEY>.json` (newer deprecation
+ * path) then `.claude/jira-cache/<KEY>.json` (older deprecation path).
+ * Returns `{ path, source } | null`.
+ */
+function findLegacyCache(projectKey, projectRoot) {
+  const candidates = [
+    { path: path.join(projectRoot, '.sdlc', 'jira-cache', `${projectKey}.json`), source: '.sdlc/jira-cache' },
+    { path: path.join(projectRoot, '.claude', 'jira-cache', `${projectKey}.json`), source: '.claude/jira-cache' },
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c.path)) return c;
+  }
+  return null;
+}
+
+/**
+ * Migrate a legacy cache file into the home-cache layout using the `siteUrl`
+ * embedded in the file. The legacy file is left in place for the user to
+ * clean up; the migration is idempotent because subsequent calls find the
+ * home cache first.
+ *
+ * Returns `{ migrated: true, path, site, warning }` on success, or
+ * `{ migrated: false, warning }` when siteUrl is missing.
+ */
+function migrateLegacyCache(legacy, projectKey) {
+  let cache;
+  try {
+    cache = JSON.parse(fs.readFileSync(legacy.path, 'utf8'));
+  } catch (err) {
+    return { migrated: false, warning: `Legacy cache at ${legacy.path} is not valid JSON: ${err.message}` };
+  }
+  const site = sanitizeSiteHost(cache.siteUrl);
+  if (!site) {
+    return { migrated: false, warning: `Legacy cache at ${legacy.path} has no siteUrl; cannot migrate automatically. Run --force-refresh to rebuild.` };
+  }
+  const destDir  = path.join(getHomeCacheRoot(), site);
+  const destPath = path.join(destDir, `${projectKey}.json`);
+  if (!fs.existsSync(destPath)) {
+    fs.mkdirSync(destDir, { recursive: true });
+    fs.copyFileSync(legacy.path, destPath);
+  }
+  return {
+    migrated: true,
+    path:     destPath,
+    site,
+    warning:  `Migrated legacy cache from ${legacy.source}/${projectKey}.json to ~/.sdlc-cache/jira/${site}/${projectKey}.json (legacy file preserved; delete manually when confident).`,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // CLI argument parsing
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let projectKey    = null;
-  let cacheDir      = path.join(process.cwd(), '.sdlc', 'jira-cache');
-  let templatesDir  = null;
-  let subcommand    = 'check';
-  let saveFieldName = null;
-  let copyType      = null;
-  let copyFrom      = null;
-  const errors      = [];
+  let projectKey             = null;
+  let cacheDir               = null;   // only set when --cache-dir is passed
+  let templatesDir           = null;
+  let subcommand             = 'check';
+  let saveFieldName          = null;
+  let copyType               = null;
+  let copyFrom               = null;
+  let site                   = null;
+  let skipWorkflowDiscovery  = false;
+  const errors               = [];
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -53,6 +181,10 @@ function parseArgs(argv) {
       cacheDir = args[++i];
     } else if (a === '--templates-dir' && args[i + 1]) {
       templatesDir = args[++i];
+    } else if (a === '--site' && args[i + 1]) {
+      site = args[++i];
+    } else if (a === '--skip-workflow-discovery') {
+      skipWorkflowDiscovery = true;
     } else if (a === '--check') {
       subcommand = 'check';
     } else if (a === '--load') {
@@ -81,18 +213,45 @@ function parseArgs(argv) {
     errors.push('--project <KEY> is required');
   }
 
-  return { projectKey, cacheDir, templatesDir, subcommand, saveFieldName, copyType, copyFrom, errors };
+  const flags = {
+    skipWorkflowDiscovery,
+    site,
+  };
+
+  return {
+    projectKey,
+    cacheDir,
+    templatesDir,
+    subcommand,
+    saveFieldName,
+    copyType,
+    copyFrom,
+    site,
+    skipWorkflowDiscovery,
+    flags,
+    errors,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Path helpers
+// Cache path resolution
 // ---------------------------------------------------------------------------
 
+/**
+ * Legacy signature preserved for back-compat with callers that pass an
+ * explicit --cache-dir (typically tests or custom deployments). When invoked
+ * with a cache dir outside the working tree, the implicit .gitignore write is
+ * suppressed to avoid polluting user home / arbitrary paths.
+ */
 function getCachePath(projectKey, cacheDir) {
   fs.mkdirSync(cacheDir, { recursive: true });
-  const gitignorePath = path.join(cacheDir, '.gitignore');
-  if (!fs.existsSync(gitignorePath)) {
-    fs.writeFileSync(gitignorePath, '*\n', 'utf8');
+  const rel = path.relative(process.cwd(), cacheDir);
+  const insideWorkTree = rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  if (insideWorkTree) {
+    const gitignorePath = path.join(cacheDir, '.gitignore');
+    if (!fs.existsSync(gitignorePath)) {
+      fs.writeFileSync(gitignorePath, '*\n', 'utf8');
+    }
   }
   return path.join(cacheDir, `${projectKey}.json`);
 }
@@ -151,7 +310,7 @@ function readStdin() {
 
 function resolveTemplateStatus(projectKey, cachePath, templatesDir) {
   let issueTypes = [];
-  if (fs.existsSync(cachePath)) {
+  if (cachePath && fs.existsSync(cachePath)) {
     try {
       const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
       if (cache.issueTypes && typeof cache.issueTypes === 'object') {
@@ -196,41 +355,133 @@ function resolveTemplateStatus(projectKey, cachePath, templatesDir) {
 }
 
 // ---------------------------------------------------------------------------
+// Shared: resolve effective cache path for check/load/clear
+// Returns { path, warnings, candidateSites, error }.
+// - `path` is null when no cache exists and no legacy was migrated.
+// - `candidateSites` is populated when multiple home-cache entries matched.
+// - `error` (string) is set when a hard failure prevents resolution.
+// ---------------------------------------------------------------------------
+
+function resolveEffectiveCachePath({ projectKey, cacheDir, site }) {
+  const warnings = [];
+
+  // Explicit --cache-dir takes precedence (back-compat).
+  if (cacheDir) {
+    return { path: getCachePath(projectKey, cacheDir), warnings, candidateSites: [] };
+  }
+
+  // Home-cache scan
+  const matches = resolveCandidatePaths(projectKey, site);
+  if (site) {
+    // --site always resolves to a single candidate path. When the home-cache
+    // root itself does not exist yet, return path: null so callers emit a clear
+    // "No cache found" rather than propagating a path that cannot exist.
+    const root = getHomeCacheRoot();
+    if (!fs.existsSync(root)) {
+      warnings.push(`Home cache root ${root} does not exist. Run cache initialization first (omit --site or use --force-refresh).`);
+      return { path: null, warnings, candidateSites: [] };
+    }
+    return { path: matches[0].path, warnings, candidateSites: [] };
+  }
+
+  if (matches.length === 1) {
+    return { path: matches[0].path, warnings, candidateSites: [] };
+  }
+
+  if (matches.length >= 2) {
+    const sites = matches.map(m => m.site);
+    warnings.push(`Cache key '${projectKey}' exists under multiple sites: ${sites.join(', ')}. Pass --site <host> to disambiguate.`);
+    return { path: null, warnings, candidateSites: sites };
+  }
+
+  // No home matches — probe legacy
+  const legacy = findLegacyCache(projectKey, process.cwd());
+  if (legacy) {
+    const result = migrateLegacyCache(legacy, projectKey);
+    warnings.push(result.warning);
+    if (result.migrated) {
+      return { path: result.path, warnings, candidateSites: [] };
+    }
+    // Migration failed (no siteUrl) — treat as fresh install.
+  }
+
+  return { path: null, warnings, candidateSites: [] };
+}
+
+/**
+ * Validate `--project <KEY>` against `jira.projects` (when set).
+ * Returns an error string or null.
+ */
+function validateProjectMembership(projectKey, jiraConfig) {
+  const list = Array.isArray(jiraConfig && jiraConfig.projects) ? jiraConfig.projects : null;
+  if (!list || list.length < 2) return null;
+  if (list.includes(projectKey)) return null;
+  return `Project ${projectKey} is not in jira.projects: [${list.join(', ')}]`;
+}
+
+// ---------------------------------------------------------------------------
 // Subcommand: --check
 // ---------------------------------------------------------------------------
 
-function checkCache(cachePath, templatesDir, projectKey) {
-  if (!fs.existsSync(cachePath)) {
-    const legacyPath = path.join(process.cwd(), '.claude', 'jira-cache', `${projectKey}.json`);
-    if (fs.existsSync(legacyPath)) {
-      process.stderr.write('Warning: .claude/jira-cache/ is deprecated. Cache will be written to .sdlc/jira-cache/ on next refresh.\n');
-      cachePath = legacyPath;
-    } else {
-      writeOutput({
-        exists:     false,
-        fresh:      false,
-        projectKey,
-        cachePath,
-        missing:    ['all'],
-        errors:     [],
-        warnings:   [],
-      }, 'jira-context', 0);
-      return;
-    }
+function checkCache({ projectKey, cacheDir, site, skipWorkflowDiscovery, templatesDir }) {
+  const jiraConfig = loadJiraConfig(process.cwd());
+  const membershipError = validateProjectMembership(projectKey, jiraConfig);
+  if (membershipError) {
+    writeOutput({ errors: [membershipError] }, 'jira-context', 1);
+    return;
+  }
+
+  const resolved = resolveEffectiveCachePath({ projectKey, cacheDir, site });
+  for (const w of resolved.warnings) process.stderr.write(`Warning: ${w}\n`);
+
+  const flagsBlock = {
+    skipWorkflowDiscovery: !!skipWorkflowDiscovery,
+    site:                  site || null,
+  };
+
+  if (!resolved.path) {
+    writeOutput({
+      exists:         false,
+      fresh:          false,
+      projectKey,
+      cachePath:      null,
+      candidateSites: resolved.candidateSites,
+      missing:        ['all'],
+      flags:          flagsBlock,
+      errors:         [],
+      warnings:       resolved.warnings,
+    }, 'jira-context', 0);
+    return;
+  }
+
+  if (!fs.existsSync(resolved.path)) {
+    writeOutput({
+      exists:         false,
+      fresh:          false,
+      projectKey,
+      cachePath:      resolved.path,
+      candidateSites: [],
+      missing:        ['all'],
+      flags:          flagsBlock,
+      errors:         [],
+      warnings:       resolved.warnings,
+    }, 'jira-context', 0);
+    return;
   }
 
   let cache;
   try {
-    cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    cache = JSON.parse(fs.readFileSync(resolved.path, 'utf8'));
   } catch (err) {
     writeOutput({
       exists:     true,
       fresh:      false,
       projectKey,
-      cachePath,
+      cachePath:  resolved.path,
       missing:    ['all'],
+      flags:      flagsBlock,
       errors:     [`Cache file is not valid JSON: ${err.message}`],
-      warnings:   [],
+      warnings:   resolved.warnings,
     }, 'jira-context', 0);
     return;
   }
@@ -247,7 +498,6 @@ function checkCache(cachePath, templatesDir, projectKey) {
     }
   }
 
-  // Section presence checks
   const issueTypes     = cache.issueTypes && typeof cache.issueTypes === 'object' ? cache.issueTypes : null;
   const fieldSchemas   = cache.fieldSchemas && typeof cache.fieldSchemas === 'object' ? cache.fieldSchemas : null;
   const workflows      = cache.workflows && typeof cache.workflows === 'object' ? cache.workflows : null;
@@ -256,13 +506,17 @@ function checkCache(cachePath, templatesDir, projectKey) {
 
   const issueTypeNames = issueTypes ? Object.keys(issueTypes) : [];
 
-  // Workflow completeness
   let issueTypesWithWorkflows = 0;
   const incompleteWorkflows   = [];
   if (workflows) {
     issueTypesWithWorkflows = Object.keys(workflows).length;
     for (const typeName of issueTypeNames) {
-      if (!workflows[typeName]) incompleteWorkflows.push(typeName);
+      const entry = workflows[typeName];
+      if (!entry) {
+        incompleteWorkflows.push(typeName);
+      }
+      // Entries marked `{ unsampled: true }` are intentionally sparse (R14);
+      // they count as present for section completeness.
     }
   } else {
     incompleteWorkflows.push(...issueTypeNames);
@@ -306,7 +560,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
     if (!info.present) missing.push(name);
   }
 
-  const templateStatus = resolveTemplateStatus(projectKey, cachePath, templatesDir);
+  const templateStatus = resolveTemplateStatus(projectKey, resolved.path, templatesDir);
   const customTypes    = Object.entries(templateStatus.resolved)
     .filter(([, v]) => v === 'custom')
     .map(([k]) => k);
@@ -314,7 +568,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
     .filter(([, v]) => v === 'none')
     .map(([k]) => k);
 
-  const warnings = [];
+  const warnings = [...resolved.warnings];
   if (ageHours === null) {
     warnings.push('Cache file has no lastUpdated field; freshness cannot be determined.');
   }
@@ -328,7 +582,8 @@ function checkCache(cachePath, templatesDir, projectKey) {
     ageHours:    ageHours !== null ? Math.round(ageHours * 100) / 100 : null,
     maxAgeHours,
     projectKey,
-    cachePath,
+    cachePath:      resolved.path,
+    candidateSites: [],
     sections,
     templates: {
       customCount:    customTypes.length,
@@ -337,6 +592,7 @@ function checkCache(cachePath, templatesDir, projectKey) {
       uncoveredTypes,
     },
     missing,
+    flags:    flagsBlock,
     errors:   [],
     warnings,
   }, 'jira-context', 0);
@@ -346,18 +602,26 @@ function checkCache(cachePath, templatesDir, projectKey) {
 // Subcommand: --load
 // ---------------------------------------------------------------------------
 
-function loadCache(cachePath, projectKey) {
-  if (!fs.existsSync(cachePath)) {
-    const legacyPath = path.join(process.cwd(), '.claude', 'jira-cache', `${projectKey}.json`);
-    if (fs.existsSync(legacyPath)) {
-      process.stderr.write('Warning: .claude/jira-cache/ is deprecated. Cache will be written to .sdlc/jira-cache/ on next refresh.\n');
-      cachePath = legacyPath;
-    } else {
-      writeOutput({ errors: ['No cache found for project. Run cache initialization first.'] }, 'jira-context', 1);
+function loadCache({ projectKey, cacheDir, site }) {
+  const resolved = resolveEffectiveCachePath({ projectKey, cacheDir, site });
+  for (const w of resolved.warnings) process.stderr.write(`Warning: ${w}\n`);
+
+  if (!resolved.path) {
+    if (resolved.candidateSites.length >= 2) {
+      writeOutput({
+        errors:         [`Multiple cache entries for '${projectKey}' — pass --site <host> to disambiguate.`],
+        candidateSites: resolved.candidateSites,
+      }, 'jira-context', 1);
       return;
     }
+    writeOutput({ errors: ['No cache found for project. Run cache initialization first.'] }, 'jira-context', 1);
+    return;
   }
-  const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+  if (!fs.existsSync(resolved.path)) {
+    writeOutput({ errors: ['No cache found for project. Run cache initialization first.'] }, 'jira-context', 1);
+    return;
+  }
+  const cache = JSON.parse(fs.readFileSync(resolved.path, 'utf8'));
   writeOutput(cache, 'jira-context', 0);
 }
 
@@ -365,7 +629,7 @@ function loadCache(cachePath, projectKey) {
 // Subcommand: --save
 // ---------------------------------------------------------------------------
 
-function saveCache(cachePath) {
+function saveCache({ projectKey, cacheDir, site }) {
   const raw = readStdin();
   let data;
   try {
@@ -375,23 +639,38 @@ function saveCache(cachePath) {
     return;
   }
 
-  const missingFields = ['version', 'cloudId', 'project'].filter(f => !(f in data));
+  const missingFields = ['version', 'cloudId', 'project', 'siteUrl'].filter(f => !(f in data));
   if (missingFields.length > 0) {
     writeOutput({ errors: [`Cache JSON is missing required fields: ${missingFields.join(', ')}`] }, 'jira-context', 1);
     return;
   }
 
-  fs.mkdirSync(path.dirname(cachePath), { recursive: true });
-  fs.writeFileSync(cachePath, JSON.stringify(data, null, 2) + '\n', 'utf8');
-  writeOutput({ saved: true, cachePath }, 'jira-context', 0);
+  let writePath;
+  if (cacheDir) {
+    writePath = getCachePath(projectKey, cacheDir);
+  } else {
+    const resolvedSite = site || sanitizeSiteHost(data.siteUrl);
+    if (!resolvedSite) {
+      writeOutput({ errors: [`Cannot derive site host from siteUrl: ${data.siteUrl}`] }, 'jira-context', 1);
+      return;
+    }
+    writePath = path.join(getHomeCacheRoot(), resolvedSite, `${projectKey}.json`);
+  }
+
+  fs.mkdirSync(path.dirname(writePath), { recursive: true });
+  fs.writeFileSync(writePath, JSON.stringify(data, null, 2) + '\n', 'utf8');
+  writeOutput({ saved: true, cachePath: writePath }, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
 // Subcommand: --save-field
 // ---------------------------------------------------------------------------
 
-function saveField(cachePath, fieldName) {
-  if (!fs.existsSync(cachePath)) {
+function saveField({ projectKey, cacheDir, site }, fieldName) {
+  const resolved = resolveEffectiveCachePath({ projectKey, cacheDir, site });
+  for (const w of resolved.warnings) process.stderr.write(`Warning: ${w}\n`);
+
+  if (!resolved.path || !fs.existsSync(resolved.path)) {
     writeOutput({ errors: ['No cache found for project. Run cache initialization first.'] }, 'jira-context', 1);
     return;
   }
@@ -407,7 +686,7 @@ function saveField(cachePath, fieldName) {
 
   let cache;
   try {
-    cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    cache = JSON.parse(fs.readFileSync(resolved.path, 'utf8'));
   } catch (err) {
     writeOutput({ errors: [`Cache file is not valid JSON: ${err.message}`] }, 'jira-context', 1);
     return;
@@ -421,16 +700,17 @@ function saveField(cachePath, fieldName) {
     cache[fieldName] = incoming;
   }
 
-  fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2) + '\n', 'utf8');
-  writeOutput({ saved: true, field: fieldName, cachePath }, 'jira-context', 0);
+  fs.writeFileSync(resolved.path, JSON.stringify(cache, null, 2) + '\n', 'utf8');
+  writeOutput({ saved: true, field: fieldName, cachePath: resolved.path }, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
 // Subcommand: --templates
 // ---------------------------------------------------------------------------
 
-function resolveTemplates(projectKey, cachePath, templatesDir) {
-  const status = resolveTemplateStatus(projectKey, cachePath, templatesDir);
+function resolveTemplates({ projectKey, cacheDir, site }, templatesDir) {
+  const resolved = resolveEffectiveCachePath({ projectKey, cacheDir, site });
+  const status = resolveTemplateStatus(projectKey, resolved.path, templatesDir);
   writeOutput(status, 'jira-context', 0);
 }
 
@@ -438,11 +718,13 @@ function resolveTemplates(projectKey, cachePath, templatesDir) {
 // Subcommand: --init-templates
 // ---------------------------------------------------------------------------
 
-function initTemplates(projectKey, cachePath, templatesDir) {
+function initTemplates({ projectKey, cacheDir, site }, templatesDir) {
+  const resolved = resolveEffectiveCachePath({ projectKey, cacheDir, site });
+
   let issueTypes = [];
-  if (fs.existsSync(cachePath)) {
+  if (resolved.path && fs.existsSync(resolved.path)) {
     try {
-      const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+      const cache = JSON.parse(fs.readFileSync(resolved.path, 'utf8'));
       if (cache.issueTypes && typeof cache.issueTypes === 'object') {
         issueTypes = Object.keys(cache.issueTypes);
       }
@@ -478,11 +760,22 @@ function initTemplates(projectKey, cachePath, templatesDir) {
 // Subcommand: --clear
 // ---------------------------------------------------------------------------
 
-function clearCache(cachePath) {
-  if (fs.existsSync(cachePath)) {
-    fs.unlinkSync(cachePath);
+function clearCache({ projectKey, cacheDir, site }) {
+  if (cacheDir) {
+    const p = getCachePath(projectKey, cacheDir);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+    writeOutput({ cleared: true, cachePath: p }, 'jira-context', 0);
+    return;
   }
-  writeOutput({ cleared: true, cachePath }, 'jira-context', 0);
+  const candidates = resolveCandidatePaths(projectKey, site);
+  const cleared = [];
+  for (const c of candidates) {
+    if (fs.existsSync(c.path)) {
+      fs.unlinkSync(c.path);
+      cleared.push(c.path);
+    }
+  }
+  writeOutput({ cleared: true, cachePaths: cleared }, 'jira-context', 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -513,37 +806,38 @@ function copyTemplate(copyType, copyFrom, templatesDir) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const { projectKey, cacheDir, templatesDir: templatesOverride, subcommand, saveFieldName, copyType, copyFrom, errors } = parseArgs(process.argv);
+  const parsed = parseArgs(process.argv);
+  const { projectKey, cacheDir, templatesDir: templatesOverride, subcommand, saveFieldName, copyType, copyFrom, site, skipWorkflowDiscovery, errors } = parsed;
 
   if (errors.length > 0) {
     writeOutput({ errors }, 'jira-context', 1);
     return;
   }
 
-  const cachePath    = getCachePath(projectKey, cacheDir);
   const templatesDir = resolveTemplatesDir(templatesOverride);
+  const ctx = { projectKey, cacheDir, site, skipWorkflowDiscovery, templatesDir };
 
   switch (subcommand) {
     case 'check':
-      checkCache(cachePath, templatesDir, projectKey);
+      checkCache(ctx);
       break;
     case 'load':
-      loadCache(cachePath, projectKey);
+      loadCache(ctx);
       break;
     case 'save':
-      saveCache(cachePath);
+      saveCache(ctx);
       break;
     case 'save-field':
-      saveField(cachePath, saveFieldName);
+      saveField(ctx, saveFieldName);
       break;
     case 'templates':
-      resolveTemplates(projectKey, cachePath, templatesDir);
+      resolveTemplates(ctx, templatesDir);
       break;
     case 'init-templates':
-      initTemplates(projectKey, cachePath, templatesDir);
+      initTemplates(ctx, templatesDir);
       break;
     case 'clear':
-      clearCache(cachePath);
+      clearCache(ctx);
       break;
     case 'copy-template':
       copyTemplate(copyType, copyFrom, templatesDir);
@@ -565,6 +859,14 @@ if (require.main === module) {
 module.exports = {
   parseArgs,
   getCachePath,
+  getHomeCacheRoot,
+  sanitizeSiteHost,
+  resolveCandidatePaths,
+  loadJiraConfig,
+  findLegacyCache,
+  migrateLegacyCache,
+  resolveEffectiveCachePath,
+  validateProjectMembership,
   resolveTemplatesDir,
   checkCache,
   loadCache,

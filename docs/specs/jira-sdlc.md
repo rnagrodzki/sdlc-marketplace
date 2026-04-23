@@ -8,16 +8,18 @@
 
 ## Arguments
 
-- A1: `--project <KEY>` — Jira project key (default: auto-detected via 4-step fallback)
+- A1: `--project <KEY>` — Jira project key (default: auto-detected via 5-step fallback). When `jira.projects` is set, values outside that list are rejected.
 - A2: `--force-refresh` — rebuild cache regardless of current state (default: false)
 - A3: `--init-templates` — copy default description templates to `.claude/jira-templates/` (default: false)
+- A4: `--skip-workflow-discovery` — bypass Phase 5 workflow discovery; per non-subtask issue type, cache `workflows: { <type>: { unsampled: true } }`. Transition operations fall back to a live `getTransitionsForJiraIssue` call per issue when workflow data is marked `unsampled`. Use in CI or pre-seeded environments where Phase 5 MCP calls are too expensive.
+- A5: `--site <host>` — disambiguator for `--check`/`--load` when multiple cache files for the same project key exist under different site subdirectories of `~/.sdlc-cache/jira/`. Value is the sanitized site host (lowercased, `.` → `_`, e.g., `acme_atlassian_net`).
 
 ## Core Requirements
 
-- R1: Initialize a deterministic cache at `.sdlc/jira-cache/<PROJECT_KEY>.json` containing cloudId, issue types, field schemas, workflow graphs, link types, and user mappings
+- R1: Initialize a deterministic cache at `~/.sdlc-cache/jira/<sanitizedSiteHost>/<PROJECT_KEY>.json` containing cloudId, issue types, field schemas, workflow graphs, link types, and user mappings. `sanitizedSiteHost` is derived from `siteUrl` — the URL host lowercased with `.` replaced by `_` (e.g., `acme.atlassian.net` → `acme_atlassian_net`). The cache lives outside the working tree to avoid repo-local state and to support multi-tenant (site-keyed) installations. When a project-keyed cache file is found at the legacy in-repo locations `.sdlc/jira-cache/<KEY>.json` or `.claude/jira-cache/<KEY>.json`, the prepare script migrates it to the home layout using `sanitizeSiteHost(cache.siteUrl)` and emits a warning; the legacy file is left in place for the user to clean up.
 - R2: Cache is permanent by default (no timer-based expiry); rebuilt only on `--force-refresh` or operation failure due to stale data
 - R3: After initialization, all operations read exclusively from cache — no discovery endpoint calls
-- R4: Project key resolution follows 4-step ordered fallback: (1) `--project` argument, (2) branch name pattern `[A-Z]{2,10}-\d+`, (3) `.claude/sdlc.json` → `jira.defaultProject`, (4) AskUserQuestion
+- R4: Project key resolution follows 5-step ordered fallback: (1) `--project` argument, (2) branch name pattern `[A-Z]{2,10}-\d+` — when `jira.projects` is configured, only keys that match a member of `jira.projects` accept this signal, (3) `.claude/sdlc.json` → `jira.defaultProject`, (4) when `jira.projects` has ≥2 entries, AskUserQuestion with a closed list matching `jira.projects`, (5) free-form AskUserQuestion. Backward compatible: repos without `jira.projects` behave as before (steps 1/2/3/5).
 - R5: Cache initialization runs 6 phases: identity, project metadata, issue types, field schemas (parallel per type), workflow discovery (per non-subtask type), assemble and save
 - R6: Classify user intent into one of 10 operation types: create, edit, search, transition, comment, link, assign, worklog, view, bulk
 - R7: Per-issue-type description templates are filled from user context before MCP calls; all `{placeholder}` markers must be replaced or the section removed — never send raw placeholders
@@ -26,6 +28,15 @@
 - R10: When `--init-templates` is passed, initialize templates and stop — do not execute any Jira operation
 - R11: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 - R12: Comments must be converted from markdown to ADF via `scripts/lib/markdown-to-adf.js` before posting to Jira — compose in markdown using REFERENCE.md Section 4 safe syntax, pipe through the conversion script, then call `addCommentToJiraIssue` with `contentFormat: "adf"` and the ADF JSON body
+- R13: `jira.projects` (string[]) may be set in `.claude/sdlc.json` alongside or instead of `jira.defaultProject`. When set with ≥2 entries, the skill (1) rejects `--project <KEY>` arguments whose value is not a member of `jira.projects` (prepare script exits 1 with a descriptive error), and (2) presents a closed-list AskUserQuestion prompt using only the configured projects when no other signal resolves the project key. Single-project repos (no `jira.projects`, or fewer than 2 entries) retain the prior behavior with `defaultProject`.
+- R14: `--skip-workflow-discovery` bypasses Phase 5 entirely. The cache is written with `workflows: { <type>: { unsampled: true } }` for each non-subtask issue type. Transition operations that encounter an `unsampled` marker fall back to a live `getTransitionsForJiraIssue` call per issue (reusing the existing stale-cache auto-refresh path from R9/E10). Cache rows for subtask types and other sections are populated normally.
+- R15: When `--check` resolves against the home-cache layout without `--site`, it scans `~/.sdlc-cache/jira/*/<KEY>.json` for all candidates. Zero matches → `{ exists: false }` (treat as fresh install). Exactly one match → use it. Two or more matches → `{ exists: false, candidateSites: [<host>, …] }`; the user must re-run with `--site <host>` to disambiguate or `--force-refresh` to rebuild against a specific site.
+- R16: SKILL.md frontmatter `description` must include auto-trigger phrases covering the full operation surface: read/view, comment add, create, edit, search, transition, link, assign, worklog, bulk. Required trigger tokens: `read jira`, `view jira`, `show jira`, `get jira`, `fetch jira`, `jira details`, `add comment`, `comment on jira`, `reply to jira`, `jira ticket`, `jira issue`. Purpose: allow the downstream model to activate the skill automatically on common read-and-comment phrasings without an explicit `/jira-sdlc` invocation. Total frontmatter `description` length must stay within 1024 characters.
+
+## Assumptions
+
+- C1 (context): `~/.sdlc-cache/` is writable by the user running the skill. On platforms without a writable `$HOME`, the user may override with `--cache-dir <path>` (preserves existing flag behavior).
+- C2 (context): `siteUrl` is always present in cache payloads; `saveCache` enforces this. Cache files migrated from legacy locations carry their original `siteUrl`, which is used to derive the new site subdirectory.
 
 ## Workflow Phases
 
@@ -61,6 +72,7 @@
 - P2: `missing` (string[]) — required cache sections that are absent
 - P3: `fresh` (boolean) — whether cache is within TTL (when `maxAgeHours > 0`)
 - P4: Cache load output (full JSON) — the complete cache object when `--load` is used
+- P5: `candidateSites` (string[]) — populated by `--check` when two or more home-cache entries match the project key without `--site` disambiguation. Empty or absent when the candidate count is 0 or 1. Paired with `exists: false` when ≥2 candidates exist.
 
 ## Error Handling
 

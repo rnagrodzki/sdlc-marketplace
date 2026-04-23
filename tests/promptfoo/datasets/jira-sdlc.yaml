@@ -2,6 +2,11 @@
 #   jira-ticket-created            -- CORRECT: simulates a created Jira ticket, triggers workflow continuation
 #   jira-create-task               -- CORRECT: simulates Jira cache with project metadata for create operation
 #   jira-comment-adf               -- CORRECT: simulates Jira cache for comment operation with ADF conversion
+#   jira-multi-project-closed-list -- CORRECT: simulates jira.projects in config to trigger closed-list prompt
+#   jira-unsampled-transition      -- CORRECT: simulates cache with workflows[Type].unsampled=true to force live fallback
+#
+# NOTE: Exec (script-only) cases for jira-prepare.js live in jira-sdlc-exec.yaml
+# (ref'd by promptfooconfig-exec.yaml). This file contains behavioral (LLM) cases only.
 
 - description: "jira-sdlc: shows workflow continuation menu after Jira ticket created"
   vars:
@@ -97,3 +102,70 @@
         issueIdOrKey (not "issueKey"). (4) It uses responseContentFormat: "markdown"
         for reading. It does NOT post raw markdown with contentFormat: "markdown" for
         the comment. The cloudId comes from the cache.
+
+- description: "jira-sdlc: multi-project config — closed-list prompt for project selection (R13)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-multi-project-closed-list.md"
+    user_request: >
+      Run /jira-sdlc. No --project argument. Current branch is "main" (no
+      [A-Z]{2,10}-\d+ pattern). .claude/sdlc.json has jira.projects: ["FOO","BAR"]
+      and jira.defaultProject is null. The user wants to create an issue but hasn't
+      said which project. Show how the skill resolves the project key.
+  assert:
+    # Must mention AskUserQuestion / closed list of the two configured projects
+    - type: icontains
+      value: "FOO"
+    - type: icontains
+      value: "BAR"
+    # Must NOT invent a third project (free-form prompt or fabricated key)
+    - type: not-regex
+      value: "(PROJ|BAZ|QUUX|TEAM)"
+    # Behavioral rubric for R13 closed-list prompt
+    - type: llm-rubric
+      value: >
+        The response recognizes that jira.projects has been configured with two entries
+        (FOO and BAR) and prompts the user to pick one of them via AskUserQuestion with
+        a closed list containing exactly "FOO" and "BAR" as options. It does NOT present
+        a free-form text input, does NOT invent a third option, and does NOT silently
+        pick defaultProject (which is null). The project key resolution follows the
+        5-step ordered fallback: since steps 1 (--project arg), 2 (branch pattern),
+        and 3 (defaultProject) all fail, step 4 (closed-list AskUserQuestion) activates
+        because jira.projects has ≥2 entries.
+
+- description: "jira-sdlc: unsampled workflow — transition falls back to live getTransitionsForJiraIssue (R14)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-unsampled-transition.md"
+    user_request: >
+      Run /jira-sdlc. Transition PROJ-147 to Done. The cache has
+      workflows.Task = { "unsampled": true } because --skip-workflow-discovery was
+      used to build the cache. Show how the skill performs the transition.
+  assert:
+    # Must call the live transitions endpoint
+    - type: icontains
+      value: "getTransitionsForJiraIssue"
+    # Must eventually call transitionJiraIssue
+    - type: icontains
+      value: "transitionJiraIssue"
+    # Must use the transition id from the live call — explicit id mention
+    - type: regex
+      value: "(\"id\"|transition id|transition.?ID)"
+    # Must NOT pass transition by name (only { id } is accepted)
+    - type: not-regex
+      value: "transition:\\s*\"Done\""
+    # Must NOT treat unsampled as a blocking cache-incompleteness failure
+    - type: not-regex
+      value: "(cache incomplete|cache is incomplete|rebuild cache|--force-refresh)"
+    # Behavioral rubric for R14 unsampled fallback
+    - type: llm-rubric
+      value: >
+        The response recognizes the workflows.Task = { unsampled: true } marker as an
+        intentional sparse entry (not a cache failure), and routes the transition
+        through a live mcp__atlassian__getTransitionsForJiraIssue call against PROJ-147
+        to fetch the transition id. It then passes that id to
+        mcp__atlassian__transitionJiraIssue in the { id: "..." } shape (never by name
+        string). It does NOT trigger --force-refresh, does NOT report the cache as
+        incomplete, and does NOT guess a transition id. The response treats unsampled
+        identically to a transition ID not being cached — the existing auto-refresh
+        fallback from REFERENCE handles both cases.
