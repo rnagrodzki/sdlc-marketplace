@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.22] - 2026-04-23
+
+### Added
+- received-review-sdlc now auto-executes Step 12 (reply to PR threads and resolve addressed items) when `--auto` is active, without an interactive consent gate (#131)
+
 ## [0.17.21] - 2026-04-15
 
 ### Added
