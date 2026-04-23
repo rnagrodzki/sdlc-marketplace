@@ -1,7 +1,7 @@
 # Jira SDLC — Examples
 
 Copy-paste MCP call examples for every operation. Values marked with `← cache.xxx`
-come from the project cache at `.claude/jira-cache/<PROJECT_KEY>.json`. Replace
+come from the project cache at `~/.sdlc-cache/jira/<sanitizedSiteHost>/<PROJECT_KEY>.json` (legacy locations `.sdlc/jira-cache/` and `.claude/jira-cache/` migrate automatically on first use). Replace
 `PROJ` with the actual project key and adjust IDs to match the cache.
 
 Comment examples use `contentFormat: "adf"` with the body converted via `markdown-to-adf.js`.
@@ -126,11 +126,11 @@ mcp__atlassian__getTransitionsForJiraIssue({
 ### Phase 6 — Save cache
 
 ```bash
-# Write assembled cache JSON to disk
-cat > .sdlc/jira-cache/PROJ.json << 'EOF'
+# Write assembled cache JSON to disk via the prepare script (handles site-keyed path)
+cat << 'EOF' | node "$SCRIPT" --project PROJ --save
 {
   "cloudId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "siteUrl": "mycompany.atlassian.net",
+  "siteUrl": "https://mycompany.atlassian.net",
   "project": { "key": "PROJ", "name": "My Project", "id": "10000" },
   "currentUser": { "accountId": "5b10a2844c20165700ede21g", "displayName": "Jane Smith", "email": "jane@company.com" },
   "issueTypes": { ... },

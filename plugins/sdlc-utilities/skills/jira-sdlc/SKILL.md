@@ -1,8 +1,8 @@
 ---
 name: jira-sdlc
-description: "Use this skill when creating, editing, searching, transitioning, commenting on, or linking Jira issues using Atlassian MCP tools. Caches project metadata (custom fields, workflows, transitions, user mappings) to eliminate redundant discovery calls. Uses per-issue-type description templates (customizable per project). Arguments: [--project <KEY>] [--force-refresh] [--init-templates]. Triggers on: create jira issue, edit jira ticket, search jira, transition jira, jira comment, link jira, assign jira, log work jira, bulk jira operations, manage jira, jira template."
+description: "Use this skill when creating, editing, reading, viewing, searching, transitioning, commenting on, or linking Jira issues using Atlassian MCP tools. Caches project metadata (custom fields, workflows, transitions, user mappings) to eliminate redundant discovery calls. Supports multi-project repos via jira.projects, and skipping workflow discovery for CI. Arguments: [--project <KEY>] [--force-refresh] [--init-templates] [--site <host>] [--skip-workflow-discovery]. Triggers on: create jira issue, edit jira ticket, search jira, transition jira, jira comment, link jira, assign jira, log work jira, bulk jira operations, manage jira, jira template, read jira, view jira, show jira, get jira, fetch jira, jira details, add comment, comment on jira, reply to jira, jira ticket, jira issue."
 user-invocable: true
-argument-hint: "[--project <KEY>] [--force-refresh] [--init-templates]"
+argument-hint: "[--project <KEY>] [--force-refresh] [--init-templates] [--site <host>] [--skip-workflow-discovery]"
 ---
 
 # Managing Jira Issues
@@ -27,12 +27,17 @@ Eliminate all redundant discovery calls after initialization.
 
 ## How This Skill Works
 
-On first use, this skill initializes a cache at `.sdlc/jira-cache/<PROJECT_KEY>.json`
+On first use, this skill initializes a cache at `~/.sdlc-cache/jira/<sanitizedSiteHost>/<PROJECT_KEY>.json`
 containing the site's `cloudId`, issue type definitions, field schemas, workflow graphs,
-link types, and user mappings. The cache is permanent by default — it does not expire
-on a timer. After initialization, every subsequent operation reads exclusively from the
-cache. The cache is rebuilt only when `--force-refresh` is passed or when operations
-fail due to stale data (invalid transition IDs, changed field schemas).
+link types, and user mappings. `sanitizedSiteHost` is the site URL host lowercased with
+`.` replaced by `_` (e.g., `acme.atlassian.net` → `acme_atlassian_net`). The cache lives
+outside the working tree and is keyed by site to support repos that map to multiple Jira
+tenants. The cache is permanent by default — it does not expire on a timer. After
+initialization, every subsequent operation reads exclusively from the cache. The cache is
+rebuilt only when `--force-refresh` is passed or when operations fail due to stale data
+(invalid transition IDs, changed field schemas). Legacy caches found at
+`.sdlc/jira-cache/<KEY>.json` or `.claude/jira-cache/<KEY>.json` are migrated to the home
+layout automatically on the next `--check`; the legacy files are left in place.
 
 Each issue type has a description template (shipped in the skill's `templates/` directory
 and customizable per project at `.claude/jira-templates/<Type>.md`). Templates are filled
@@ -48,16 +53,25 @@ removed entirely — the API call is never made with raw placeholder text.
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `--project <KEY>` | Jira project key (e.g., PROJ) | Auto-detected |
+| `--project <KEY>` | Jira project key (e.g., PROJ). When `jira.projects` is set, values outside the list are rejected. | Auto-detected |
 | `--force-refresh` | Rebuild cache even if fresh | false |
 | `--init-templates` | Copy default templates to `.claude/jira-templates/` | false |
+| `--site <host>` | Sanitized site host (e.g., `acme_atlassian_net`). Disambiguates `--check`/`--load` when the same project key is cached under multiple sites. | Unset |
+| `--skip-workflow-discovery` | Bypass Phase 5; cache `workflows[type] = { unsampled: true }` per non-subtask type. Transitions fall back to live `getTransitionsForJiraIssue` per issue. Use in CI. | false |
 
 **Project key resolution (ordered fallback):**
 
-1. `--project <KEY>` argument
-2. Parse current git branch for `[A-Z]{2,10}-\d+` pattern (e.g., `feat/PROJ-123-fix` → `PROJ`)
-3. Read `.claude/sdlc.json` → `jira.defaultProject`
-4. Use AskUserQuestion to ask: "Which Jira project key should I use? (e.g., PROJ, TEAM)"
+1. `--project <KEY>` argument. When `jira.projects` is set (≥2 entries), the prepare script rejects values not in the list (exit 1).
+2. Parse current git branch for `[A-Z]{2,10}-\d+` pattern (e.g., `feat/PROJ-123-fix` → `PROJ`). When `jira.projects` is set, accept only keys in the list; otherwise fall through.
+3. Read `.claude/sdlc.json` → `jira.defaultProject`.
+4. When `jira.projects` has ≥2 entries, use AskUserQuestion with a closed list matching `jira.projects` ("Which Jira project key should I use?").
+5. Use AskUserQuestion to ask: "Which Jira project key should I use? (e.g., PROJ, TEAM)".
+
+Backward compatible: repos without `jira.projects` retain the previous 4-step behavior (1/2/3/5).
+
+**Multi-candidate cache disambiguation:**
+
+When `--check` is run without `--site` and the home-cache contains entries for the project key under two or more site subdirectories, the script returns `exists: false` and `candidateSites: [<host>, …]`. Present the `candidateSites` list to the user via AskUserQuestion and re-run with `--site <host>`, or use `--force-refresh` to rebuild against a specific site.
 
 ### Script Resolution Block
 
@@ -201,6 +215,22 @@ mcp__atlassian__getJiraIssueTypeMetaWithFields({ cloudId, projectKey, issueTypeI
 ```
 
 ### Phase 5 — Workflow discovery (per non-subtask issue type)
+
+**Skip branch (when `flags.skipWorkflowDiscovery` is `true` in the `--check` output):**
+
+Do not issue any of the Phase 5a/5b/5c calls. Instead, for each non-subtask issue type in
+`issueTypes`, write:
+
+```json
+"workflows": { "<issueTypeName>": { "unsampled": true } }
+```
+
+Subtask types are omitted (no workflow entry). Transitions at runtime fall back to a live
+`getTransitionsForJiraIssue` call per issue — the existing stale-cache auto-refresh path
+handles `unsampled` markers identically to a cache miss. Use this branch in CI and other
+pre-seeded environments where Phase 5 is too expensive.
+
+**Standard branch (default):**
 
 For each non-subtask issue type in `issueTypes`:
 
@@ -406,6 +436,7 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 - Transition `requiredFields` may include screen-only fields not in `fieldSchemas` — if a required field is absent from the schema, try the transition without it first; screen fields sometimes only block the Jira UI, not the API
 - `getVisibleJiraProjects` uses `searchString` (not `query`) for filtering — check parameter name before calling
 - When Phase 5 workflow sampling finds no issues at all for a type, skip workflow discovery for that type entirely and note it in the cache as `"workflows": { "Story": { "unsampled": true } }`
+- `unsampled: true` markers (from `--skip-workflow-discovery` in CI, or from no-sample results above) route transition operations through a live `getTransitionsForJiraIssue` per issue — the skill reuses the existing stale-cache auto-refresh path, so no separate branch is required in Step 3. Treat `unsampled` identically to "transition ID not cached".
 - The `mcp__atlassian__` prefix is the default; if the user's MCP is registered under a different prefix (e.g., `mcp__claude_ai_Atlassian__`), use the active prefix consistently across all calls in the session
 
 ---

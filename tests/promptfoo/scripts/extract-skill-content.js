@@ -67,7 +67,18 @@ module.exports = async function transformVars(vars) {
 
   // script_args: replace {{project_root}} placeholder after temp dir resolution
   if (vars.script_args && result.project_root) {
-    result.script_args = vars.script_args.replace('{{project_root}}', result.project_root);
+    result.script_args = vars.script_args.replace(/\{\{project_root\}\}/g, result.project_root);
+  }
+
+  // script_home: replace {{project_root}} placeholder so tests can anchor HOME
+  // overrides against the temp-copied fixture directory.
+  if (vars.script_home && result.project_root) {
+    result.script_home = vars.script_home.replace(/\{\{project_root\}\}/g, result.project_root);
+  }
+
+  // script_cwd: same substitution — common when the fixture root itself is the cwd.
+  if (vars.script_cwd && result.project_root) {
+    result.script_cwd = vars.script_cwd.replace(/\{\{project_root\}\}/g, result.project_root);
   }
 
   return result;

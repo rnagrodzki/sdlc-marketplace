@@ -15,6 +15,7 @@
 'use strict';
 
 const fs   = require('node:fs');
+const os   = require('node:os');
 const path = require('node:path');
 
 const pluginRoot = path.resolve(__dirname, '..');
@@ -261,43 +262,68 @@ try {
 // ---------------------------------------------------------------------------
 
 try {
-  const projectRoot = process.cwd();
-  const jiraCacheDir = path.join(projectRoot, '.sdlc', 'jira-cache');
-  if (fs.existsSync(jiraCacheDir)) {
-    const cacheFiles = fs.readdirSync(jiraCacheDir).filter(f => f.endsWith('.json'));
-    for (const cacheFile of cacheFiles) {
+  // Home-cache layout: ~/.sdlc-cache/jira/<sanitizedSiteHost>/<PROJECT_KEY>.json
+  const homeRoot = path.join(os.homedir(), '.sdlc-cache', 'jira');
+  const entries = [];
+  if (fs.existsSync(homeRoot)) {
+    let siteDirs;
+    try {
+      siteDirs = fs.readdirSync(homeRoot, { withFileTypes: true });
+    } catch {
+      siteDirs = [];
+    }
+    for (const siteEntry of siteDirs) {
+      if (!siteEntry.isDirectory()) continue;
+      const siteDir = path.join(homeRoot, siteEntry.name);
+      let cacheFiles;
       try {
-        const projectKey = path.basename(cacheFile, '.json');
-        const cacheData = JSON.parse(fs.readFileSync(path.join(jiraCacheDir, cacheFile), 'utf8'));
-        const lastUpdated = cacheData.lastUpdated;
-        const maxAgeHours = cacheData.maxAgeHours;
-
-        if (!lastUpdated) continue;
-
-        const ageMs = Date.now() - new Date(lastUpdated).getTime();
-        const ageHours = ageMs / (1000 * 60 * 60);
-
-        let ageDisplay;
-        if (ageHours < 1) {
-          ageDisplay = 'less than 1h ago';
-        } else if (ageHours < 24) {
-          const h = Math.round(ageHours);
-          ageDisplay = `${h}h ago`;
-        } else {
-          const d = Math.round(ageHours / 24);
-          ageDisplay = `${d} day${d !== 1 ? 's' : ''} ago`;
-        }
-
-        if (maxAgeHours === 0) {
-          resumeLines.push(`Jira cache: ${projectKey} (last updated ${ageDisplay}, permanent)`);
-        } else if (ageHours > maxAgeHours) {
-          resumeLines.push(`Jira cache: ${projectKey} (stale — ${ageDisplay}, TTL ${maxAgeHours}h) — refresh with /jira-sdlc --force-refresh`);
-        } else {
-          resumeLines.push(`Jira cache: ${projectKey} (last updated ${ageDisplay}, TTL ${maxAgeHours}h)`);
-        }
+        cacheFiles = fs.readdirSync(siteDir).filter(f => f.endsWith('.json'));
       } catch {
-        // Graceful degradation — skip this cache file on any error
+        continue;
       }
+      for (const cacheFile of cacheFiles) {
+        const projectKey = path.basename(cacheFile, '.json');
+        const fullPath = path.join(siteDir, cacheFile);
+        try {
+          const cacheData = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+          entries.push({
+            projectKey,
+            site:        siteEntry.name,
+            lastUpdated: cacheData.lastUpdated,
+            maxAgeHours: cacheData.maxAgeHours,
+          });
+        } catch {
+          // Graceful degradation — skip this cache file on parse error
+        }
+      }
+    }
+  }
+
+  for (const entry of entries) {
+    const { projectKey, site, lastUpdated, maxAgeHours } = entry;
+    if (!lastUpdated) continue;
+
+    const ageMs = Date.now() - new Date(lastUpdated).getTime();
+    const ageHours = ageMs / (1000 * 60 * 60);
+
+    let ageDisplay;
+    if (ageHours < 1) {
+      ageDisplay = 'less than 1h ago';
+    } else if (ageHours < 24) {
+      const h = Math.round(ageHours);
+      ageDisplay = `${h}h ago`;
+    } else {
+      const d = Math.round(ageHours / 24);
+      ageDisplay = `${d} day${d !== 1 ? 's' : ''} ago`;
+    }
+
+    const label = `${projectKey}@${site}`;
+    if (maxAgeHours === 0) {
+      resumeLines.push(`Jira cache: ${label} (last updated ${ageDisplay}, permanent)`);
+    } else if (ageHours > maxAgeHours) {
+      resumeLines.push(`Jira cache: ${label} (stale — ${ageDisplay}, TTL ${maxAgeHours}h) — refresh with /jira-sdlc --force-refresh`);
+    } else {
+      resumeLines.push(`Jira cache: ${label} (last updated ${ageDisplay}, TTL ${maxAgeHours}h)`);
     }
   }
 } catch {
