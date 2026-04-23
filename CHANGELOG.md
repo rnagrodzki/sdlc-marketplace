@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.24] - 2026-04-23
+
+### Fixed
+- review-sdlc post-confirm handling moved to the skill's main context, preventing the orchestrator from re-running the full review pipeline when the user confirms posting the PR comment; includes branch-name escaping for save paths, corrected field reference in review-orchestrator, and stale pipeline step types in skills-meta.ts (#167)
+
 ## [0.17.23] - 2026-04-23
 
 ### Added
