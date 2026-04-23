@@ -13,7 +13,7 @@ Eliminate all redundant discovery calls after initialization.
 
 **Announce at start:** "I'm using jira-sdlc (sdlc v{sdlc_version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
 
-## When to Use This Skill
+## When to Use This Skill (implements R16)
 
 - Creating, editing, or viewing Jira issues
 - Transitioning issues through workflow statuses
@@ -59,7 +59,7 @@ removed entirely — the API call is never made with raw placeholder text.
 | `--site <host>` | Sanitized site host (e.g., `acme_atlassian_net`). Disambiguates `--check`/`--load` when the same project key is cached under multiple sites. | Unset |
 | `--skip-workflow-discovery` | Bypass Phase 5; cache `workflows[type] = { unsampled: true }` per non-subtask type. Transitions fall back to live `getTransitionsForJiraIssue` per issue. Use in CI. | false |
 
-**Project key resolution (ordered fallback):**
+**Project key resolution (ordered fallback):** (implements R13)
 
 1. `--project <KEY>` argument. When `jira.projects` is set (≥2 entries), the prepare script rejects values not in the list (exit 1).
 2. Parse current git branch for `[A-Z]{2,10}-\d+` pattern (e.g., `feat/PROJ-123-fix` → `PROJ`). When `jira.projects` is set, accept only keys in the list; otherwise fall through.
@@ -69,7 +69,7 @@ removed entirely — the API call is never made with raw placeholder text.
 
 Backward compatible: repos without `jira.projects` retain the previous 4-step behavior (1/2/3/5).
 
-**Multi-candidate cache disambiguation:**
+**Multi-candidate cache disambiguation:** (implements R15)
 
 When `--check` is run without `--site` and the home-cache contains entries for the project key under two or more site subdirectories, the script returns `exists: false` and `candidateSites: [<host>, …]`. Present the `candidateSites` list to the user via AskUserQuestion and re-run with `--site <host>`, or use `--force-refresh` to rebuild against a specific site.
 
@@ -214,7 +214,7 @@ mcp__atlassian__getJiraIssueTypeMetaWithFields({ cloudId, projectKey, issueTypeI
 → Store in: fieldSchemas[issueTypeName] = { [fieldKey]: { required, type, name?, allowedValues? } }
 ```
 
-### Phase 5 — Workflow discovery (per non-subtask issue type)
+### Phase 5 — Workflow discovery (per non-subtask issue type) (implements R14)
 
 **Skip branch (when `flags.skipWorkflowDiscovery` is `true` in the `--check` output):**
 

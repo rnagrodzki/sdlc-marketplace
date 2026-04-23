@@ -373,7 +373,14 @@ function resolveEffectiveCachePath({ projectKey, cacheDir, site }) {
   // Home-cache scan
   const matches = resolveCandidatePaths(projectKey, site);
   if (site) {
-    // --site always resolves to a single path (may not exist yet).
+    // --site always resolves to a single candidate path. When the home-cache
+    // root itself does not exist yet, return path: null so callers emit a clear
+    // "No cache found" rather than propagating a path that cannot exist.
+    const root = getHomeCacheRoot();
+    if (!fs.existsSync(root)) {
+      warnings.push(`Home cache root ${root} does not exist. Run cache initialization first (omit --site or use --force-refresh).`);
+      return { path: null, warnings, candidateSites: [] };
+    }
     return { path: matches[0].path, warnings, candidateSites: [] };
   }
 

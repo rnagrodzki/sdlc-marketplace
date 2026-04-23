@@ -20,7 +20,7 @@ sections are missing, or when an operation fails due to stale cached data.
   "lastUpdated": "2026-03-12T10:00:00.000Z",
   "maxAgeHours": 0,
   "cloudId": "uuid-string",
-  "siteUrl": "yoursite.atlassian.net",
+  "siteUrl": "https://yoursite.atlassian.net",
   "currentUser": {
     "accountId": "abc123",
     "displayName": "John Doe",
@@ -149,6 +149,43 @@ on time — it is refreshed only when `--force-refresh` is passed or when operat
 due to stale data. If `maxAgeHours` is set to a positive number, the TTL behavior applies:
 compare `lastUpdated` + `maxAgeHours` against the current timestamp; if stale, run the
 full initialization sequence.
+
+**Unsampled workflow shape (R14):** When `--skip-workflow-discovery` is passed, Phase 5 is
+bypassed and each non-subtask issue type is stored with:
+
+```json
+"workflows": {
+  "Task": { "unsampled": true },
+  "Bug":  { "unsampled": true }
+}
+```
+
+Subtask types have no workflow entry. At runtime, any transition operation that encounters
+an `unsampled` marker falls back to a live `getTransitionsForJiraIssue` call per issue —
+the same stale-cache auto-refresh path handles it transparently.
+
+**`--check` output shape (R15):** The prepare script `--check` subcommand emits JSON with
+these fields:
+
+```jsonc
+{
+  "exists": false,           // true when cache file present and readable
+  "fresh": false,            // true when within TTL or maxAgeHours === 0
+  "projectKey": "PROJ",
+  "cachePath": null,         // resolved file path (null when not resolvable)
+  "candidateSites": [],      // non-empty when same key found under 2+ site subdirs
+  "missing": ["all"],        // required sections absent from cache
+  "flags": {
+    "skipWorkflowDiscovery": false,   // echoes the --skip-workflow-discovery arg
+    "site": null                      // echoes the --site arg (null if not passed)
+  },
+  "errors": [],
+  "warnings": []
+}
+```
+
+When `candidateSites` is non-empty, `exists` is always `false` and `cachePath` is `null`.
+The caller must re-run with `--site <host>` from `candidateSites` to disambiguate.
 
 ---
 

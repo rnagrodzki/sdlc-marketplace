@@ -35,8 +35,8 @@
 
 ## Assumptions
 
-- A4 (context): `~/.sdlc-cache/` is writable by the user running the skill. On platforms without a writable `$HOME`, the user may override with `--cache-dir <path>` (preserves existing flag behavior).
-- A5 (context): `siteUrl` is always present in cache payloads; `saveCache` enforces this. Cache files migrated from legacy locations carry their original `siteUrl`, which is used to derive the new site subdirectory.
+- C1 (context): `~/.sdlc-cache/` is writable by the user running the skill. On platforms without a writable `$HOME`, the user may override with `--cache-dir <path>` (preserves existing flag behavior).
+- C2 (context): `siteUrl` is always present in cache payloads; `saveCache` enforces this. Cache files migrated from legacy locations carry their original `siteUrl`, which is used to derive the new site subdirectory.
 
 ## Workflow Phases
 

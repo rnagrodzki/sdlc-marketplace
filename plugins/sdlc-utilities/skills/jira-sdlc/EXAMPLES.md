@@ -126,6 +126,7 @@ mcp__atlassian__getTransitionsForJiraIssue({
 ### Phase 6 — Save cache
 
 ```bash
+# $SCRIPT is set by the Script Resolution Block in SKILL.md Step 0.
 # Write assembled cache JSON to disk via the prepare script (handles site-keyed path)
 cat << 'EOF' | node "$SCRIPT" --project PROJ --save
 {

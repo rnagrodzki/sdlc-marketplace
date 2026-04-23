@@ -163,7 +163,7 @@ The cache is stored at `~/.sdlc-cache/jira/<sanitizedSiteHost>/<PROJECT_KEY>.jso
 The cache contains:
 
 - `cloudId` — Atlassian cloud instance identifier
-- `siteUrl` — site origin used to derive the cache subdirectory
+- `siteUrl` — canonical form is the full origin URL (e.g., `https://acme.atlassian.net`); the prepare script also accepts a bare host (e.g., `acme.atlassian.net`) and will strip any trailing path. The `sanitizedSiteHost` subdirectory is always derived from the host portion only.
 - Issue types and their field schemas (including custom fields)
 - Workflow graphs with transition IDs and per-transition required fields (or `{ unsampled: true }` when Phase 5 was skipped)
 - Available issue link types

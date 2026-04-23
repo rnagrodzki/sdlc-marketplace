@@ -10,7 +10,11 @@
  *   script_args  — (optional) space-separated args
  *   script_stdin — JSON string piped to the script's stdin
  *   script_cwd   — (optional) working directory for script execution
+ *   script_home  — (optional) HOME override; accepts relative (resolved against
+ *                  script_cwd) or absolute path. Useful for tests depending on
+ *                  ~/.sdlc-cache/... layouts.
  */
+const path = require('path');
 const { spawnSync } = require('child_process');
 
 class HookRunnerProvider {
@@ -29,11 +33,20 @@ class HookRunnerProvider {
       return { error: 'hook-runner: script_path var is required' };
     }
 
+    const env = Object.assign({}, process.env);
+    if (vars.script_home) {
+      const home = path.isAbsolute(vars.script_home)
+        ? vars.script_home
+        : path.resolve(cwd || process.cwd(), vars.script_home);
+      env.HOME = home;
+    }
+
     const result = spawnSync('node', [scriptPath, ...scriptArgs], {
       input: stdinData,
       timeout: 30_000,
       encoding: 'utf8',
       cwd,
+      env,
     });
 
     const output = JSON.stringify({
