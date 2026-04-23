@@ -221,6 +221,93 @@
         dispatch indicates that dimension subagents should use sonnet as their
         model (via manifest.subagent_model or explicit model: sonnet).
 
+- description: "review-sdlc: post-confirmation yes posts via gh api -F body=@ without re-dispatch (issue #167)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/review-post-confirm-yes.md"
+    user_request: >
+      Continue the /review-sdlc flow. The orchestrator has already returned the summary shown
+      in the project context and the user replied "yes". Describe exactly what happens next
+      in the main context, including the precise shell command used to post the comment.
+  assert:
+    # Must post via -F body=@ (file form, not -f body="…")
+    - type: regex
+      value: 'gh api[^\n]+-F body=@'
+    # Must reference the orchestrator-provided comment_file path
+    - type: icontains
+      value: "/tmp/review-diff-abc123/review-comment.md"
+    # Must NOT use the fragile -f body="…" inline form
+    - type: not-regex
+      value: '-f body="'
+    # Must NOT re-dispatch any agent to post the comment
+    - type: not-regex
+      value: "(dispatch.*orchestrator|spawn.*Agent|Agent tool|subagent_type)"
+    # Behavioral: one gh api call, zero agent re-dispatch, cleanup happens after
+    - type: llm-rubric
+      value: >
+        The response describes posting the consolidated review comment to PR #42 via exactly
+        one `gh api repos/acme-corp/widgets/issues/42/comments -F body=@/tmp/review-diff-abc123/review-comment.md`
+        call. It does NOT re-invoke the review-orchestrator, does NOT dispatch any new Agent,
+        and does NOT use the fragile `-f body="…"` inline form. After posting, both the
+        manifest file and the diff dir (`/tmp/review-diff-abc123`) are cleaned up.
+
+- description: "review-sdlc: post-confirmation cancel — no gh api, no save, diff_dir cleaned (issue #167)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/review-post-confirm-cancel.md"
+    user_request: >
+      Continue the /review-sdlc flow. The orchestrator has already returned the summary shown
+      in the project context and the user replied "cancel". Describe exactly what happens next.
+  assert:
+    # Must NOT invoke gh api
+    - type: not-regex
+      value: "gh api"
+    # Must NOT write anything under .claude/reviews/
+    - type: not-regex
+      value: '\.claude/reviews/[^"\s]*\.md'
+    # Must clean up the diff dir from the summary
+    - type: regex
+      value: "(rm -rf.*review-diff-def456|/tmp/review-diff-def456.*(cleaned|removed|deleted))"
+    # Behavioral
+    - type: llm-rubric
+      value: >
+        The response acknowledges the cancel reply. It does NOT post via `gh api`. It does NOT
+        write any file under `.claude/reviews/`. It still cleans up the manifest file and the
+        diff dir at `/tmp/review-diff-def456` — cleanup runs on every terminal branch, including
+        cancel. It does not re-dispatch the orchestrator.
+
+- description: "review-sdlc: post-confirmation save — copies comment to .claude/reviews, no gh api (issue #167)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/review-post-confirm-save.md"
+    user_request: >
+      Continue the /review-sdlc flow. The orchestrator has already returned the summary shown
+      in the project context and the user replied "save". Describe exactly what happens next,
+      including the filename under .claude/reviews/.
+  assert:
+    # Must NOT invoke gh api
+    - type: not-regex
+      value: "gh api"
+    # Must save under .claude/reviews/<branch>-<date>.md
+    - type: regex
+      value: '\.claude/reviews/feat-search-api-\d{4}-\d{2}-\d{2}\.md|\.claude/reviews/[^"\s]*search-api[^"\s]*\.md'
+    # Must reference the orchestrator-provided comment_file as the source
+    - type: icontains
+      value: "/tmp/review-diff-ghi789/review-comment.md"
+    # Must clean up the diff dir after save
+    - type: regex
+      value: "(rm -rf.*review-diff-ghi789|/tmp/review-diff-ghi789.*(cleaned|removed|deleted))"
+    # Behavioral
+    - type: llm-rubric
+      value: >
+        The response describes saving the consolidated comment to a file under
+        `.claude/reviews/` named `<branch>-<YYYY-MM-DD>.md` where branch is `feat/search-api`
+        (slashes replaced or preserved per project convention) and the date is today. The save
+        is performed by copying from the orchestrator-provided `Comment file` path
+        (`/tmp/review-diff-ghi789/review-comment.md`). It does NOT call `gh api`. After saving,
+        both the manifest file and the diff dir (`/tmp/review-diff-ghi789`) are cleaned up.
+        It does not re-dispatch the orchestrator.
+
 - description: "review-sdlc: approved verdict completes cleanly without fix offer"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"

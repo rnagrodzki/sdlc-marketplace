@@ -182,6 +182,51 @@ These suggestions are informational during a review run. To act on them, run `/s
 
 ---
 
+## PR Posting Flow
+
+After the orchestrator finishes, the skill (not the orchestrator) handles posting in the main context. What you see depends on whether a PR exists for the current branch and the review scope.
+
+### When a PR exists
+
+The skill prints the full consolidated comment, then prompts:
+
+```text
+Post this review comment to PR #{number}? (yes / save / cancel)
+```
+
+| Reply | Effect |
+|-------|--------|
+| `yes` | Posts the comment to the PR via `gh api repos/{owner}/{repo}/issues/{number}/comments -F body=@{comment_file}`. The `-F body=@<path>` form reads the body from the file, so markdown with backticks, quotes, or long content posts reliably — no shell escaping. |
+| `save` | Copies the comment to `.claude/reviews/<branch>-<YYYY-MM-DD>.md`. Does not post. |
+| `cancel` | No action. The review remains visible in the terminal only. |
+
+No additional orchestrator or dimension subagent is dispatched after your reply — the comment body was computed during the single orchestrator run and persisted to disk.
+
+### When no PR exists — branch scope (`all` / `committed` / `worktree`)
+
+```text
+No PR found. Options:
+  1. Create a draft PR and attach this review as a comment
+  2. Save review to .claude/reviews/<branch>-<YYYY-MM-DD>.md
+  3. Keep in terminal only
+```
+
+Option 1 invokes `/pr-sdlc` in draft mode, then posts the comment to the newly created PR.
+
+### When no PR exists — local scope (`staged` / `working`)
+
+```text
+Reviewing local changes — no PR to post to. Options:
+  1. Save review to .claude/reviews/<branch>-<YYYY-MM-DD>.md
+  2. Keep in terminal only
+```
+
+### Comment persistence
+
+During the run, the consolidated comment body is written to `${diff_dir}/review-comment.md` (a temporary location under `$TMPDIR`). The skill reads this path from the orchestrator summary and uses it for `gh api -F body=@…` or `save` copies. The file is discarded along with the diff dir after the terminal branch — including when you reply `cancel` or the command fails.
+
+---
+
 ## Post-Review Self-Fix
 
 After a review completes with actionable findings (verdict **CHANGES REQUESTED** or **APPROVED WITH NOTES**), the skill prompts:

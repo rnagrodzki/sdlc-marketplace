@@ -1,7 +1,7 @@
 ---
 name: review-orchestrator
-description: Orchestrates multi-dimension code review. Reads manifest from a temp file, resolves REFERENCE.md, dispatches dimension review subagents in parallel, critiques and deduplicates findings, and posts a consolidated PR comment.
-tools: Read, Glob, Grep, Bash, Agent
+description: Orchestrates multi-dimension code review. Reads manifest from a temp file, resolves REFERENCE.md, dispatches dimension review subagents in parallel, critiques and deduplicates findings, and persists the consolidated comment body to disk for the skill to post.
+tools: Read, Write, Glob, Grep, Bash, Agent
 ---
 
 # Code Review Orchestrator
@@ -135,7 +135,7 @@ Apply fixes from the critique:
   manual review required.`
 - **Re-calibrate** miscalibrated severities.
 
-## Step 5 — Build and Post Consolidated Comment
+## Step 5 — Build and Persist Consolidated Comment
 
 Format the comment using the template from REFERENCE.md section 3.
 
@@ -145,76 +145,40 @@ Format the comment using the template from REFERENCE.md section 3.
 - `APPROVED WITH NOTES` — any `high` finding, OR ≥ 5 `medium` findings
 - `APPROVED` — all other cases
 
-**Present for confirmation:**
+**Display the formatted comment in the terminal** so the user sees the content in your output.
 
-If `manifest.pr.exists`, display the full formatted comment and ask for explicit user
-approval before posting. **Do not execute `gh api` without explicit user approval.**
+**Persist the comment body to disk** using the `Write` tool:
 
-```text
-Review comment ready to post to PR #{manifest.pr.number}:
-─────────────────────────────────────────────
-{consolidated comment}
-─────────────────────────────────────────────
+- Path: `{manifest.diff_dir}/review-comment.md`
+- Content: the consolidated comment body verbatim (no surrounding fences, no shell escaping)
 
-Post this review comment to PR #{manifest.pr.number}? (yes / save / cancel)
-  yes    — post the comment to the PR
-  save   — save review to .claude/reviews/<branch>-<date>.md instead
-  cancel — keep in terminal only (already shown above)
-```
+The skill's main context will read this file when posting or saving.
 
-Wait for the user's response:
+**Do NOT** prompt the user for posting confirmation. **Do NOT** call `gh api`. **Do NOT** implement a `save` branch. **Do NOT** present no-PR menu options. **Do NOT** invoke the `pr-sdlc` skill. The skill owns all of these in the main context after you return — posting is driven from the summary you emit in Step 6.
 
-- `yes` → post via `gh api`:
+## Step 6 — Return Summary
 
-  ```bash
-  gh api repos/{manifest.pr.owner}/{manifest.pr.repo}/issues/{manifest.pr.number}/comments \
-    -f body="{comment}"
-  ```
+Do NOT delete `manifest.diff_dir` — the skill owns cleanup of both the manifest file and the diff dir.
 
-- `save` → write the review to `.claude/reviews/<branch>-<date>.md`
-- `cancel` → skip posting; review is already visible in the terminal
-
-If no PR: present the full review in the terminal, then offer options based on scope:
-
-For `all`, `committed`, or `worktree` scope (branch-based changes):
-
-```text
-No PR found. Options:
-  1. Create a draft PR to attach this review as a comment
-  2. Save review to .claude/reviews/<branch>-<date>.md
-  3. Keep in terminal only (already shown)
-```
-
-For option 1: invoke the `pr-sdlc` skill
-in draft mode, wait for the PR to be created, then post the consolidated review
-comment to the new PR using the `gh api` command above.
-
-For `staged` or `working` scope (local changes not yet committed):
-
-```text
-Reviewing local changes — no PR to post to. Options:
-  1. Save review to .claude/reviews/<branch>-<date>.md
-  2. Keep in terminal only (already shown)
-```
-
-## Step 6 — Cleanup and Return Summary
-
-Clean up the temp diff directory:
-
-```bash
-rm -rf {manifest.diff_dir}
-```
-
-Output this summary for the main context to display:
+Output this structured plain-text summary for the main context to parse:
 
 ```text
 Review complete
   Dimensions run:  {active} ({skipped} skipped — no matching files)
   Total findings:  {total}
     critical: {C} | high: {H} | medium: {M} | low: {L} | info: {I}
-  Verdict: {VERDICT}
-  PR comment: {url or "none"}
+  Verdict:         {VERDICT}
+  Scope:           {scope label}
+  Branch:          {manifest.git.branch}
+  Comment file:    {absolute path to review-comment.md inside diff_dir}
+  PR exists:       {true|false}
+  PR owner:        {manifest.pr.owner or "—"}
+  PR repo:         {manifest.pr.repo or "—"}
+  PR number:       {manifest.pr.number or "—"}
+  Diff dir:        {manifest.diff_dir}
 ```
+
+Every field is required. Use `—` for `PR owner` / `PR repo` / `PR number` when `PR exists` is `false`.
 
 ## Quality Gates
 
@@ -225,9 +189,14 @@ Before returning:
 - Consolidated comment has all 4 sections: header, summary table, verdict, per-dimension details
 - All findings reference a specific `file:line`
 - Verdict computed from actual severity counts (not hardcoded)
-- Temp diff directory (`manifest.diff_dir`) has been cleaned up
+- Comment body written to `{manifest.diff_dir}/review-comment.md`
+- Summary contains all required fields (comment file absolute path, PR metadata, diff_dir)
 
 ## DO NOT
 
-- Post the review comment to a PR via `gh api` without explicit user approval
+- Prompt user for PR-posting confirmation (the skill's main context owns this)
+- Call `gh api` to post a comment (the skill's main context owns this)
+- Implement `yes` / `save` / `cancel` branches or no-PR menu options
+- Invoke the `pr-sdlc` skill
+- Delete `manifest.diff_dir` or the manifest file — the skill cleans both up
 - Dispatch dimension subagents without `model: manifest.subagent_model` — omitting it defaults to opus

@@ -28,6 +28,9 @@
 - R7: When verdict is APPROVED, skip the self-fix offer
 - R8: Clean up the manifest temp file after completion
 - R9: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
+- R10: Post-confirmation (`yes` / `save` / `cancel`) is issued by the skill in the main context, not by the orchestrator
+- R11: Orchestrator writes the consolidated comment body to `${manifest.diff_dir}/review-comment.md` and returns its absolute path plus `pr.*` metadata in its summary; the skill acts on the summary without reading the manifest
+- R12: When the user confirms `yes`, the skill posts via `gh api … -F body=@<path>` — no further Agent dispatch is made to complete posting
 
 ## Workflow Phases
 
@@ -36,14 +39,16 @@
    - **Params:** A1-A7 forwarded (`--base <branch>`, `--committed`, `--staged`, `--working`, `--worktree`, `--set-default`, `--dimensions <list>`)
    - **Output:** manifest file path → P1-P8 (base branch, changed files, dimension counts/entries, plan critique); also writes per-dimension `.diff` files to tmpdir. Skill must NOT read manifest into main context
 2. DO — dispatch review-orchestrator agent (or display dry-run plan)
-3. REPORT — display orchestrator summary, clean up manifest
-4. OFFER — conditionally offer self-fix based on review verdict
+3. REPORT — display orchestrator summary
+4. POST — skill handles PR posting decision in main context (`yes` / `save` / `cancel` or no-PR options), then cleans up manifest and diff dir
+5. OFFER — conditionally offer self-fix based on review verdict
 
 ## Quality Gates
 
 - G1: Manifest file produced — `skill/review.js` exits successfully and produces a valid file path
 - G2: Orchestrator dispatched — agent is spawned (not via Skill tool) with manifest path and project root
-- G3: Manifest cleaned up — temp file is deleted after completion or cancellation
+- G3: Manifest file and `diff_dir` cleaned up by the skill after the terminal branch (including failures)
+- G4: Exactly one `review-orchestrator` Agent dispatch per `/review-sdlc` invocation (a retry on failure counts as the same attempt; user confirmation never triggers a new dispatch)
 
 ## Prepare Script Contract
 
@@ -75,6 +80,9 @@
 - C7: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
 - C8: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
 - C9: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
+- C10: Orchestrator MUST NOT call `gh api` or prompt the user for PR-posting confirmation
+- C11: Orchestrator MUST NOT delete `manifest.diff_dir` — the skill owns cleanup of both the manifest file and the diff dir
+- C12: Skill MUST NOT re-dispatch the orchestrator to complete a posting flow already computed — `comment_file` from the orchestrator summary is authoritative
 
 ## Step-Emitter Contract
 
