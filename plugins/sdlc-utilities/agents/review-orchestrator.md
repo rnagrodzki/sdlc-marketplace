@@ -169,7 +169,7 @@ Review complete
     critical: {C} | high: {H} | medium: {M} | low: {L} | info: {I}
   Verdict:         {VERDICT}
   Scope:           {scope label}
-  Branch:          {manifest.git.branch}
+  Branch:          {manifest.current_branch}
   Comment file:    {absolute path to review-comment.md inside diff_dir}
   PR exists:       {true|false}
   PR owner:        {manifest.pr.owner or "—"}

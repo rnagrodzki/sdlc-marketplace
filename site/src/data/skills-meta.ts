@@ -110,7 +110,8 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'scope-diff', label: 'Resolve diff scope', type: 'script', description: 'Computes the diff based on --committed/--staged/--working/--worktree flags' },
       { id: 'dispatch-reviewers', label: 'Dispatch review agents', type: 'dispatch', description: 'Parallel subagents review each matching dimension independently' },
       { id: 'deduplicate', label: 'Deduplicate findings', type: 'llm', description: 'Merges overlapping findings from multiple dimensions into a unified list' },
-      { id: 'post-comment', label: 'Post PR comment', type: 'script', description: 'Posts consolidated review comment to the GitHub PR via gh CLI' },
+      { id: 'persist-comment', label: 'Persist review comment', type: 'llm', description: 'Orchestrator writes consolidated comment body to disk; skill parses summary and handles posting in main context' },
+      { id: 'post-prompt', label: 'Post or save comment', type: 'user', description: 'Prompts yes / save / cancel; posts via gh api -F body=@ or saves to .claude/reviews/' },
       { id: 'fix-prompt', label: 'Offer self-fix', type: 'user', description: 'Prompts to invoke received-review-sdlc when actionable findings exist' },
     ],
     connections: [

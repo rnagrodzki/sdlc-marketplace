@@ -72,11 +72,8 @@ Clean up: `rm -f "$MANIFEST_FILE"`. Stop here.
 
 ## Step 2 — Spawn Orchestrator Agent
 
-Locate the orchestrator agent definition using Glob: `path: ~/.claude`, pattern
-`**/agents/review-orchestrator.md`. If not found, retry Glob with the default path (cwd).
-
-Spawn a single Agent (subagent_type: `sdlc:review-orchestrator`) with the orchestrator
-agent's full content as the prompt, plus this context appended:
+Spawn a single Agent using `subagent_type: sdlc:review-orchestrator` with the following
+context as the prompt:
 
 ```
 MANIFEST_FILE: {the temp file path from Step 0}
@@ -142,8 +139,9 @@ Wait for the user's reply.
 - `save` →
 
   ```bash
+  BRANCH_SAFE="${branch//\//-}"
   mkdir -p .claude/reviews
-  cp "{comment_file}" ".claude/reviews/{branch}-$(date +%Y-%m-%d).md"
+  cp "{comment_file}" ".claude/reviews/${BRANCH_SAFE}-$(date +%Y-%m-%d).md"
   ```
 
 - `cancel` → no action. The comment is already visible in the terminal from Step 3.
