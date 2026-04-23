@@ -331,7 +331,16 @@ Review feedback processing complete:
 - K comments intentionally skipped (agree, won't fix)
 ```
 
-2. **Consent gate** — Use AskUserQuestion:
+2. **Consent gate:**
+
+**Auto mode:** When `flags.auto` is true (from manifest or arguments), skip the AskUserQuestion
+consent gate. Still display the summary block above for visibility, then proceed directly to
+step 3 below as if the user selected `yes`: post in-thread replies for every action-plan item
+and resolve only "agree, will fix" threads. Pushback and "won't fix" threads are replied to
+but left open for the reviewer. Pipeline context does NOT override this behavior — only the
+explicit `flags.auto` signal skips the gate.
+
+**Manual mode (default):** When `flags.auto` is false or absent, use AskUserQuestion:
 
 > Should I reply to all addressed review comments on the PR and resolve the threads?
 
@@ -340,7 +349,7 @@ Options:
 - **skip** — do not post replies (user will handle manually)
 - **selective** — let me choose which threads to reply to
 
-3. **If yes or selective:** For each comment in the action plan:
+3. **If yes, selective, or auto mode:** For each comment in the action plan:
 
    **For addressed comments (agree, will fix):**
    - Post a reply describing what was changed:

@@ -243,3 +243,35 @@
         the ship-sdlc pipeline, the consent gate is NOT skipped and there is no inference
         that automatic execution is expected. The response does not reference pipeline
         context as a reason to bypass the consent gate.
+
+- description: "received-review-sdlc: --auto mode auto-executes Step 12 without reply/resolve consent gate"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-reply-step.md"
+    user_request: >
+      Run /received-review-sdlc --auto. The prepare script manifest includes
+      flags: { auto: true }. Review fixes have been implemented and verified.
+      Proceed to Step 12 (reply to PR threads and resolve addressed ones).
+  assert:
+    # Must still display the Step 12 summary
+    - type: regex
+      value: "(addressed|fixed|implemented|summary)"
+    # Must NOT present the yes/skip/selective consent prompt
+    - type: not-regex
+      value: "(yes.*skip.*selective|Should I reply|How to proceed)"
+    # Must proceed to post replies and resolve threads
+    - type: regex
+      value: "(reply|resolve|post|threadId|gh api)"
+    # Must still distinguish resolved vs left-open threads
+    - type: regex
+      value: "(push.?back|disagree|left open|reviewer)"
+    - type: llm-rubric
+      value: >
+        The response demonstrates --auto mode behavior in Step 12: the summary of
+        addressed/pushback/skipped comments is displayed, but the yes/skip/selective
+        AskUserQuestion consent gate is NOT presented. The skill proceeds directly to
+        posting in-thread replies for every action-plan item and resolves only the
+        "agree, will fix" threads via GraphQL mutation. Pushback and "won't fix"
+        threads are replied to but left open for the reviewer. No pipeline-context
+        reasoning is used to justify skipping — the behavior is driven by
+        flags.auto === true from the prepare script manifest.

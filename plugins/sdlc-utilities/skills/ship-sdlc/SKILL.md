@@ -171,7 +171,7 @@ Not all sub-skills support `--auto`. This table is the source of truth:
 | execute-plan-sdlc | No | Forwards `--preset` only. Preset selection prompt is skipped when preset is provided. |
 | commit-sdlc | Yes | `--auto` forwarded. Skips commit approval prompt. |
 | review-sdlc | No | No interactive prompts to skip — runs fully automatically already. |
-| received-review-sdlc | Yes | `--auto` forwarded. Skips consent prompt. Critique gates and verification still run. Only "will fix" items auto-implemented. |
+| received-review-sdlc | Yes | `--auto` forwarded. Skips Step 10 consent prompt and Step 12 reply/resolve prompt. Critique gates and verification still run. Only "will fix" items auto-implemented; threads for "will fix" items auto-resolved. |
 | version-sdlc | Yes | `--auto` forwarded. Skips release plan approval prompt. Pre-condition checks and critique gates still run. |
 | pr-sdlc | Yes | `--auto` forwarded. Skips PR approval prompt. |
 
@@ -618,7 +618,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Verdict detection is text-based.** Parse the conversation for a line matching `Verdict: <VERDICT>`. The review-sdlc orchestrator always emits this. If the conversation is compacted between review and verdict parsing, the verdict may be lost — treat missing verdict as APPROVED WITH NOTES and warn the user.
 
-**received-review-sdlc supports `--auto`.** When `--auto` is forwarded, the consent prompt (Step 10) is skipped and only "will fix" items are auto-implemented. "Disagree" and "won't fix" items are displayed but not auto-actioned. Critique gates and verification still run. Without `--auto`, the pipeline pauses for human approval.
+**received-review-sdlc supports `--auto`.** When `--auto` is forwarded, both the Step 10 consent prompt and the Step 12 reply/resolve prompt are skipped. "Will fix" items are auto-implemented and their threads are auto-resolved via in-thread replies. "Disagree" and "won't fix" items are displayed but not auto-implemented; their threads are replied to but left open for the reviewer. Critique gates and verification still run. Without `--auto`, the pipeline pauses for human approval at both gates.
 
 **Double commit is intentional.** Feature commit (step 2) and review fix commit (step 5) are separate. This keeps feature work and review fixes distinct in git history. Do not squash them.
 

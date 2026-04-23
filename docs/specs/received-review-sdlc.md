@@ -9,7 +9,7 @@
 ## Arguments
 
 - A1: `--pr <number>` — PR number to process review comments from (default: none, falls back to manual gathering)
-- A2: `--auto` — auto-implement "will fix" items without interactive consent; "disagree"/"needs discussion"/"won't fix" items are displayed but never auto-actioned (default: false)
+- A2: `--auto` — auto-implement "will fix" items without Step 10 consent; also auto-runs Step 12 (post in-thread replies and resolve "agree, will fix" threads) without consent. "disagree"/"needs discussion"/"won't fix" items are displayed but never auto-implemented; their threads are replied to but not resolved (default: false)
 
 ## Core Requirements
 
@@ -28,6 +28,7 @@
 - R13: Forbidden openers: no performative language ("Great catch!", "You're right!", "Thanks!")
 - R14: YAGNI check for feature requests: grep codebase for actual usage before accepting
 - R15: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
+- R16: Under `--auto`, Step 12 posts in-thread replies for all action-plan items and resolves only "agree, will fix" threads without an AskUserQuestion gate; pushback and "won't fix" threads are replied to but left open for the reviewer
 
 ## Workflow Phases
 
@@ -100,6 +101,7 @@ Critique #2 (responses):
 - C11: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
 - C12: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
 - C13: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
+- C14: Must not present Step 12 consent gate when `flags.auto` is true — the reply/resolve step auto-executes under the same policy as manual `yes`
 
 ## Step-Emitter Contract
 

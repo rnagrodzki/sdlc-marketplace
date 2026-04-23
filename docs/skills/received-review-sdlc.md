@@ -24,7 +24,7 @@ Provide review feedback in one of three ways:
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--pr <number>` | PR number to fetch review threads from. Enables thread-aware mode: pre-computes thread resolution state, filters to outstanding comments only on re-run. | Auto-detected from current branch |
-| `--auto` | Skip the consent gate (Step 10) and auto-implement all "will fix" items. Critique gates still run. "Disagree" and "won't fix" items are displayed but not auto-actioned. | Off |
+| `--auto` | Skip consent gates at Step 10 and Step 12. Auto-implement all "will fix" items and auto-post in-thread replies (resolving only "agree, will fix" threads). Critique gates still run. "Disagree" and "won't fix" items are displayed but not auto-implemented; their threads are replied to but left open. | Off |
 
 ---
 
@@ -95,7 +95,7 @@ When invoked from `/ship-sdlc` with `--auto`, the consent gate is skipped and "w
 /received-review-sdlc --pr 42 --auto
 ```
 
-Claude runs the full analysis pipeline (Steps 2–9), displays the action plan for visibility, then proceeds directly to implement "will fix" items. Items with "disagree" or "won't fix" verdicts are displayed but not auto-actioned. Critique gates still run.
+Claude runs the full analysis pipeline (Steps 2–9), displays the action plan for visibility, then proceeds directly to implement "will fix" items. Items with "disagree" or "won't fix" verdicts are displayed but not auto-actioned. Critique gates still run. Step 12 also runs automatically: Claude posts in-thread replies and resolves "agree, will fix" threads without a second consent prompt.
 
 ### Re-run on a partially addressed PR
 
