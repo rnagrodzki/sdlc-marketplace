@@ -3,6 +3,14 @@
 This is the append-only learnings log for the `ai-setup-automation` marketplace repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-04-23 — pr-sdlc auto-switch account detection
+**Trigger:** `gh pr create` failed with permissions error because active gh account was `rnagrodzkicl` (work account) rather than `rnagrodzki` (personal account where the repo lives). The auto-switch logic in `pr.js` did not switch because the branch had already been pushed with the remote set.
+**Rule:** When `gh pr create` fails with a permissions error, check `gh auth status` and switch to the account matching the repo owner before retrying. The skill should detect this and switch automatically; when it doesn't, manual `gh auth switch --user <login>` is the fix.
+**Example:** Repo owner is `rnagrodzki`; active account was `rnagrodzkicl`; fix was `gh auth switch --user rnagrodzki`.
+
+## 2026-04-23 — version-sdlc: patch bump on feature branch without upstream
+Branch feat/131-received-review-auto-step12 had no upstream configured. `git push` failed with exit 128; recovered with `git push --set-upstream origin <branch>` then `git push --tags`. The `remoteState.hasUpstream: false` in the version context was the correct pre-condition warning. No data lost.
+
 ## 2026-04-15 — PR #165 (fix/#164 openspec-detection hardening)
 
 The `prConfig.titlePattern` for this repo requires `type(#issue): scope - description` format (e.g. `fix(#164): openspec-detection - harden against contradictory signals`). The dash-separated scope and description is mandatory — titles without the ` - ` separator will fail validation. Conventional commit style alone (without issue number in parens) is not accepted.
