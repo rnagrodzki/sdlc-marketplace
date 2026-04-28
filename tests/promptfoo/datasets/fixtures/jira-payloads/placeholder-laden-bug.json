@@ -1,0 +1,8 @@
+{
+  "cloudId": "abc-123",
+  "projectKey": "PROJ",
+  "issueTypeName": "Bug",
+  "summary": "Login button broken",
+  "description": "## Objective\n[describe the broken behavior here]\n\n## Details\nReal content.\n",
+  "contentFormat": "markdown"
+}

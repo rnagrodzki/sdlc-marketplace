@@ -1,0 +1,5 @@
+{
+  "cloudId": "abc-123",
+  "issueIdOrKey": "PROJ-42",
+  "transition": { "id": "31" }
+}

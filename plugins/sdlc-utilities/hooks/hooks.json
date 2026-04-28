@@ -69,6 +69,16 @@
             "timeout": 1000
           }
         ]
+      },
+      {
+        "matcher": "^mcp__(atlassian|claude_ai_Atlassian)__(createJiraIssue|editJiraIssue|transitionJiraIssue|addCommentToJiraIssue|addWorklogToJiraIssue|createIssueLink)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-jira-write-guard.js\"",
+            "timeout": 3000
+          }
+        ]
       }
     ]
   }

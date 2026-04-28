@@ -1,0 +1,6 @@
+{
+  "cloudId": "abc-123",
+  "linkType": { "name": "Blocks" },
+  "inwardIssue": { "key": "PROJ-100" },
+  "outwardIssue": { "key": "PROJ-200" }
+}

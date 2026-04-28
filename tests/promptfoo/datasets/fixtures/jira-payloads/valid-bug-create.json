@@ -1,0 +1,9 @@
+{
+  "cloudId": "abc-123",
+  "projectKey": "PROJ",
+  "issueTypeName": "Bug",
+  "summary": "Login button broken on mobile Safari",
+  "description": "## Objective\nButton fails to submit on iOS Safari 17.\n\n## Details\nReproduced 100% on iPhone 14, blocks login flow.\n\n## How to Test\nTap the login button on iPhone 14 Safari; expect form submit.\n",
+  "contentFormat": "markdown",
+  "responseContentFormat": "markdown"
+}

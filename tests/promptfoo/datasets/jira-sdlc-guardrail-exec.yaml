@@ -1,0 +1,207 @@
+# jira-sdlc write-op guardrail (R17–R21) hook + helper exec tests.
+#
+# Coverage matrix:
+#   helper-payload-hash      → R21 (canonical hash)
+#   helper-placeholder       → R19 / C13
+#   helper-template          → R18
+#   helper-artifact-store    → R17 / R20 / R21
+#   hook-allow (×3)          → R17/R18/R19/R20/R21 happy paths
+#   hook-deny (×9)           → R17/R18/R19/R20/R21 violation paths
+#   hook-continue (×2)       → defense-in-depth
+#
+# All cases use the local script-runner; assertions check the RESULT line
+# emitted by tests/promptfoo/scripts/jira-write-guard-test.js.
+
+# ---------- Helper module tests ----------
+
+- description: "guardrail helper: payload-hash key-order independence + determinism"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op helper-payload-hash"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+
+- description: "guardrail helper: placeholder-detect ADF traversal + short-bracket exclusion"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op helper-placeholder"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+
+- description: "guardrail helper: template-fingerprint override beats shipped, missing returns null"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op helper-template"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+
+- description: "guardrail helper: artifact-store roundtrip + stale-detection"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op helper-artifact-store"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+
+# ---------- Hook integration: allow paths ----------
+
+- description: "jira-write-guardrail #1: createJiraIssue valid Bug, fresh artifacts → allow"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-allow --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/valid-bug-create.json --artifacts fresh"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "allow"
+
+- description: "jira-write-guardrail #10: transitionJiraIssue valid → allow"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-allow --tool mcp__atlassian__transitionJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/valid-transition.json --artifacts fresh"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+
+- description: "jira-write-guardrail #13: createJiraIssue with override template → allow"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-allow --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/override-bug-create.json --artifacts fresh --template-mode override"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+
+# ---------- Hook integration: deny paths ----------
+
+- description: "jira-write-guardrail #2: createJiraIssue with [bracketed] placeholder → deny (R19)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: '--op hook-deny --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/placeholder-laden-bug.json --artifacts fresh --reason-substring placeholder'
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "placeholder"
+
+- description: "jira-write-guardrail #3: createJiraIssue with no description → deny (R18)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: '--op hook-deny --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/no-description-bug.json --artifacts fresh --reason-substring template'
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "template"
+
+- description: "jira-write-guardrail #4: createJiraIssue with invented heading → deny (R18 template mismatch)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: '--op hook-deny --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/freeform-description-bug.json --artifacts fresh --reason-substring template'
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "template"
+
+- description: "jira-write-guardrail #5: createJiraIssue with critique present, approval missing → deny (R17)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: '--op hook-deny --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/valid-bug-create.json --artifacts missing-approval --reason-substring approval'
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "approval"
+
+- description: "jira-write-guardrail #6: createJiraIssue with approval present, critique missing → deny (R20)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: '--op hook-deny --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/valid-bug-create.json --artifacts missing-critique --reason-substring critique'
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "critique"
+
+- description: "jira-write-guardrail #7: createJiraIssue with stale artifacts (> 10 min) → deny (R21 TTL)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: '--op hook-deny --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/valid-bug-create.json --artifacts stale --reason-substring stale'
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "stale"
+
+- description: "jira-write-guardrail #8: editJiraIssue with {placeholder} in description → deny (R19)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: '--op hook-deny --tool mcp__atlassian__editJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/edit-with-placeholder.json --artifacts fresh --reason-substring placeholder'
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "placeholder"
+
+- description: "jira-write-guardrail #9: addCommentToJiraIssue ADF [TBD] in text node → deny (R19 ADF traversal)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: '--op hook-deny --tool mcp__atlassian__addCommentToJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/comment-adf-with-placeholder.json --artifacts fresh --reason-substring placeholder'
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "placeholder"
+
+- description: "jira-write-guardrail #11: createIssueLink with no artifacts → deny (R17/R20)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: '--op hook-deny --tool mcp__atlassian__createIssueLink --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/valid-link.json --artifacts none --reason-substring approval'
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "approval"
+
+# ---------- Hook integration: continue paths (defense-in-depth) ----------
+
+- description: "jira-write-guardrail #12: non-matching tool (Read) → continue:true (no parsing)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-continue --tool Read --payload-fixture __no_input__"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "continue"
+
+- description: "jira-write-guardrail #14: malformed tool_input → continue:true (defense-in-depth)"
+  provider: file://providers/script-runner.js
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-continue --tool mcp__atlassian__createJiraIssue --payload-fixture __malformed__"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "continue"

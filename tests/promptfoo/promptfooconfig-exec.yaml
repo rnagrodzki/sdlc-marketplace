@@ -36,3 +36,4 @@ tests:
   - file://datasets/openspec-lib-exec.yaml
   - file://datasets/openspec-enrich-exec.yaml
   - file://datasets/jira-sdlc-exec.yaml
+  - file://datasets/jira-sdlc-guardrail-exec.yaml

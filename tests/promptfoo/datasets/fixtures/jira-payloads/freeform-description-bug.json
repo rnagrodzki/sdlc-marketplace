@@ -1,0 +1,8 @@
+{
+  "cloudId": "abc-123",
+  "projectKey": "PROJ",
+  "issueTypeName": "Bug",
+  "summary": "Free-form description",
+  "description": "## Made-up Heading\nThis heading does not exist in the Bug template.\n",
+  "contentFormat": "markdown"
+}

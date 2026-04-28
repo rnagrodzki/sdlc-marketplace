@@ -1,0 +1,9 @@
+{
+  "cloudId": "abc-123",
+  "issueIdOrKey": "PROJ-42",
+  "issueTypeName": "Bug",
+  "fields": {
+    "summary": "Updated summary"
+  },
+  "responseContentFormat": "markdown"
+}

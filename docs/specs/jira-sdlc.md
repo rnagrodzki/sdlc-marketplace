@@ -32,6 +32,15 @@
 - R14: `--skip-workflow-discovery` bypasses Phase 5 entirely. The cache is written with `workflows: { <type>: { unsampled: true } }` for each non-subtask issue type. Transition operations that encounter an `unsampled` marker fall back to a live `getTransitionsForJiraIssue` call per issue (reusing the existing stale-cache auto-refresh path from R9/E10). Cache rows for subtask types and other sections are populated normally.
 - R15: When `--check` resolves against the home-cache layout without `--site`, it scans `~/.sdlc-cache/jira/*/<KEY>.json` for all candidates. Zero matches → `{ exists: false }` (treat as fresh install). Exactly one match → use it. Two or more matches → `{ exists: false, candidateSites: [<host>, …] }`; the user must re-run with `--site <host>` to disambiguate or `--force-refresh` to rebuild against a specific site.
 - R16: SKILL.md frontmatter `description` must include auto-trigger phrases covering the full operation surface: read/view, comment add, create, edit, search, transition, link, assign, worklog, bulk. Required trigger tokens: `read jira`, `view jira`, `show jira`, `get jira`, `fetch jira`, `jira details`, `add comment`, `comment on jira`, `reply to jira`, `jira ticket`, `jira issue`. Purpose: allow the downstream model to activate the skill automatically on common read-and-comment phrasings without an explicit `/jira-sdlc` invocation. Total frontmatter `description` length must stay within 1024 characters.
+- R17 (approval gate): Before `createJiraIssue`, `editJiraIssue`, `transitionJiraIssue`, `addCommentToJiraIssue`, `addWorklogToJiraIssue`, `createIssueLink`, the skill MUST print the full final payload and call `AskUserQuestion` with `approve` / `change <what>` / `cancel`. Loop on `change`. The MCP write tool is dispatched only after `approve`. Read operations (`searchJiraIssuesUsingJql`, `getJiraIssue`, `getTransitionsForJiraIssue`, etc.) are exempt.
+- R18 (template enforcement): Every `createJiraIssue` and every `editJiraIssue` whose payload touches `description` MUST resolve a description template via `.claude/jira-templates/<IssueType>.md` (override) then `plugins/sdlc-utilities/skills/jira-sdlc/templates/<IssueType>.md` (shipped). If no template clearly matches the requested issue type, the skill MUST call `AskUserQuestion` with a closed list of available templates. Free-form descriptions are prohibited. Sections may be removed when not applicable, but new sections MUST NOT be invented.
+- R19 (no-assume placeholder policy): The skill MUST detect placeholder markers in proposed payloads using the C13 regex (both `{name}` and `[bracketed prose]` forms; ADF documents are traversed recursively over `text` nodes). Each detected marker MUST be classified as `high` confidence (explicit user input or definitive cache value) or `low` confidence (inferred or paraphrased). Every `low`-confidence marker MUST be resolved via `AskUserQuestion` before payload finalization. Inapplicable sections require explicit user consent before removal — silent drops are prohibited.
+- R20 (self-critique, surfaced): Before the R17 approval presentation, the skill MUST run a critique pass against (a) template completeness, (b) field correctness (issue type, project key, parent, components, labels), (c) workflow validity (transition target reachable per cached workflow graph), and (d) terminology consistency between summary and description. The skill MUST surface findings to the user as an `Initial:` / `Critique:` / `Final:` block. Critique deltas MUST NOT be applied silently.
+- R21 (script-enforcement layer): R17–R20 MUST be enforced by a PreToolUse hook, not LLM compliance alone. Specifically:
+  - The skill canonicalizes the proposed payload (stable JSON key sort) and computes `payload_hash = sha256(canonical_json)` using shared `lib/payload-hash.js`.
+  - The skill writes `$TMPDIR/jira-sdlc/critique-<payload_hash>.json` before the R20 presentation; structural shape `{initial: string, findings: string[], final: string}`.
+  - The skill writes `$TMPDIR/jira-sdlc/approval-<payload_hash>.token` only after `AskUserQuestion` returns `approve`.
+  - The PreToolUse hook (`hooks/pre-tool-jira-write-guard.js`) re-derives `payload_hash` from `tool_input` and BLOCKS dispatch unless: (a) the C13 regex finds zero unfilled placeholders in payload string fields and ADF text nodes; (b) for `createJiraIssue` / `editJiraIssue` with description: payload `## ` headings are a subset of the resolved template's heading set; (c) `approval-<hash>.token` exists and its mtime is < 10 minutes old; (d) `critique-<hash>.json` exists with valid shape. On success the hook consumes (deletes) both artifact files. Both Atlassian MCP namespaces (`mcp__atlassian__*` and `mcp__claude_ai_Atlassian__*`) MUST be matched by the hook.
 
 ## Assumptions
 
@@ -65,6 +74,11 @@
 - G6: Transition safety — transition `id` from cache or fresh API call, never guessed
 - G7: User disambiguation — `lookupJiraAccountId` results always disambiguated if multiple matches
 - G8: No fabricated values — all field values derived from cache `allowedValues` or user input
+- G9: No write MCP call without an `approve` answer to the R17 approval gate in the same skill turn
+- G10: No `description` field built without a resolved template (R18) — override `.claude/jira-templates/<Type>.md` or shipped `templates/<Type>.md`
+- G11: No `low`-confidence placeholder dispatched without R19 user resolution via `AskUserQuestion`
+- G12: No payload presented to the user without a preceding R20 critique block (`Initial:` / `Critique:` / `Final:`)
+- G13: No write MCP call dispatched without the PreToolUse hook successfully verifying R21 artifacts (approval token + critique JSON, payload-hash bound, < 10 min old). Hook absence or matcher gap is a build failure (caught by `validate-plugin-consistency`).
 
 ## Prepare Script Contract
 
@@ -101,6 +115,7 @@
 - C10: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
 - C11: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
 - C12: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
+- C13: Placeholder regex — `\{[a-zA-Z_][a-zA-Z0-9_-]*\}|\[[^\]\n]{3,}\]`. Both `{name}` and `[bracketed prose ≥ 3 chars]` forms are treated equally as placeholder markers. ADF `text` nodes are traversed recursively; the regex applies to every string-valued field of the payload.
 
 ## Step-Emitter Contract
 

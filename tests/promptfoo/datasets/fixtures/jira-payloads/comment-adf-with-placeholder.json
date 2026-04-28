@@ -1,0 +1,15 @@
+{
+  "cloudId": "abc-123",
+  "issueIdOrKey": "PROJ-42",
+  "commentBody": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "Status update: [TBD pending review]" }]
+      }
+    ]
+  },
+  "contentFormat": "adf"
+}

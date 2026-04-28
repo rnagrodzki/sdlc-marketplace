@@ -1,0 +1,8 @@
+{
+  "cloudId": "abc-123",
+  "projectKey": "PROJ",
+  "issueTypeName": "Bug",
+  "summary": "Custom override path",
+  "description": "## Steps to reproduce\nReal repro.\n\n## Expected\nA.\n\n## Actual\nB.\n",
+  "contentFormat": "markdown"
+}

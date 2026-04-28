@@ -1,0 +1,7 @@
+{
+  "cloudId": "abc-123",
+  "issueIdOrKey": "PROJ-42",
+  "issueTypeName": "Bug",
+  "description": "## Objective\nResolve user {user_id} session bug.\n",
+  "contentFormat": "markdown"
+}

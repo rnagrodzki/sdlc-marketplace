@@ -169,3 +169,111 @@
         incomplete, and does NOT guess a transition id. The response treats unsampled
         identically to a transition ID not being cached — the existing auto-refresh
         fallback from REFERENCE handles both cases.
+
+- description: "jira-sdlc R17: write-op approval gate prompts before createJiraIssue dispatch"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      Run /jira-sdlc. Create a bug in PROJ: "login button broken on mobile Safari".
+      The cache is loaded. Walk through how you would handle the request — show the
+      payload you would dispatch and the user interaction you would have before
+      calling the MCP tool.
+  assert:
+    # Must NOT dispatch createJiraIssue in the planned/described flow before approval
+    - type: not-regex
+      value: "Dispatching mcp__atlassian__createJiraIssue|Dispatched mcp__atlassian__createJiraIssue|Successfully called mcp__atlassian__createJiraIssue"
+    # Must surface the approval prompt with the three required options
+    - type: icontains
+      value: "approve"
+    - type: icontains
+      value: "cancel"
+    # Behavioral: approval gate is presented and dispatch is conditional on approve
+    - type: llm-rubric
+      value: >
+        The response presents the full final payload to the user via AskUserQuestion
+        with three options: approve, change <what>, and cancel. The skill explicitly
+        states it will NOT call mcp__atlassian__createJiraIssue until the user answers
+        "approve". On "change" it loops back; on "cancel" it aborts the operation.
+        The skill describes the approval gate (R17) as a precondition for dispatch,
+        not as an optional courtesy.
+
+- description: "jira-sdlc R18: createJiraIssue requires a resolved description template"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      Run /jira-sdlc. Create a Subtask in PROJ: "refactor cache layer". Note that
+      this skill ships templates only for Bug, Story, Task, Spike, and Epic — there
+      is no Subtask.md template, and no override is configured at
+      .claude/jira-templates/Subtask.md. Walk through how the skill resolves the
+      description template.
+  assert:
+    # Must ask which template to use rather than fabricating a description
+    - type: regex
+      value: "(which template|pick a template|choose.*template|select.*template|AskUserQuestion)"
+    # Must not promise a free-form description
+    - type: not-regex
+      value: "free.?form|free.?text|unstructured description"
+    # Behavioral: closed-list template prompt
+    - type: llm-rubric
+      value: >
+        The response recognizes that no Subtask template ships and no override
+        exists, then prompts the user via AskUserQuestion with a closed list of
+        available templates (Bug, Story, Task, Spike, Epic) — never inventing a
+        description and never proceeding with a free-form description. The skill
+        treats the absence of a template as a user-resolution event (R18), not a
+        silent fallback.
+
+- description: "jira-sdlc R19: low-confidence placeholders escalate to AskUserQuestion"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      Run /jira-sdlc. Create a Story for the new dashboard. The user has given
+      no other detail — the request is intentionally vague. Walk through how the
+      skill builds the description and what it asks the user before dispatching.
+  assert:
+    # Must surface AskUserQuestion for missing context
+    - type: icontains
+      value: "AskUserQuestion"
+    # Must not leave unfilled bracketed placeholder prose in the proposed payload
+    - type: not-regex
+      value: "\\[[^\\]\\n]{15,}\\]"
+    # Behavioral: per-section escalation
+    - type: llm-rubric
+      value: >
+        The response detects that the request is too vague to fill the Story
+        template's sections (acceptance criteria, scope, etc.), classifies each
+        templated marker as low-confidence, and explicitly escalates each one via
+        AskUserQuestion to the user before assembling the final payload. The
+        proposed final payload contains no unfilled `{name}` or `[bracketed prose]`
+        markers. Inapplicable sections are removed only with explicit user consent
+        (no silent drops).
+
+- description: "jira-sdlc R20: critique block (Initial/Critique/Final) surfaces before approval"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      Run /jira-sdlc. Edit BUG-42 in PROJ to add a Steps to Reproduce section in
+      the description. The cache is loaded. Walk through the full flow including
+      the self-critique step before you ask for approval.
+  assert:
+    # Must emit Initial:/Critique:/Final: labels
+    - type: icontains
+      value: "Initial:"
+    - type: icontains
+      value: "Critique:"
+    - type: icontains
+      value: "Final:"
+    # Behavioral: critique deltas surfaced, not silent
+    - type: llm-rubric
+      value: >
+        The response emits an explicit Initial: / Critique: / Final: block before
+        the approval gate, surfacing every critique delta to the user. The Initial
+        section shows the first-pass payload, Critique lists the issues found
+        (template completeness, field correctness, workflow validity, terminology
+        consistency per R20), and Final shows the corrected payload. The skill
+        does NOT apply critique deltas silently — every change between Initial and
+        Final is enumerated in Critique.

@@ -330,7 +330,44 @@ For ambiguous requests, use AskUserQuestion to ask one clarifying question befor
 
 ---
 
+## Step 2.5 — Critique (write-ops only, R20)
+
+Skip this step for read operations (`search`, `view`). For every write operation (`create`, `edit`, `transition`, `comment`, `link`, `assign`, `worklog`, `bulk`), run a critique pass against the proposed payload **before** showing it to the user. Implements R20.
+
+1. Build the initial payload exactly as you would dispatch it (template-resolved per R18, placeholders resolved per R19, fields validated against cache per G5/G6/G8).
+2. Run the critique checklist:
+   - **Template completeness** (create / description-touching edit) — every `## ` heading in the payload description belongs to the resolved template; no invented sections.
+   - **Field correctness** — issue type / project key / parent / components / labels match cached `allowedValues`.
+   - **Workflow validity** — for `transition`, the target status is reachable per the cached workflow graph (R6).
+   - **Terminology consistency** — summary vocabulary matches description vocabulary (no contradictions).
+3. Compute `payload_hash` and write the critique artifact:
+   ```js
+   const { payloadHash } = require('./lib/payload-hash.js');
+   const { writeCritique } = require('./lib/artifact-store.js');
+   const hash = payloadHash(toolInput);
+   writeCritique(hash, { initial: '<one-line summary of initial draft>', findings: [...], final: '<one-line summary of final payload>' });
+   ```
+4. Surface the critique to the user as an `Initial:` / `Critique:` / `Final:` block — do not apply deltas silently.
+
+## Step 2.6 — Approval (write-ops only, R17)
+
+Skip for read operations. Implements R17 + the cooperative half of R21.
+
+1. Print the full final payload (not a summary — the bytes the MCP call will dispatch).
+2. Call `AskUserQuestion` with three options:
+   - **approve** — proceed to Step 3 dispatch
+   - **change <what>** — describe the desired change; loop back to Step 2.5 with the revised draft (new `payload_hash`, fresh artifacts; the previous artifacts are stale and will be auto-purged)
+   - **cancel** — abort the operation, do not dispatch
+3. On `approve` only, write the approval token:
+   ```js
+   const { writeApprovalToken } = require('./lib/artifact-store.js');
+   writeApprovalToken(hash);
+   ```
+4. Proceed to Step 3.
+
 ## Step 3 — Execute Operation
+
+For write operations: precondition — Step 2.6 returned `approve` and both artifacts (`approval-<hash>.token`, `critique-<hash>.json`) are on disk. The PreToolUse hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the hash from `tool_input`, verifies both artifacts, and BLOCKS dispatch otherwise (R21). If dispatch is blocked, surface the hook's `permissionDecisionReason` to the user verbatim — do not retry by guessing what changed.
 
 After Step 2 classifies the operation type, read `./operations-reference.md` and follow the procedure for the matching operation type.
 
@@ -398,8 +435,21 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 | Transition safety | Transition `id` from cache or fresh `getTransitionsForJiraIssue`, never guessed |
 | User disambiguation | `lookupJiraAccountId` results always disambiguated if multiple matches |
 | No fabricated values | All field values derived from cache `allowedValues` or user input |
+| Approval gate (G9) | No write MCP call dispatched without an `approve` from the R17 prompt in this turn |
+| Template enforced (G10) | No `description` field built without a resolved template — `.claude/jira-templates/<Type>.md` (override) or shipped `templates/<Type>.md` (R18) |
+| Placeholders resolved (G11) | No `low`-confidence `{name}` or `[prose]` marker dispatched without explicit user resolution (R19) |
+| Critique surfaced (G12) | No proposal presented to the user without a preceding `Initial:` / `Critique:` / `Final:` block (R20) |
+| Hook verified (G13) | No write MCP call dispatched without the PreToolUse hook successfully verifying R21 artifacts (payload-hash bound, < 10 min old) |
 
 ---
+
+## DO
+
+- Present the full final payload before any write MCP call (R17)
+- Resolve a description template — override or shipped — before building `description` (R18)
+- Escalate every low-confidence placeholder marker via `AskUserQuestion` (R19)
+- Run a critique pass before the approval gate; surface findings to the user (R20)
+- Write critique + approval artifacts via `lib/artifact-store.js` and use `lib/payload-hash.js` for the canonical hash (R21)
 
 ## DO NOT
 
@@ -416,6 +466,11 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 - Leave raw `{placeholder}` syntax in issue descriptions
 - Ignore custom templates at `.claude/jira-templates/<Type>.md` when they exist
 - Generate unstructured descriptions when a template is available
+- Dispatch a write MCP without an `approve` answer to the R17 prompt in this turn (R17)
+- Use a free-form description on `createJiraIssue` or `editJiraIssue` (R18)
+- Fill `[bracketed prose]` or `{name}` placeholders from inference — every `low`-confidence marker requires explicit user resolution (R19)
+- Apply critique deltas silently — always surface the `Initial:` / `Critique:` / `Final:` block (R20)
+- Bypass `lib/artifact-store.js` with direct `fs.writeFile` calls — direct writes break the canonical hash contract the hook verifies (R21)
 
 ---
 
