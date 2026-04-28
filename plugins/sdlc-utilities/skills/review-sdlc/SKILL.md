@@ -95,18 +95,41 @@ a new orchestrator dispatch.
 
 ---
 
-## Step 3 — Parse Orchestrator Summary
+## Step 3 — Parse Orchestrator Summary and Display Full Comment Body
 
-Display the orchestrator's summary to the user verbatim.
+This step implements R13 and quality gate G5: the user MUST see the full
+consolidated review (every per-dimension finding, every severity) in the terminal
+before any posting prompt. The orchestrator summary alone contains only severity
+counts and is insufficient.
 
-Parse the summary to extract:
+1. Display the orchestrator's summary to the user verbatim.
 
-- `comment_file` — absolute path to `${diff_dir}/review-comment.md`
-- `pr.exists` (boolean), `pr.owner`, `pr.repo`, `pr.number`
-- `verdict` — one of `CHANGES REQUESTED`, `APPROVED WITH NOTES`, `APPROVED`
-- `scope` — scope label from the summary
-- `branch` — current branch name
-- `diff_dir` — absolute path to the orchestrator's working diff dir
+2. Parse the summary to extract:
+
+   - `comment_file` — absolute path to `${diff_dir}/review-comment.md`
+   - `pr.exists` (boolean), `pr.owner`, `pr.repo`, `pr.number`
+   - `verdict` — one of `CHANGES REQUESTED`, `APPROVED WITH NOTES`, `APPROVED`
+   - `scope` — scope label from the summary
+   - `branch` — current branch name
+   - `diff_dir` — absolute path to the orchestrator's working diff dir
+
+3. **Display full comment body (implements R13).** Use the Read tool to load the
+   file at `comment_file`, then emit its full contents verbatim to the user inside
+   a fenced markdown block. No summarization, no truncation, no per-severity
+   collapsed table, no "Additional finding (see PR comment for details)"
+   placeholders. The full body must be visible in the terminal before Step 4's
+   posting prompt is shown.
+
+   ### DO NOT (Step 3 display)
+
+   - Do NOT summarize or paraphrase findings — emit the file contents byte-for-byte
+   - Do NOT collapse any finding to a placeholder like
+     "Additional finding (see PR comment for details)"
+   - Do NOT synthesize a severity/count table in place of the persisted body —
+     the orchestrator summary already provides counts; Step 3 must emit the
+     per-finding detail
+   - Do NOT skip the Read step even if the orchestrator summary appears
+     "complete" — the summary is metadata only
 
 Do NOT delete the manifest file here — cleanup happens in Step 6 on every terminal branch.
 
