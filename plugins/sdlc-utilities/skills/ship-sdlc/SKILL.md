@@ -77,6 +77,8 @@ echo "EXIT_CODE=$EXIT_CODE"
 
 Parse the output JSON from `$PREPARE_OUTPUT_FILE`. If `errors` is non-empty, display them and stop. The parsed output replaces manual computation in subsequent sub-steps (1d–1g).
 
+**Context-heaviness advisory (implements R35):** If the parsed output's top-level `contextAdvisory` field is a non-empty string, print it verbatim before continuing. The advisory recommends `/compact` and notes that pipeline state is preserved across compaction (PreCompact + SessionStart hooks). Sourced from `$TMPDIR/sdlc-context-stats.json`, written by the `UserPromptSubmit` hook (`hooks/context-stats.js`); helper at `scripts/lib/context-advisory.js`. When `contextAdvisory` is `null`, emit nothing.
+
 **Gitignore warning:** If `context.sdlcGitignored` is `false` in the output, print:
 ```
 ⚠ Warning: .sdlc/ is not gitignored. Run --init-config to fix, or manually create .sdlc/.gitignore:

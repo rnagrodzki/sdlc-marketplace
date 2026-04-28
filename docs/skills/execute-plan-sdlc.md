@@ -264,6 +264,7 @@ Guardrails:       3/3 passed (1 warning, 0 overridden)
 | Source code files | Files created or modified as specified by plan tasks |
 | `.claude/learnings/log.md` | Execution learnings appended after completion (classification accuracy, wave conflicts, recovery outcomes) |
 | `.sdlc/execution/execute-<branch>-<timestamp>.json` | Execution state file written after each wave; enables cross-session resume via --resume. Deleted on success, preserved on failure. |
+| Step 1 context-heaviness advisory | When the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget), Step 1 emits a `/compact` advisory to stderr before guardrail loading. Sidecar is written by the `UserPromptSubmit` hook `hooks/context-stats.js`. Implementation: [`scripts/lib/context-advisory.js`](../../plugins/sdlc-utilities/scripts/lib/context-advisory.js). Distinct from R21 between-wave compaction. Pipeline state survives `/compact` (PreCompact + SessionStart hooks). |
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.
 

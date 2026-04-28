@@ -42,6 +42,7 @@
 - R23: The post-pipeline archive suggestion is never auto-executed — this is the "execute only" entry point; archival is deferred to `/ship-sdlc` or manual invocation
 - R24: If `validateChangeStrict` returns `ok: false`, the suggestion is NOT emitted and the validation output is surfaced instead
 - R25: If the `openspec` CLI is not on PATH (`cliAvailable: false`), the suggestion falls back to the current advisory text (no fabricated validation claim)
+- R26: Step 1 (LOAD) MUST emit a context-heaviness advisory when the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget). The advisory recommends `/compact` and notes that pipeline state survives compaction. When the sidecar is absent or `heavy: false`, no advisory is emitted. This is distinct from R21 (between-wave compaction inside the execution loop) — R26 fires once at handoff before any wave dispatch, R21 governs context management between waves. Implementation lives in `scripts/lib/context-advisory.js`. (Rationale: #173.)
 
 ## Workflow Phases
 

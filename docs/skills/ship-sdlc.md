@@ -525,6 +525,7 @@ Then run `/ship-sdlc` without `--resume` to start a new pipeline.
 | Git commits | Feature commit (step 2) and optionally a review fix commit (step 5). |
 | Git tag | Created by version-sdlc if the version step runs. |
 | GitHub PR | Opened or updated by pr-sdlc as the final step. |
+| Step 1 context-heaviness advisory | When the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget), Step 1 emits a `/compact` advisory before the pipeline begins. Sidecar is written by the `UserPromptSubmit` hook `hooks/context-stats.js`. Surfaced through the `contextAdvisory` field of `skill/ship.js` output. Implementation: [`scripts/lib/context-advisory.js`](../../plugins/sdlc-utilities/scripts/lib/context-advisory.js). Pipeline state survives `/compact` (PreCompact + SessionStart hooks). |
 
 ---
 

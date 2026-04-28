@@ -30,6 +30,7 @@
 - R14: Remove the `## Requirements` working section after task decomposition (temporary scaffolding)
 - R15: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 - R16: When `openspec/config.yaml` exists AND the injected session-start `<system-reminder>` contains a contradictory signal (regex matching `not initialized` together with `openspec`), the skill MUST emit a single audit line naming the authoritative file path and note that the contradictory signal is being ignored. The override line is informational only — skill flow continues. (Rationale: #164 — defensive hardening against co-installed plugins emitting false-negative OpenSpec detection.)
+- R17: Step 7 (handoff) MUST emit a context-heaviness advisory when the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget). The advisory recommends `/compact` and notes that pipeline state survives compaction (preserved by the existing `PreCompact` + `SessionStart` hooks). When the sidecar is absent or `heavy: false`, no advisory is emitted. Implementation lives in `scripts/lib/context-advisory.js` shared with ship-sdlc and execute-plan-sdlc. (Rationale: #173.)
 
 ## Workflow Phases
 
