@@ -420,8 +420,11 @@ if [ "$GH_EXIT" -ne 0 ]; then
   [ -z "$RECOVER_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js" ] && RECOVER_SCRIPT="plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js"
   if [ -n "$RECOVER_SCRIPT" ]; then
     RECOVER_JSON=$(node "$RECOVER_SCRIPT" --error-file "$ERR_FILE")
+  else
+    echo "Warning: pr-recover-gh-account.js not found — skipping account-switch recovery"
   fi
 fi
+rm -f "$ERR_FILE"
 ```
 
 Parse `RECOVER_JSON`. Branches:
@@ -430,7 +433,7 @@ Parse `RECOVER_JSON`. Branches:
 - `recovered: false` and `hint` is present — surface the original stderr followed by the hint (e.g., `Run \`gh auth login --hostname <host>\` to authenticate the account that owns this repo.`) and proceed to the existing failure fallback.
 - `recovered: false` and `reason: "non-permission-error"` — proceed straight to the existing failure fallback (this is not an account problem).
 
-The retry runs at most once per pipeline invocation. The recovery helper is the single source of decision logic — SKILL.md only orchestrates capture, invocation, and re-run. Always remove `"$ERR_FILE"` after handling.
+The retry runs at most once per pipeline invocation. The recovery helper is the single source of decision logic — SKILL.md only orchestrates capture, invocation, and re-run.
 
 **Update mode:**
 

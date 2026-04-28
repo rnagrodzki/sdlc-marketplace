@@ -178,6 +178,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'revise-draft', label: 'Revise draft', type: 'llm', description: 'Fixes failing gates; asks user if context unclear' },
       { id: 'review-confirm', label: 'Present for approval', type: 'user', description: 'Shows title and description; yes/edit/cancel' },
       { id: 'create-pr', label: 'Create or update PR', type: 'script', description: 'Runs gh pr create or gh pr edit after approval' },
+      { id: 'account-recovery', label: 'Post-failure account-switch', type: 'script', description: 'On permission error, auto-switches gh account and retries once (E7)' },
     ],
     connections: [
       { to: 'setup-sdlc', label: 'uses template from' },
