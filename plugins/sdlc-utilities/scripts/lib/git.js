@@ -430,6 +430,14 @@ function recoverGhAccountForRepo(projectRoot, errorText, opts = {}) {
   // gh auth switch prints to stderr on success and may return null in our exec wrapper —
   // verify by re-querying status.
   const verify = getGhAccounts(host);
+  if (verify.error || !Array.isArray(verify.accounts)) {
+    return {
+      recovered: false,
+      switched: false,
+      reason: 'switch-verify-failed',
+      error: verify.error,
+    };
+  }
   const newActive = verify.accounts.find(a => a && a.active);
   if (newActive && newActive.login.toLowerCase() === match.login.toLowerCase()) {
     return {
