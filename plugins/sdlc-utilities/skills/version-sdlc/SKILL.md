@@ -184,7 +184,7 @@ Before executing, verify:
 - The version file path exists (for `config.mode === "file"`)
 - The new tag does not conflict with existing tags (`conflictsWithNext[bumpType]` is false)
 - There are no uncommitted changes that would corrupt the release commit (run `git status --porcelain` and warn if non-empty)
-- Remote state is known — warn if no upstream is configured, but do not block the release
+- Remote state is known — note `remoteState.hasUpstream` for use in Step 8 (the push step self-heals a missing upstream by emitting `--set-upstream`; no user action required)
 - Git identity is configured: run `git config user.name` and `git config user.email`. If either is empty, stop and instruct the user to set them:
   ```
   git config user.name "Your Name"
@@ -242,7 +242,9 @@ The release proceeds regardless of the user's answer. This is informational, not
      git tag -a ${newTag} -m "$(printf 'Release %s\n\nType: hotfix' ${newTag})"
      ```
    - Otherwise: `git tag -a ${newTag} -m "Release ${newTag}"`
-6. **Push** (unless `flags.noPush === true`): `git push && git push --tags`
+6. **Push** (unless `flags.noPush === true`):
+   - If `remoteState.hasUpstream === true` (R11): `git push && git push --tags`
+   - If `remoteState.hasUpstream === false` (R15): `git push --set-upstream origin <currentBranch> && git push --tags` — uses `currentBranch` from the prepare-script `version-context` output. This auto-heals first push from a fresh feature branch; no manual `git push -u` is required.
 
 **If any git command fails** (commit, tag, or push) with a non-auth error, show the error.
 
@@ -331,6 +333,7 @@ When invoking `error-report-sdlc`, provide:
 - `bumpOptions.preRelease` is pre-computed in the JSON only when `--pre` was passed at script time. If the user requests a different pre-label during `edit`, re-run the script — the `preRelease` field reflects the label passed at script invocation, not a label added mid-session.
 - For TOML/YAML version files, use the Edit tool with targeted string replacement (old version string → new version string), not full file rewrites, to avoid corrupting file structure.
 - `git push && git push --tags` are two separate pushes. `git push --tags` alone does NOT push the release commit — both commands are required.
+- **Auto-`--set-upstream` on first push (R15):** When `remoteState.hasUpstream === false`, Step 8 emits `git push --set-upstream origin <currentBranch>` instead of bare `git push`. This eliminates the `fatal: The current branch has no upstream` error on releases cut from a fresh feature branch. The branch comes from `currentBranch` in the `version-context` JSON — never hardcode it. The subsequent `git push --tags` is unchanged.
 - If the working tree has uncommitted changes at execution time, the release commit will include only the staged version file and changelog changes. Warn the user so they are not surprised by files missing from the commit.
 - `conventionalSummary.suggestedBump` is derived from commit types. If there are no conventional commits since the last tag, the suggested bump may default to `patch` — confirm with the user if this seems wrong.
 

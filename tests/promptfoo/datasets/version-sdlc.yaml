@@ -197,3 +197,75 @@
         is empty for that commit). The ticket IDs are appended in parentheses at the end of
         each relevant entry line. It presents a release plan and asks for confirmation before
         proceeding.
+
+- description: "version-sdlc: no upstream — release auto-sets upstream on first push"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user is on a fresh feature branch feat/foo with no upstream configured. Running
+      version-prepare.js produces this version-context JSON (excerpt):
+      {"flow": "release", "config": {"mode": "file", "versionFile": "package.json",
+      "tagPrefix": "v", "changelog": false}, "versionSource": {"currentVersion": "1.2.3"},
+      "requestedBump": "patch", "conventionalSummary": {"suggestedBump": "patch",
+      "hasBreakingChanges": false}, "bumpOptions": {"patch": "1.2.4", "minor": "1.3.0",
+      "major": "2.0.0"}, "tags": {"latest": "v1.2.3"}, "commits": [{"type": "fix",
+      "subject": "correct rate limit header"}], "flags": {"noPush": false, "auto": true,
+      "hotfix": false, "changelog": false}, "conflictsWithNext": {"patch": false,
+      "minor": false, "major": false}, "currentBranch": "feat/foo",
+      "remoteState": {"hasUpstream": false}, "errors": [], "warnings": []}
+    user_request: >
+      Run /version-sdlc patch --auto. The version-prepare.js output is provided in the
+      project context. Show the release plan and the exact push command(s) you would run.
+  assert:
+    # Must auto-set upstream for the current branch
+    - type: regex
+      value: 'git push (--set-upstream|-u) origin feat/foo'
+    # Must still push tags
+    - type: icontains
+      value: "git push --tags"
+    - type: llm-rubric
+      value: >
+        The response reads the version-context output, recognises remoteState.hasUpstream
+        is false and currentBranch is "feat/foo", and emits the push step as
+        `git push --set-upstream origin feat/foo && git push --tags` (or equivalent
+        `git push -u origin feat/foo && git push --tags`). It does NOT emit a bare
+        `git push` for the release commit. It does NOT prompt the user to manually set
+        the upstream — the skill self-heals. The tag push (`git push --tags`) is unchanged.
+
+- description: "version-sdlc: existing upstream — release uses bare push (no --set-upstream)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user is on a feature branch feat/bar that already tracks origin/feat/bar.
+      Running version-prepare.js produces this version-context JSON (excerpt):
+      {"flow": "release", "config": {"mode": "file", "versionFile": "package.json",
+      "tagPrefix": "v", "changelog": false}, "versionSource": {"currentVersion": "1.2.3"},
+      "requestedBump": "patch", "conventionalSummary": {"suggestedBump": "patch",
+      "hasBreakingChanges": false}, "bumpOptions": {"patch": "1.2.4", "minor": "1.3.0",
+      "major": "2.0.0"}, "tags": {"latest": "v1.2.3"}, "commits": [{"type": "fix",
+      "subject": "correct rate limit header"}], "flags": {"noPush": false, "auto": true,
+      "hotfix": false, "changelog": false}, "conflictsWithNext": {"patch": false,
+      "minor": false, "major": false}, "currentBranch": "feat/bar",
+      "remoteState": {"hasUpstream": true}, "errors": [], "warnings": []}
+    user_request: >
+      Run /version-sdlc patch --auto. The version-prepare.js output is provided in the
+      project context. Show the release plan and the exact push command(s) you would run.
+  assert:
+    # Must use plain `git push` followed by `git push --tags`
+    - type: icontains
+      value: "git push"
+    - type: icontains
+      value: "git push --tags"
+    # Must NOT inject --set-upstream / -u when an upstream already exists (regression guard)
+    - type: not-icontains
+      value: "--set-upstream"
+    - type: not-regex
+      value: 'git push -u '
+    - type: llm-rubric
+      value: >
+        The response reads the version-context output, recognises remoteState.hasUpstream
+        is true, and emits the push step as `git push && git push --tags` — the standard
+        two-command push with no `--set-upstream` flag and no `-u` shorthand. The branch
+        name "feat/bar" does NOT appear in the push command. This is the regression-guard
+        case: ensure auto-upstream behaviour does not leak into branches that already
+        have an upstream.

@@ -32,6 +32,7 @@
 - R12: When `--auto` is set, skip AskUserQuestion prompts but display the release plan and run all critique gates
 - R13: Verify pre-conditions before execution: version file exists (file mode), tag does not conflict, no uncommitted changes, git identity configured
 - R14: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
+- R15: When `remoteState.hasUpstream === false`, the push step uses `git push --set-upstream origin <currentBranch>` instead of bare `git push`; the subsequent `git push --tags` is unchanged. This avoids first-push failures on fresh feature branches.
 
 ## Workflow Phases
 
