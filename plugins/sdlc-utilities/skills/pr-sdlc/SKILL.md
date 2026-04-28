@@ -409,6 +409,29 @@ gh pr create --title "<title>" --body "<body>" [--draft] [--label "<l1>" --label
 
 If no labels were approved, omit the `--label` flags entirely.
 
+**Post-failure account-switch recovery (implements spec E7, issue #184):** If `gh pr create` exits non-zero, capture stderr to a temp file and invoke the recovery helper exactly once:
+
+```bash
+ERR_FILE=$(mktemp)
+gh pr create --title "<title>" --body "<body>" [--draft] [--label ...] 2> "$ERR_FILE"
+GH_EXIT=$?
+if [ "$GH_EXIT" -ne 0 ]; then
+  RECOVER_SCRIPT=$(find ~/.claude/plugins -name "pr-recover-gh-account.js" -path "*/sdlc*/scripts/skill/pr-recover-gh-account.js" 2>/dev/null | head -1)
+  [ -z "$RECOVER_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js" ] && RECOVER_SCRIPT="plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js"
+  if [ -n "$RECOVER_SCRIPT" ]; then
+    RECOVER_JSON=$(node "$RECOVER_SCRIPT" --error-file "$ERR_FILE")
+  fi
+fi
+```
+
+Parse `RECOVER_JSON`. Branches:
+
+- `recovered: true` and `switched: true` — print one user-visible line: `Switched gh account to <account> due to repo-permission mismatch — retrying`. Re-run `gh pr create` with the same arguments **exactly once**. A second consecutive failure is terminal and falls through to the existing failure path below.
+- `recovered: false` and `hint` is present — surface the original stderr followed by the hint (e.g., `Run \`gh auth login --hostname <host>\` to authenticate the account that owns this repo.`) and proceed to the existing failure fallback.
+- `recovered: false` and `reason: "non-permission-error"` — proceed straight to the existing failure fallback (this is not an account problem).
+
+The retry runs at most once per pipeline invocation. The recovery helper is the single source of decision logic — SKILL.md only orchestrates capture, invocation, and re-run. Always remove `"$ERR_FILE"` after handling.
+
 **Update mode:**
 
 ```bash
@@ -427,7 +450,7 @@ Pull request created: <url>
 Pull request updated: <url>
 ```
 
-**If `gh` is unavailable or fails**, show the error and provide a fallback:
+**If `gh` is unavailable or fails (after any account-switch retry has already run)**, show the error and provide a fallback:
 
 ```text
 The GitHub CLI (gh) could not complete the operation. You can:
@@ -472,6 +495,7 @@ Title: <title>
 |-------|----------|---------------------------|
 | `skill/pr.js` exit 1 (`errors[]` present) | Show each error, stop | No — user input error |
 | `skill/pr.js` exit 2 (crash) | Show stderr, stop | Yes |
+| `gh pr create` fails with `does not have the correct permissions to execute CreatePullRequest` (spec E7) | Auto-recover: invoke `pr-recover-gh-account.js` once; if a matching local gh account exists, switch and retry `gh pr create` exactly once. If no match, surface original error + `gh auth login --hostname <host>` hint and continue with the manual fallback below. | No on first retry; Yes only if the retry also fails |
 | `gh pr create` / `gh pr edit` fails with 5xx or unexpected error | Show error; offer manual fallback (copy title + description) | Yes |
 | `gh` unavailable | Show install instructions | No — user setup |
 | `gh` auth failure | Show `gh auth login` instructions | No — auth, not a bug |
@@ -503,14 +527,16 @@ When invoking `error-report-sdlc`, provide:
   use it as the template, then warn the user that the installed plugin may be out of date and
   suggest re-installing (`/plugin install sdlc@sdlc-marketplace`).
 
-- **Multiple GitHub accounts — auto-switch may pick the wrong account for team repos**: The
-  skill detects the correct `gh` account using two phases: first it matches the account login
-  against the remote repository owner name (fast, works for personal repos), then it tests API
-  access per account (fallback, handles org repos). If you're a collaborator on a repo owned by
-  a third party (not your org or personal account), the auto-detection may not find a match and
-  falls back to the currently active account with a warning. In that case, run
-  `gh auth switch --user <login>` manually before invoking the skill. The switch persists for
-  subsequent commands.
+- **Multiple GitHub accounts — auto-recovery covers most mismatches**: Pre-flight, the skill
+  matches the active `gh` account against the remote repo owner (via `ensureGhAccount`).
+  Post-flight (spec E7, issue #184), if `gh pr create` still fails with a `CreatePullRequest`
+  permission error, the skill invokes `pr-recover-gh-account.js` once: it parses the repo
+  owner, looks for a local gh account whose login matches, runs `gh auth switch`, and retries
+  `gh pr create` exactly once. The user sees a single concise recovery line, not the raw
+  GraphQL error. If no matching account is configured locally, the skill surfaces a
+  `gh auth login --hostname <host>` hint and falls through to the manual fallback. Manual
+  `gh auth switch --user <login>` before invoking the skill is still valid for collaborator
+  scenarios where no local account login matches the owner.
 
 - **OpenSpec change detection during PR creation should not block.** Unlike plan-sdlc which can ask the user to disambiguate multiple active changes, pr-sdlc should silently skip OpenSpec enrichment if the change cannot be uniquely identified from the branch name. PR creation should never be blocked by spec detection ambiguity.
 

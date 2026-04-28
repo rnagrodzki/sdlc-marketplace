@@ -23,6 +23,7 @@ tests:
   - file://datasets/sdlc-script-resolution-exec.yaml
   - file://datasets/commit-prepare-exec.yaml
   - file://datasets/pr-prepare-exec.yaml
+  - file://datasets/pr-recover-gh-account-exec.yaml
   - file://datasets/ship-prepare-exec.yaml
   - file://datasets/guardrails-prepare-exec.yaml
   - file://datasets/setup-init-exec.yaml

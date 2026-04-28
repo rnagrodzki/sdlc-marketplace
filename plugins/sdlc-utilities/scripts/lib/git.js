@@ -314,6 +314,142 @@ function ensureGhAccount(projectRoot) {
   };
 }
 
+/**
+ * Pure helper — pick a gh account whose login matches the given repo owner (case-insensitive).
+ * Used by post-failure recovery (issue #184). Pure / no I/O so it can be unit-tested
+ * without mocking gh.
+ *
+ * @param {string} owner — repo owner from `parseRemoteOwner`
+ * @param {Array<{login: string, active?: boolean}>} accounts — list of gh accounts
+ * @returns {{ login: string, active: boolean }|null}
+ */
+function selectAccountForOwner(owner, accounts) {
+  if (!owner || !Array.isArray(accounts) || accounts.length === 0) return null;
+  const ownerLower = String(owner).toLowerCase();
+  const match = accounts.find(
+    a => a && typeof a.login === 'string' && a.login.toLowerCase() === ownerLower
+  );
+  if (!match) return null;
+  return { login: match.login, active: Boolean(match.active) };
+}
+
+/**
+ * Permission-error signature check for `gh pr create` failures (issue #184).
+ * Returns true when the error text indicates the active gh account lacks
+ * permission to create a pull request on this repo (vs. unrelated failures
+ * like 404, network, or rate-limit).
+ *
+ * @param {string} errorText
+ * @returns {boolean}
+ */
+function isGhCreatePrPermissionError(errorText) {
+  if (typeof errorText !== 'string' || errorText.length === 0) return false;
+  const lower = errorText.toLowerCase();
+  return (
+    lower.includes('does not have the correct permissions to execute') &&
+    lower.includes('createpullrequest')
+  );
+}
+
+/**
+ * Post-failure gh-account-switch recovery for `gh pr create`.
+ *
+ * Composes existing helpers (`parseRemoteOwner`, `getGhAccounts`, `exec`) — no new
+ * git or gh primitives. Distinct from the pre-flight `ensureGhAccount`:
+ * this runs ONLY when `gh pr create` already failed with a permission error,
+ * so it can confirm the recovery actually changed something.
+ *
+ * Behavior:
+ *   - If `errorText` is not a permission error → `{ recovered: false, reason: "non-permission-error" }`
+ *   - If matching account is already active → `{ recovered: false, switched: false, reason: "already-active", account }`
+ *   - If matching account exists and switch succeeds → `{ recovered: true, switched: true, account, previousAccount }`
+ *   - If no matching account → `{ recovered: false, switched: false, hint: "gh auth login --hostname <host>" }`
+ *
+ * For test injection (so promptfoo exec tests can run hermetically), pass
+ * `accounts` and `remote` directly instead of letting the function call gh.
+ *
+ * @param {string} projectRoot
+ * @param {string} errorText
+ * @param {{ accounts?: Array<{login:string, active?:boolean}>, remote?: {host:string,owner:string,repo:string}, dryRun?: boolean }} [opts]
+ * @returns {object}
+ */
+function recoverGhAccountForRepo(projectRoot, errorText, opts = {}) {
+  if (!isGhCreatePrPermissionError(errorText)) {
+    return { recovered: false, reason: 'non-permission-error' };
+  }
+
+  const remote = opts.remote || parseRemoteOwner(projectRoot);
+  if (!remote) {
+    return { recovered: false, switched: false, reason: 'no-remote' };
+  }
+  const { host, owner } = remote;
+
+  let accounts = opts.accounts;
+  if (!accounts) {
+    const result = getGhAccounts(host);
+    if (result.error) {
+      return { recovered: false, switched: false, reason: 'gh-status-error', error: result.error };
+    }
+    accounts = result.accounts;
+  }
+
+  const match = selectAccountForOwner(owner, accounts);
+  if (!match) {
+    return {
+      recovered: false,
+      switched: false,
+      hint: `gh auth login --hostname ${host}`,
+      owner,
+      host,
+    };
+  }
+
+  const activeAccount = accounts.find(a => a && a.active) || null;
+  const previousAccount = activeAccount ? activeAccount.login : null;
+
+  if (match.active) {
+    return {
+      recovered: false,
+      switched: false,
+      reason: 'already-active',
+      account: match.login,
+    };
+  }
+
+  if (opts.dryRun) {
+    return {
+      recovered: true,
+      switched: true,
+      account: match.login,
+      previousAccount,
+      dryRun: true,
+    };
+  }
+
+  const switchResult = exec(`gh auth switch --user ${match.login}`);
+  // gh auth switch prints to stderr on success and may return null in our exec wrapper —
+  // verify by re-querying status.
+  const verify = getGhAccounts(host);
+  const newActive = verify.accounts.find(a => a && a.active);
+  if (newActive && newActive.login.toLowerCase() === match.login.toLowerCase()) {
+    return {
+      recovered: true,
+      switched: true,
+      account: match.login,
+      previousAccount,
+    };
+  }
+
+  return {
+    recovered: false,
+    switched: false,
+    reason: 'switch-failed',
+    account: match.login,
+    previousAccount,
+    error: switchResult,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // PR-specific helpers (used by pr-prepare.js only)
 // ---------------------------------------------------------------------------
@@ -700,6 +836,9 @@ module.exports = {
   parseRemoteOwner,
   getGhAccounts,
   ensureGhAccount,
+  selectAccountForOwner,
+  isGhCreatePrPermissionError,
+  recoverGhAccountForRepo,
   // PR-specific
   getRemoteState,
   pushToRemote,

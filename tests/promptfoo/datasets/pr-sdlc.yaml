@@ -196,3 +196,38 @@
         The scope is drawn from allowedScopes (api, auth, db). The quality gate
         validates the title against the titlePattern regex, confirming pattern match.
         The response mentions pattern validation or matching in the critique output.
+
+- description: "pr-sdlc: post-failure gh-account-switch retry on CreatePullRequest permission error (issue #184)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: "file://fixtures/feature-branch-permission-denied.md"
+    user_request: >
+      Run /pr-sdlc. The first `gh pr create` call has just failed with stderr containing
+      `does not have the correct permissions to execute \`CreatePullRequest\``.
+      The project context describes the helper script available and the expected recovery
+      JSON it returns. Describe the exact Step 6 flow your skill follows on this failure,
+      including (a) how stderr is captured, (b) how `pr-recover-gh-account.js` is invoked,
+      (c) what user-visible message is printed on a successful switch, (d) how many times
+      `gh pr create` is retried, and (e) what happens on the no-match branch.
+  assert:
+    - type: icontains
+      value: "pr-recover-gh-account"
+    - type: icontains
+      value: "--error-file"
+    - type: regex
+      value: "(retry|retried|re-run|rerun).{0,40}(once|exactly one|single)"
+    - type: llm-rubric
+      value: >
+        The response describes the post-failure recovery flow accurately. It captures the
+        failing `gh pr create` stderr to a temp file (mktemp). It invokes
+        `pr-recover-gh-account.js --error-file <tmp>` exactly once, using the standard
+        installed-first-then-local script lookup pattern (find under ~/.claude/plugins,
+        fallback to plugins/sdlc-utilities/scripts/skill/). It parses the returned JSON.
+        On `recovered:true && switched:true`, it prints a single concise user-visible
+        recovery line (something like "Switched gh account to Cleeng due to repo-permission
+        mismatch — retrying"), not the raw GraphQL error. It re-runs `gh pr create` exactly
+        once — never in a loop. On the no-match branch (`recovered:false` with a `hint`
+        field), it surfaces the original error plus the `gh auth login --hostname <host>`
+        hint and proceeds to the existing failure fallback (no retry). It does not call
+        the helper twice or invoke any matching/decision logic itself — all decisions
+        come from the helper.

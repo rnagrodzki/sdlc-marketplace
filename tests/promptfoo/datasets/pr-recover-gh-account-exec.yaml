@@ -1,0 +1,69 @@
+# Script execution tests for pr-recover-gh-account.js (issue #184).
+# Hermetic: --dry-run --accounts-file --owner bypasses real `gh` calls.
+# Fixtures live under tests/promptfoo/fixtures-fs/project-pr-recover-*.
+
+- description: "pr-recover: permission error + matching account → recovered+switched"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js"
+    script_args: "--dry-run --accounts-file accounts.json --owner Cleeng --error-file perm-error.txt"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-recover-match"
+  assert:
+    - type: icontains
+      value: '"recovered":true'
+    - type: icontains
+      value: '"switched":true'
+    - type: icontains
+      value: '"account":"Cleeng"'
+
+- description: "pr-recover: permission error + no matching account → hint emitted"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js"
+    script_args: "--dry-run --accounts-file accounts.json --owner Cleeng --error-file perm-error.txt"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-recover-nomatch"
+  assert:
+    - type: icontains
+      value: '"recovered":false'
+    - type: icontains
+      value: '"switched":false'
+    - type: regex
+      value: '"hint":"gh auth login --hostname [^"]+"'
+
+- description: "pr-recover: non-permission error (404) → reason=non-permission-error"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js"
+    script_args: "--dry-run --accounts-file accounts.json --owner Cleeng --error-file non-perm-error.txt"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-recover-match"
+  assert:
+    - type: icontains
+      value: '"recovered":false'
+    - type: icontains
+      value: '"reason":"non-permission-error"'
+
+- description: "pr-recover: error text missing CreatePullRequest token → reason=non-permission-error"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js"
+    script_args: "--dry-run --accounts-file accounts.json --owner Cleeng --error-file near-perm-error.txt"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-recover-match"
+  assert:
+    - type: icontains
+      value: '"recovered":false'
+    - type: icontains
+      value: '"reason":"non-permission-error"'
+
+- description: "pr-recover: case-insensitive match (owner Cleeng vs account cleeng) → switched"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js"
+    script_args: "--dry-run --accounts-file accounts.json --owner Cleeng --error-file perm-error.txt"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-recover-case"
+  assert:
+    - type: icontains
+      value: '"recovered":true'
+    - type: icontains
+      value: '"switched":true'
+    - type: icontains
+      value: '"account":"cleeng"'

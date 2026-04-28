@@ -152,6 +152,26 @@ If a switch occurs, the skill notifies you: `GitHub account switched: now using 
 
 To override manually: `gh auth switch --user <login>` before running the skill.
 
+### Account auto-recovery (post-failure retry)
+
+If `gh pr create` still fails with a `does not have the correct permissions to execute CreatePullRequest` error after pre-flight detection (for example, the wrong account was active for a personal repo), the skill auto-recovers once. It parses the repo owner from `git remote`, looks for a local `gh` account whose login matches, switches to it, and retries `gh pr create` exactly once.
+
+You see a single concise recovery line:
+
+```
+Switched gh account to <login> due to repo-permission mismatch — retrying
+Pull request created: <url>
+```
+
+If no local account matches the owner, the skill surfaces the original error plus an actionable hint:
+
+```
+gh: ... does not have the correct permissions to execute `CreatePullRequest` ...
+Run `gh auth login --hostname github.com` to authenticate the account that owns this repo.
+```
+
+This recovery is one-shot per pipeline invocation — a second consecutive permission failure is terminal. Tracked in spec requirement E7 ([issue #184](https://github.com/rnagrodzki/sdlc-marketplace/issues/184)).
+
 ---
 
 ## Prerequisites

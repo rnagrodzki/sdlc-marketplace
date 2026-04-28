@@ -86,6 +86,7 @@
 - E4: `gh` unavailable → show install instructions (no error report)
 - E5: `gh` auth failure → show `gh auth login` instructions (no error report)
 - E6: Title pattern validation fails → show error message, ask user to edit title
+- E7: `gh pr create` fails with stderr containing both `does not have the correct permissions to execute` and `CreatePullRequest` → post-flight account-switch recovery (distinct from pre-flight `ensureGhAccount`): parse repo owner from `git remote`, look up local gh accounts via `gh auth status`, find a matching account (case-insensitive login vs. owner), run `gh auth switch --user <login>`, retry `gh pr create` exactly once. If a matching account is switched and the retry succeeds, surface a single concise recovery line to the user. If no matching account exists, surface the original error plus the hint `gh auth login --hostname <host>`. Max one retry per pipeline invocation; a second permission failure is terminal. References issue #184.
 
 ## Constraints
 
