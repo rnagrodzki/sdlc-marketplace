@@ -161,9 +161,18 @@ And stop.
 
 **Skip this step if:** `needsMigration` is `false` AND `--migrate` was NOT passed.
 
+`needsMigration` is true when ANY of these conditions hold:
+- A legacy config file exists (`.claude/version.json`, `.sdlc/ship-config.json`, `.sdlc/jira-config.json`, `.sdlc/review.json`, `.claude/review.json`)
+- `.claude/sdlc.json` contains misplaced sections (e.g. `ship` in the project config)
+- `.sdlc/local.json` is v1 schema — has legacy `ship.preset` or `ship.skip` keys, or lacks the top-level `version: 2` stamp (`localIsV1` from prepare output). Auto-migrated by `lib/config.js::readLocalConfig` on next read; `--migrate` triggers it explicitly with a banner.
+
 If legacy files exist or `projectConfig.misplaced` is non-empty, use AskUserQuestion:
 
 > Legacy config files detected. Migrate to unified config before proceeding?
+
+If `localIsV1` is true but no legacy files and no misplaced sections exist, use AskUserQuestion:
+
+> Ship config at `.sdlc/local.json` uses a v1 schema (missing `version: 2`, or has legacy `preset`/`skip` keys). Migrate to v2 format?
 
 Options:
 - **yes** -- migrate now (recommended)

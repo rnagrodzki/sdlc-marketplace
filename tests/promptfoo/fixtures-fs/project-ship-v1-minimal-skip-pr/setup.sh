@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+git init -q
+git config user.email "test@test.com"
+git config user.name "Test"
+mkdir -p .sdlc
+cat > .sdlc/local.json <<'EOF'
+{
+  "ship": {
+    "preset": "minimal",
+    "skip": ["pr"]
+  }
+}
+EOF
+echo '*' > .sdlc/.gitignore
+git add .sdlc/.gitignore
+git commit -q -m "init"

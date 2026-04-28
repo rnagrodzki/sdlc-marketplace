@@ -58,6 +58,26 @@ function detect(projectRoot) {
   const localPath = path.join(projectRoot, LOCAL_CONFIG_PATH);
   const localExists = fs.existsSync(localPath);
 
+  // Detect v1 ship-section shape (legacy preset/skip keys, or missing
+  // top-level version stamp). Drives needsMigration so `/setup-sdlc` reports
+  // the migration to the user even though readLocalConfig will run it
+  // automatically on next read.
+  let localIsV1 = false;
+  if (localExists) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(localPath, 'utf8'));
+      const hasLegacyShipKeys =
+        parsed.ship && (
+          Object.prototype.hasOwnProperty.call(parsed.ship, 'preset') ||
+          Object.prototype.hasOwnProperty.call(parsed.ship, 'skip')
+        );
+      const noVersion = parsed.version == null;
+      localIsV1 = hasLegacyShipKeys || (noVersion && !!parsed.ship);
+    } catch (_) {
+      // unreadable JSON — leave localIsV1 false; downstream tooling handles errors
+    }
+  }
+
   // --- Legacy files ---
   const legacyVersionPath = path.join(projectRoot, LEGACY.version);
   const legacyShipPath = path.join(projectRoot, LEGACY.ship);
@@ -170,7 +190,10 @@ function detect(projectRoot) {
   };
 
   result.needsMigration =
-    Object.values(result.legacy).some(l => l.exists) || misplacedSections.length > 0;
+    Object.values(result.legacy).some(l => l.exists) ||
+    misplacedSections.length > 0 ||
+    localIsV1;
+  result.localIsV1 = localIsV1;
 
   return result;
 }

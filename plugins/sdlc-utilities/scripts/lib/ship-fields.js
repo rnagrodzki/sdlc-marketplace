@@ -4,26 +4,26 @@
 // Consumed by:
 //   - scripts/skill/setup.js  → emits as P7 `shipFields` (Step 3b questions)
 //   - scripts/skill/ship.js   → imports VALID_SKIP and BUILT_IN_DEFAULTS
+//   - scripts/util/ship-init.js → imports VALID_SKIP for --steps validation
 //
 // Keep schemas/sdlc-local.schema.json (repo root) in sync when adding,
 // removing, or renaming fields.
 
+const { PRESET_TO_STEPS } = require('./config');
+
+// Canonical pipeline steps that may appear in ship.steps[]. Order matters
+// — used as default ordering for the multi-select question and as the
+// iteration order for resolving steps[] -> pipeline steps in ship.js.
+const CANONICAL_STEPS = ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec'];
+
 const SHIP_FIELDS = [
   {
-    name: 'preset',
-    label: 'Pipeline variant',
-    type: 'enum',
-    options: ['full', 'balanced', 'minimal'],
-    default: 'balanced',
-    description: 'full (all steps), balanced (skip version), minimal (execute + commit + PR)',
-  },
-  {
-    name: 'skip',
-    label: 'Additional steps to skip',
+    name: 'steps',
+    label: 'Pipeline steps to run',
     type: 'multi-select',
-    options: ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec'],
-    default: [],
-    description: 'Top-level pipeline steps plus archive-openspec are user-skippable. received-review and commit-fixes run conditionally based on review verdict and are not in this list by design.',
+    options: CANONICAL_STEPS.slice(),
+    default: CANONICAL_STEPS.slice(),
+    description: 'Pipeline steps to run by default. received-review and commit-fixes run conditionally based on review verdict and are not configurable here.',
   },
   {
     name: 'bump',
@@ -75,24 +75,30 @@ const SHIP_FIELDS = [
   },
 ];
 
-// Derived: values user may legally pass to --skip or write into ship.skip[].
-const VALID_SKIP = SHIP_FIELDS.find(f => f.name === 'skip').options.slice();
+// Derived: values legally allowed in ship.steps[] (and as members of the
+// legacy --skip CLI flag, which subtracts from the resolved steps[]).
+// Re-exported as both VALID_SKIP (legacy alias) and VALID_STEPS (preferred,
+// self-documenting name). Same array reference — keeping VALID_SKIP avoids
+// breaking imports while a follow-up cleanup retires it.
+const VALID_STEPS = SHIP_FIELDS.find(f => f.name === 'steps').options.slice();
+const VALID_SKIP = VALID_STEPS;
 
 // Runtime resolver defaults consumed by ship.js mergeDefaults().
-// Byte-identical to the pre-refactor inline constant in ship.js (lines 48-57).
-// Preserving wire shape means ship.js runtime behavior is unchanged after
-// the Task 4 refactor.
 //
-// Two fields intentionally diverge from SHIP_FIELDS[i].default:
+// Three fields intentionally diverge from SHIP_FIELDS[i].default:
 //   - rebase: `true` here (legacy boolean, mapped to 'auto' by ship.js
 //     line 191-192) vs 'auto' in SHIP_FIELDS (user-facing question default).
 //     Same effective value, different storage form.
 //   - workspace: 'prompt' here (runtime fallback — ask each time if no
 //     config) vs 'branch' in SHIP_FIELDS (user-facing question default).
 //     Different intents — don't collapse these without migration analysis.
+//   - steps: PRESET_TO_STEPS.balanced here (runtime fallback when no config
+//     exists — spec A3 says default is 'balanced') vs CANONICAL_STEPS in
+//     SHIP_FIELDS (questionnaire default shows all six so users can pick).
+//     The questionnaire default is intentionally broader than the runtime
+//     fallback; do not collapse these.
 const BUILT_IN_DEFAULTS = {
-  preset: 'balanced',
-  skip: [],
+  steps: PRESET_TO_STEPS.balanced.slice(),
   bump: 'patch',
   draft: false,
   auto: false,
@@ -101,4 +107,4 @@ const BUILT_IN_DEFAULTS = {
   rebase: true,
 };
 
-module.exports = { SHIP_FIELDS, VALID_SKIP, BUILT_IN_DEFAULTS };
+module.exports = { SHIP_FIELDS, VALID_SKIP, VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS };

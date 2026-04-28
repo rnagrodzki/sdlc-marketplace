@@ -3,6 +3,9 @@
 This is the append-only learnings log for the `ai-setup-automation` marketplace repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-04-28 — version-sdlc: branch with no upstream requires --set-upstream on first push
+Feature branch `fix/replace-preset-with-steps-versioned-config` had no remote tracking branch. `git push` failed with exit 128; recovered with `git push --set-upstream origin <branch>` then `git push --tags` separately. Tag pushed successfully.
+
 ## 2026-04-23 — version-sdlc: branch without upstream requires --set-upstream on first push
 When releasing from a feature branch that has never been pushed, `git push` fails with exit 128. The fix is `git push --set-upstream origin <branch>` followed by `git push --tags`. This is expected behavior when `remoteState.hasUpstream: false` in the version context.
 

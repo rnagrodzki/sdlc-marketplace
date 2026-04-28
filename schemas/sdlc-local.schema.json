@@ -21,18 +21,14 @@
       "type": "object",
       "description": "Controls the ship-sdlc skill behaviour.",
       "properties": {
-        "preset": {
-          "type": "string",
-          "enum": ["full", "balanced", "minimal", "A", "B", "C"],
-          "description": "Preset pipeline variant. Preferred values: full, balanced, minimal. Legacy A/B/C are accepted for backward compatibility."
-        },
-        "skip": {
+        "steps": {
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["execute", "commit", "review", "received-review", "commit-fixes", "version", "pr"]
+            "enum": ["execute", "commit", "review", "version", "pr", "archive-openspec"]
           },
-          "description": "Pipeline steps to skip."
+          "uniqueItems": true,
+          "description": "Pipeline steps to run. Replaces legacy preset/skip fields."
         },
         "bump": {
           "type": "string",
@@ -77,6 +73,11 @@
     "$schema": {
       "type": "string",
       "description": "URL pointing to this schema."
+    },
+    "version": {
+      "type": "integer",
+      "const": 2,
+      "description": "Schema version of this local config file. Current version is 2; v1 files (no version field, with ship.preset/ship.skip) are auto-migrated on read."
     },
     "review": {
       "$ref": "#/$defs/reviewSection"

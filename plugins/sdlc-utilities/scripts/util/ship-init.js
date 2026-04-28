@@ -9,13 +9,14 @@
  *   node ship-init.js [options]
  *
  * Options:
- *   --preset full|balanced|minimal  Pipeline preset (default: balanced, legacy A|B|C accepted)
- *   --skip <csv>                Comma-separated steps to skip (default: empty)
+ *   --steps <csv>               Comma-separated pipeline steps to run (default: all six canonical steps).
+ *                               Valid values: execute, commit, review, version, pr, archive-openspec.
  *   --bump patch|minor|major    Version bump type (default: patch)
  *   --draft                     Mark PR as draft (default: false)
  *   --auto                      Skip interactive approval prompts (default: false)
  *   --threshold critical|high|medium  Review threshold (default: high)
  *   --workspace branch|worktree|prompt  Workspace isolation mode (default: prompt)
+ *   --rebase auto|skip|prompt   Rebase strategy (default: auto)
  *
  * Exit codes:
  *   0 = success, JSON on stdout
@@ -31,8 +32,9 @@ const fs   = require('fs');
 const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { readSection, writeSection, normalizePreset, PRESET_NAMES, ensureSdlcGitignore } = require(path.join(LIB, 'config'));
+const { readSection, writeSection, ensureSdlcGitignore } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { VALID_STEPS, CANONICAL_STEPS } = require(path.join(LIB, 'ship-fields'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -40,21 +42,29 @@ const { writeOutput } = require(path.join(LIB, 'output'));
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let preset    = 'balanced';
-  let skip      = [];
+  let steps     = CANONICAL_STEPS.slice();
   let bump      = 'patch';
   let draft     = false;
   let auto      = false;
   let threshold = 'high';
   let workspace = 'prompt';
+  let rebase    = 'auto';
   const warnings = [];
+  const errors   = [];
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === '--preset' && args[i + 1]) {
-      preset = normalizePreset(args[++i]);
-    } else if (a === '--skip' && args[i + 1]) {
-      skip = args[++i].split(',').map(s => s.trim()).filter(Boolean);
+    if (a === '--steps' && args[i + 1]) {
+      steps = args[++i].split(',').map(s => s.trim()).filter(Boolean);
+    } else if (a === '--preset') {
+      // Hard-removed in v2: --preset is no longer accepted by ship-init.
+      // ship-sdlc still parses --preset as legacy CLI sugar, but ship-init
+      // is internal (called from setup-sdlc Step 3b after questionnaire) and
+      // the unified config now writes ship.steps[] directly.
+      errors.push('--preset is no longer accepted by ship-init. Use --steps <csv> instead. Schema migrated to v2 in issue #180.');
+    } else if (a === '--skip') {
+      // Same: --skip is legacy CLI sugar for ship-sdlc, not a ship-init input.
+      errors.push('--skip is no longer accepted by ship-init. Use --steps <csv> instead.');
     } else if (a === '--bump' && args[i + 1]) {
       bump = args[++i];
     } else if (a === '--draft') {
@@ -65,27 +75,34 @@ function parseArgs(argv) {
       threshold = args[++i];
     } else if (a === '--workspace' && args[i + 1]) {
       workspace = args[++i];
+    } else if (a === '--rebase' && args[i + 1]) {
+      rebase = args[++i];
     }
   }
 
-  return { preset, skip, bump, draft, auto, threshold, workspace, warnings };
+  return { steps, bump, draft, auto, threshold, workspace, rebase, warnings, parseErrors: errors };
 }
 
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
 
-const VALID_PRESETS   = PRESET_NAMES;
 const VALID_BUMPS     = ['patch', 'minor', 'major'];
 const VALID_THRESHOLD = ['critical', 'high', 'medium'];
 const VALID_WORKSPACE = ['branch', 'worktree', 'prompt'];
-const VALID_SKIP      = ['execute', 'commit', 'review', 'version', 'pr'];
+const VALID_REBASE    = ['auto', 'skip', 'prompt'];
 
 function validate(parsed) {
   const errors = [];
 
-  if (!VALID_PRESETS.includes(parsed.preset)) {
-    errors.push(`--preset must be one of: ${VALID_PRESETS.join(', ')}. Got: "${parsed.preset}"`);
+  if (!Array.isArray(parsed.steps) || parsed.steps.length === 0) {
+    errors.push(`--steps must be a non-empty comma-separated list. Valid values: ${VALID_STEPS.join(', ')}`);
+  } else {
+    for (const step of parsed.steps) {
+      if (!VALID_STEPS.includes(step)) {
+        errors.push(`--steps contains invalid value "${step}". Valid values: ${VALID_STEPS.join(', ')}`);
+      }
+    }
   }
 
   if (!VALID_BUMPS.includes(parsed.bump)) {
@@ -100,10 +117,8 @@ function validate(parsed) {
     errors.push(`--workspace must be one of: ${VALID_WORKSPACE.join(', ')}. Got: "${parsed.workspace}"`);
   }
 
-  for (const step of parsed.skip) {
-    if (!VALID_SKIP.includes(step)) {
-      errors.push(`--skip contains invalid step "${step}". Valid values: ${VALID_SKIP.join(', ')}`);
-    }
+  if (!VALID_REBASE.includes(parsed.rebase)) {
+    errors.push(`--rebase must be one of: ${VALID_REBASE.join(', ')}. Got: "${parsed.rebase}"`);
   }
 
   return errors;
@@ -115,13 +130,19 @@ function validate(parsed) {
 
 function main() {
   const projectRoot = process.cwd();
-  const { preset, skip, bump, draft, auto, threshold, workspace, warnings: parseWarnings } = parseArgs(process.argv);
+  const parsed = parseArgs(process.argv);
+  const { steps, bump, draft, auto, threshold, workspace, rebase, warnings: parseWarnings, parseErrors } = parsed;
 
-  const errors   = [];
+  const errors   = [...parseErrors];
   const warnings = [...parseWarnings];
 
+  if (errors.length > 0) {
+    writeOutput({ errors, warnings }, 'ship-init', 1);
+    return;
+  }
+
   // Validate inputs
-  const validationErrors = validate({ preset, skip, bump, draft, auto, threshold, workspace });
+  const validationErrors = validate({ steps, bump, draft, auto, threshold, workspace, rebase });
   if (validationErrors.length > 0) {
     errors.push(...validationErrors);
     writeOutput({ errors, warnings }, 'ship-init', 1);
@@ -139,18 +160,21 @@ function main() {
     warnings.push('.sdlc/.gitignore already exists — skipped');
   }
 
-  // Build config object (no $schema or version — handled by unified config system)
+  // Build ship-section payload. Note: rebase is stored as the string token
+  // (auto/skip/prompt) — ship.js mergeFlags() handles backward-compat with
+  // legacy boolean true/false values for older configs.
   const config = {
-    preset,
-    skip,
+    steps,
     bump,
     draft,
     auto,
-    reviewThreshold:  threshold,
+    reviewThreshold: threshold,
     workspace,
+    rebase,
   };
 
-  // Write ship section via unified config — warn if overwriting existing ship section
+  // Write ship section via unified config — warn if overwriting existing ship section.
+  // writeLocalConfig (called by writeSection) stamps top-level version: 2 automatically.
   const existingShip = readSection(projectRoot, 'ship');
   let configAction;
   if (existingShip) {

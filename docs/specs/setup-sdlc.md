@@ -37,7 +37,7 @@
 - R12: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 - R13: Content sub-flows (setup-dimensions, setup-pr-template, setup-guardrails) inherit the parent skill's permission mode. Sub-flows MUST NOT call ExitPlanMode, change permission settings, or exit any mode.
 - R14: Scan phase (R10) MUST use the Glob tool for all file/directory existence checks. Bash MUST NOT be used with glob patterns — zsh errors on unmatched globs. Bash is permitted only for `git`, `gh`, and `which` commands.
-- R15: Ship config field enumeration (Step 3b) is authoritative from prepare script output P7 (`shipFields`). The skill MUST iterate every entry in `shipFields` and dispatch one `AskUserQuestion` per field — it MUST NOT hand-enumerate the field list or short-circuit the loop. Ship config writes use answers collected in this loop plus defaults for any field the user explicitly deferred.
+- R15: Ship config field enumeration (Step 3b) is authoritative from prepare script output P7 (`shipFields`). The skill MUST iterate every entry in `shipFields` and dispatch one `AskUserQuestion` per field — it MUST NOT hand-enumerate the field list or short-circuit the loop. Ship config writes use answers collected in this loop plus defaults for any field the user explicitly deferred. The `shipFields` contract emits a `steps` multi-select field (canonical step list) and the resulting config write is persisted at top-level schema `version: 2`. The contract MUST NOT emit a `preset` field or a `skip` field — those are legacy CLI-only sugar handled at parse time, not config-level fields.
 - R16: When `openspec/config.yaml` is detected during full-interactive setup (Step 4 content menu), prompt the user to apply managed-block enrichment (default: yes). Detection uses prepare script output field `openspecConfig.exists`.
 - R17: Enrichment uses a string-delimited managed block (`# BEGIN MANAGED BY sdlc-utilities (vN)` … `# END MANAGED BY sdlc-utilities (vN)`) with a plugin-owned version marker. The block is appended, updated, or left unchanged by `scripts/util/openspec-enrich.js`.
 - R18: Re-running setup on an already-enriched config at the current plugin version is a no-op (exit 0, action: `"unchanged"`)
@@ -82,7 +82,8 @@
 - P3: `legacy` (object) — `{ version, ship, review, reviewLegacy, jira }` each with `{ exists, path }`
 - P4: `content` (object) — `{ reviewDimensions: { count, path }, prTemplate: { exists, path }, jiraTemplates: { count, path } }`
 - P5: `detected` (object) — `{ versionFile, fileType, tagPrefix, defaultBranch }` auto-detected project settings
-- P6: `needsMigration` (boolean) — true when any legacy file exists or any misplaced section found
+- P6: `needsMigration` (boolean) — true when any legacy file exists, any misplaced section found, OR `.sdlc/local.json` has a v1 ship section (`localIsV1` is true)
+- P6a: `localIsV1` (boolean) — true when `.sdlc/local.json` ship section has legacy `preset`/`skip` keys, or lacks a top-level `version: 2` stamp
 - P7: `shipFields` (array) — authoritative list of interactive ship-config fields sourced from `scripts/lib/ship-fields.js`. Each entry: `{ name, label, type, options, default, description }`. `name` is the local-config key; `options` is an array of valid values; `default` is the value applied if the user accepts the default answer.
 - P8: `openspecConfig` (object) — `{ exists: boolean, path: string, managedBlockVersion: number|null }` state of `openspec/config.yaml` and its managed block
 
