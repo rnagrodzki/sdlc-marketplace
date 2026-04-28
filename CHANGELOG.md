@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.27] - 2026-04-28
+
+### Added
+- ship-sdlc: replaced `preset` abstraction with `steps[]` as the canonical source of truth; CLI `--preset` and `--skip` now expand/subtract from the resolved steps array (#180)
+- ship-sdlc: added config schema versioning (v2) with automatic migration of legacy v1 preset-based configs (#180)
+
+### Fixed
+- ship-sdlc: corrected balanced preset defaults, BUILT_IN_DEFAULTS.steps alignment, setup-sdlc questionnaire steps emission, and stale skills-meta.ts file references (#180)
+
 ## [0.17.26] - 2026-04-28
 
 ### Added
