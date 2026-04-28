@@ -221,12 +221,52 @@ The resulting cache stores `workflows: { "<Type>": { "unsampled": true } }` for 
 
 ---
 
+## Write Operation Safeguards
+
+Every write operation (`create`, `edit`, `transition`, `comment`, `link`, `assign`, `worklog`, `bulk`) passes through a two-step gate before any MCP call is dispatched. Read operations (`search`, `view`) skip this gate entirely.
+
+### Critique pass (R20)
+
+Before presenting a proposal, the skill runs an internal critique against the assembled payload:
+
+- **Template completeness** — every `## ` heading in `description` must come from the resolved template; no invented sections.
+- **Placeholder resolution** — `[bracketed prose]` and `{name}` markers flagged as `low`-confidence must be resolved via `AskUserQuestion` before the payload is shown (R19). High-confidence auto-fills are surfaced as findings but do not block.
+- **Field validity** — required fields for the selected transition are present; field values are within cache-validated enumerations.
+
+The findings are surfaced as a three-line block before the approval prompt:
+
+```
+Initial: <one-line summary of the initial draft>
+Critique: <findings, or "none">
+Final: <one-line summary of the revised payload>
+```
+
+The critique artifact is written to `$TMPDIR/jira-sdlc/critique-<hash>.json`.
+
+### Approval gate (R17)
+
+After the critique block, the full final payload (the exact bytes the MCP call will dispatch) is printed. The user must respond with one of:
+
+- **approve** — proceed to dispatch
+- **change `<what>`** — describe the desired change; the skill loops back through the critique pass with a revised draft and new artifacts
+- **cancel** — abort without dispatching
+
+On `approve`, an approval token is written to `$TMPDIR/jira-sdlc/approval-<hash>.token`. No write MCP call is dispatched without this token.
+
+### Hook enforcement (R21)
+
+A `PreToolUse` hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the payload hash from the tool input at dispatch time, verifies both artifacts exist and are under 10 minutes old, and **blocks dispatch** if either check fails. If dispatch is blocked, the hook's `permissionDecisionReason` is surfaced verbatim — the skill does not retry by guessing what changed.
+
+---
+
 ## What It Creates or Modifies
 
 | File / Artifact | Description |
 |-----------------|-------------|
 | `~/.sdlc-cache/jira/<site>/<KEY>.json` | Project metadata cache (home-keyed, outside the working tree): cloudId, issue types, field schemas, workflows, user mappings |
 | `.claude/jira-templates/<Type>.md` | Project-level issue description templates (created only when `--init-templates` is run, or manually) |
+| `$TMPDIR/jira-sdlc/critique-<hash>.json` | Per-operation critique artifact (write-ops only); contains initial/findings/final summary; verified by the PreToolUse hook |
+| `$TMPDIR/jira-sdlc/approval-<hash>.token` | Per-operation approval token (write-ops only); created on `approve`; verified and deleted by the PreToolUse hook after dispatch |
 | Jira issues | Created or updated via the Atlassian MCP |
 
 ## Related Skills

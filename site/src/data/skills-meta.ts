@@ -217,6 +217,8 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'resolve-project', label: 'Resolve project key', type: 'script', description: 'Auto-detects from git branch or .sdlc/jira-config.json' },
       { id: 'load-cache', label: 'Initialize or load cache', type: 'script', description: 'Builds cache on first use; reads cached metadata after' },
       { id: 'parse-intent', label: 'Classify operation', type: 'llm', description: 'Interprets request into create/edit/search/transition/etc.' },
+      { id: 'critique-payload', label: 'Critique payload', type: 'llm', description: 'Write-ops only: checks template completeness, placeholder resolution, and field validity before approval' },
+      { id: 'approve-payload', label: 'Approve payload', type: 'user', description: 'Write-ops only: presents final payload for explicit approve / change / cancel before any MCP dispatch' },
       { id: 'execute-op', label: 'Execute Jira operation', type: 'script', description: 'Calls Atlassian MCP with cached field IDs and schemas' },
       { id: 'cache-refresh', label: 'Update cache', type: 'script', description: 'Saves new users, transitions; auto-refreshes on stale data' },
     ],
