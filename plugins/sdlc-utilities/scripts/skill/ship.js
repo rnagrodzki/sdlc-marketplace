@@ -40,6 +40,7 @@ const { readSection, normalizePreset, PRESET_TO_STEPS } = require(path.join(LIB,
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { VALID_SKIP, VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS } = require(path.join(LIB, 'ship-fields'));
 const { detectActiveChanges, isArchived } = require(path.join(LIB, 'openspec'));
+const { getAdvisory } = require(path.join(LIB, 'context-advisory'));
 
 /**
  * Reverse-map the resolved steps[] back to the nearest canonical preset
@@ -741,6 +742,12 @@ function main() {
   // Detect resume state
   const resume = detectResumeState(projectRoot, gitState.currentBranch);
 
+  // Context-heaviness advisory (implements R35) — sourced from the sidecar
+  // written by hooks/context-stats.js on UserPromptSubmit. Returns null when
+  // the sidecar is missing, malformed, or transcript is below the heavy
+  // threshold. Surfaced verbatim by SKILL.md Step 1c when non-null.
+  const contextAdvisory = getAdvisory({ skill: 'ship-sdlc' });
+
   // Build config values for output
   const configValues = {};
   for (const key of Object.keys(BUILT_IN_DEFAULTS)) {
@@ -780,6 +787,7 @@ function main() {
       warnings: validation.warnings,
     },
     resume,
+    contextAdvisory,
   };
 
   // Exit with 1 if there are fatal errors, 0 otherwise

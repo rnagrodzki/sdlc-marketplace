@@ -81,5 +81,23 @@ module.exports = async function transformVars(vars) {
     result.script_cwd = vars.script_cwd.replace(/\{\{project_root\}\}/g, result.project_root);
   }
 
+  // script_env: substitute {{project_root}} in env values so tests can point env
+  // variables (TMPDIR, HOME-style paths, etc.) at fixture-copied directories.
+  // Accepts both string-encoded JSON and object forms.
+  if (vars.script_env && result.project_root) {
+    let envVal = vars.script_env;
+    if (typeof envVal === 'string') {
+      result.script_env = envVal.replace(/\{\{project_root\}\}/g, result.project_root);
+    } else if (envVal && typeof envVal === 'object') {
+      const out = {};
+      for (const [k, v] of Object.entries(envVal)) {
+        out[k] = typeof v === 'string'
+          ? v.replace(/\{\{project_root\}\}/g, result.project_root)
+          : v;
+      }
+      result.script_env = out;
+    }
+  }
+
   return result;
 };

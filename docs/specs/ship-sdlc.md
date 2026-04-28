@@ -62,6 +62,8 @@
   - Acceptance: `SHIP_FIELDS[0].name === 'steps'`; `ship-init.js --steps execute,commit,pr` produces a `.sdlc/local.json` whose top level has `version: 2` and `ship.steps: ["execute","commit","pr"]`, no `preset`/`skip` keys.
 - R34: When no ship config exists and no `--steps`/`--preset` flags are passed, the synthesized preset MUST be `balanced` (excludes the `version` step). `BUILT_IN_DEFAULTS.steps` in `ship-fields.js` MUST equal `PRESET_TO_STEPS.balanced` (`['execute','commit','review','pr','archive-openspec']`). Note: `SHIP_FIELDS[0].default` intentionally diverges (all six canonical steps) — this is the broader questionnaire default so users see all choices; it does not affect runtime behavior.
   - Acceptance: running `skill/ship.js --has-plan` with no `.sdlc/local.json` produces `flags.preset === 'balanced'` and `flags.steps === ['execute','commit','review','pr','archive-openspec']`.
+- R35: Step 1 (pre-flight handoff) MUST emit a context-heaviness advisory when the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget). The advisory recommends `/compact` and notes that pipeline state survives compaction. When the sidecar is absent or `heavy: false`, no advisory is emitted. Implementation lives in `scripts/lib/context-advisory.js` and is appended to `skill/ship.js` PREPARE_OUTPUT_FILE so it surfaces before the pipeline begins. (Rationale: #173.)
+  - Acceptance: with a sidecar containing `heavy: true`, the advisory text appears in `skill/ship.js --dry-run` output; with `heavy: false` or no sidecar, the output contains no advisory.
 
 ## Workflow Phases
 

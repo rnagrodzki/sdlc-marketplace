@@ -324,7 +324,17 @@ If this is the 3rd iteration, use AskUserQuestion to surface remaining issues in
 
 ## Step 7: Handoff
 
-**Plan mode:** Announce the plan path and propose execution:
+**Context-heaviness advisory (implements R17):** Before printing either branch below, locate and run the advisory wrapper. If it prints text, prepend that text verbatim to the handoff menu (above the `ship` / `execute` / `done` lines). If it prints nothing, skip the prepend.
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "plan-handoff-advisory.js" -path "*/sdlc*/scripts/skill/plan-handoff-advisory.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan-handoff-advisory.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan-handoff-advisory.js"
+[ -n "$SCRIPT" ] && node "$SCRIPT"
+```
+
+The wrapper reads `$TMPDIR/sdlc-context-stats.json` (written by the `UserPromptSubmit` hook `hooks/context-stats.js`) and emits a `/compact` advisory only when transcript ≥60% of model budget. Pipeline state is preserved across `/compact` (PreCompact + SessionStart hooks), so re-invoking after compaction is safe.
+
+**Plan mode:** Announce the plan path and propose execution. Prepend any advisory output from the wrapper above the `ship` / `execute` lines:
 
 > Plan written to `<path>`. On approval:
 >   ship    — run the full pipeline: execute → commit → review → version → PR (/ship-sdlc)
@@ -332,7 +342,7 @@ If this is the 3rd iteration, use AskUserQuestion to surface remaining issues in
 
 Then call ExitPlanMode. Do NOT invoke execute-plan-sdlc or ship-sdlc in this turn — they run after the user accepts in the next turn.
 
-**Normal mode:** Announce the plan path, then present the Workflow Continuation menu (see below).
+**Normal mode:** Announce the plan path, then present the Workflow Continuation menu (see below). Prepend any advisory output from the wrapper above the menu's `ship` / `execute` / `done` lines.
 
 ## Error Recovery
 
