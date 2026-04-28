@@ -3,6 +3,15 @@
 This is the append-only learnings log for the `ai-setup-automation` marketplace repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-04-23 — version-sdlc: branch without upstream requires --set-upstream on first push
+When releasing from a feature branch that has never been pushed, `git push` fails with exit 128. The fix is `git push --set-upstream origin <branch>` followed by `git push --tags`. This is expected behavior when `remoteState.hasUpstream: false` in the version context.
+
+## 2026-04-23 — pr-sdlc: active gh account may be wrong for repo owner
+When the active `gh` account (`rnagrodzkicl`) doesn't have write permission on the target repo, `gh pr create` fails with "does not have the correct permissions to execute CreatePullRequest". Recovery: run `gh auth switch --user <login>` to switch to the account that owns the repo before retrying. The skill's auto-switch only fires if `ghAuth` is non-null in PR_CONTEXT_JSON; if the script doesn't detect a needed switch, the user may need to switch manually.
+
+## 2026-04-23 — version-sdlc: patch bump on feat branch with no upstream
+Branch had no upstream configured. `git push` failed with exit 128. Recovery: used `git push --set-upstream origin <branch>` followed by `git push --tags`. Branch was a new feature branch in the pipeline, so setting upstream was correct and unblocking.
+
 ## 2026-04-23 — pr-sdlc auto-switch account detection
 **Trigger:** `gh pr create` failed with permissions error because active gh account was `rnagrodzkicl` (work account) rather than `rnagrodzki` (personal account where the repo lives). The auto-switch logic in `pr.js` did not switch because the branch had already been pushed with the remote set.
 **Rule:** When `gh pr create` fails with a permissions error, check `gh auth status` and switch to the account matching the repo owner before retrying. The skill should detect this and switch automatically; when it doesn't, manual `gh auth switch --user <login>` is the fix.
@@ -96,3 +105,8 @@ Branch fix/pipeline-contract-enforcement-and-model-assignment had no upstream. F
 **Trigger:** Review finding that 6 test cases in `openspec-lib-exec.yaml` used `script_path: "inline"` + `script_inline` which the provider doesn't support.
 **Rule:** If a promptfoo exec test calls library functions directly, create a real wrapper script in `tests/promptfoo/scripts/` and use `script_path: "repo://tests/promptfoo/scripts/<name>.js"`. Never use `script_path: "inline"` — script-runner.js passes the path string literally to `execFileSync`, so "inline" becomes a file argument and crashes. The `script_inline` var is never read by any provider.
 **Example:** `script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"` with `script_args: "--op isArchived --project-root {{project_root}} --change add-auth"`
+
+## 2026-04-23 — review-orchestrator: manifest field reference `manifest.git.branch` doesn't exist
+**Trigger:** Review of fix/#167 found orchestrator Step 6 summary template used `{manifest.git.branch}` — this field doesn't exist. The manifest schema has `current_branch` at the top level and `git.{commit_count, commit_log, changed_files}` in a sub-object.
+**Rule:** When adding new fields to an orchestrator summary template, verify field paths against the manifest construction in `scripts/skill/review.js` (lines 535-560). The top-level branch field is `current_branch`, not `git.branch`.
+**Example:** `{manifest.current_branch}` (correct) vs `{manifest.git.branch}` (wrong — this key is undefined).

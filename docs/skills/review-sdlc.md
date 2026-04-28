@@ -184,11 +184,13 @@ These suggestions are informational during a review run. To act on them, run `/s
 
 ## PR Posting Flow
 
-After the orchestrator finishes, the skill (not the orchestrator) handles posting in the main context. What you see depends on whether a PR exists for the current branch and the review scope.
+After the orchestrator returns, the full consolidated review (all per-dimension findings, every severity, with `file:line` references and per-dimension `<details>` sections) is printed to the terminal verbatim — read directly from `${diff_dir}/review-comment.md`. The posting prompt then appears below it; replying `cancel` no longer hides any content from view because the body was already shown.
+
+What you see next depends on whether a PR exists for the current branch and the review scope.
 
 ### When a PR exists
 
-The skill prints the full consolidated comment, then prompts:
+After printing the full comment body above, the skill prompts:
 
 ```text
 Post this review comment to PR #{number}? (yes / save / cancel)
@@ -223,7 +225,7 @@ Reviewing local changes — no PR to post to. Options:
 
 ### Comment persistence
 
-During the run, the consolidated comment body is written to `${diff_dir}/review-comment.md` (a temporary location under `$TMPDIR`). The skill reads this path from the orchestrator summary and uses it for `gh api -F body=@…` or `save` copies. The file is discarded along with the diff dir after the terminal branch — including when you reply `cancel` or the command fails.
+During the run, the consolidated comment body is written to `${diff_dir}/review-comment.md` (a temporary location under `$TMPDIR`). The skill reads this path from the orchestrator summary and (a) emits the file's contents verbatim in the terminal before the posting prompt, and (b) uses the same file as the body source for `gh api -F body=@…` or `save` copies. The file is discarded along with the diff dir after the terminal branch — including when you reply `cancel` or the command fails — but its contents remain visible in scrollback.
 
 ---
 

@@ -31,6 +31,7 @@
 - R10: Post-confirmation (`yes` / `save` / `cancel`) is issued by the skill in the main context, not by the orchestrator
 - R11: Orchestrator writes the consolidated comment body to `${manifest.diff_dir}/review-comment.md` and returns its absolute path plus `pr.*` metadata in its summary; the skill acts on the summary without reading the manifest
 - R12: When the user confirms `yes`, the skill posts via `gh api … -F body=@<path>` — no further Agent dispatch is made to complete posting
+- R13: After the orchestrator returns, the skill MUST read `${diff_dir}/review-comment.md` and display its full contents verbatim in the main context before any posting prompt — the orchestrator summary alone is insufficient because it contains only severity counts, not per-finding detail
 
 ## Workflow Phases
 
@@ -39,7 +40,7 @@
    - **Params:** A1-A7 forwarded (`--base <branch>`, `--committed`, `--staged`, `--working`, `--worktree`, `--set-default`, `--dimensions <list>`)
    - **Output:** manifest file path → P1-P8 (base branch, changed files, dimension counts/entries, plan critique); also writes per-dimension `.diff` files to tmpdir. Skill must NOT read manifest into main context
 2. DO — dispatch review-orchestrator agent (or display dry-run plan)
-3. REPORT — display orchestrator summary
+3. REPORT — display orchestrator summary and full consolidated comment body
 4. POST — skill handles PR posting decision in main context (`yes` / `save` / `cancel` or no-PR options), then cleans up manifest and diff dir
 5. OFFER — conditionally offer self-fix based on review verdict
 
@@ -49,6 +50,7 @@
 - G2: Orchestrator dispatched — agent is spawned (not via Skill tool) with manifest path and project root
 - G3: Manifest file and `diff_dir` cleaned up by the skill after the terminal branch (including failures)
 - G4: Exactly one `review-orchestrator` Agent dispatch per `/review-sdlc` invocation (a retry on failure counts as the same attempt; user confirmation never triggers a new dispatch)
+- G5: Full comment body displayed — Step 3 emits the verbatim contents of `${diff_dir}/review-comment.md` in the main context before the posting prompt is shown
 
 ## Prepare Script Contract
 

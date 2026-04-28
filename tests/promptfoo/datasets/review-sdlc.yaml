@@ -308,6 +308,61 @@
         both the manifest file and the diff dir (`/tmp/review-diff-ghi789`) are cleaned up.
         It does not re-dispatch the orchestrator.
 
+- description: "review-sdlc: step-3-full-body-display — emits review-comment.md verbatim before posting prompt (issue #176)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/review-step-3-full-body-display.md"
+    user_request: >
+      The review-orchestrator has returned the summary in the project context and the
+      consolidated comment body has been persisted to /tmp/review-diff-issue176/review-comment.md.
+      Resume the skill at Step 3 — display the orchestrator summary, then read and emit
+      the full contents of comment_file verbatim, then show the Step 4 posting prompt.
+  assert:
+    # All four findings (every severity) must appear verbatim — file:line references
+    - type: icontains
+      value: "src/auth/login.ts:42"
+    - type: icontains
+      value: "src/auth/session.ts:88"
+    - type: icontains
+      value: "src/search/query.ts:120"
+    - type: icontains
+      value: "src/api/search.ts:15"
+    # Each finding's message text must appear (not collapsed to a placeholder)
+    - type: icontains
+      value: "Plaintext password comparison"
+    - type: icontains
+      value: "Session token has no expiry"
+    - type: icontains
+      value: "Unbounded recursion in nested filter parser"
+    - type: icontains
+      value: "Inconsistent response envelope"
+    # The truncation placeholder must NOT appear in any form
+    - type: not-regex
+      value: "(Additional finding \\(see PR comment for details\\)|see PR comment for details|see comment for details)"
+    # The model must NOT replace the body with a synthesized severity/count table
+    # standing in for findings — i.e., must not output a table whose only data rows
+    # are bare severity labels with no file:line. The presence of file:line above
+    # is the positive evidence; here we forbid an obvious collapsed-table phrasing.
+    - type: not-regex
+      value: "(\\| critical \\| 1 \\|\\s*\\n\\s*\\| high \\| 1 \\|\\s*\\n\\s*\\| medium \\| 1 \\|\\s*\\n\\s*\\| low \\| 1 \\|\\s*$)"
+    # Posting prompt must appear, and must appear AFTER the findings (login.ts:42 is
+    # the first finding in the body) — regex enforces ordering
+    - type: regex
+      value: "(?s)src/auth/login\\.ts:42.*?yes\\s*/\\s*save\\s*/\\s*cancel"
+    # Behavioral rubric
+    - type: llm-rubric
+      value: >
+        The response performs Step 3 of /review-sdlc. It first displays the orchestrator's
+        structured summary verbatim. It then emits the full contents of
+        /tmp/review-diff-issue176/review-comment.md verbatim — every one of the 4 findings
+        appears with its file:line reference and full message text (CRITICAL plaintext
+        password, HIGH session expiry, MEDIUM unbounded recursion, LOW response envelope).
+        It does NOT summarize, paraphrase, or collapse any finding to a placeholder like
+        "Additional finding (see PR comment for details)". It does NOT replace the body
+        with a synthesized severity/count table. The Step 4 posting prompt
+        (yes / save / cancel) appears AFTER the full comment body, not before. R13 and
+        G5 are satisfied.
+
 - description: "review-sdlc: approved verdict completes cleanly without fix offer"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
