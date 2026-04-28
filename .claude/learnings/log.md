@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-04-29 — version-sdlc: patch release v0.17.31 on fix/184-sequential-meteor
+First push from untracked branch; `git push --set-upstream origin <branch>` required before `git push --tags`. Both commits were `fix` type (null-check guard + gh-account-switch retry), cleanly mapping to a patch bump.
+
 Active bugs are tracked in GitHub issues. This log retains only entries < 30 days old
 that capture non-obvious gotchas not yet reflected in code, docs, or skills.
 
