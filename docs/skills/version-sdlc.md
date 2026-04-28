@@ -26,6 +26,8 @@ Manages the full semantic release workflow: detects the version source, bumps th
 | `--hotfix` | Mark this release as a hotfix for DORA metrics tracking. Annotates the commit message with `[hotfix]` and the tag message body with `Type: hotfix`. | off |
 | `--auto` | Skip interactive approval prompts. Release plan is still displayed for visibility; critique gates and pre-condition checks still run. | off |
 
+> **Auto-upstream:** When releasing from a branch with no remote upstream configured, the push step automatically uses `git push --set-upstream origin <branch>` instead of bare `git push`. This avoids first-push failures on fresh feature branches. The subsequent `git push --tags` is unaffected.
+
 ---
 
 ## Examples

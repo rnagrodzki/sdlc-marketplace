@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.17.29] - 2026-04-28
 
+### Fixed
+- version-sdlc: auto-set upstream branch on first push when no upstream is configured (#183)
+
 ### Changed
 - Internal maintenance: triaged and pruned stale learnings-log entries (#186)
 

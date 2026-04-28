@@ -257,8 +257,8 @@
     - type: icontains
       value: "git push --tags"
     # Must NOT inject --set-upstream / -u when an upstream already exists (regression guard)
-    - type: not-icontains
-      value: "--set-upstream"
+    - type: not-regex
+      value: 'git push.*--set-upstream'
     - type: not-regex
       value: 'git push -u '
     - type: llm-rubric
