@@ -110,3 +110,7 @@ Branch fix/pipeline-contract-enforcement-and-model-assignment had no upstream. F
 **Trigger:** Review of fix/#167 found orchestrator Step 6 summary template used `{manifest.git.branch}` — this field doesn't exist. The manifest schema has `current_branch` at the top level and `git.{commit_count, commit_log, changed_files}` in a sub-object.
 **Rule:** When adding new fields to an orchestrator summary template, verify field paths against the manifest construction in `scripts/skill/review.js` (lines 535-560). The top-level branch field is `current_branch`, not `git.branch`.
 **Example:** `{manifest.current_branch}` (correct) vs `{manifest.git.branch}` (wrong — this key is undefined).
+
+## 2026-04-27 — version-sdlc: branch with no upstream requires --set-upstream on first push
+**Trigger:** v0.17.25 release on `fix/issue-176-review-sdlc-full-display` — `git push` failed with "no upstream branch". The remoteState in the version context correctly showed `hasUpstream: false`, which was noted as a warning but not acted on pre-push.
+**Rule:** When `remoteState.hasUpstream === false`, use `git push --set-upstream origin <branchName>` for the commit push, then `git push --tags` separately. Don't attempt bare `git push` — it will fail.
