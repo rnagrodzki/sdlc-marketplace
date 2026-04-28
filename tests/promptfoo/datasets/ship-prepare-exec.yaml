@@ -193,7 +193,7 @@
     - type: icontains
       value: "received-review"
 
-- description: "ship-prepare: BUILT_IN_DEFAULTS resolve to all six canonical steps (v2 default)"
+- description: "ship-prepare: BUILT_IN_DEFAULTS resolve to balanced steps (no version) when no config exists"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan"
@@ -203,8 +203,8 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const expected = ['execute','commit','review','version','pr','archive-openspec'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected) && o.flags.preset === 'full'
+        const expected = ['execute','commit','review','pr','archive-openspec'];
+        JSON.stringify(o.flags.steps) === JSON.stringify(expected) && o.flags.preset === 'balanced'
     - type: icontains
       value: '"bump": "patch"'
     - type: icontains

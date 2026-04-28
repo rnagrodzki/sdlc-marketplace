@@ -9,6 +9,8 @@
 // Keep schemas/sdlc-local.schema.json (repo root) in sync when adding,
 // removing, or renaming fields.
 
+const { PRESET_TO_STEPS } = require('./config');
+
 // Canonical pipeline steps that may appear in ship.steps[]. Order matters
 // — used as default ordering for the multi-select question and as the
 // iteration order for resolving steps[] -> pipeline steps in ship.js.
@@ -83,15 +85,20 @@ const VALID_SKIP = VALID_STEPS;
 
 // Runtime resolver defaults consumed by ship.js mergeDefaults().
 //
-// Two fields intentionally diverge from SHIP_FIELDS[i].default:
+// Three fields intentionally diverge from SHIP_FIELDS[i].default:
 //   - rebase: `true` here (legacy boolean, mapped to 'auto' by ship.js
 //     line 191-192) vs 'auto' in SHIP_FIELDS (user-facing question default).
 //     Same effective value, different storage form.
 //   - workspace: 'prompt' here (runtime fallback — ask each time if no
 //     config) vs 'branch' in SHIP_FIELDS (user-facing question default).
 //     Different intents — don't collapse these without migration analysis.
+//   - steps: PRESET_TO_STEPS.balanced here (runtime fallback when no config
+//     exists — spec A3 says default is 'balanced') vs CANONICAL_STEPS in
+//     SHIP_FIELDS (questionnaire default shows all six so users can pick).
+//     The questionnaire default is intentionally broader than the runtime
+//     fallback; do not collapse these.
 const BUILT_IN_DEFAULTS = {
-  steps: CANONICAL_STEPS.slice(),
+  steps: PRESET_TO_STEPS.balanced.slice(),
   bump: 'patch',
   draft: false,
   auto: false,

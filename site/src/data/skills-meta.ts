@@ -79,9 +79,9 @@ export const skillsMeta: SkillMeta[] = [
     command: '/ship-sdlc',
     category: 'workflows',
     userInvocable: true,
-    tagline: 'Orchestrates the full shipping pipeline: execute, commit, review, fix, version, and PR in one invocation.',
+    tagline: 'Orchestrates the full shipping pipeline via a steps[]-based config: execute, commit, review, fix, version, and PR in one invocation.',
     pipeline: [
-      { id: 'load-config', label: 'Load config and flags', type: 'script', description: 'Reads .sdlc/ship-config.json, merges CLI flags, detects context' },
+      { id: 'load-config', label: 'Load config and flags', type: 'script', description: 'Reads .sdlc/local.json (ship section), merges CLI flags, auto-migrates v1 configs, detects context' },
       { id: 'build-pipeline', label: 'Build pipeline plan', type: 'llm', description: 'Determines which steps run, builds routing table with conditions' },
       { id: 'validate', label: 'Validate pipeline', type: 'critique', description: 'Checks prerequisites, warns about interactive pauses' },
       { id: 'confirm', label: 'Present and confirm', type: 'user', description: 'Shows full pipeline table; proceeds automatically in --auto mode' },

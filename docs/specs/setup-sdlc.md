@@ -82,7 +82,8 @@
 - P3: `legacy` (object) — `{ version, ship, review, reviewLegacy, jira }` each with `{ exists, path }`
 - P4: `content` (object) — `{ reviewDimensions: { count, path }, prTemplate: { exists, path }, jiraTemplates: { count, path } }`
 - P5: `detected` (object) — `{ versionFile, fileType, tagPrefix, defaultBranch }` auto-detected project settings
-- P6: `needsMigration` (boolean) — true when any legacy file exists or any misplaced section found
+- P6: `needsMigration` (boolean) — true when any legacy file exists, any misplaced section found, OR `.sdlc/local.json` has a v1 ship section (`localIsV1` is true)
+- P6a: `localIsV1` (boolean) — true when `.sdlc/local.json` ship section has legacy `preset`/`skip` keys, or lacks a top-level `version: 2` stamp
 - P7: `shipFields` (array) — authoritative list of interactive ship-config fields sourced from `scripts/lib/ship-fields.js`. Each entry: `{ name, label, type, options, default, description }`. `name` is the local-config key; `options` is an array of valid values; `default` is the value applied if the user accepts the default answer.
 - P8: `openspecConfig` (object) — `{ exists: boolean, path: string, managedBlockVersion: number|null }` state of `openspec/config.yaml` and its managed block
 

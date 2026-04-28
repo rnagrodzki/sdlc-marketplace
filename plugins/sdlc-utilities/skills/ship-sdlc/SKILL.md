@@ -224,7 +224,7 @@ Pipeline validation:
 Validation checks:
 - `gh auth status` succeeds
 - Current branch is not the default branch (warn if it is — do not block)
-- All `--skip` values are recognized step names: `execute`, `commit`, `review`, `version`, `pr`
+- All `--skip` values are recognized step names: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`
 - At least one step will run
 - Flag combinations are coherent (`--bump` without version step → warn)
 
