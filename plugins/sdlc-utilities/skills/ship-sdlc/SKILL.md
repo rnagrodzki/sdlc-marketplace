@@ -28,14 +28,14 @@ If `--init-config` was passed:
 
 **Redirect:** Suggest running `/setup-sdlc` instead for unified configuration. If user insists on `--init-config`, proceed with the existing walkthrough.
 
-1. Read `./config-format.md` and run the interactive walkthrough to collect the user's answers (preset, skip set, bump type, auto, threshold, workspace isolation).
+1. Read `./config-format.md` and run the interactive walkthrough to collect the user's answers (steps multi-select, bump type, auto, threshold, workspace isolation).
 2. Locate and call `ship-init.js` via Bash with the collected answers:
 ```bash
 SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" -path "*/sdlc*/scripts/util/ship-init.js" 2>/dev/null | head -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/ship-init.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate util/ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-INIT_OUTPUT_FILE=$(node "$SCRIPT" --output-file --preset balanced --skip version --bump patch --auto --threshold high --workspace prompt)
+INIT_OUTPUT_FILE=$(node "$SCRIPT" --output-file --steps execute,commit,review,pr,archive-openspec --bump patch --auto --threshold high --workspace prompt)
 EXIT_CODE=$?
 echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -51,11 +51,13 @@ echo "EXIT_CODE=$EXIT_CODE"
 
 Check for ship config via skill/ship.js output (reads from `.sdlc/local.json` → `ship` section, with legacy `.sdlc/ship-config.json` fallback). If found, read and merge. Print loaded config verbosely:
 ```
-Ship config loaded from .sdlc/local.json
-  preset: balanced, skip: [version], draft: false, bump: patch
+Ship config loaded from .sdlc/local.json (schema v2)
+  steps: [execute, commit, review, pr, archive-openspec], draft: false, bump: patch
   reviewThreshold: high
 ```
 If not found: `No ship config found — using built-in defaults. Run /setup-sdlc to configure.`
+
+**Legacy v1 auto-migration:** If the loader detects a v1 config (no top-level `version`, with `ship.preset` or `ship.skip`), it migrates in place to schema v2 and emits a single stderr deprecation notice. The migrated shape (`ship.steps[]`) is what subsequent steps consume.
 
 ### 1c. Prepare pipeline context
 
@@ -66,6 +68,8 @@ SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/shi
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --skip version --preset balanced --bump patch --workspace branch)
+# Note: --preset and --skip are legacy CLI sugar (deprecated). They expand to flags.steps internally.
+# The config-level field is `steps[]` (top-level `version: 2`); preset/skip are no longer persisted.
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -85,8 +89,8 @@ Print the `flags` object from the `skill/ship.js` output, including the `sources
 ```
 Flag resolution (from skill/ship.js):
   auto:    true  (source: cli)
-  preset:  C     (source: cli, overrides config B)
-  skip:    [version]  (source: config)
+  steps:   [execute, commit, review, pr, archive-openspec]  (source: config)
+  preset:  balanced  (source: cli, legacy sugar; expanded to steps)
   bump:    patch (source: default)
   draft:   false (source: default)
 ```
@@ -168,7 +172,7 @@ Not all sub-skills support `--auto`. This table is the source of truth:
 
 | Sub-skill | --auto support | Behavior when ship runs with --auto |
 |-----------|---------------|--------------------------------------|
-| execute-plan-sdlc | No | Forwards `--preset` only. Preset selection prompt is skipped when preset is provided. |
+| execute-plan-sdlc | No | Forwards a synthesized `--preset <full\|balanced\|minimal>` derived from the resolved `steps[]`. Preset selection prompt is skipped when preset is provided. (execute-plan-sdlc semantics unchanged; ship synthesizes preset at the boundary.) |
 | commit-sdlc | Yes | `--auto` forwarded. Skips commit approval prompt. |
 | review-sdlc | No | No interactive prompts to skip — runs fully automatically already. |
 | received-review-sdlc | Yes | `--auto` forwarded. Skips Step 10 consent prompt and Step 12 reply/resolve prompt. Critique gates and verification still run. Only "will fix" items auto-implemented; threads for "will fix" items auto-resolved. |
@@ -261,7 +265,7 @@ Use AskUserQuestion to ask:
 
 Options:
 - **yes** — execute as shown
-- **edit** — change skip list, flags, or preset
+- **edit** — change steps, flags, or other config
 - **cancel** — stop here
 
 On **edit**: ask what to change, update flags, rebuild the pipeline table, and re-present. Loop until `yes` or `cancel`.
@@ -515,7 +519,7 @@ Step  Skill                 Result
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Decisions log:
-  - Preset B selected (from config default)
+  - Steps resolved: [execute, commit, review, pr, archive-openspec] (from config default; synthesized --preset balanced for execute-plan-sdlc)
   - Version step skipped (from config default, bump type: patch)
   - Review found 2 medium issues — below threshold, deferred
   - PR created as draft (from --draft flag)
@@ -663,7 +667,7 @@ After completing the pipeline, append to `.claude/learnings/log.md`:
 - Review verdicts that surprised (threshold too aggressive or too lenient)
 - Sub-skills that failed in unexpected ways during chaining
 - Config combinations that produced unintended pipeline shapes
-- Projects where the default skip/preset behavior was wrong
+- Projects where the default `steps[]` behavior was wrong (or where legacy `--preset`/`--skip` sugar misled users)
 
 Format:
 ```

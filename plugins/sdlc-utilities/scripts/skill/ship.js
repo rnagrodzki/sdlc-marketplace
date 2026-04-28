@@ -36,10 +36,39 @@ const LIB = path.join(__dirname, '..', 'lib');
 
 const { exec, checkGitState, detectBaseBranch } = require(path.join(LIB, 'git'));
 const { resolveMainWorktree } = require(path.join(LIB, 'state'));
-const { readSection, normalizePreset } = require(path.join(LIB, 'config'));
+const { readSection, normalizePreset, PRESET_TO_STEPS } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
-const { VALID_SKIP, BUILT_IN_DEFAULTS } = require(path.join(LIB, 'ship-fields'));
+const { VALID_SKIP, VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS } = require(path.join(LIB, 'ship-fields'));
 const { detectActiveChanges, isArchived } = require(path.join(LIB, 'openspec'));
+
+/**
+ * Reverse-map the resolved steps[] back to the nearest canonical preset
+ * (`full`, `balanced`, or `minimal`). Used solely to synthesize a `--preset`
+ * argument for execute-plan-sdlc, which still requires one for state init.
+ *
+ * Exact set match wins. Non-canonical step combinations fall back to `full`
+ * — execute-plan-sdlc's preset is decorative for state seeding only; the
+ * actual pipeline shape is controlled by ship's resolved steps[].
+ *
+ * Compatibility seam tied to issue #180: decoupling execute-plan-sdlc from
+ * --preset is explicitly out of scope.
+ *
+ * @param {string[]} steps  Resolved step list
+ * @returns {'full'|'balanced'|'minimal'}
+ */
+function stepsToPreset(steps) {
+  if (!Array.isArray(steps)) return 'full';
+  const set = new Set(steps);
+  const eq = (canonical) => {
+    if (set.size !== canonical.length) return false;
+    for (const s of canonical) if (!set.has(s)) return false;
+    return true;
+  };
+  if (eq(PRESET_TO_STEPS.full))     return 'full';
+  if (eq(PRESET_TO_STEPS.balanced)) return 'balanced';
+  if (eq(PRESET_TO_STEPS.minimal))  return 'minimal';
+  return 'full';
+}
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -134,8 +163,9 @@ function mergeFlags(cli, config) {
     }
   }
 
-  // Value flags: CLI non-null overrides; otherwise config; otherwise default.
-  for (const key of ['preset', 'bump', 'workspace']) {
+  // Value flags (no preset here — preset is legacy CLI sugar that expands to
+  // steps[]; synthesized from steps[] later for execute-plan-sdlc forwarding).
+  for (const key of ['bump', 'workspace']) {
     if (cli[key] !== null && cli[key] !== undefined) {
       merged[key]  = cli[key];
       sources[key] = 'cli';
@@ -148,16 +178,66 @@ function mergeFlags(cli, config) {
     }
   }
 
-  // skip: CLI non-null array overrides; otherwise config; otherwise default.
-  if (cli.skip !== null && cli.skip !== undefined) {
-    merged.skip  = cli.skip;
-    sources.skip = 'cli';
-  } else if (cfg.skip !== undefined) {
-    merged.skip  = Array.isArray(cfg.skip) ? cfg.skip : [];
-    sources.skip = 'config';
+  // -- Step resolution (replaces preset/skip as the canonical source) --
+  //
+  // Resolution order:
+  //   1. config.steps (from .sdlc/local.json — already migrated to v2 by lib/config.js)
+  //   2. BUILT_IN_DEFAULTS.steps (all six canonical steps)
+  //
+  // CLI overrides applied in order:
+  //   3. --preset <X>: legacy sugar — expands to canonical PRESET_TO_STEPS[X]
+  //      and OVERRIDES the resolved steps[] entirely.
+  //   4. --skip <a,b>: legacy sugar — subtracts the named steps from the
+  //      currently resolved steps[].
+  //
+  // The persistent config field is `ship.steps[]`. CLI `--preset` and
+  // `--skip` are not persisted — they're parse-time sugar only.
+  let stepsList;
+  let stepsSource;
+  if (Array.isArray(cfg.steps)) {
+    stepsList   = cfg.steps.slice();
+    stepsSource = 'config';
   } else {
-    merged.skip  = BUILT_IN_DEFAULTS.skip;
-    sources.skip = 'default';
+    stepsList   = BUILT_IN_DEFAULTS.steps.slice();
+    stepsSource = 'default';
+  }
+
+  // CLI --preset (legacy sugar) — full override
+  let cliPreset = null;
+  if (cli.preset !== null && cli.preset !== undefined) {
+    cliPreset = normalizePreset(cli.preset);
+    if (PRESET_TO_STEPS[cliPreset]) {
+      stepsList   = PRESET_TO_STEPS[cliPreset].slice();
+      stepsSource = 'cli (preset)';
+    }
+  }
+
+  // CLI --skip (legacy sugar) — subtraction
+  if (Array.isArray(cli.skip) && cli.skip.length > 0) {
+    const skipSet = new Set(cli.skip);
+    stepsList = stepsList.filter(s => !skipSet.has(s));
+    stepsSource = stepsSource + ' (cli --skip)';
+  }
+
+  merged.steps    = stepsList;
+  sources.steps   = stepsSource;
+
+  // skip stays in the merged object purely as the subtraction list users
+  // supplied on the CLI — surfaced for validation (unrecognized values) and
+  // diagnostic output. It is NOT a source of truth for which steps run.
+  merged.skip   = Array.isArray(cli.skip) ? cli.skip : [];
+  sources.skip  = Array.isArray(cli.skip) && cli.skip.length > 0 ? 'cli' : 'none';
+
+  // Synthesize preset from resolved steps[] for execute-plan-sdlc forwarding.
+  // CLI --preset (if passed) takes precedence as the synthesized value, since
+  // the user's explicit choice is more informative than a reverse-mapped
+  // approximation. Otherwise reverse-map from steps[].
+  if (cliPreset && ['full', 'balanced', 'minimal'].includes(cliPreset)) {
+    merged.preset = cliPreset;
+    sources.preset = 'cli';
+  } else {
+    merged.preset = stepsToPreset(stepsList);
+    sources.preset = 'synthesized';
   }
 
   // reviewThreshold: not a CLI flag, comes from config or default.
@@ -190,9 +270,6 @@ function mergeFlags(cli, config) {
     sources.rebase = 'default';
   }
 
-  // Normalize legacy preset names (A/B/C → full/balanced/minimal).
-  merged.preset = normalizePreset(merged.preset);
-
   // Pass-through flags that don't come from config.
   merged.hasPlan        = cli.hasPlan;
   merged.dryRun         = cli.dryRun;
@@ -207,37 +284,54 @@ function mergeFlags(cli, config) {
 // ---------------------------------------------------------------------------
 
 function computeSteps(flags, flagSources, { openspecContext } = {}) {
-  const skipSet = new Set(flags.skip);
+  // Steps[] is the canonical source of truth for which top-level steps run.
+  // A step IS skipped when it is NOT in flags.steps. The legacy `skip[]`
+  // semantics are now derived: a step is "skipped" iff it's missing from
+  // flags.steps; the original skip provenance is whatever determined the
+  // resolved steps[] (config / cli --preset / cli --skip).
+  const stepsSet = new Set(Array.isArray(flags.steps) ? flags.steps : []);
+  const skipSetCli = new Set(Array.isArray(flags.skip) ? flags.skip : []);
 
-  // Derive the skip source for a given step name.
+  // Derive the skipSource for a given step name. Convention preserved for
+  // downstream consumers (state files, hooks, learnings).
   function skipSource(name) {
-    if (!skipSet.has(name)) return 'none';
-    const src = flagSources && flagSources.skip;
-    if (src === 'cli') return 'cli';
-    if (src === 'config') return 'config';
+    if (stepsSet.has(name)) return 'none';
+    // CLI --skip explicitly excluded this step
+    if (skipSetCli.has(name)) return 'cli';
+    // The resolved steps[] came from config (or default) and doesn't include
+    // this step. Treat as 'config' if config provided a steps[]; otherwise
+    // 'default' (built-in default — would only happen for an unknown step).
+    const src = flagSources && flagSources.steps;
+    if (src && src.startsWith('config')) return 'config';
+    if (src && src.startsWith('cli'))    return 'cli';
     return 'default';
   }
+
+  const isIn = (name) => stepsSet.has(name);
 
   const steps = [
     {
       name: 'execute',
       skill: 'execute-plan-sdlc',
       model: 'opus',
-      status: (!flags.hasPlan || skipSet.has('execute')) ? 'skipped' : 'will_run',
-      skipSource: !flags.hasPlan && !skipSet.has('execute')
+      status: (!flags.hasPlan || !isIn('execute')) ? 'skipped' : 'will_run',
+      skipSource: !flags.hasPlan && isIn('execute')
         ? 'none'
         : !flags.hasPlan
           ? 'condition'
           : skipSource('execute'),
       args: [
+        // Forward synthesized preset to execute-plan-sdlc (compatibility seam
+        // — execute-plan-sdlc still requires --preset for state init; see
+        // stepsToPreset() comment above).
         flags.preset ? `--preset ${flags.preset}` : '',
         flags.workspace !== 'prompt' ? `--workspace ${flags.workspace}` : '',
         flags.rebase !== 'prompt' ? `--rebase ${flags.rebase}` : '',
       ].filter(Boolean).join(' '),
       reason: !flags.hasPlan
         ? 'no plan in context'
-        : skipSet.has('execute')
-          ? 'in skip set'
+        : !isIn('execute')
+          ? 'not in steps[]'
           : 'plan detected in context',
       pause: false,
     },
@@ -245,20 +339,20 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       name: 'commit',
       skill: 'commit-sdlc',
       model: 'haiku',
-      status: skipSet.has('commit') ? 'skipped' : 'will_run',
+      status: isIn('commit') ? 'will_run' : 'skipped',
       skipSource: skipSource('commit'),
       args: flags.auto ? '--auto' : '',
-      reason: skipSet.has('commit') ? 'in skip set' : 'pending (will check after execute)',
+      reason: isIn('commit') ? 'pending (will check after execute)' : 'not in steps[]',
       pause: false,
     },
     {
       name: 'review',
       skill: 'review-sdlc',
       model: 'sonnet',
-      status: skipSet.has('review') ? 'skipped' : 'will_run',
+      status: isIn('review') ? 'will_run' : 'skipped',
       skipSource: skipSource('review'),
       args: '--committed',
-      reason: skipSet.has('review') ? 'in skip set' : 'not in skip set',
+      reason: isIn('review') ? 'in steps[]' : 'not in steps[]',
       pause: false,
     },
     {
@@ -287,7 +381,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       const changeName = flags.openspecChange || oc.branchMatch || null;
       const archiveActionable = changeName && !oc.isAlreadyArchived;
 
-      if (skipSet.has('archive-openspec')) {
+      if (!isIn('archive-openspec')) {
         return {
           name: 'archive-openspec',
           skill: null,
@@ -295,7 +389,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           status: 'skipped',
           skipSource: skipSource('archive-openspec'),
           args: '',
-          reason: 'in skip set',
+          reason: 'not in steps[]',
           pause: false,
         };
       }
@@ -328,8 +422,8 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       name: 'version',
       skill: 'version-sdlc',
       model: 'sonnet',
-      status: (skipSet.has('version') || flags.workspace === 'worktree') ? 'skipped' : 'will_run',
-      skipSource: skipSet.has('version')
+      status: (!isIn('version') || flags.workspace === 'worktree') ? 'skipped' : 'will_run',
+      skipSource: !isIn('version')
         ? skipSource('version')
         : flags.workspace === 'worktree'
           ? 'auto'
@@ -338,29 +432,29 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         flags.bump || 'patch',
         flags.auto ? '--auto' : '',
       ].filter(Boolean).join(' '),
-      reason: skipSet.has('version')
-        ? 'in skip set'
+      reason: !isIn('version')
+        ? 'not in steps[]'
         : flags.workspace === 'worktree'
           ? 'auto-skipped — tags are repo-global, not safe from worktrees'
-          : 'not in skip set',
+          : 'in steps[]',
       pause: true,
     },
     {
       name: 'pr',
       skill: 'pr-sdlc',
       model: 'sonnet',
-      status: skipSet.has('pr') ? 'skipped' : 'will_run',
+      status: isIn('pr') ? 'will_run' : 'skipped',
       skipSource: skipSource('pr'),
       args: [
         flags.auto ? '--auto' : '',
         flags.draft ? '--draft' : '',
         flags.workspace === 'worktree' ? '--label skip-version-check' : '',
       ].filter(Boolean).join(' '),
-      reason: skipSet.has('pr')
-        ? 'in skip set'
+      reason: !isIn('pr')
+        ? 'not in steps[]'
         : flags.workspace === 'worktree'
-          ? 'not in skip set; --label skip-version-check added (version auto-skipped)'
-          : 'not in skip set',
+          ? 'in steps[]; --label skip-version-check added (version auto-skipped)'
+          : 'in steps[]',
       pause: false,
     },
   ];
@@ -426,19 +520,29 @@ function runValidation(flags, flagSources, steps, context) {
     warnings.push(`You are on the default branch "${context.defaultBranch}". Ship pipelines should run on feature branches.`);
   }
 
-  // All skip values must be recognized
+  // All --skip values must be recognized (legacy CLI sugar; subtraction list)
   let skipValuesRecognized = true;
   for (const s of flags.skip) {
-    if (!VALID_SKIP.includes(s)) {
-      warnings.push(`Unrecognized skip value "${s}". Valid values: ${VALID_SKIP.join(', ')}`);
+    if (!VALID_STEPS.includes(s)) {
+      warnings.push(`Unrecognized skip value "${s}". Valid values: ${VALID_STEPS.join(', ')}`);
       skipValuesRecognized = false;
     }
   }
 
-  // Fabrication guard: skip values present but source is 'default' means the
-  // LLM may have hallucinated --skip arguments that were never actually passed.
-  if (flags.skip.length > 0 && flagSources.skip === 'default') {
-    errors.push("Skip flags present but source is 'default' — likely fabricated. Remove --skip or pass explicitly via CLI.");
+  // All steps[] values must be recognized
+  if (Array.isArray(flags.steps)) {
+    for (const s of flags.steps) {
+      if (!VALID_STEPS.includes(s)) {
+        warnings.push(`Unrecognized step "${s}" in steps[]. Valid values: ${VALID_STEPS.join(', ')}`);
+      }
+    }
+  }
+
+  // Fabrication guard: --skip values present but source is 'none' would
+  // indicate the LLM hallucinated --skip arguments that were never actually
+  // passed. (skip source is 'cli' when --skip was passed, 'none' otherwise.)
+  if (flags.skip.length > 0 && flagSources.skip === 'none') {
+    errors.push("Skip flags present but source is 'none' — likely fabricated. Remove --skip or pass explicitly via CLI.");
   }
 
   // At least one non-conditional step must run (conditional steps only
@@ -448,11 +552,13 @@ function runValidation(flags, flagSources, steps, context) {
     errors.push('All steps are skipped. At least one step must run.');
   }
 
-  // --bump without version step
+  // --bump without version step (only error when user explicitly set bump on
+  // the CLI — config-level/default bump is just a no-op when version is
+  // excluded from steps[]).
   let coherentFlags = true;
   const versionStep = steps.find(s => s.name === 'version');
-  if (flags.bump && versionStep && versionStep.status === 'skipped') {
-    errors.push(`--bump "${flags.bump}" specified but version step is skipped — resolve by removing --bump or removing "version" from skip set.`);
+  if (flags.bump && flagSources.bump === 'cli' && versionStep && versionStep.status === 'skipped') {
+    errors.push(`--bump "${flags.bump}" specified but version step is skipped — resolve by removing --bump or adding "version" to ship.steps[].`);
     coherentFlags = false;
   }
 
@@ -650,8 +756,9 @@ function main() {
     },
     flags: {
       auto: flags.auto,
-      preset: flags.preset,
-      skip: flags.skip,
+      steps: flags.steps,
+      preset: flags.preset, // synthesized for execute-plan-sdlc forwarding
+      skip: flags.skip,     // legacy CLI subtraction list (diagnostic only)
       bump: flags.bump,
       draft: flags.draft,
       dryRun: flags.dryRun,

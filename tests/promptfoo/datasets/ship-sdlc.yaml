@@ -59,36 +59,38 @@
         The version step is shown as skipped because of --skip version. The response
         does NOT ask the user to choose yes/edit/cancel before running.
 
-- description: "ship-sdlc: config file loaded and CLI --preset flag overrides config preset"
+- description: "ship-sdlc: CLI --preset legacy sugar overrides config steps[]"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     project_context: "file://fixtures/ship-config-present.md"
     user_request: >
-      Run /ship-sdlc --preset C --dry-run. The project has a .sdlc/ship-config.json
-      with preset: B, skip: [version], bump: patch. The CLI flag --preset C should
-      override the config preset B. Show the flag resolution and dry-run pipeline table.
+      Run /ship-sdlc --preset minimal --dry-run. The project has a v1 .sdlc/local.json
+      with legacy preset: balanced. The loader auto-migrates to steps[]. The CLI flag
+      --preset minimal (legacy sugar) expands to [execute, commit, pr] and overrides
+      the migrated config steps[]. Show the flag resolution and dry-run pipeline table.
   assert:
-    # Must show config was loaded
+    # Must show config was loaded (from .sdlc/local.json)
     - type: icontains
-      value: "ship-config.json"
+      value: "local.json"
     # Must show flag resolution section
     - type: icontains
       value: "Flag resolution"
-    # Must show preset C (CLI override wins)
+    # Must show steps were resolved
     - type: icontains
-      value: "preset"
-    # Must show version step is skipped (from config)
+      value: "steps"
+    # Must show that the version step is skipped (minimal excludes it)
     - type: icontains
       value: "skipped"
-    # Behavioral: CLI flag overrides config, both sources shown in resolution
+    # Behavioral: CLI --preset overrides config steps via legacy sugar expansion
     - type: llm-rubric
       value: >
-        The response shows the ship config was loaded from .sdlc/ship-config.json
-        with preset B and skip [version]. It then prints a Flag resolution section
-        showing that --preset C (from CLI) overrides the config value of B. The
-        final resolved preset is C, not B. The version step remains skipped because
-        the config skip list is honored. The output clearly distinguishes between
-        values from config and values from CLI flags.
+        The response shows the ship config was loaded from .sdlc/local.json (v1
+        legacy or v2 — either is acceptable since the loader auto-migrates). The
+        Flag resolution section shows --preset minimal as legacy CLI sugar that
+        expands to a steps[] of [execute, commit, pr], overriding any
+        config-level steps[]. The version step is shown as skipped (not in the
+        resolved steps[]). The output clearly distinguishes between
+        config-resolved steps[] and the CLI override.
 
 - description: "ship-sdlc: critical review finding pauses pipeline and invokes received-review-sdlc"
   vars:

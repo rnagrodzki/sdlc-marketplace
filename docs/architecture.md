@@ -164,6 +164,20 @@ Key components:
 
 See [Step-Emitter Architecture](step-emitter-architecture.md) for the full protocol reference, migration guide, and testing patterns.
 
+## Config Schema Versioning
+
+Configuration files (`.sdlc/local.json`, `.claude/sdlc.json`) carry a top-level integer `version` field. The current schema version is **2**.
+
+When introducing a format-breaking change to a config schema:
+
+1. Bump the schema `version` constant in the relevant JSON Schema (e.g. `schemas/sdlc-local.schema.json`).
+2. Add a migration step in `lib/config.js` that runs at read time (`readLocalConfig`/`readProjectConfig`).
+3. Migrations MUST be **idempotent** — reading an already-migrated config is a no-op.
+4. Migrations MUST **persist back to disk** atomically and emit a single deprecation notice on first migration.
+5. Legacy fields are dropped from the in-memory state once migrated; downstream consumers see only the modern shape.
+
+Issue [#180](https://github.com/rnagrodzki/sdlc-marketplace/issues/180) (replacing the decorative `preset` field with explicit `steps[]`) is the motivating example: legacy v1 ship configs auto-migrate to v2 on the next read, with a one-line stderr deprecation notice.
+
 ## Testing
 
 All testing uses [promptfoo](https://promptfoo.dev/) — a framework for evaluating LLM outputs. Two configurations cover different test types:

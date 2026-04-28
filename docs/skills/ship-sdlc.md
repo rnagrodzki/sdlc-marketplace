@@ -39,8 +39,8 @@ This skill is for **expert users working on projects with established quality gu
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
-| `--skip <steps>` | Comma-separated list of steps to skip: `execute`, `commit`, `review`, `version`. PR cannot be skipped. | None |
-| `--preset full\|balanced\|minimal` | Execution preset forwarded to execute-plan-sdlc. full = Speed, balanced = Balanced, minimal = Quality. Legacy A/B/C accepted. | `balanced` |
+| `--skip <steps>` | **Legacy CLI sugar.** Comma-separated list of steps to subtract from the resolved `steps[]`: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`. The persistent config field is `ship.steps[]` — `--skip` is parse-time sugar only. | None |
+| `--preset full\|balanced\|minimal` | **Legacy CLI sugar.** Expands to a canonical `steps[]` set: `full` = all six, `balanced` = all except `version`, `minimal` = `[execute, commit, pr]`. Legacy `A`/`B`/`C` aliases accepted. The persistent config field is `ship.steps[]`; ship synthesizes `--preset` for execute-plan-sdlc at the boundary. | `balanced` |
 | `--bump patch\|minor\|major` | Version bump type forwarded to version-sdlc. | `patch` |
 | `--draft` | Create the PR as a draft. | Off |
 | `--dry-run` | Display the full pipeline plan and stop. No steps are executed. | Off |
@@ -144,14 +144,14 @@ The pipeline prints every decision and state change. Here is a realistic full ou
 ```
 I'm using the ship-sdlc skill.
 
-Ship config loaded from .sdlc/local.json
-  preset: balanced, skip: [version], draft: false, bump: patch
+Ship config loaded from .sdlc/local.json (schema v2)
+  steps: [execute, commit, review, pr, archive-openspec], draft: false, bump: patch
   reviewThreshold: high
 
 Flag resolution (CLI overrides config):
   auto:    true  (from CLI --auto)
-  preset:  balanced  (from config)
-  skip:    [version]  (from config)
+  steps:   [execute, commit, review, pr, archive-openspec]  (from config)
+  preset:  balanced  (CLI legacy sugar; expanded to steps before resolution)
   bump:    patch (from config default)
   draft:   false (from built-in default)
 
@@ -164,11 +164,11 @@ Context detection:
   OpenSpec:            not detected
 
 Auto-skip decisions:
-  execute: WILL RUN — plan detected in context
-  commit:  WILL RUN — pending (will check after execute)
-  review:  WILL RUN — not in skip set
-  version: SKIPPED — in skip set (from config)
-  pr:      WILL RUN — not in skip set
+  execute: WILL RUN — in steps[]
+  commit:  WILL RUN — in steps[] (will check pending after execute)
+  review:  WILL RUN — in steps[]
+  version: SKIPPED — not in steps[] (from config)
+  pr:      WILL RUN — in steps[]
 
 Pipeline validation:
   [pass] gh CLI authenticated
@@ -239,7 +239,7 @@ Review verdict: APPROVED WITH NOTES (2 medium, 1 low)
   Status: not triggered (no review fixes applied)
 
 ━━━ Ship Pipeline — Step 6/7: Version ━━━
-  Status: skipped (in skip set from config)
+  Status: skipped (not in steps[] from config)
 
 ━━━ Ship Pipeline — Step 7/7: PR ━━━
   Invoking: /pr-sdlc --auto
@@ -263,7 +263,7 @@ Step  Skill                 Result
 ================================================================
 
 Decisions log:
-  - Preset B selected (from config default)
+  - Steps resolved: [execute, commit, review, pr, archive-openspec] (from config; synthesized --preset balanced for execute-plan-sdlc)
   - Version step skipped (from config default, bump type: patch)
   - Review found 2 medium, 1 low issues — below threshold, deferred
   - PR created (from --auto flag)
@@ -343,22 +343,44 @@ Walks through an interactive questionnaire and writes `.sdlc/local.json`. Does n
 
 Pipeline behavior is configured via `.sdlc/local.json`. Create it manually or run `/ship-sdlc --init-config` for guided setup.
 
+### Schema versioning
+
+The local config carries a top-level integer `version` field. The current schema version is **`2`**. Files lacking `version` (or with `version < 2`) are auto-migrated by the loader (`lib/config.js::readLocalConfig`) on the next read. Migration:
+
+- Expands legacy `ship.preset` to `ship.steps[]` (full → all six, balanced → all except `version`, minimal → `[execute, commit, pr]`).
+- Subtracts legacy `ship.skip[]` members from the expanded steps.
+- Drops `ship.preset` and `ship.skip`; writes `version: 2` at the top level.
+- Emits a single stderr deprecation notice on first migration; subsequent reads are silent.
+
+To migrate explicitly, run `/setup-sdlc --migrate`.
+
 ### Config fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `preset` | `"full"` \| `"balanced"` \| `"minimal"` | `"balanced"` | Execution preset forwarded to execute-plan-sdlc. Legacy `"A"`/`"B"`/`"C"` accepted. |
-| `skip` | `string[]` | `[]` | Steps to skip by default on every run. |
+| `version` (top-level) | `2` | `2` | Schema version literal. New configs MUST include `version: 2`. Legacy v1 configs are auto-migrated on read. |
+| `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`. Replaces legacy `preset` / `skip`. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type. |
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |
 | `auto` | `boolean` | `false` | Run in non-interactive mode by default. |
 | `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` | `"high"` | Minimum severity that triggers the fix loop. |
 | `workspace` | `"branch"` \| `"worktree"` \| `"prompt"` | `"prompt"` | Workspace isolation strategy forwarded to execute-plan-sdlc. |
+| `rebase` | `true` \| `false` \| `"prompt"` | `true` | Rebase strategy before execution and versioning. |
+
+### Migrating from v1
+
+If your `.sdlc/local.json` was created before SDLC v2 schema (used `preset:` and `skip:`), the loader will auto-migrate on the next ship run and emit a one-line deprecation notice. The mapping is:
+
+- `full` (or legacy `A`) → `[execute, commit, review, version, pr, archive-openspec]`
+- `balanced` (or legacy `B`) → `[execute, commit, review, pr, archive-openspec]` (omits `version`)
+- `minimal` (or legacy `C`) → `[execute, commit, pr]`
+
+Any legacy `skip[]` entries are subtracted from the expanded set. To trigger the migration explicitly, run `/setup-sdlc --migrate`.
 
 ### Merge precedence
 
 ```
-CLI flag  >  .sdlc/local.json  >  built-in defaults
+CLI flag (incl. --preset/--skip sugar)  >  .sdlc/local.json (ship.steps)  >  built-in defaults
 ```
 
 ### Team-specific examples
@@ -370,12 +392,14 @@ Skip version management, auto-commit, only pause on critical findings.
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "preset": "full",
-  "skip": ["version"],
-  "auto": true,
-  "bump": "patch",
-  "draft": false,
-  "reviewThreshold": "critical"
+  "version": 2,
+  "ship": {
+    "steps": ["execute", "commit", "review", "pr", "archive-openspec"],
+    "auto": true,
+    "bump": "patch",
+    "draft": false,
+    "reviewThreshold": "critical"
+  }
 }
 ```
 
@@ -386,28 +410,32 @@ Full pipeline with high-severity review threshold. PRs open as drafts for team r
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "preset": "balanced",
-  "skip": [],
-  "auto": false,
-  "bump": "minor",
-  "draft": true,
-  "reviewThreshold": "high"
+  "version": 2,
+  "ship": {
+    "steps": ["execute", "commit", "review", "version", "pr", "archive-openspec"],
+    "auto": false,
+    "bump": "minor",
+    "draft": true,
+    "reviewThreshold": "high"
+  }
 }
 ```
 
 **CI-adjacent — maximum confidence:**
 
-Quality preset catches medium-severity findings. Suitable for regulated environments or release branches.
+Smallest step set with widest review threshold. Suitable for regulated environments or release branches.
 
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "preset": "minimal",
-  "skip": [],
-  "auto": false,
-  "bump": "patch",
-  "draft": false,
-  "reviewThreshold": "medium"
+  "version": 2,
+  "ship": {
+    "steps": ["execute", "commit", "pr"],
+    "auto": false,
+    "bump": "patch",
+    "draft": false,
+    "reviewThreshold": "medium"
+  }
 }
 ```
 
@@ -418,12 +446,14 @@ For when you've already implemented and reviewed manually, and just need to comm
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "preset": "balanced",
-  "skip": ["execute", "review"],
-  "auto": true,
-  "bump": "patch",
-  "draft": true,
-  "reviewThreshold": "high"
+  "version": 2,
+  "ship": {
+    "steps": ["commit", "version", "pr"],
+    "auto": true,
+    "bump": "patch",
+    "draft": true,
+    "reviewThreshold": "high"
+  }
 }
 ```
 

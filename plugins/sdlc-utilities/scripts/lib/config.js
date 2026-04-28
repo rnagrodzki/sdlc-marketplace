@@ -19,6 +19,25 @@ const LOCAL_SCHEMA_URL =
 const PRESET_NAMES = ['full', 'balanced', 'minimal'];
 const LEGACY_PRESET_MAP = { A: 'full', B: 'balanced', C: 'minimal' };
 
+// Current schema version of .sdlc/local.json. Incremented when a
+// format-breaking change is introduced; readLocalConfig auto-migrates
+// older versions in place.
+const LOCAL_SCHEMA_VERSION = 2;
+
+// Migration map (v1 → v2): legacy ship.preset values → canonical steps[].
+// `balanced` omits 'version' by design (current pre-v2 default behavior).
+// Legacy A/B/C aliases map to the same step lists as their modern equivalents.
+const PRESET_TO_STEPS = {
+  full:     ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec'],
+  balanced: ['execute', 'commit', 'review',            'pr', 'archive-openspec'],
+  minimal:  ['execute', 'commit',                      'pr'],
+  A:        ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec'],
+  B:        ['execute', 'commit', 'review',            'pr', 'archive-openspec'],
+  C:        ['execute', 'commit',                      'pr'],
+};
+
+const ALL_STEPS = ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec'];
+
 /**
  * Normalize a preset value: maps legacy A/B/C to full/balanced/minimal.
  * Unknown values pass through unchanged (validation catches them later).
@@ -28,6 +47,53 @@ const LEGACY_PRESET_MAP = { A: 'full', B: 'balanced', C: 'minimal' };
 function normalizePreset(value) {
   if (typeof value !== 'string') return value;
   return LEGACY_PRESET_MAP[value.toUpperCase()] || value;
+}
+
+/**
+ * Migrate a v1 ship section to v2 in place: expand legacy preset → steps[],
+ * subtract legacy skip[] members, drop preset/skip keys.
+ *
+ * @param {object|null|undefined} rawShip — the ship section as read from disk
+ * @returns {{ ship: object, changed: boolean }} — the migrated ship section
+ *   and a flag indicating whether the section actually changed (used by the
+ *   loader to decide whether to rewrite the file and emit the deprecation
+ *   notice).
+ */
+function migrateShipSectionV1ToV2(rawShip) {
+  if (!rawShip || typeof rawShip !== 'object') {
+    // No ship section at all → nothing to migrate. Return as-is so callers
+    // don't accidentally synthesize a section.
+    return { ship: rawShip, changed: false };
+  }
+
+  const hasLegacyPreset = Object.prototype.hasOwnProperty.call(rawShip, 'preset');
+  const hasLegacySkip   = Object.prototype.hasOwnProperty.call(rawShip, 'skip');
+
+  if (!hasLegacyPreset && !hasLegacySkip) {
+    // Already clean (v2 shape or just lacking the legacy keys) — caller
+    // will leave it alone.
+    return { ship: rawShip, changed: false };
+  }
+
+  const presetRaw = hasLegacyPreset ? rawShip.preset : undefined;
+  const presetKey = typeof presetRaw === 'string' ? presetRaw : undefined;
+
+  // Resolve to the canonical step list. If preset is missing or unrecognized,
+  // default to all six steps (safe default — matches new-config behavior).
+  let steps = PRESET_TO_STEPS[presetKey] ? PRESET_TO_STEPS[presetKey].slice() : ALL_STEPS.slice();
+
+  // Subtract any legacy skip[] members (validating membership; unknown values
+  // are dropped silently — the schema would have rejected them anyway).
+  if (Array.isArray(rawShip.skip)) {
+    const skipSet = new Set(rawShip.skip);
+    steps = steps.filter(s => !skipSet.has(s));
+  }
+
+  // Build the migrated ship section. Preserve all non-legacy fields verbatim.
+  const { preset: _droppedPreset, skip: _droppedSkip, ...rest } = rawShip;
+  const migrated = { ...rest, steps };
+
+  return { ship: migrated, changed: true };
 }
 
 /** Legacy file paths relative to projectRoot. */
@@ -153,7 +219,31 @@ function readProjectConfig(projectRoot) {
  */
 function readLocalConfig(projectRoot) {
   const localPath = path.join(projectRoot, LOCAL_CONFIG_PATH);
-  const localData = readJsonFile(localPath);
+  let localData = readJsonFile(localPath);
+
+  // v1 → v2 ship migration: when local.json exists, has a ship section with
+  // legacy preset/skip keys, and lacks (or has stale) `version`, migrate in
+  // place, persist, and emit a single deprecation notice. Idempotent — a v2
+  // file with no legacy keys returns false from migrateShipSectionV1ToV2.
+  if (localData && (localData.version == null || localData.version < LOCAL_SCHEMA_VERSION)) {
+    const { ship: migratedShip, changed } = migrateShipSectionV1ToV2(localData.ship);
+    if (changed) {
+      const migratedFull = { ...localData, ship: migratedShip, version: LOCAL_SCHEMA_VERSION, $schema: LOCAL_SCHEMA_URL };
+      writeJsonFile(localPath, migratedFull);
+      process.stderr.write(
+        `Deprecation: ${LOCAL_CONFIG_PATH} migrated from preset/skip to steps[] (schema v${LOCAL_SCHEMA_VERSION}). Run /setup-sdlc --migrate to silence this notice in future.\n`
+      );
+      // Re-read so subsequent code paths see the canonical on-disk shape.
+      localData = readJsonFile(localPath);
+    } else if (localData.version == null && localData.ship && Object.keys(localData.ship).length > 0) {
+      // Edge case: ship section exists but has neither legacy keys nor
+      // version stamp (e.g. only bump/draft were set). Stamp version: 2 so
+      // future reads short-circuit and the file remains schema-valid.
+      const stamped = { ...localData, version: LOCAL_SCHEMA_VERSION, $schema: LOCAL_SCHEMA_URL };
+      writeJsonFile(localPath, stamped);
+      localData = readJsonFile(localPath);
+    }
+  }
 
   // If local.json exists and has both review and ship, no fallbacks needed
   if (localData && localData.review && localData.ship) {
@@ -277,7 +367,15 @@ function writeProjectConfig(projectRoot, config) {
 function writeLocalConfig(projectRoot, config) {
   const filePath = path.join(projectRoot, LOCAL_CONFIG_PATH);
   let existing = readJsonFile(filePath) || {};
-  const merged = { ...existing, ...config, $schema: LOCAL_SCHEMA_URL };
+  // Always stamp version: 2 at the top level. Caller-supplied overrides
+  // are honored (so an explicit version: N still wins) but the default is
+  // the current schema version. $schema URL is fixed.
+  const merged = {
+    ...existing,
+    ...config,
+    version: config.version != null ? config.version : LOCAL_SCHEMA_VERSION,
+    $schema: LOCAL_SCHEMA_URL,
+  };
   writeJsonFile(filePath, merged);
 }
 
@@ -390,12 +488,30 @@ function migrateConfig(projectRoot) {
   const shipData = readJsonFile(shipPath);
   if (shipData) {
     const section = stripMeta(shipData, '$schema', 'version');
+    // Run v1→v2 ship-shape migration on the legacy file content too — a
+    // legacy ship-config.json may carry preset/skip in its ship section.
+    const { ship: migratedShipFromLegacy } = migrateShipSectionV1ToV2(section);
     if (existingLocal?.ship) {
       conflicts.push(LEGACY.ship);
     } else {
-      writeLocalConfig(projectRoot, { ship: section });
+      writeLocalConfig(projectRoot, { ship: migratedShipFromLegacy });
       migrated.push(LEGACY.ship);
       shipMigrated = true;
+    }
+  }
+
+  // v1 → v2 ship-shape migration: if the local file has version < 2 and
+  // a ship section with legacy preset/skip keys, migrate it explicitly.
+  // (readLocalConfig already does this on demand; running it here makes
+  // /setup-sdlc --migrate cover the case explicitly with a migrated entry.)
+  const localPathForV2 = path.join(projectRoot, LOCAL_CONFIG_PATH);
+  const reloaded = readJsonFile(localPathForV2);
+  if (reloaded && (reloaded.version == null || reloaded.version < LOCAL_SCHEMA_VERSION)) {
+    const { ship: migratedShipReloaded, changed } = migrateShipSectionV1ToV2(reloaded.ship);
+    if (changed) {
+      const next = { ...reloaded, ship: migratedShipReloaded, version: LOCAL_SCHEMA_VERSION, $schema: LOCAL_SCHEMA_URL };
+      writeJsonFile(localPathForV2, next);
+      migrated.push(`${LOCAL_CONFIG_PATH}#v1->v2`);
     }
   }
 
@@ -456,6 +572,10 @@ module.exports = {
   // Preset normalization
   normalizePreset,
   PRESET_NAMES,
+  // v1 → v2 ship section migration
+  PRESET_TO_STEPS,
+  migrateShipSectionV1ToV2,
+  LOCAL_SCHEMA_VERSION,
   // Exposed for testing
   PROJECT_CONFIG_PATH,
   LOCAL_CONFIG_PATH,

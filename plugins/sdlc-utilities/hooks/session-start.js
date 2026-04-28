@@ -339,11 +339,16 @@ try {
   const projectRoot = process.cwd();
   const shipConfig = readSection(projectRoot, 'ship');
   if (shipConfig) {
+    // Note: steps[] is the v2 canonical field. preset/skip are legacy v1
+    // fields and only appear here when readSection returns a non-migrated
+    // raw config (shouldn't happen on a v2-migrated read, but kept for
+    // defensive backward compatibility).
+    const steps     = Array.isArray(shipConfig.steps) ? `steps ${JSON.stringify(shipConfig.steps)}` : null;
     const preset    = shipConfig.preset    !== undefined ? `preset ${normalizePreset(shipConfig.preset)}` : null;
     const skip      = shipConfig.skip      !== undefined ? `skip ${JSON.stringify(shipConfig.skip)}` : null;
     const bump      = shipConfig.bump      !== undefined ? `bump ${shipConfig.bump}` : null;
     const threshold = shipConfig.reviewThreshold !== undefined ? `threshold ${shipConfig.reviewThreshold}` : null;
-    const parts = [preset, skip, bump, threshold].filter(Boolean);
+    const parts = [steps, preset, skip, bump, threshold].filter(Boolean);
     if (parts.length > 0) {
       resumeLines.push(`Ship config: ${parts.join(', ')}`);
     }
