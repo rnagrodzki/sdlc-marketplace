@@ -2,6 +2,7 @@
 #   plan-written                   -- CORRECT: simulates a written plan file, triggers Step 7 handoff
 #   plan-from-openspec             -- CORRECT: simulates --from-openspec with ready-for-plan stage, tasks.md present
 #   plan-from-openspec-no-tasks    -- CORRECT: simulates --from-openspec with spec-in-progress stage, no tasks.md
+#   plan-creates-skill             -- CORRECT: simulates a request to plan a new skill; exercises skill-docs-required guardrail (Fixes #185)
 
 - description: "plan-sdlc: asks whether to execute after plan is written"
   vars:
@@ -121,3 +122,43 @@
         output. The response does NOT treat OpenSpec as uninitialized, does NOT suggest
         running openspec init, and does NOT add an "initialize OpenSpec" task to the plan.
         The skill flow continues normally with OpenSpec detected as present.
+
+- description: "plan-sdlc: new-skill plan includes all four companion artifacts (Fixes #185)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-creates-skill.md"
+    user_request: >
+      Run /plan-sdlc. The user wants a new skill named example-skill (see project context
+      above for the full request and active guardrails). Produce the plan. The
+      skill-docs-required guardrail requires that any plan creating
+      plugins/*/skills/*/SKILL.md must also create docs/specs/<name>.md,
+      docs/skills/<name>.md, a README.md skills-table entry, and a
+      site/src/data/skills-meta.ts SkillCard entry. Show the resulting plan with all tasks
+      and their Files lists.
+  assert:
+    # Spec companion (docs/specs)
+    - type: icontains
+      value: "docs/specs/example-skill.md"
+    # Reference doc companion (docs/skills)
+    - type: icontains
+      value: "docs/skills/example-skill.md"
+    # README skills-table row
+    - type: icontains
+      value: "README.md"
+    # SkillCard registry entry
+    - type: icontains
+      value: "site/src/data/skills-meta.ts"
+    # The SKILL.md task itself
+    - type: icontains
+      value: "plugins/sdlc-utilities/skills/example-skill/SKILL.md"
+    # Behavioral: all four companion artifacts present and spec-first ordering respected
+    - type: llm-rubric
+      value: >
+        The plan creates plugins/sdlc-utilities/skills/example-skill/SKILL.md AND includes
+        tasks (or file entries within tasks) covering all four companion artifacts:
+        (1) docs/specs/example-skill.md, (2) docs/skills/example-skill.md,
+        (3) a README.md skills-table row update, and (4) a site/src/data/skills-meta.ts
+        SkillCard registry entry. The spec task is ordered before the SKILL.md task
+        (spec-first). No companion is omitted. The plan does not include a step that runs
+        promptfoo eval automatically.
+

@@ -27,7 +27,7 @@
       },
       {
         "id": "skill-docs-required",
-        "description": "Any task adding or renaming a skill must include a matching doc in docs/skills/.",
+        "description": "Any task that creates `plugins/*/skills/*/SKILL.md` must include matching entries for all four companion artifacts: `docs/specs/<skill-name>.md` (spec), `docs/skills/<skill-name>.md` (reference doc), `README.md` (skills-table row), and `site/src/data/skills-meta.ts` (SkillCard registry). Skill-name is derived from the SKILL.md path's parent directory.",
         "severity": "error"
       },
       {
