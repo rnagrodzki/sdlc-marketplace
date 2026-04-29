@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-04-29 — version-sdlc: patch release v0.17.32 on fix/185-skill-docs-required-guardrail
+Single chore commit (plan-sdlc skill-docs-required guardrail & test fixture). Branch had no upstream; push used `-u` to set it. The `--output-file` flag passed via pipeline args triggers an "Unknown flag" warning in version.js but does not block execution.
+
 ## 2026-04-29 — version-sdlc: patch release v0.17.31 on fix/184-sequential-meteor
 First push from untracked branch; `git push --set-upstream origin <branch>` required before `git push --tags`. Both commits were `fix` type (null-check guard + gh-account-switch retry), cleanly mapping to a patch bump.
 
