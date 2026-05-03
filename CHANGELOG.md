@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.34] - 2026-05-03
+
+### Fixed
+- test infrastructure: converted exec-test provider declarations from string form to object form, fixing a "Could not identify provider" crash introduced by promptfoo 0.121.9 (#191)
+
 ## [0.17.33] - 2026-05-03
 
 ### Fixed
