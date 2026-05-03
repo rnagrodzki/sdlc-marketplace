@@ -18,9 +18,9 @@ Manages the full semantic release workflow: detects the version source, bumps th
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `major` / `minor` / `patch` | Bump type (positional). If omitted, auto-detected from conventional commits. | auto |
+| `major` / `minor` / `patch` / `<label>` | Bump type (positional). If omitted, auto-detected from conventional commits. The `<label>` form (e.g. `version-sdlc rc`) is sugar for `--bump patch --pre <label>` and accepts any pre-release label matching `^[a-z][a-z0-9]*$`. | auto |
 | `--init` | Run the setup wizard and write `.claude/version.json`. Safe to re-run. | — |
-| `--pre <label>` | Create a pre-release version (e.g. `beta`, `rc`). Auto-increments the counter on repeated runs. | — |
+| `--pre <label>` | Create a pre-release version (e.g. `beta`, `rc`). Label must match `^[a-z][a-z0-9]*$`. Auto-increments the counter on repeated runs. | — |
 | `--no-push` | Commit and tag locally, skip `git push`. | — |
 | `--changelog` | With a bump type: generate a CHANGELOG entry as part of the release. Without a bump type: update the changelog for the already-tagged current version (no new tag created). | off |
 | `--hotfix` | Mark this release as a hotfix for DORA metrics tracking. Annotates the commit message with `[hotfix]` and the tag message body with `Type: hotfix`. | off |
@@ -134,6 +134,44 @@ Proceed? (yes / edit / cancel)
 /version-sdlc minor               # 1.3.0-rc.1 → 1.3.0         (graduate to release)
 ```
 
+### Pre-release shorthand: `--bump <label>`
+
+The positional `<label>` form is sugar for `--bump patch --pre <label>`. Useful for short, repeated RC iteration:
+
+```text
+/version-sdlc rc                  # 1.2.3        → 1.2.4-rc.1   (fresh patch + label)
+/version-sdlc rc                  # 1.2.4-rc.1   → 1.2.4-rc.2   (same-label increment)
+/version-sdlc rc                  # 1.2.4-beta.3 → 1.2.4-rc.1   (label change, counter reset)
+/version-sdlc mycorp              # 1.0.0        → 1.0.1-mycorp.1  (any custom label matching ^[a-z][a-z0-9]*$)
+```
+
+Label-form bumps skip the breaking-change suggestion (R3): pre-release trains do not nag on every iteration.
+
+### Default pre-release label via config
+
+Set `version.preRelease` in `.claude/sdlc.json` to apply a default label whenever the user runs `version-sdlc` without an explicit `major|minor|patch` and without `--pre`:
+
+```json
+{
+  "version": {
+    "mode": "file",
+    "versionFile": "package.json",
+    "tagPrefix": "v",
+    "preRelease": "rc"
+  }
+}
+```
+
+With this config:
+
+```text
+/version-sdlc                     # 1.2.3      → 1.2.4-rc.1   (config default applied)
+/version-sdlc                     # 1.2.4-rc.1 → 1.2.4-rc.2   (same as `version-sdlc rc`)
+/version-sdlc major               # 1.2.4-rc.1 → 2.0.0        (explicit base bump graduates)
+```
+
+Configure interactively via `/setup-sdlc` (Step 3a customize path).
+
 ### Example release session
 
 ```text
@@ -231,7 +269,7 @@ git tag -l --format='%(refname:short)%09%(contents:subject)%09%(contents:body)'
 
 | Field | Value |
 |---|---|
-| `argument-hint` | `[major\|minor\|patch] [--pre <label>] [--changelog] [--hotfix]` |
+| `argument-hint` | `[major\|minor\|patch\|<label>] [--pre <label>] [--changelog] [--hotfix]` |
 | Plan mode | Graceful refusal (Step 0) |
 
 ---

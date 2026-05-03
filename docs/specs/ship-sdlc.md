@@ -11,7 +11,7 @@
 - A1: `--auto` — run pipeline non-interactively; forwarded to sub-skills that support it (default: false)
 - A2: `--steps <csv>` — comma-separated steps to run; valid: execute, commit, review, received-review, commit-fixes, version, pr, archive-openspec. When passed, fully replaces the resolved step list (config `ship.steps[]` and built-in defaults are ignored). The single source of truth for pipeline composition is config `ship.steps[]`; CLI `--steps` is a one-shot override.
 - A3: `--quality full|balanced|minimal` — execution quality (model tier) forwarded to execute-plan-sdlc; only forwarded when explicitly passed via CLI (default: not forwarded; execute-plan-sdlc applies its own selection)
-- A4: `--bump patch|minor|major` — version bump type forwarded to version-sdlc (default: from config or patch)
+- A4: `--bump patch|minor|major|<label>` — version bump type forwarded to version-sdlc; `<label>` is any pre-release label matching `^[a-z][a-z0-9]*$` (e.g., `rc`, `beta`, `alpha`, custom). A label-form value is forwarded verbatim to version-sdlc, where it is interpreted as `--bump patch --pre <label>` (default: from config or patch)
 - A5: `--draft` — create PR as draft (default: from config or false)
 - A6: `--dry-run` — display pipeline plan without executing (default: false)
 - A7: `--resume` — resume pipeline from saved state file (default: false)
@@ -88,7 +88,7 @@
 - G2: Not on default branch — warn if on main/master (do not block)
 - G3: Step values valid — all CLI `--steps` values are recognized step names (`VALID_STEPS` from `lib/ship-fields.js`)
 - G4: At least one step will run — pipeline is not entirely skipped
-- G5: Flag coherence — `--bump` without version step produces error (exit code 1, blocking)
+- G5: Flag coherence — `--bump` without version step produces error (exit code 1, blocking). The `--bump` value space accepts `major|minor|patch` or any pre-release label matching `^[a-z][a-z0-9]*$`; values outside this set are rejected at parse time before the version step runs.
 - G6: Pipeline contract — every `will_run` step was dispatched as Agent
 - G6a: Pipeline completion gate — `state/ship.js cleanup` validates all steps are in terminal state (`completed`, `skipped`, or `failed`) before deleting the state file. Steps still `pending` or `in_progress` cause cleanup to refuse deletion and exit 1.
 - G7: Staging gap filled — `git add -A -- ':!.sdlc/'` ran between execute and commit

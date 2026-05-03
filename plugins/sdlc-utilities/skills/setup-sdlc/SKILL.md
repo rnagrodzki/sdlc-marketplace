@@ -255,8 +255,25 @@ On **customize**: ask about each field individually using AskUserQuestion:
 4. **tagPrefix** -- prefix for git tags (default: `v`)
 5. **changelog** -- generate changelog on release? yes/no (default: no)
 6. **changelogFile** -- path to changelog file (only if changelog is yes, default: `CHANGELOG.md`)
+7. **preRelease** -- default pre-release label for `version-sdlc` and `ship-sdlc`. Leave empty for stable releases, or set to `rc`/`beta`/`alpha`/etc. Must match `^[a-z][a-z0-9]*$` (lowercase, start with a letter, alphanumeric). When set, running `version-sdlc` (or `ship-sdlc`) without an explicit `major|minor|patch` and without `--pre` produces a pre-release version using this label. Empty/skipped omits the field. Validate against the regex; on mismatch, re-prompt showing the regex.
 
 On **skip**: do not write a version section.
+
+Write the version section with the collected answers. The `preRelease` field is written only if the user supplied a non-empty answer that matched the regex (matching the existing optional-field pattern used for `versionFile` / `changelogFile`):
+```json
+{
+  "version": {
+    "mode": "file",
+    "versionFile": "...",
+    "fileType": "...",
+    "tagPrefix": "v",
+    "changelog": false,
+    "preRelease": "rc"
+  }
+}
+```
+
+The "yes-defaults" path above does NOT write `preRelease` — defaults preserve stable-release behavior.
 
 #### 3b. Ship section
 

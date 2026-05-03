@@ -1,8 +1,8 @@
 ---
 name: version-sdlc
-description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow, updating an existing changelog entry for the current version. Consumes pre-computed context from skill/version.js and handles the complete release process. Use --changelog without a bump type to update the changelog for the already-tagged current version. Arguments: [major|minor|patch] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix] [--auto]. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate. Use --auto to skip interactive approval prompts (release plan is still displayed)."
+description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow, updating an existing changelog entry for the current version. Consumes pre-computed context from skill/version.js and handles the complete release process. Use --changelog without a bump type to update the changelog for the already-tagged current version. Arguments: [major|minor|patch|<label>] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix] [--auto]. The positional `<label>` form (e.g. `version-sdlc rc`) is sugar for `--bump patch --pre <label>` and accepts any pre-release label matching `^[a-z][a-z0-9]*$`. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate. Use --auto to skip interactive approval prompts (release plan is still displayed)."
 user-invocable: true
-argument-hint: "[major|minor|patch] [--pre <label>] [--changelog] [--hotfix] [--auto]"
+argument-hint: "[major|minor|patch|<label>] [--pre <label>] [--changelog] [--hotfix] [--auto]"
 ---
 
 # Versioning Releases Skill
@@ -96,13 +96,13 @@ Read `VERSION_CONTEXT_JSON`. Key fields to extract:
 | `versionSource.currentVersion` | Current version string |
 | `config.mode` | `"file"` or `"tag"` |
 | `config.changelog` | Whether changelog is enabled by default |
-| `requestedBump` | `"major"`, `"minor"`, `"patch"`, or `null` |
+| `requestedBump` | `"major"`, `"minor"`, `"patch"`, or `null`. May be auto-set to `"patch"` by the script when `flags.bumpFromLabel === true` (positional `<label>` sugar) or when `flags.preLabelFromConfig === true` (config-driven default) |
 | `conventionalSummary.suggestedBump` | Auto-detected bump type from commits |
 | `conventionalSummary.hasBreakingChanges` | Whether any commit is a breaking change |
-| `bumpOptions` | `{ major, minor, patch, preRelease }` — pre-computed next versions |
+| `bumpOptions` | `{ major, minor, patch, preRelease }` — pre-computed next versions. `preRelease` is populated whenever any pre-release source is active (`--pre`, label-form `<bump>`, or `config.preRelease`). |
 | `tags.latest` | Most recent tag |
 | `commits` | Array of commits since last tag |
-| `flags` | `{ preLabel, noPush, changelog, hotfix, auto }` — parsed CLI flags |
+| `flags` | `{ preLabel, noPush, changelog, hotfix, auto, bumpFromLabel, preLabelExplicit, preLabelFromConfig }` — parsed CLI flags plus pre-release provenance fields. The provenance flags are mutually exclusive: at most one of `bumpFromLabel`, `preLabelExplicit`, `preLabelFromConfig` is `true`. |
 | `flags.hotfix` | Whether this release is a hotfix (for DORA metrics tracking) |
 | `flags.auto` | Whether `--auto` was passed — skip interactive approval prompts |
 | `config.ticketPrefix` | Optional Jira/project key prefix (e.g. `"PROJ"`). When set, ticket IDs matching this prefix are extracted from commits. |
@@ -113,12 +113,29 @@ Read `VERSION_CONTEXT_JSON`. Key fields to extract:
 
 **Determine new version:**
 
-- If `flags.preLabel` is set:
-  - If `requestedBump` is also set: compute pre-release from the corresponding base version (e.g. `--minor --pre beta` on `1.2.3` → `1.3.0-beta.1`). Use `bumpOptions.preRelease`.
-  - If only `--pre` with no bump type: use `bumpOptions.preRelease` directly (increments existing pre-release counter).
-- If `requestedBump` is explicitly set (and no pre-label): use `bumpOptions[requestedBump]`.
-- Otherwise: use `conventionalSummary.suggestedBump` automatically. Inform the user which bump type was auto-selected and why.
-- If `conventionalSummary.hasBreakingChanges` is true and the chosen bump is not `major` (and is not a pre-release): warn the user that breaking changes were detected and suggest bumping to `major` instead.
+The script (`skill/version.js`) does all label validation and precedence resolution before this step runs. Read the resolved values from `VERSION_CONTEXT_JSON` and select the version verbatim — do not re-derive bump type or label from the original CLI string.
+
+Pre-release intent can come from four sources, with this precedence (top wins):
+
+1. Explicit base bump (`major|minor|patch`) plus optional `--pre <label>`
+2. Explicit label-form positional (e.g. `version-sdlc rc`, equivalent to `--bump patch --pre rc`) OR explicit `--pre <label>`
+3. `config.preRelease` from `.claude/sdlc.json` (active when no explicit bump and no `--pre`)
+4. Auto-detection from conventional commits (no pre-release applied)
+
+The script signals which source fired via `flags.bumpFromLabel`, `flags.preLabelExplicit`, and `flags.preLabelFromConfig`. Use those provenance flags when explaining the choice to the user — do not infer it from raw CLI args.
+
+Decision table:
+
+| `flags.preLabel` | `requestedBump` | Source signal | Use |
+| ---- | ---- | ---- | ---- |
+| set | set (`major`/`minor`/`patch`) | explicit `--pre` plus base bump | `bumpOptions.preRelease` (label on top of bumped base, e.g. `--minor --pre beta` on `1.2.3` → `1.3.0-beta.1`) |
+| set | `"patch"` with `bumpFromLabel: true` | positional label-form (`version-sdlc rc`) | `bumpOptions.preRelease` (script applies same-base same-label increment, label-reset, or fresh patch+label depending on current version state) |
+| set | `"patch"` with `preLabelFromConfig: true` | `config.preRelease` default | `bumpOptions.preRelease` (same semantics as label-form above) |
+| set | `null` | `--pre <label>` alone | `bumpOptions.preRelease` (script computes counter increment / label reset on current version, no base bump) |
+| unset | set (`major`/`minor`/`patch`) | explicit base bump | `bumpOptions[requestedBump]` |
+| unset | `null` | no explicit intent and no `config.preRelease` | `bumpOptions[conventionalSummary.suggestedBump]` (auto-detect) — inform the user of the auto-selection rationale |
+
+**Implements R3 (breaking-change gate, reworded):** if `conventionalSummary.hasBreakingChanges` is `true` AND the chosen bump is not `major`, suggest `major` UNLESS the resolved bump is a pre-release from any source. Detect "is a pre-release" by checking that `flags.preLabel` is non-null (covers all three pre-release sources: explicit `--pre`, label-form positional, and `config.preRelease`). Pre-release trains skip this warning to avoid nagging on every RC iteration.
 
 **Draft CHANGELOG entry** (only if `flags.changelog === true` OR `config.changelog === true`):
 
@@ -291,10 +308,11 @@ If `flags.hotfix === true`, show instead:
 ## Best Practices
 
 1. Always show the full release plan before executing any git commands
-2. Use `--pre beta` or `--pre rc` for pre-release versions; they auto-increment (e.g. `rc.1` → `rc.2`)
-3. For pre-releases: running the full release without `--pre` "graduates" the pre-release to a stable version
-4. Breaking changes require a major bump — suggest it even if the user requested a lower bump type
+2. Use `--pre beta` or `--pre rc` for pre-release versions; they auto-increment (e.g. `rc.1` → `rc.2`). The shorthand `version-sdlc rc` (positional label-form bump) is equivalent to `--bump patch --pre rc`.
+3. For pre-releases: running the full release without `--pre` "graduates" the pre-release to a stable version. An explicit `--bump major|minor|patch` always overrides `config.preRelease` and graduates out of the pre-release train.
+4. Breaking changes require a major bump — suggest it even if the user requested a lower bump type. The suggestion is suppressed when the resolved bump is a pre-release from any source (`--pre`, label-form, or `config.preRelease`).
 5. Changelog entries should be user-facing and outcome-focused, not implementation-focused
+6. Set `version.preRelease` in `.claude/sdlc.json` to default to a pre-release label (e.g. `"rc"`) on every bump until explicit graduation. Configure interactively via `/setup-sdlc`.
 
 ## DO NOT
 

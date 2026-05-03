@@ -269,3 +269,218 @@
         name "feat/bar" does NOT appear in the push command. This is the regression-guard
         case: ensure auto-upstream behaviour does not leak into branches that already
         have an upstream.
+
+# ---------------------------------------------------------------------------
+# Pre-release bump labels (#193)
+# ---------------------------------------------------------------------------
+
+- description: "version-sdlc: --bump rc from clean 1.2.3 produces 1.2.4-rc.1 with no breaking-change warning"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user is on feat/payments. Running version-prepare.js with `rc` (positional
+      label-form bump, sugar for --bump patch --pre rc) produces this version-context
+      JSON (excerpt):
+      {"flow": "release", "config": {"mode": "file", "versionFile": "package.json",
+      "tagPrefix": "v", "changelog": false}, "versionSource": {"currentVersion": "1.2.3"},
+      "requestedBump": "patch", "conventionalSummary": {"suggestedBump": "patch",
+      "hasBreakingChanges": false}, "bumpOptions": {"patch": "1.2.4", "minor": "1.3.0",
+      "major": "2.0.0", "preRelease": "1.2.4-rc.1"}, "tags": {"latest": "v1.2.3"},
+      "commits": [{"type": "fix", "subject": "fix payment timeout"}],
+      "flags": {"noPush": false, "auto": false, "hotfix": false, "changelog": false,
+      "preLabel": "rc", "bumpFromLabel": true, "preLabelExplicit": false,
+      "preLabelFromConfig": false}, "conflictsWithNext": {"patch": false,
+      "minor": false, "major": false}, "currentBranch": "feat/payments",
+      "remoteState": {"hasUpstream": true}, "errors": [], "warnings": []}
+    user_request: >
+      Run /version-sdlc rc. The version-prepare.js output is provided in the project
+      context. Show the resolved version and the release plan.
+  assert:
+    - type: icontains
+      value: "1.2.4-rc.1"
+    - type: not-icontains
+      value: "breaking change"
+    - type: not-regex
+      value: '(?i)suggest.*major'
+    - type: llm-rubric
+      value: >
+        The response uses bumpOptions.preRelease (1.2.4-rc.1) as the resolved release
+        version. It does NOT propose 1.2.4 (plain patch) or 1.3.0 (minor). It does NOT
+        warn about breaking changes or suggest a major bump (R3 reworded — pre-release
+        sources skip the warning). It recognises bumpFromLabel=true and explains that
+        `rc` was treated as a pre-release label. The release plan tag is v1.2.4-rc.1.
+
+- description: "version-sdlc: --bump rc from existing 1.2.4-rc.1 increments counter to 1.2.4-rc.2"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user is iterating on an RC. Running version-prepare.js with `rc` produces:
+      {"flow": "release", "config": {"mode": "file", "versionFile": "package.json",
+      "tagPrefix": "v"}, "versionSource": {"currentVersion": "1.2.4-rc.1"},
+      "requestedBump": "patch", "conventionalSummary": {"suggestedBump": "patch",
+      "hasBreakingChanges": false}, "bumpOptions": {"patch": "1.2.5", "minor": "1.3.0",
+      "major": "2.0.0", "preRelease": "1.2.4-rc.2"}, "tags": {"latest": "v1.2.4-rc.1"},
+      "commits": [{"type": "fix", "subject": "address RC1 review feedback"}],
+      "flags": {"noPush": false, "auto": false, "preLabel": "rc",
+      "bumpFromLabel": true, "preLabelExplicit": false, "preLabelFromConfig": false},
+      "conflictsWithNext": {"patch": false, "preRelease": false},
+      "currentBranch": "feat/payments", "remoteState": {"hasUpstream": true},
+      "errors": [], "warnings": []}
+    user_request: >
+      Run /version-sdlc rc. The version-prepare.js output is provided. Show the
+      resolved version.
+  assert:
+    - type: icontains
+      value: "1.2.4-rc.2"
+    - type: not-icontains
+      value: "1.2.5"
+    - type: llm-rubric
+      value: >
+        The response uses bumpOptions.preRelease (1.2.4-rc.2) — the same-base counter
+        increment of 1.2.4-rc.1. It does NOT propose 1.2.5-rc.1 (which would be a stale
+        same-label semantic) or 1.2.5 (plain patch). It explicitly notes the counter
+        increment (rc.1 -> rc.2) on the same base.
+
+- description: "version-sdlc: --bump rc from 1.2.4-beta.3 resets counter on label change to 1.2.4-rc.1"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user is switching pre-release tracks from beta to rc. Running version-prepare.js
+      with `rc` produces:
+      {"flow": "release", "config": {"mode": "file", "versionFile": "package.json",
+      "tagPrefix": "v"}, "versionSource": {"currentVersion": "1.2.4-beta.3"},
+      "requestedBump": "patch", "conventionalSummary": {"suggestedBump": "patch",
+      "hasBreakingChanges": false}, "bumpOptions": {"patch": "1.2.5", "minor": "1.3.0",
+      "major": "2.0.0", "preRelease": "1.2.4-rc.1"}, "tags": {"latest": "v1.2.4-beta.3"},
+      "commits": [], "flags": {"noPush": false, "auto": false, "preLabel": "rc",
+      "bumpFromLabel": true, "preLabelExplicit": false, "preLabelFromConfig": false},
+      "conflictsWithNext": {"preRelease": false}, "currentBranch": "feat/payments",
+      "remoteState": {"hasUpstream": true}, "errors": [], "warnings": []}
+    user_request: >
+      Run /version-sdlc rc. The version-prepare.js output is provided. Show the
+      resolved version.
+  assert:
+    - type: icontains
+      value: "1.2.4-rc.1"
+    - type: not-icontains
+      value: "beta"
+    - type: llm-rubric
+      value: >
+        The response uses bumpOptions.preRelease (1.2.4-rc.1). The counter resets to
+        1 on label change from beta to rc, on the same base 1.2.4. The response does
+        NOT propose 1.2.4-beta.4 (continuing the beta train) or 1.2.5-rc.1 (bumping
+        the base). The label change is acknowledged.
+
+- description: "version-sdlc: --pre with invalid label '1bad' is rejected by the script"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user invokes `/version-sdlc --pre 1bad`. version-prepare.js exits 1 with
+      this output:
+      {"flow": "release", "errors": ["Invalid --pre label '1bad'. Labels must match
+      /^[a-z][a-z0-9]*$/ (lowercase, start with a letter, alphanumeric)."],
+      "warnings": []}
+    user_request: "Run /version-sdlc --pre 1bad."
+  assert:
+    - type: icontains
+      value: "1bad"
+    - type: regex
+      value: '(?i)(invalid|reject|cannot)'
+    - type: not-icontains
+      value: "Release Plan"
+    - type: llm-rubric
+      value: >
+        The response surfaces the script's error verbatim or paraphrased — the label
+        '1bad' is invalid because it starts with a digit. It does NOT proceed to a
+        release plan, does NOT silently coerce the label, and does NOT attempt any
+        git command. It points the user at the regex `^[a-z][a-z0-9]*$` for the
+        valid label format.
+
+- description: "version-sdlc: custom label 'mycorp' is accepted as positional bump"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user wants a private-tag pre-release. Running version-prepare.js with
+      `mycorp` produces:
+      {"flow": "release", "config": {"mode": "file", "versionFile": "package.json",
+      "tagPrefix": "v"}, "versionSource": {"currentVersion": "1.0.0"},
+      "requestedBump": "patch", "conventionalSummary": {"suggestedBump": "patch",
+      "hasBreakingChanges": false}, "bumpOptions": {"patch": "1.0.1", "minor": "1.1.0",
+      "major": "2.0.0", "preRelease": "1.0.1-mycorp.1"}, "tags": {"latest": "v1.0.0"},
+      "commits": [{"type": "feat", "subject": "internal hardening"}],
+      "flags": {"preLabel": "mycorp", "bumpFromLabel": true, "preLabelExplicit": false,
+      "preLabelFromConfig": false, "auto": false}, "conflictsWithNext": {"preRelease": false},
+      "currentBranch": "feat/internal", "remoteState": {"hasUpstream": true},
+      "errors": [], "warnings": []}
+    user_request: "Run /version-sdlc mycorp."
+  assert:
+    - type: icontains
+      value: "1.0.1-mycorp.1"
+    - type: llm-rubric
+      value: >
+        The response uses bumpOptions.preRelease (1.0.1-mycorp.1) and accepts the
+        custom label. It does NOT reject the label as unrecognized — any label
+        matching `^[a-z][a-z0-9]*$` is valid.
+
+- description: "version-sdlc: config.preRelease=rc with no flags behaves like --bump rc"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user has set `version.preRelease: "rc"` in .claude/sdlc.json. Running
+      version-prepare.js with no positional bump and no flags produces:
+      {"flow": "release", "config": {"mode": "file", "versionFile": "package.json",
+      "tagPrefix": "v", "preRelease": "rc"}, "versionSource": {"currentVersion": "1.2.3"},
+      "requestedBump": "patch", "conventionalSummary": {"suggestedBump": "patch",
+      "hasBreakingChanges": false}, "bumpOptions": {"patch": "1.2.4", "minor": "1.3.0",
+      "major": "2.0.0", "preRelease": "1.2.4-rc.1"}, "tags": {"latest": "v1.2.3"},
+      "commits": [{"type": "fix", "subject": "fix flaky test"}],
+      "flags": {"preLabel": "rc", "bumpFromLabel": false, "preLabelExplicit": false,
+      "preLabelFromConfig": true, "auto": false}, "conflictsWithNext": {"preRelease": false},
+      "currentBranch": "feat/payments", "remoteState": {"hasUpstream": true},
+      "errors": [], "warnings": []}
+    user_request: "Run /version-sdlc."
+  assert:
+    - type: icontains
+      value: "1.2.4-rc.1"
+    - type: regex
+      value: '(?i)(config|preRelease|sdlc\.json)'
+    - type: not-regex
+      value: '(?i)suggest.*major'
+    - type: llm-rubric
+      value: >
+        The response uses bumpOptions.preRelease (1.2.4-rc.1) and explicitly mentions
+        that the pre-release label was sourced from config.preRelease (preLabelFromConfig=true)
+        rather than a CLI flag. The behavior matches `--bump rc`. The breaking-change
+        warning is NOT triggered (no breaking changes anyway, but the principle holds).
+
+- description: "version-sdlc: explicit --bump major overrides config.preRelease and graduates"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user has `version.preRelease: "rc"` in .claude/sdlc.json but is graduating
+      with --bump major. Running version-prepare.js with `major` produces:
+      {"flow": "release", "config": {"mode": "file", "versionFile": "package.json",
+      "tagPrefix": "v", "preRelease": "rc"}, "versionSource": {"currentVersion": "1.2.4-rc.1"},
+      "requestedBump": "major", "conventionalSummary": {"suggestedBump": "major",
+      "hasBreakingChanges": true}, "bumpOptions": {"patch": "1.2.5", "minor": "1.3.0",
+      "major": "2.0.0"}, "tags": {"latest": "v1.2.4-rc.1"},
+      "commits": [{"type": "feat", "subject": "feat!: redesign API", "breaking": true}],
+      "flags": {"preLabel": null, "bumpFromLabel": false, "preLabelExplicit": false,
+      "preLabelFromConfig": false, "auto": false}, "conflictsWithNext": {"major": false},
+      "currentBranch": "feat/v2", "remoteState": {"hasUpstream": true},
+      "errors": [], "warnings": []}
+    user_request: "Run /version-sdlc major."
+  assert:
+    - type: icontains
+      value: "2.0.0"
+    - type: not-icontains
+      value: "rc"
+    - type: not-icontains
+      value: "preRelease"
+    - type: llm-rubric
+      value: >
+        The response uses bumpOptions.major (2.0.0) — a clean, non-pre-release version.
+        Explicit base bump overrides config.preRelease (precedence rule). The release
+        plan does NOT include any pre-release suffix. bumpOptions.preRelease is absent
+        from the output (script did not compute one). The user has graduated out of
+        the rc train.
