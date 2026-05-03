@@ -214,7 +214,7 @@ Plan guardrails    — [N configured via guardrails sub-flow | skipped]
 
 | File | Purpose |
 |------|---------|
-| `.claude/sdlc.json` | Unified project config with `version`, `jira`, `commit`, `pr` sections, and optional `plan.guardrails` |
+| `.claude/sdlc.json` | Unified project config with `version`, `jira`, `commit`, `pr` sections, and optional `plan.guardrails`. The `version` section may include an optional `preRelease` field (lowercase label matching `^[a-z][a-z0-9]*$`) — when set, `version-sdlc` and `ship-sdlc` produce a pre-release version (e.g. `1.2.4-rc.1`) on every default bump until an explicit `major\|minor\|patch` graduates the release. Configured interactively via the customize path of Step 3a (version section). |
 | `.sdlc/local.json` | User-local config with `review` scope preferences and `ship` settings |
 | `.claude/review-dimensions/*.yaml` | Review dimensions created during dimensions sub-flow (via `--dimensions`) |
 | `.claude/pr-template.md` | PR template created during PR template sub-flow (via `--pr-template`) |

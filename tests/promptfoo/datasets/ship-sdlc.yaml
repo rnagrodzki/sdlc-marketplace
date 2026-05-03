@@ -449,3 +449,73 @@
       value: >
         The pipeline table includes the archive-openspec step but shows it as skipped
         with a reason indicating no matching OpenSpec change was found for the current branch.
+
+# ---------------------------------------------------------------------------
+# Pre-release bump labels (#193)
+# ---------------------------------------------------------------------------
+
+- description: "ship-sdlc: --bump rc forwards the label verbatim to version-sdlc"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: >
+      The user runs `/ship-sdlc --bump rc --auto` on feat/payments. ship.js exits 0
+      and emits a pipeline where the version step receives `rc` as its positional
+      bump argument (forwarded verbatim because version-sdlc accepts label-form
+      bumps as sugar for --bump patch --pre rc):
+      {"flags": {"bump": "rc", "auto": true, "steps":
+      ["execute","commit","review","version","pr"]}, "context":
+      {"currentBranch": "feat/payments", "defaultBranch": "main", "ghAuth": true},
+      "steps": [
+        {"skill": "execute-plan-sdlc", "status": "will_run", "args": "", "invocation":
+        "execute-plan-sdlc"},
+        {"skill": "commit-sdlc", "status": "will_run", "args": "--auto", "invocation":
+        "commit-sdlc --auto"},
+        {"skill": "review-sdlc", "status": "will_run", "args": "--committed", "invocation":
+        "review-sdlc --committed"},
+        {"skill": "version-sdlc", "status": "will_run", "args": "rc --auto",
+        "invocation": "version-sdlc rc --auto"},
+        {"skill": "pr-sdlc", "status": "will_run", "args": "--auto", "invocation":
+        "pr-sdlc --auto"}
+      ], "errors": [], "warnings": []}
+    user_request: >
+      Run /ship-sdlc --bump rc --auto. The ship.js output is provided. Show the
+      pipeline table and explain how `rc` flows to the version step.
+  assert:
+    - type: icontains
+      value: "version-sdlc rc"
+    - type: regex
+      value: '(?i)(rc|pre[- ]?release|label)'
+    - type: not-icontains
+      value: "1foo"
+    - type: llm-rubric
+      value: >
+        The pipeline table shows version-sdlc dispatched with `rc` as its positional
+        bump argument. The response notes that `rc` is forwarded verbatim and will
+        be interpreted by version-sdlc as a pre-release label (sugar for
+        --bump patch --pre rc, per the value-space widening). The pipeline does NOT
+        reject the label or coerce it to `patch`. No error about an invalid bump
+        value appears.
+
+- description: "ship-sdlc: --bump 1foo (invalid label) is rejected at parse time"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: >
+      The user runs `/ship-sdlc --bump 1foo`. ship.js exits 1 with this output:
+      {"errors": ["--bump value '1foo' is invalid. Expected one of: major|minor|patch,
+      or a pre-release label matching /^[a-z][a-z0-9]*$/."], "warnings": [], "flags":
+      {"bump": "1foo"}, "steps": []}
+    user_request: "Run /ship-sdlc --bump 1foo."
+  assert:
+    - type: icontains
+      value: "1foo"
+    - type: regex
+      value: '(?i)(invalid|reject)'
+    - type: not-icontains
+      value: "Pipeline:"
+    - type: llm-rubric
+      value: >
+        The response surfaces the script's error — `1foo` is invalid because it
+        starts with a digit. The pipeline does NOT proceed; no Agent is dispatched.
+        The response references the regex `^[a-z][a-z0-9]*$` (or paraphrases it)
+        for the valid label format. It does NOT silently coerce the label to
+        `patch` or skip the version step.

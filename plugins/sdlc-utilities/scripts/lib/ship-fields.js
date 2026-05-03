@@ -31,7 +31,7 @@ const SHIP_FIELDS = [
     type: 'enum',
     options: ['patch', 'minor', 'major'],
     default: 'patch',
-    description: 'Applied by /version-sdlc when no explicit bump argument is passed',
+    description: 'Applied by /version-sdlc when no explicit bump argument is passed. The runtime value space is wider than this questionnaire presents: ship.bump in .sdlc/local.json may also be a pre-release label matching `^[a-z][a-z0-9]*$` (e.g., `rc`, `beta`); enter such values via `ship-init.js --bump <label>` or by editing the config file. Schema (schemas/sdlc-local.schema.json) validates the union pattern.',
   },
   {
     name: 'draft',

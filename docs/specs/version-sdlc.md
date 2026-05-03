@@ -8,8 +8,8 @@
 
 ## Arguments
 
-- A1: `major|minor|patch` — explicit bump type (default: auto-detected from conventional commits)
-- A2: `--pre <label>` — create or increment a pre-release version with the given label (e.g., beta, rc) (default: none)
+- A1: `major|minor|patch|<label>` — explicit bump type, where `<label>` is any pre-release label matching `^[a-z][a-z0-9]*$` (e.g., `rc`, `beta`, `alpha`, `mycorp`); a label-form value is syntactic sugar for `--bump patch --pre <label>` (default: auto-detected from conventional commits)
+- A2: `--pre <label>` — create or increment a pre-release version with the given label (must match `^[a-z][a-z0-9]*$`; e.g., beta, rc) (default: none)
 - A3: `--changelog` — generate or update a CHANGELOG entry; without a bump type, enters changelog-update workflow (default: from config)
 - A4: `--hotfix` — mark release as a hotfix for DORA metrics tracking (default: false)
 - A5: `--auto` — skip interactive approval prompts; critique gates still run (default: false)
@@ -20,7 +20,7 @@
 
 - R1: Three distinct workflow branches determined by `flow` field: init, release, changelog-update
 - R2: Determine bump type from explicit argument, or auto-detect from conventional commit summary; inform user of auto-selection rationale
-- R3: When `hasBreakingChanges` is true and chosen bump is not major (and not pre-release), warn the user and suggest major bump
+- R3: When `hasBreakingChanges` is true and chosen bump is not major, warn the user and suggest major bump — UNLESS the resolved bump is a pre-release from any source (`--pre <label>`, label-form `--bump <label>`, or `config.preRelease`); pre-release trains skip the warning to avoid nagging on every RC iteration
 - R4: Pre-release handling: `--pre` with bump type computes from base version; `--pre` alone increments existing pre-release counter
 - R5: CHANGELOG entry uses Keep a Changelog format with today's date, mapping commit types to sections (feat→Added, fix→Fixed, refactor/perf→Changed)
 - R6: Skip non-user-facing commit types in CHANGELOG (chore, docs, test, ci, build, style) unless clearly user-facing
@@ -33,6 +33,7 @@
 - R13: Verify pre-conditions before execution: version file exists (file mode), tag does not conflict, no uncommitted changes, git identity configured
 - R14: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 - R15: When `remoteState.hasUpstream === false`, the push step uses `git push --set-upstream origin <currentBranch>` instead of bare `git push`; the subsequent `git push --tags` is unchanged. This avoids first-push failures on fresh feature branches.
+- R16: Pre-release source precedence (top wins): (1) explicit base bump `major|minor|patch` (with optional `--pre <label>`); (2) explicit label-form `--bump <label>` OR explicit `--pre <label>`; (3) `config.preRelease` from `.claude/sdlc.json`; (4) auto-detection from conventional commits. When `config.preRelease` is set and the user passes neither an explicit base bump nor `--pre` nor a label-form `--bump`, the resolved bump is `patch + --pre <config.preRelease>`. An explicit base bump always graduates the release out of the pre-release train regardless of `config.preRelease`. Label values from any source must match `^[a-z][a-z0-9]*$`.
 
 ## Workflow Phases
 
@@ -62,7 +63,7 @@
 - P2: `config.mode` (string: "file" | "tag") — version storage mode
 - P3: `config.changelog` (boolean) — whether changelog is enabled by default
 - P4: `config.ticketPrefix` (string | null) — Jira/project key prefix for ticket ID extraction
-- P5: `requestedBump` (string | null: "major" | "minor" | "patch") — explicitly requested bump type
+- P5: `requestedBump` (string | null: "major" | "minor" | "patch" | label matching `^[a-z][a-z0-9]*$`) — explicitly requested bump type; a label-form value indicates the user passed `--bump <label>` (sugar for patch + `--pre <label>`), and the script-resolved `flags.preLabel` will reflect this
 - P6: `conventionalSummary.suggestedBump` (string) — auto-detected bump type from commits
 - P7: `conventionalSummary.hasBreakingChanges` (boolean) — whether any commit is a breaking change
 - P8: `bumpOptions` (object: `{ major, minor, patch, preRelease }`) — pre-computed next versions

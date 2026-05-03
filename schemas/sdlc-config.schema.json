@@ -38,6 +38,11 @@
         "ticketPrefix": {
           "type": "string",
           "description": "Jira ticket prefix used to filter commit messages for the changelog (e.g. \"PROJ\")."
+        },
+        "preRelease": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*$",
+          "description": "Default pre-release label applied when no explicit base bump or --pre is given."
         }
       },
       "required": ["mode"],

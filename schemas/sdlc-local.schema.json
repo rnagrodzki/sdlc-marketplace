@@ -32,8 +32,8 @@
         },
         "bump": {
           "type": "string",
-          "enum": ["patch", "minor", "major"],
-          "description": "Version bump level."
+          "pattern": "^(major|minor|patch|[a-z][a-z0-9]*)$",
+          "description": "Version bump level. Accepts `major|minor|patch` or any pre-release label matching `^[a-z][a-z0-9]*$` (e.g., `rc`, `beta`, `alpha`). Label values are forwarded verbatim to version-sdlc, where they are interpreted as `--bump patch --pre <label>`."
         },
         "draft": {
           "type": "boolean",

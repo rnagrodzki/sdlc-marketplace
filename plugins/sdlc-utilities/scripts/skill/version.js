@@ -37,7 +37,7 @@ const { checkGitState, getTagList, getCommitsSinceRef, getCommitsBetweenRefs, ge
 const {
   detectVersionFile, readVersion, validateSemver,
   computeNextVersions, computePreRelease, parseConventionalCommit,
-  readConfig,
+  readConfig, PRE_RELEASE_LABEL_RE,
 } = require(path.join(LIB, 'version'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 
@@ -47,6 +47,16 @@ const { writeOutput } = require(path.join(LIB, 'output'));
 
 /**
  * Parse process.argv.slice(2) into a structured args object.
+ *
+ * Bump value space:
+ *  - `major|minor|patch` — explicit base bump
+ *  - `<label>` — pre-release label matching `^[a-z][a-z0-9]*$` (sugar for `--bump patch --pre <label>`)
+ *
+ * When the positional bump matches a label form and the user did not also pass
+ * `--pre <label>`, we set `requestedBump = 'patch'` and `preLabel = <token>`.
+ * If `--pre` is also explicitly passed, that explicit value wins (the
+ * positional label is treated as a duplicate intent and ignored).
+ *
  * @param {string[]} argv  process.argv
  * @returns {{
  *   init: boolean,
@@ -58,20 +68,29 @@ const { writeOutput } = require(path.join(LIB, 'output'));
  *   auto: boolean,
  *   fileOverride: string|null,
  *   warnings: string[],
+ *   errors: string[],
  * }}
  */
 function parseArgs(argv) {
   const args = argv.slice(2);
 
-  let init           = false;
-  let requestedBump  = null;
-  let preLabel       = null;
-  let noPush         = false;
-  let changelog      = false;
-  let hotfix         = false;
-  let auto           = false;
-  let fileOverride   = null;
-  const warnings     = [];
+  let init                = false;
+  let requestedBump       = null;
+  let preLabel            = null;
+  // Track whether --pre was passed explicitly so a label-form positional does
+  // not overwrite an explicit --pre value.
+  let preLabelExplicit    = false;
+  // Track whether the positional bump came from a label-form token; the
+  // skill layer (version-sdlc) consults this to skip the breaking-change
+  // warning (R3 reworded — pre-release source coverage).
+  let bumpFromLabel       = false;
+  let noPush              = false;
+  let changelog           = false;
+  let hotfix              = false;
+  let auto                = false;
+  let fileOverride        = null;
+  const warnings          = [];
+  const errors            = [];
 
   const BUMP_VALUES = new Set(['major', 'minor', 'patch']);
 
@@ -83,7 +102,13 @@ function parseArgs(argv) {
     } else if (a === '--init') {
       init = true;
     } else if (a === '--pre' && args[i + 1]) {
-      preLabel = args[++i];
+      const label = args[++i];
+      if (!PRE_RELEASE_LABEL_RE.test(label)) {
+        errors.push(`Invalid --pre label '${label}'. Labels must match ${PRE_RELEASE_LABEL_RE.toString()} (lowercase, start with a letter, alphanumeric).`);
+      } else {
+        preLabel = label;
+        preLabelExplicit = true;
+      }
     } else if (a === '--no-push') {
       noPush = true;
     } else if (a === '--changelog') {
@@ -96,10 +121,25 @@ function parseArgs(argv) {
       fileOverride = args[++i];
     } else if (a.startsWith('-')) {
       warnings.push(`Unknown flag: ${a}`);
+    } else if (PRE_RELEASE_LABEL_RE.test(a)) {
+      // Label-form bump (e.g. `version-sdlc rc`). Sugar for patch + --pre <label>.
+      if (requestedBump === null) {
+        requestedBump = 'patch';
+        bumpFromLabel = true;
+      }
+      if (!preLabelExplicit) {
+        preLabel = a;
+      }
+    } else {
+      // Token matched no recognized form (positional bump, label, or flag).
+      errors.push(`Unrecognized argument '${a}'. Expected one of: major|minor|patch|<label> (label must match ${PRE_RELEASE_LABEL_RE.toString()}).`);
     }
   }
 
-  return { init, requestedBump, preLabel, noPush, changelog, hotfix, auto, fileOverride, warnings };
+  return {
+    init, requestedBump, preLabel, noPush, changelog, hotfix, auto,
+    fileOverride, warnings, errors, bumpFromLabel, preLabelExplicit,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +176,18 @@ function fileTypeFromPath(filePath) {
 async function main() {
   const projectRoot = process.cwd();
   const args        = parseArgs(process.argv);
+
+  // Fail fast on argument-parse errors (invalid --pre label, unrecognized
+  // positional token). Skip in --init flow because init never accepts a bump
+  // value; flag mismatches there are warnings, not errors.
+  if (!args.init && args.errors.length > 0) {
+    writeOutput({
+      flow:     'release',
+      errors:   args.errors,
+      warnings: args.warnings,
+    }, 'version-context', 1);
+    return;
+  }
 
   // -------------------------------------------------------------------------
   // Init flow
@@ -378,6 +430,39 @@ async function main() {
     return;
   }
 
+  // Validate config.preRelease shape if present (defense in depth — schema
+  // also enforces this). A misconfigured value should fail loudly, not
+  // silently fall through to auto-detection.
+  if (config.preRelease !== undefined && config.preRelease !== null && config.preRelease !== '') {
+    if (typeof config.preRelease !== 'string' || !PRE_RELEASE_LABEL_RE.test(config.preRelease)) {
+      errors.push(`config.preRelease '${config.preRelease}' is invalid. Must match ${PRE_RELEASE_LABEL_RE.toString()}.`);
+      writeOutput({ flow: 'release', errors, warnings }, 'version-context', 1);
+      return;
+    }
+  }
+
+  // Apply config.preRelease default. Per spec R16, the precedence is:
+  //   (1) explicit base bump major|minor|patch (with optional --pre)
+  //   (2) explicit label-form --bump <label> OR explicit --pre <label>
+  //   (3) config.preRelease
+  //   (4) auto-detection from conventional commits (existing path)
+  //
+  // The condition below fires only when the user passed no explicit base
+  // bump AND no preLabel (neither from --pre nor from a label-form bump),
+  // so an explicit --bump major (graduate) or --bump rc (label) bypasses
+  // this branch.
+  let preLabelFromConfig = false;
+  if (
+    args.requestedBump === null &&
+    args.preLabel === null &&
+    typeof config.preRelease === 'string' &&
+    config.preRelease.length > 0
+  ) {
+    args.requestedBump = 'patch';
+    args.preLabel      = config.preRelease;
+    preLabelFromConfig = true;
+  }
+
   // 3. Verify git repo
   let gitState;
   try {
@@ -461,12 +546,53 @@ async function main() {
   const bumpOptions = computeNextVersions(currentVersion);
 
   // 8. Pre-release handling
+  //
+  // Two operating modes:
+  //
+  //   (A) "Pre-release on top of an explicit base bump"
+  //       Triggered by an explicit base bump combined with a pre-release
+  //       label (either via `--minor --pre beta`, or via auto-injected
+  //       patch from `config.preRelease`). Resolves to the next base
+  //       version with the label applied.
+  //         Example: 1.2.3 + --minor --pre beta → 1.3.0-beta.1
+  //
+  //   (B) "Label-form bump (sugar) on the current version"
+  //       Triggered by a positional label-form bump like `version-sdlc rc`.
+  //       The parser sets requestedBump='patch' for downstream code that
+  //       always expects a base, but we delegate to computePreRelease()
+  //       on the CURRENT version so that:
+  //         - 1.2.3        → 1.2.4-rc.1  (no existing pre-release: patch + label)
+  //         - 1.2.4-rc.1   → 1.2.4-rc.2  (same label: increment counter)
+  //         - 1.2.4-beta.3 → 1.2.4-rc.1  (different label: reset counter)
+  //       Note: when the current version has no pre-release, `computePreRelease`
+  //       would produce `1.2.3-rc.1` (no patch). To match the acceptance
+  //       criterion `1.2.3 → 1.2.4-rc.1`, fall back to the patched base in
+  //       that case. This preserves the "fresh pre-release train starts on
+  //       the NEXT release" intuition.
   if (args.preLabel) {
-    if (args.requestedBump) {
-      // Pre-release on top of the next bump, e.g. --minor --pre beta on 1.2.3 → 1.3.0-beta.1
-      const nextBase  = bumpOptions[args.requestedBump]; // e.g. "1.3.0"
+    const currentHasPreRelease = currentVersion.includes('-');
+    // "Sugar mode" covers both the label-form positional bump and the
+    // config.preRelease default — both express "default pre-release intent"
+    // and per spec must behave identically.
+    const sugarMode = args.bumpFromLabel || preLabelFromConfig;
+
+    if (sugarMode) {
+      // Sugar: prefer same-base increment / label-reset on existing
+      // pre-releases; otherwise patch then label (fresh pre-release train).
+      if (currentHasPreRelease) {
+        bumpOptions.preRelease = computePreRelease(currentVersion, args.preLabel);
+      } else {
+        const nextBase = bumpOptions.patch;
+        bumpOptions.preRelease = computePreRelease(nextBase, args.preLabel);
+      }
+    } else if (args.requestedBump) {
+      // Explicit base bump with label (e.g. `--minor --pre beta`):
+      // apply label on top of the bumped base.
+      const nextBase = bumpOptions[args.requestedBump];
       bumpOptions.preRelease = computePreRelease(nextBase, args.preLabel);
     } else {
+      // `--pre <label>` alone: increment / restart pre-release train on the
+      // current version (no base bump).
       bumpOptions.preRelease = computePreRelease(currentVersion, args.preLabel);
     }
   }
@@ -590,11 +716,17 @@ async function main() {
     bumpOptions,
     requestedBump: args.requestedBump,
     flags: {
-      noPush:    args.noPush,
-      changelog: args.changelog,
-      preLabel:  args.preLabel,
-      hotfix:    args.hotfix,
-      auto:      args.auto,
+      noPush:             args.noPush,
+      changelog:          args.changelog,
+      preLabel:           args.preLabel,
+      hotfix:             args.hotfix,
+      auto:               args.auto,
+      // Provenance fields (R16): downstream skill (version-sdlc SKILL.md) uses
+      // these to decide whether the breaking-change warning (R3) applies.
+      // Any pre-release source means "skip the warn".
+      bumpFromLabel:      args.bumpFromLabel,
+      preLabelExplicit:   args.preLabelExplicit,
+      preLabelFromConfig,
     },
     tags:               tagsOutput,
     commits,

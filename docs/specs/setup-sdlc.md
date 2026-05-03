@@ -33,7 +33,7 @@
 - R8: Ship config is developer-local (`.sdlc/local.json`, gitignored), not project-level
 - R9: Content setup sub-flows: review dimensions (`setup-dimensions.md`), PR template (`setup-pr-template.md`), plan guardrails (`setup-guardrails.md`), execution guardrails (`setup-execution-guardrails.md`)
 - R10: Project scan phase runs before content sub-flows to collect signals (dependencies, framework, CI, DB, tests, etc.)
-- R11: Version section requires `mode` field (required by schema): `"file"` when version file detected, `"tag"` when not
+- R11: Version section requires `mode` field (required by schema): `"file"` when version file detected, `"tag"` when not. Optional fields include `versionFile`, `fileType`, `tagPrefix`, `changelog`, `changelogFile`, `ticketPrefix`, and `preRelease`. The `preRelease` field, when set, is a string matching `^[a-z][a-z0-9]*$` that supplies a default pre-release label to version-sdlc when the user runs `version-sdlc` without an explicit base bump or `--pre`. Empty / skipped answers omit the field; the schema (`schemas/sdlc-config.schema.json`) does not require it.
 - R12: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
 - R13: Content sub-flows (setup-dimensions, setup-pr-template, setup-guardrails) inherit the parent skill's permission mode. Sub-flows MUST NOT call ExitPlanMode, change permission settings, or exit any mode.
 - R14: Scan phase (R10) MUST use the Glob tool for all file/directory existence checks. Bash MUST NOT be used with glob patterns — zsh errors on unmatched globs. Bash is permitted only for `git`, `gh`, and `which` commands.
@@ -72,7 +72,7 @@
 - G1: Pre-flight passed — `skill/setup.js` exits successfully
 - G2: Config validation — re-run `skill/setup.js` after writing config to verify correctness
 - G3: No direct file writes — all config writes go through `lib/config.js` functions
-- G4: Version mode present — version section always includes `mode` field
+- G4: Version mode present — version section always includes `mode` field. Optional `preRelease` field, if collected, must match `^[a-z][a-z0-9]*$`; invalid values cause re-prompt before write.
 - G5: Migration consent — legacy files only deleted after explicit user confirmation
 
 ## Prepare Script Contract

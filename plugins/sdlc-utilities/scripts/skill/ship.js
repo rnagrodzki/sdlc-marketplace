@@ -45,8 +45,16 @@ const { writeOutput } = require(path.join(LIB, 'output'));
 const { VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS } = require(path.join(LIB, 'ship-fields'));
 const { detectActiveChanges, isArchived } = require(path.join(LIB, 'openspec'));
 const { getAdvisory } = require(path.join(LIB, 'context-advisory'));
+const { PRE_RELEASE_LABEL_RE } = require(path.join(LIB, 'version'));
 
 const VALID_QUALITY = ['full', 'balanced', 'minimal'];
+
+// Bump value space accepted by --bump and ship config `ship.bump`. Mirrors
+// the JSON Schema pattern in `schemas/sdlc-local.schema.json` (shipSection.bump).
+// The value space is the union of the three semver bump types and any
+// pre-release label (forwarded verbatim to version-sdlc, where it is
+// interpreted as `--bump patch --pre <label>`).
+const BUMP_RE = new RegExp(`^(major|minor|patch|${PRE_RELEASE_LABEL_RE.source.slice(1, -1)})$`);
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -87,6 +95,9 @@ function parseArgs(argv) {
       errors.push('--skip is no longer accepted by ship-sdlc. Use --steps <csv> with the desired steps listed instead.');
     } else if (a === '--bump' && args[i + 1]) {
       bump = args[++i];
+      if (!BUMP_RE.test(bump)) {
+        errors.push(`--bump value '${bump}' is invalid. Expected one of: major|minor|patch, or a pre-release label matching ${PRE_RELEASE_LABEL_RE.toString()}.`);
+      }
     } else if (a === '--draft') {
       draft = true;
     } else if (a === '--dry-run') {
