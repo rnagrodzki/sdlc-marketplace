@@ -81,7 +81,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        Array.isArray(o.flags.steps) && o.flags.steps.length > 0
+        return Array.isArray(o.flags.steps) && o.flags.steps.length > 0
 
 # Auto-mode workspace override for config source (issue #133)
 
