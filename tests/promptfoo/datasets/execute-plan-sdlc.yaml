@@ -1,6 +1,6 @@
 # Fixture appropriateness:
 #   plan-execution-complete        -- CORRECT: simulates completed plan execution, triggers workflow continuation
-#   feature-branch-with-commits   -- CORRECT: provides branch context for plan execution with --preset
+#   feature-branch-with-commits   -- CORRECT: provides branch context for plan execution with --quality
 #   plan-execution-with-guardrails -- CORRECT: provides execution guardrails context for guardrail evaluation testing
 
 - description: "execute-plan-sdlc: shows workflow continuation menu after plan execution"
@@ -32,30 +32,31 @@
         commit (/commit-sdlc), review (/review-sdlc), version (/version-sdlc), pr (/pr-sdlc),
         and done. The user is asked to select an option rather than being given a passive suggestion.
 
-- description: "execute-plan-sdlc: skips preset selection when --preset B is provided"
+- description: "execute-plan-sdlc: skips quality-tier selection when --quality balanced is provided"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
     project_context: "file://fixtures/feature-branch-with-commits.md"
     user_request: >
-      Run /execute-plan-sdlc --preset B. A plan with 5 tasks has been loaded and validated.
-      Task classification and wave building are complete. Show the wave structure and proceed
-      with the Balanced preset applied automatically.
+      Run /execute-plan-sdlc --quality balanced. A plan with 5 tasks has been loaded and
+      validated. Task classification and wave building are complete. Show the wave structure
+      and proceed with the Balanced quality tier applied automatically.
   assert:
-    # Behavioral: applies Balanced preset without interactive selection
+    # Behavioral: applies Balanced tier without interactive selection
     - type: llm-rubric
       value: >
-        The response applies preset B (Balanced) without presenting the A/B/C selection menu
-        to the user. It shows the wave structure with model assignments that reflect the
-        Balanced preset (haiku for Trivial, sonnet for Standard, opus for Complex) and
-        proceeds directly to execution. The response does not ask the user to "Select preset
-        (A/B/C)" — the selection is already made via the --preset argument.
+        The response applies the Balanced quality tier (--quality balanced) without
+        presenting the interactive selection menu to the user. It shows the wave structure
+        with model assignments that reflect the Balanced tier (haiku for Trivial, sonnet
+        for Standard, opus for Complex) and proceeds directly to execution. The response
+        does not ask the user to select a quality tier — the selection is already made via
+        the --quality argument. The response uses --quality (not --preset).
 
 - description: "execute-plan-sdlc: loads execution guardrails from config and evaluates during execution"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
     project_context: "file://fixtures/plan-execution-with-guardrails.md"
     user_request: >
-      Run /execute-plan-sdlc --preset B. A plan with 4 tasks has been loaded and validated.
+      Run /execute-plan-sdlc --quality balanced. A plan with 4 tasks has been loaded and validated.
       The project has execution guardrails configured in .claude/sdlc.json under execute.guardrails.
       Show how guardrails are loaded and describe how they will be evaluated during execution.
   assert:
@@ -75,7 +76,7 @@
     skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
     project_context: "file://fixtures/plan-execution-complete.md"
     user_request: >
-      Run /execute-plan-sdlc --preset B. A plan has been loaded. No execution guardrails are
+      Run /execute-plan-sdlc --quality balanced. A plan has been loaded. No execution guardrails are
       configured in the project. Show how the execution proceeds.
   assert:
     - type: not-icontains
@@ -87,12 +88,12 @@
         evaluation steps or guardrail violations. Execution flows through the standard
         wave dispatch, verification, and reporting steps.
 
-- description: "execute-plan-sdlc: model parameter required on every agent dispatch per preset"
+- description: "execute-plan-sdlc: model parameter required on every agent dispatch per quality tier"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
     project_context: "file://fixtures/feature-branch-with-commits.md"
     user_request: >
-      Run /execute-plan-sdlc --preset balanced. A plan with 5 tasks (2 Trivial, 2 Standard,
+      Run /execute-plan-sdlc --quality balanced. A plan with 5 tasks (2 Trivial, 2 Standard,
       1 Complex) is ready. Show the wave structure with model assignments and how
       agents will be dispatched.
   assert:
@@ -103,8 +104,8 @@
     - type: llm-rubric
       value: >
         The response shows wave structure with explicit model assignments per task:
-        Trivial=haiku, Standard=sonnet, Complex=opus (Balanced preset). The dispatch
-        includes model: as a required parameter for each agent.
+        Trivial=haiku, Standard=sonnet, Complex=opus (Balanced quality tier). The
+        dispatch includes model: as a required parameter for each agent.
 
 # OpenSpec post-pipeline archive suggestion tests (issue #162)
 

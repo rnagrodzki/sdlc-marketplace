@@ -42,47 +42,46 @@
     - type: icontains
       value: '"workspace": "worktree"'
 
-# Preset normalization tests (issue #114)
+# --preset / --skip hard-removal (issue #190)
+# CLI --preset and --skip are no longer accepted by ship-sdlc — they expand to
+# errors with a migration pointer to --steps. Legacy on-disk v1 configs are
+# still auto-migrated by lib/config.js (see migration matrix below).
 
-- description: "ship-prepare: --preset B normalizes to balanced"
+- description: "ship-prepare: --preset is hard-rejected with migration pointer (#190)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --preset B"
+    script_args: "--has-plan --preset balanced"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
     - type: icontains
-      value: '"preset": "balanced"'
+      value: "--preset is no longer accepted"
+    - type: icontains
+      value: "--steps"
 
-- description: "ship-prepare: --preset A normalizes to full"
+- description: "ship-prepare: --skip is hard-rejected with migration pointer (#190)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --preset A"
+    script_args: "--has-plan --skip version"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
     - type: icontains
-      value: '"preset": "full"'
-
-- description: "ship-prepare: --preset full passes through as full"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --preset full"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
-  assert:
+      value: "--skip is no longer accepted"
     - type: icontains
-      value: '"preset": "full"'
+      value: "--steps"
 
-- description: "ship-prepare: config with legacy preset B normalizes to balanced"
+- description: "ship-prepare: config with legacy preset still auto-migrates to v2 steps[]"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-ship-legacy-preset"
   assert:
-    - type: icontains
-      value: '"preset": "balanced"'
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        Array.isArray(o.flags.steps) && o.flags.steps.length > 0
 
 # Auto-mode workspace override for config source (issue #133)
 
@@ -98,33 +97,16 @@
     - type: icontains
       value: "config (auto)"
 
-# Fabrication guard (issue #129; updated for v2 schema #180)
-# Post-v2: --skip is legacy CLI sugar. Source is 'cli' when passed, 'none' otherwise.
-# Fabrication is only possible when flags.skip is non-empty but sources.skip isn't 'cli',
-# which the new mergeFlags shape makes structurally impossible from CLI parsing alone.
-# This test asserts the new behavior: passing --skip explicitly is the legitimate path
-# and produces NO fabrication error (the previous false-positive failure mode is fixed).
+# Bump+steps coherence (issue #146; updated #190)
+# When --bump is set on CLI but the resolved steps[] excludes the version step,
+# this is a contradiction: the user wanted to bump but the pipeline shape skips
+# version. The error fires regardless of whether version was excluded via
+# --steps (CLI) or via config.
 
-- description: "ship-prepare: legitimate --skip use does NOT trigger fabrication guard (post-v2)"
+- description: "ship-prepare: --bump with version excluded from --steps produces error"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --skip pr"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
-  assert:
-    - type: not-icontains
-      value: "likely fabricated"
-    - type: javascript
-      value: |
-        const o = JSON.parse(output);
-        o.flags.sources.skip === 'cli' && Array.isArray(o.flags.skip) && o.flags.skip.includes('pr')
-
-# Bump+skip contradiction blocking error (issue #146)
-
-- description: "ship-prepare: --bump with skipped version step produces error"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --bump minor --skip version"
+    script_args: "--has-plan --bump minor --steps execute,commit,review,pr,archive-openspec"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
@@ -181,17 +163,17 @@
 
 # Shared lib import regression tests (issue #152)
 
-- description: "ship-prepare: rejects skip values not in VALID_SKIP (post-refactor)"
+- description: "ship-prepare: rejects unrecognized step values in --steps"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --skip received-review"
+    script_args: "--has-plan --steps execute,reviw,pr"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
     - type: icontains
-      value: "Unrecognized skip value"
+      value: "Unrecognized step"
     - type: icontains
-      value: "received-review"
+      value: "reviw"
 
 - description: "ship-prepare: BUILT_IN_DEFAULTS resolve to balanced steps (no version) when no config exists"
   vars:
@@ -204,7 +186,7 @@
       value: |
         const o = JSON.parse(output);
         const expected = ['execute','commit','review','pr','archive-openspec'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected) && o.flags.preset === 'balanced'
+        JSON.stringify(o.flags.steps) === JSON.stringify(expected)
     - type: icontains
       value: '"bump": "patch"'
     - type: icontains
@@ -291,10 +273,10 @@
         const step = JSON.parse(output).steps.find(s => s.name === 'archive-openspec');
         step.status === 'skipped' && step.reason === 'change already archived'
 
-- description: "ship-prepare: --skip archive-openspec marks step as skipped"
+- description: "ship-prepare: --steps without archive-openspec marks step as skipped"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --skip archive-openspec --openspec-change add-auth"
+    script_args: "--has-plan --steps execute,commit,review,version,pr --openspec-change add-auth"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-ship-openspec-ready"
   assert:
@@ -303,15 +285,15 @@
         const step = JSON.parse(output).steps.find(s => s.name === 'archive-openspec');
         step.status === 'skipped' && step.reason === 'not in steps[]'
 
-- description: "ship-prepare: VALID_SKIP includes archive-openspec"
+- description: "ship-prepare: VALID_STEPS includes archive-openspec"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --skip archive-openspec"
+    script_args: "--has-plan --steps execute,archive-openspec"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
     - type: not-icontains
-      value: "Unrecognized skip value"
+      value: "Unrecognized step"
 
 # ---------------------------------------------------------------------------
 # Migration matrix tests (issue #180)
@@ -331,7 +313,7 @@
         const o = JSON.parse(output);
         const steps = o.flags.steps;
         const expected = ['execute','commit','review','pr','archive-openspec'];
-        JSON.stringify(steps) === JSON.stringify(expected) && o.flags.preset === 'balanced'
+        JSON.stringify(steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: legacy preset:minimal + skip:[pr] migrates to [execute, commit]"
   vars:
@@ -356,7 +338,7 @@
       value: |
         const o = JSON.parse(output);
         const expected = ['execute','commit','review','version','pr','archive-openspec'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected) && o.flags.preset === 'full'
+        JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: legacy A/B/C preset codes resolve to canonical equivalents (B → balanced)"
   vars:
@@ -369,7 +351,7 @@
       value: |
         const o = JSON.parse(output);
         const expected = ['execute','commit','review','pr','archive-openspec'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected) && o.flags.preset === 'balanced'
+        JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: already-migrated v2 config passes through unchanged"
   vars:
@@ -384,10 +366,10 @@
         const expected = ['execute','commit','review','pr','archive-openspec'];
         JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
-- description: "ship-prepare: CLI --preset minimal overrides config steps (legacy sugar)"
+- description: "ship-prepare: CLI --steps fully overrides config (#190)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --preset minimal"
+    script_args: "--has-plan --steps execute,commit,pr"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-ship-v2-already-migrated"
   assert:
@@ -395,17 +377,57 @@
       value: |
         const o = JSON.parse(output);
         const expected = ['execute','commit','pr'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected) && o.flags.preset === 'minimal'
+        JSON.stringify(o.flags.steps) === JSON.stringify(expected) && o.flags.sources.steps === 'cli'
 
-- description: "ship-prepare: CLI --skip pr subtracts from resolved steps[]"
+# #190 repro: config-only steps[] excluding `version` MUST produce a pipeline
+# plan where version is skipped. This is the smoking gun fixed by removing the
+# CLI --preset override path that previously clobbered config steps[].
+
+- description: "ship-prepare: #190 repro — config steps without `version` produces version: skipped"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --skip pr"
+    script_args: "--has-plan"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-ship-v2-already-migrated"
   assert:
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const expected = ['execute','commit','review','archive-openspec'];
+        const versionStep = o.steps.find(s => s.name === 'version');
+        const expected = ['execute','commit','review','pr','archive-openspec'];
         JSON.stringify(o.flags.steps) === JSON.stringify(expected)
+          && versionStep.status === 'skipped'
+          && versionStep.skipSource === 'config'
+
+# --quality forwarding (issue #190): when ship is invoked with --quality, the
+# resolved flag is emitted; when omitted, no quality is forwarded.
+
+- description: "ship-prepare: --quality balanced is forwarded to execute step args"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --quality balanced"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const exec = o.steps.find(s => s.name === 'execute');
+        o.flags.quality === 'balanced'
+          && o.flags.sources.quality === 'cli'
+          && exec.args.includes('--quality balanced')
+
+- description: "ship-prepare: no --quality means no quality forwarded to execute"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const exec = o.steps.find(s => s.name === 'execute');
+        o.flags.quality === undefined
+          && !exec.args.includes('--quality')
+          && !exec.args.includes('--preset')

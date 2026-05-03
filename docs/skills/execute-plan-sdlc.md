@@ -10,7 +10,7 @@ Orchestrates implementation plan execution with adaptive task classification, wa
 
 ```text
 /execute-plan-sdlc
-/execute-plan-sdlc --preset balanced
+/execute-plan-sdlc --quality balanced
 /execute-plan-sdlc --resume
 ```
 
@@ -28,7 +28,8 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 
 | Flag | Description | Default |
 |---|---|---|
-| `--preset <full\|balanced\|minimal>` | Auto-select a model preset, skipping the interactive selection prompt. `full` = Speed, `balanced` = Balanced, `minimal` = Quality. Legacy A/B/C accepted. Invalid values fall back to interactive selection. | Interactive prompt |
+| `--quality <full\|balanced\|minimal>` | Auto-select the model quality tier, skipping the interactive selection prompt. `full` = Speed, `balanced` = Balanced, `minimal` = Quality. Invalid values fall back to interactive selection. (Renamed from `--preset` in #190 to disambiguate from ship-sdlc's `--steps` step-selection flag.) When invoked from ship-sdlc, `--quality` is forwarded only when the user explicitly passed `--quality` to ship. | Interactive prompt |
+| `--auto` | Suppress interactive prompts: auto-resume if state exists, auto-approve high-risk gates, use `--quality` value (required when `--auto` is set). | Off |
 | `--resume` | Resume from the most recent execution state file for the current branch. Completed waves are skipped; in-progress waves are retried. If the plan has changed since execution started, you are prompted to resume or restart. | Off |
 | `--workspace <branch\|worktree\|prompt>` | Workspace isolation mode when on the default branch. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. | `prompt` |
 | `--rebase <auto\|skip\|prompt>` | Rebase onto the default branch before execution. `auto` rebases silently (aborts on conflict), `skip` skips, `prompt` asks. | Skip |
@@ -190,13 +191,13 @@ Select preset (full/balanced/minimal), "custom" to edit individual tasks, or "ca
 
 Claude loads the plan from the specified file, validates it, classifies tasks, and presents the wave structure for confirmation.
 
-### Skip preset selection
+### Skip quality-tier selection
 
 ```text
-/execute-plan-sdlc --preset balanced
+/execute-plan-sdlc --quality balanced
 ```
 
-Claude applies the Balanced preset automatically and proceeds to execution after showing the wave structure — no interactive prompt.
+Claude applies the Balanced quality tier automatically and proceeds to execution after showing the wave structure — no interactive prompt.
 
 ### Resume after interruption
 

@@ -39,10 +39,10 @@
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     project_context: "file://fixtures/ship-pipeline-ready.md"
     user_request: >
-      Run /ship-sdlc --auto --skip version. Show the pipeline plan and demonstrate
-      that --auto mode skips the interactive approval prompt. Stop after displaying
-      the pipeline table (do not actually invoke sub-skills — treat this as context
-      setup only, not full execution).
+      Run /ship-sdlc --auto --steps execute,commit,review,pr,archive-openspec. Show
+      the pipeline plan and demonstrate that --auto mode skips the interactive
+      approval prompt. Stop after displaying the pipeline table (do not actually
+      invoke sub-skills — treat this as context setup only, not full execution).
   assert:
     # Must forward --auto in the pipeline plan for commit-sdlc
     - type: icontains
@@ -56,41 +56,58 @@
         The response shows the pipeline table and proceeds without presenting an
         interactive "Run this pipeline?" question to the user. The --auto flag is
         shown as forwarded to commit-sdlc and pr-sdlc (the sub-skills that support it).
-        The version step is shown as skipped because of --skip version. The response
-        does NOT ask the user to choose yes/edit/cancel before running.
+        The version step is shown as skipped because it is not in the resolved
+        steps[] (CLI --steps excluded it). The response does NOT ask the user to
+        choose yes/edit/cancel before running.
 
-- description: "ship-sdlc: CLI --preset legacy sugar overrides config steps[]"
+- description: "ship-sdlc: CLI --preset is hard-rejected with migration pointer (#190)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     project_context: "file://fixtures/ship-config-present.md"
     user_request: >
-      Run /ship-sdlc --preset minimal --dry-run. The project has a v1 .sdlc/local.json
-      with legacy preset: balanced. The loader auto-migrates to steps[]. The CLI flag
-      --preset minimal (legacy sugar) expands to [execute, commit, pr] and overrides
-      the migrated config steps[]. Show the flag resolution and dry-run pipeline table.
+      Run /ship-sdlc --preset minimal --dry-run. The CLI flag --preset is no longer
+      accepted (#190). Show the error message and stop without running the pipeline.
   assert:
-    # Must show config was loaded (from .sdlc/local.json)
+    # Must surface the rejection
     - type: icontains
-      value: "local.json"
+      value: "--preset is no longer accepted"
+    # Must point at --steps as the replacement
+    - type: icontains
+      value: "--steps"
+    # Behavioral: hard-rejection, no pipeline execution
+    - type: llm-rubric
+      value: >
+        The response surfaces the parseArgs error: --preset is no longer accepted by
+        ship-sdlc. The error suggests --steps <csv> as the replacement for step
+        composition (and --quality for the model-tier flag forwarded to
+        execute-plan-sdlc). The pipeline does NOT run. The response does NOT silently
+        fall back to a default preset — it stops at the validation gate.
+
+- description: "ship-sdlc: CLI --steps fully overrides config steps[] (#190)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-config-present.md"
+    user_request: >
+      Run /ship-sdlc --steps execute,commit,pr --dry-run. The CLI --steps fully
+      replaces the resolved step list. Show the flag resolution and dry-run pipeline table.
+  assert:
     # Must show flag resolution section
     - type: icontains
       value: "Flag resolution"
-    # Must show steps were resolved
+    # Must show steps were resolved from CLI
     - type: icontains
       value: "steps"
-    # Must show that the version step is skipped (minimal excludes it)
+    # Must show that the version step is skipped (not in --steps)
     - type: icontains
       value: "skipped"
-    # Behavioral: CLI --preset overrides config steps via legacy sugar expansion
+    # Behavioral: CLI --steps overrides config steps[] entirely
     - type: llm-rubric
       value: >
-        The response shows the ship config was loaded from .sdlc/local.json (v1
-        legacy or v2 — either is acceptable since the loader auto-migrates). The
-        Flag resolution section shows --preset minimal as legacy CLI sugar that
-        expands to a steps[] of [execute, commit, pr], overriding any
-        config-level steps[]. The version step is shown as skipped (not in the
-        resolved steps[]). The output clearly distinguishes between
-        config-resolved steps[] and the CLI override.
+        The response shows the Flag resolution section with steps[] resolved from
+        CLI (source: cli) to [execute, commit, pr]. The version, review, and
+        archive-openspec steps are shown as skipped because they are not in the
+        resolved steps[]. The output clearly indicates that CLI --steps fully
+        replaced the config-level steps[].
 
 - description: "ship-sdlc: critical review finding pauses pipeline and invokes received-review-sdlc"
   vars:
@@ -144,16 +161,16 @@
         to the final summary report. The response does NOT invoke received-review-sdlc.
         It proceeds toward the next pipeline step (version-sdlc or pr-sdlc).
 
-- description: "ship-sdlc: --skip flag excludes specified steps from pipeline"
+- description: "ship-sdlc: --steps narrows pipeline to listed steps only (#190)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     project_context: "file://fixtures/ship-pipeline-ready.md"
     user_request: >
-      Run /ship-sdlc --skip execute,review,version --dry-run. Show the pipeline
-      table reflecting that execute, review, and version steps are skipped, while
-      commit and pr steps will run.
+      Run /ship-sdlc --steps commit,pr --dry-run. Show the pipeline table
+      reflecting that only commit-sdlc and pr-sdlc will run; all other steps
+      (execute, review, version, archive-openspec) are skipped.
   assert:
-    # All three skipped steps must appear as skipped
+    # All non-listed steps must appear as skipped
     - type: icontains
       value: "execute-plan-sdlc"
     - type: icontains
@@ -163,14 +180,15 @@
     # PR step should show as will run
     - type: icontains
       value: "pr-sdlc"
-    # Behavioral: correct skip set applied to pipeline table
+    # Behavioral: correct steps[] applied to pipeline table
     - type: llm-rubric
       value: >
-        The response displays a dry-run pipeline table where execute-plan-sdlc,
-        review-sdlc, and version-sdlc all show "skipped" status. commit-sdlc and
-        pr-sdlc show "will run" status. received-review-sdlc shows "conditional"
-        (or skipped because review is skipped). The table accurately reflects all
-        three --skip values. The response stops after displaying the table (dry-run).
+        The response displays a dry-run pipeline table where commit-sdlc and pr-sdlc
+        show "will run" status. execute-plan-sdlc, review-sdlc, version-sdlc, and
+        archive-openspec all show "skipped" status. received-review-sdlc shows
+        "conditional" (or skipped because review is skipped). The table accurately
+        reflects the CLI --steps override. The response stops after displaying the
+        table (dry-run).
 
 - description: "ship-sdlc: dry-run shows config loading, flag resolution, context detection, and auto-skip reasoning"
   vars:

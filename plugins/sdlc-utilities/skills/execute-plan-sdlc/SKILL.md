@@ -2,7 +2,7 @@
 name: execute-plan-sdlc
 description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan. Also auto-triggered when the user accepts a plan from plan-sdlc (plan content is already in conversation context)."
 user-invocable: true
-argument-hint: "[plan-file-path] [--preset full|balanced|minimal] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto]"
+argument-hint: "[plan-file-path] [--quality full|balanced|minimal] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto]"
 ---
 
 # Execute Plan (SDLC)
@@ -84,7 +84,7 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
      Options: **resume** | **restart**
      If "restart", delete the state file and proceed to plan loading below.
   5. Load the `context` object: use `completedTaskIds` to identify remaining tasks, `filesAdded`/`filesModified` for filesystem awareness, `interfacesCreated` and `decisionsFromPriorWaves` for agent prompt context.
-  6. Load the `preset` from the state file (CLI `--preset` overrides if provided).
+  6. Load the `quality` from the state file (CLI `--quality` overrides if provided).
   7. Skip to Step 5, resuming from the first wave with status `in_progress` or `pending`. Use the context object to construct inter-wave context for the next wave's agent prompts.
 
 - If `--resume` was NOT passed but a state file exists for the current branch:
@@ -94,7 +94,7 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
     Options: **yes** — resume | **restart** — discard state file and start fresh
     If "yes", follow the resume flow above (steps 2-7). If "restart", delete the state file and proceed normally.
 
-**Parse `--auto`:** If `--auto` was passed, store the flag. Auto mode suppresses interactive prompts: resume detection auto-resumes if state exists, high-risk gates auto-approve, and preset selection uses the value from `--preset` (required when `--auto` is set).
+**Parse `--auto`:** If `--auto` was passed, store the flag. Auto mode suppresses interactive prompts: resume detection auto-resumes if state exists, high-risk gates auto-approve, and quality-tier selection uses the value from `--quality` (required when `--auto` is set).
 
 **Parse `--workspace`:** If `--workspace branch|worktree|prompt` was passed as an argument, store the mode. If absent, default to `prompt`. When `--workspace` is explicitly set to `branch` or `worktree`, the corresponding action is taken automatically without prompting (steps 3a-3c below).
 
@@ -178,7 +178,7 @@ For each task, determine three things:
 - **Standard** → `sonnet` — capable, cost-efficient
 - **Complex** → `opus` — most capable, required for architectural and cross-cutting work
 
-The user selects a preset in Step 4 that applies these mappings (or overrides them).
+The user selects a quality tier (preset) in Step 4 that applies these mappings (or overrides them).
 
 After classification, Read `./classifying-and-waving-tasks.md` for wave-building algorithm and adaptive sizing.
 
@@ -218,7 +218,7 @@ Note every issue found.
 
 Fix each issue from the critique. Then present the final wave structure showing per-task model assignments:
 
-**Preset auto-selection:** If the user invoked the skill with `--preset <full|balanced|minimal>` (e.g., `/execute-plan-sdlc --preset balanced`), apply the specified preset without presenting the selection prompt. Show the wave structure with the applied preset and proceed directly to Step 5.
+**Quality auto-selection:** If the user invoked the skill with `--quality <full|balanced|minimal>` (e.g., `/execute-plan-sdlc --quality balanced`), apply the specified quality tier (preset) without presenting the selection prompt. Show the wave structure with the applied tier and proceed directly to Step 5. (When invoked from ship-sdlc, `--quality` is forwarded only when the user explicitly passed `--quality` to ship.)
 
 Valid values: `full` (Speed), `balanced` (Balanced), `minimal` (Quality). Legacy `A`/`B`/`C` are accepted and normalized. Invalid values → fall back to interactive selection.
 
@@ -241,19 +241,19 @@ Wave 3 (N tasks — HIGH RISK, will pause):
 ────────────────────────────────────────────
 Total: N tasks across N waves + pre-wave
 
-Model Presets:
+Quality Tiers (Model Presets):
   full) Speed:       N × haiku, N × sonnet              — fast, low cost (skips spec compliance review)
   balanced) Balanced:  N × haiku, N × sonnet, N × opus  — default ✓
   minimal) Quality:    N × sonnet, N × opus              — max correctness
 
-Use AskUserQuestion to select a preset:
-> Select execution preset
+Use AskUserQuestion to select a quality tier:
+> Select execution quality tier
 
 Options: **full** (Speed) | **balanced** (Balanced, default) | **minimal** (Quality) | **custom** | **cancel**
-Tip: Use --preset balanced to skip this prompt next time.
+Tip: Use --quality balanced to skip this prompt next time.
 ```
 
-Always present all 3 presets. Default is Balanced. When the user selects a preset (full/balanced/minimal), update the per-task model assignments and proceed to execution immediately. "custom" opens per-task editing before execution. "cancel" aborts. No additional confirmation needed — preset selection is the approval.
+Always present all 3 tiers. Default is Balanced. When the user selects a tier (full/balanced/minimal), update the per-task model assignments and proceed to execution immediately. "custom" opens per-task editing before execution. "cancel" aborts. No additional confirmation needed — tier selection is the approval.
 
 ## Step 5 (DO): Execute
 
@@ -301,8 +301,8 @@ Options:
 - Exact list of files the agent may touch
 - Expected deliverable: what changed + how to verify
 - For complex tasks: brief summary of relevant changes from prior waves
-- **Model**: pass `model: "<assigned-model>"` to the Agent tool (haiku, sonnet, or opus per the selected preset)
-  **This is REQUIRED on every dispatch — no exceptions.** Omitting `model:` causes the agent to inherit the parent model (opus), defeating the preset system. Before sending any Agent dispatch message, verify: does every Agent call in this message include `model:`? If not, add it.
+- **Model**: pass `model: "<assigned-model>"` to the Agent tool (haiku, sonnet, or opus per the selected quality tier)
+  **This is REQUIRED on every dispatch — no exceptions.** Omitting `model:` causes the agent to inherit the parent model (opus), defeating the quality-tier system. Before sending any Agent dispatch message, verify: does every Agent call in this message include `model:`? If not, add it.
 - **Mode**: pass `mode: "bypassPermissions"` to the Agent tool on every dispatch.
 
 **5c. Collect and verify** — After all agents return:
@@ -335,7 +335,7 @@ Options:
 
 **5c-bis. Spec compliance review (Standard and Complex tasks only):**
 
-Skip for waves containing only Trivial tasks. Skip if the Speed preset was selected.
+Skip for waves containing only Trivial tasks. Skip if the Speed quality tier (`--quality full`) was selected.
 
 After mechanical verification passes (Steps 5c.1–4), dispatch a single spec compliance reviewer (sonnet). At dispatch time, Read `./spec-compliance-reviewer.md` and use it as the prompt template. Provide:
 - Each non-trivial task's full specification text
@@ -392,7 +392,7 @@ SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/
 
 On the very first wave dispatch, initialize the state file:
 ```bash
-node "$SCRIPT" init --branch <branch> --preset <X> --total-tasks <N>
+node "$SCRIPT" init --branch <branch> --quality <X> --total-tasks <N>
 ```
 
 Before each wave: `node "$SCRIPT" wave-start --wave <N>`
@@ -454,7 +454,7 @@ Fix inline if possible; report to user otherwise.
 
 **8-bis. Final spec completeness check (when OpenSpec context available):**
 
-Skip this sub-step if `openspecSpecs` is empty (no OpenSpec context was loaded in Step 1) or if the Speed preset was selected.
+Skip this sub-step if `openspecSpecs` is empty (no OpenSpec context was loaded in Step 1) or if the Speed quality tier (`--quality full`) was selected.
 
 Also skip if ALL per-wave spec compliance reviews (Step 5c-bis) passed without issues AND the plan has 3 or fewer waves — the per-wave reviews already provided sufficient coverage in that case.
 
@@ -507,13 +507,13 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 |---|---|
 | Plan validated | No blocking validation issues |
 | Wave structure critiqued | All file conflicts and dependency issues resolved |
-| User approved | Preset selected (A/B/C) or custom editing completed in Step 4 |
+| User approved | Quality tier selected (`--quality full|balanced|minimal`) or custom editing completed in Step 4 |
 | All tasks completed | No tasks skipped without user consent |
 | Per-wave verification | Tests/build/lint pass after each wave |
 | Final verification | Full suite green |
 | No drift | Tasks match their specifications |
 | No orphans | All created files are referenced/used |
-| Spec compliance reviewed | Non-trivial waves pass spec review (unless Speed preset selected) |
+| Spec compliance reviewed | Non-trivial waves pass spec review (unless Speed quality tier `--quality full` selected) |
 | Final spec completeness | All delta spec requirements covered across all waves (when openspecSpecs available) |
 | Pre-wave guardrail check | Error-severity guardrails pass or user overrides (Step 5a-pre) |
 | Post-wave guardrail check | Error-severity guardrails pass, fixed, or user overrides; warnings reported (Step 5c-ter) |
@@ -548,7 +548,7 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 - Write state files for small-plan direct execution (≤3 tasks) — they execute without waves and are fast enough to re-run
 - Auto-override error-severity guardrail violations in `--auto` mode — guardrails exist to prevent drift; always block
 - Evaluate warning-severity guardrails pre-wave — warnings are assessed post-wave against actual changes, not intent
-- Dispatch agents without the `model:` parameter — every agent dispatch must include `model: "<X>"` per the preset table. Omitting it defaults to opus, defeating the cost optimization of the preset system.
+- Dispatch agents without the `model:` parameter — every agent dispatch must include `model: "<X>"` per the quality-tier table. Omitting it defaults to opus, defeating the cost optimization of the quality-tier system.
 
 ## Gotchas
 

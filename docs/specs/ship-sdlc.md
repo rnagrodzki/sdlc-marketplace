@@ -9,8 +9,8 @@
 ## Arguments
 
 - A1: `--auto` — run pipeline non-interactively; forwarded to sub-skills that support it (default: false)
-- A2: `--skip <steps>` — comma-separated steps to skip; valid: execute, commit, review, received-review, commit-fixes, version, pr (default: from config or none)
-- A3: `--preset full|balanced|minimal` — execution preset forwarded to execute-plan-sdlc (default: from config or balanced)
+- A2: `--steps <csv>` — comma-separated steps to run; valid: execute, commit, review, received-review, commit-fixes, version, pr, archive-openspec. When passed, fully replaces the resolved step list (config `ship.steps[]` and built-in defaults are ignored). The single source of truth for pipeline composition is config `ship.steps[]`; CLI `--steps` is a one-shot override.
+- A3: `--quality full|balanced|minimal` — execution quality (model tier) forwarded to execute-plan-sdlc; only forwarded when explicitly passed via CLI (default: not forwarded; execute-plan-sdlc applies its own selection)
 - A4: `--bump patch|minor|major` — version bump type forwarded to version-sdlc (default: from config or patch)
 - A5: `--draft` — create PR as draft (default: from config or false)
 - A6: `--dry-run` — display pipeline plan without executing (default: false)
@@ -47,21 +47,21 @@
 - R23: Trigger conditions for `archive-openspec` (all must hold): `openspec/config.yaml` exists; an active non-archived change matches the current branch (`openspec.branchMatch`) OR `--openspec-change <name>` is passed; prior steps completed without halting.
 - R24: The `archive-openspec` step calls `openspec validate <name> --strict` via `lib/openspec.js::validateChangeStrict`; on failure, halts the pipeline and surfaces validation output.
 - R25: On validation success: prompts the user (non-interactive in `--auto`); on approval (or `--auto`), runs `openspec archive <name> --yes` via `lib/openspec.js::runArchive`, then creates a commit `chore(openspec): archive <name>`.
-- R26: `--skip archive-openspec` disables the step. The value is added to `VALID_SKIP` in `ship-fields.js`.
+- R26: To disable the `archive-openspec` step, omit it from `ship.steps[]` in config or from CLI `--steps`. The value `archive-openspec` is recognized in `VALID_STEPS` (`lib/ship-fields.js`).
 - R27: The step is idempotent — if `lib/openspec.js::isArchived(projectRoot, changeName)` returns true, the step is skipped with reason "already archived".
 - R28: `--openspec-change <name>` flag explicitly selects the change to archive, overriding branch matching.
-- R29: The ship config schema MUST NOT contain a `preset` field. The decorative `preset` (`full|balanced|minimal`) is replaced by an explicit `steps[]` list in `.sdlc/local.json`. CLI flag `--preset <X>` is preserved as legacy sugar that expands to `steps[]` at parse time; it is never persisted as `preset` in the config file.
-  - Acceptance: `schemas/sdlc-local.schema.json` `shipSection` contains no `preset` property; `lib/ship-fields.js` `SHIP_FIELDS` contains no `preset` field; `BUILT_IN_DEFAULTS` contains no `preset` key.
-- R30: The ship config schema MUST NOT contain a `skip` field. The single source of truth for which steps run is `steps[]`; CLI flag `--skip <step,…>` is preserved as legacy sugar that subtracts from the resolved `steps[]` at parse time. It is never persisted in the config file.
-  - Acceptance: `schemas/sdlc-local.schema.json` `shipSection` contains no `skip` property; `lib/ship-fields.js` `SHIP_FIELDS` contains no `skip` field; `BUILT_IN_DEFAULTS` contains no `skip` key.
+- R29: The ship config schema MUST NOT contain a `preset` field. The decorative `preset` (`full|balanced|minimal`) is replaced by an explicit `steps[]` list in `.sdlc/local.json`. CLI flag `--preset` is hard-removed: passing `--preset` to ship-sdlc produces a clear error pointing the user at `--steps <csv>`. Migration of legacy on-disk v1 configs (with `ship.preset`) continues to be handled by `lib/config.js` v1→v2 migration (R32).
+  - Acceptance: `schemas/sdlc-local.schema.json` `shipSection` contains no `preset` property; `lib/ship-fields.js` `SHIP_FIELDS` contains no `preset` field; `BUILT_IN_DEFAULTS` contains no `preset` key; `skill/ship.js parseArgs` rejects `--preset` with an error written to `errors[]`.
+- R30: The ship config schema MUST NOT contain a `skip` field. The single source of truth for which steps run is `steps[]`. CLI flag `--skip` is hard-removed: passing `--skip` to ship-sdlc produces a clear error pointing the user at `--steps <csv>`. Migration of legacy on-disk v1 configs (with `ship.skip`) continues to be handled by `lib/config.js` v1→v2 migration (R32).
+  - Acceptance: `schemas/sdlc-local.schema.json` `shipSection` contains no `skip` property; `lib/ship-fields.js` `SHIP_FIELDS` contains no `skip` field; `BUILT_IN_DEFAULTS` contains no `skip` key; `skill/ship.js parseArgs` rejects `--skip` with an error written to `errors[]`.
 - R31: Top-level local config files (`.sdlc/local.json`) MUST carry an integer `version` field. Current schema version is `2`. The schema declares `"version": {"type": "integer", "const": 2}` at the top level. Files lacking `version` are treated as v1 and auto-migrated on read.
   - Acceptance: `schemas/sdlc-local.schema.json` declares top-level `version` with `const: 2`; new configs written via `writeLocalConfig`/`util/ship-init.js` include `version: 2` at the top level (not nested in `ship`).
 - R32: `lib/config.js::readLocalConfig` MUST auto-migrate v1 → v2 on read. Migration steps: (a) expand legacy `ship.preset` to `steps[]` via `PRESET_TO_STEPS` (full/balanced/minimal and legacy A/B/C aliases); (b) subtract any legacy `ship.skip[]` members from the expanded steps; (c) delete `ship.preset` and `ship.skip` from the in-memory object; (d) set `ship.steps = <result>` and top-level `version: 2`; (e) persist the migrated config back atomically; (f) emit a single stderr deprecation notice on first migration. Migration MUST be idempotent — reading a v2 config does not rewrite or re-emit. The `migrateConfig` (--migrate) flow also triggers the v1→v2 ship migration.
   - Acceptance: passing `{$schema, ship:{preset:"balanced", skip:[]}}` (no version) to `readLocalConfig` returns `{version:2, ship:{steps:[execute,commit,review,pr,archive-openspec], …}}` and rewrites disk; passing the migrated result back to `readLocalConfig` returns identical content with no disk write and no second notice.
 - R33: The setup-sdlc questionnaire (`shipFields` from `lib/ship-fields.js`) MUST emit a `steps` field (multi-select; options enumerate the six canonical steps `execute, commit, review, version, pr, archive-openspec`; default = all six). It MUST NOT emit `preset` or `skip` fields. `util/ship-init.js` MUST consume `--steps <csv>` (validated against `VALID_STEPS`) and write a config whose top level carries `version: 2`. The `--preset` flag MUST be removed from `ship-init.js` and rejected with a clear migration-pointer error if passed.
   - Acceptance: `SHIP_FIELDS[0].name === 'steps'`; `ship-init.js --steps execute,commit,pr` produces a `.sdlc/local.json` whose top level has `version: 2` and `ship.steps: ["execute","commit","pr"]`, no `preset`/`skip` keys.
-- R34: When no ship config exists and no `--steps`/`--preset` flags are passed, the synthesized preset MUST be `balanced` (excludes the `version` step). `BUILT_IN_DEFAULTS.steps` in `ship-fields.js` MUST equal `PRESET_TO_STEPS.balanced` (`['execute','commit','review','pr','archive-openspec']`). Note: `SHIP_FIELDS[0].default` intentionally diverges (all six canonical steps) — this is the broader questionnaire default so users see all choices; it does not affect runtime behavior.
-  - Acceptance: running `skill/ship.js --has-plan` with no `.sdlc/local.json` produces `flags.preset === 'balanced'` and `flags.steps === ['execute','commit','review','pr','archive-openspec']`.
+- R34: When no ship config exists and no `--steps` flag is passed, `BUILT_IN_DEFAULTS.steps` in `ship-fields.js` MUST equal `['execute','commit','review','pr','archive-openspec']` (excludes the `version` step). The resolved `flags.steps` mirrors that array. Note: `SHIP_FIELDS[0].default` intentionally diverges (all six canonical steps) — this is the broader questionnaire default so users see all choices; it does not affect runtime behavior.
+  - Acceptance: running `skill/ship.js --has-plan` with no `.sdlc/local.json` produces `flags.steps === ['execute','commit','review','pr','archive-openspec']` and contains no `flags.preset` field at the top level.
 - R35: Step 1 (pre-flight handoff) MUST emit a context-heaviness advisory when the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget). The advisory recommends `/compact` and notes that pipeline state survives compaction. When the sidecar is absent or `heavy: false`, no advisory is emitted. Implementation lives in `scripts/lib/context-advisory.js` and is appended to `skill/ship.js` PREPARE_OUTPUT_FILE so it surfaces before the pipeline begins. (Rationale: #173.)
   - Acceptance: with a sidecar containing `heavy: true`, the advisory text appears in `skill/ship.js --dry-run` output; with `heavy: false` or no sidecar, the output contains no advisory.
 
@@ -69,7 +69,7 @@
 
 1. CONSUME — load config, parse flags, run `skill/ship.js` for context detection and step computation
    - **Script:** `skill/ship.js`
-   - **Params:** A1-A8 forwarded (`--auto`, `--skip <csv>`, `--preset`, `--bump`, `--draft`, `--resume`, `--workspace`); internal: `--has-plan` (from plan context detection)
+   - **Params:** A1-A8 forwarded (`--auto`, `--steps <csv>`, `--quality`, `--bump`, `--draft`, `--resume`, `--workspace`); internal: `--has-plan` (from plan context detection). `--quality` is forwarded to execute-plan-sdlc only when explicitly passed; cross-reference: see `execute-plan-sdlc.md` A2.
    - **Output:** JSON → P1-P6 (flags with per-flag provenance sources, resume detection, context with branch/auth/openspec/worktree, pipeline steps with status/reason/skipSource/invocation, config)
 2. PLAN — build pipeline table from `skill/ship.js` steps array; display flag resolution and auto-skip decisions
 3. CRITIQUE — validate pipeline: gh auth, branch safety, skip values, flag coherence
@@ -86,7 +86,7 @@
 
 - G1: `gh` CLI authenticated — `gh auth status` succeeds
 - G2: Not on default branch — warn if on main/master (do not block)
-- G3: Skip values valid — all `--skip` values are recognized step names
+- G3: Step values valid — all CLI `--steps` values are recognized step names (`VALID_STEPS` from `lib/ship-fields.js`)
 - G4: At least one step will run — pipeline is not entirely skipped
 - G5: Flag coherence — `--bump` without version step produces error (exit code 1, blocking)
 - G6: Pipeline contract — every `will_run` step was dispatched as Agent
@@ -127,7 +127,7 @@
 - C7: Must not proceed past a failed sub-skill — stop, save state, inform user
 - C8: Must not skip steps marked `will_run` in the pipeline plan — the plan is a binding contract
 - C9: Must not copy example args from SKILL.md — use `step.invocation` from skill/ship.js
-- C10: Must not add `--skip` flags not present in user invocation or ship config
+- C10: Must not add `--steps` flags not present in user invocation; pipeline composition derives from CLI `--steps` > config `ship.steps[]` > `BUILT_IN_DEFAULTS.steps`
 - C11: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
 - C12: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
 - C13: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data

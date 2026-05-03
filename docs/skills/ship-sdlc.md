@@ -29,7 +29,7 @@ This skill is for **expert users working on projects with established quality gu
 ## Usage
 
 ```text
-/ship-sdlc [--auto] [--skip <steps>] [--preset full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]
+/ship-sdlc [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]
 ```
 
 ---
@@ -39,8 +39,8 @@ This skill is for **expert users working on projects with established quality gu
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
-| `--skip <steps>` | **Legacy CLI sugar.** Comma-separated list of steps to subtract from the resolved `steps[]`: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`. The persistent config field is `ship.steps[]` — `--skip` is parse-time sugar only. | None |
-| `--preset full\|balanced\|minimal` | **Legacy CLI sugar.** Expands to a canonical `steps[]` set: `full` = all six, `balanced` = all except `version`, `minimal` = `[execute, commit, pr]`. Legacy `A`/`B`/`C` aliases accepted. The persistent config field is `ship.steps[]`; ship synthesizes `--preset` for execute-plan-sdlc at the boundary. | `balanced` |
+| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
+| `--quality <full\|balanced\|minimal>` | Forwarded to execute-plan-sdlc as `--quality` (model tier). Only forwarded when the user explicitly passes `--quality` to ship; otherwise execute-plan-sdlc applies its own selection. (Renamed from `--preset` in #190 to disambiguate from `--steps`.) | Not forwarded |
 | `--bump patch\|minor\|major` | Version bump type forwarded to version-sdlc. | `patch` |
 | `--draft` | Create the PR as a draft. | Off |
 | `--dry-run` | Display the full pipeline plan and stop. No steps are executed. | Off |
@@ -48,7 +48,11 @@ This skill is for **expert users working on projects with established quality gu
 | `--init-config` | Launch interactive config creation for `.sdlc/local.json`, then stop. No pipeline execution. | Off |
 | `--workspace branch\|worktree\|prompt` | Workspace isolation mode forwarded to execute-plan-sdlc. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. In worktree mode, the version step is auto-skipped (tags are repo-global) and `--label skip-version-check` is added to the PR step to bypass the CI version check. | `prompt` |
 | `--openspec-change <name>` | Explicitly select the OpenSpec change to archive, overriding branch-name matching. Used when the branch name does not match the change directory name. | — |
-| `--skip archive-openspec` | Skip the conditional archive-openspec step even when trigger conditions are met. | — |
+
+
+**Removed (#190 hard-remove):** `--preset` and `--skip` are no longer accepted. Passing either produces an error pointing at `--steps <csv>` (for step composition) and `--quality <full|balanced|minimal>` (for the execute-plan-sdlc model tier). Legacy on-disk v1 configs (`ship.preset`/`ship.skip`) are still auto-migrated to v2 by `lib/config.js`.
+
+To omit the `archive-openspec` step from a single run: `--steps <csv>` listing the desired steps without `archive-openspec`. Or omit it from `ship.steps[]` in `.sdlc/local.json` for a persistent change.
 
 ---
 
@@ -81,7 +85,8 @@ The pipeline runs 7 steps sequentially. Two steps are conditional on the review 
 Step 5a:       Step 5b:       Step 5c:
 execute-       commit-sdlc    review-sdlc
 plan-sdlc      (--auto if     (--committed)
-(--preset X)    auto mode)          |
+(--quality X    auto mode)          |
+ if forwarded)                      |
    |                |              |
    | git add -A     |    +---------+---------+
    +------->--------+    |                   |
@@ -132,14 +137,14 @@ plan-sdlc      (--auto if     (--committed)
 - **Staging gap**: execute-plan-sdlc creates files but does not stage them. The pipeline runs `git add -A -- ':!.sdlc/'` between execute and commit, excluding the `.sdlc/` runtime directory.
 - **Pipeline plan is binding**: Steps marked "will run" in the pipeline table must execute. Step statuses are computed by `ship-prepare.js` — the LLM follows them mechanically and cannot unilaterally skip planned steps.
 - **Agent-based dispatch**: Sub-skills are dispatched as Agents, not invoked via the Skill tool. Each Agent loads its sub-skill's SKILL.md in its own context and returns only a structured result (status, summary, artifacts). This keeps the ship pipeline's context clean — sub-skill definitions stay in the agent, not the orchestrator.
-- **Skip provenance (`skipSource`)**: Each step in the `ship-prepare.js` output includes a `skipSource` field tracking why it was skipped: `"none"` (not skipped), `"cli"` (user `--skip`), `"config"` (from `.sdlc/local.json`), `"auto"` (workspace rule), `"condition"` (precondition unmet), or `"default"` (unexpected — may indicate fabricated flags).
+- **Skip provenance (`skipSource`)**: Each step in the `ship-prepare.js` output includes a `skipSource` field tracking why it was skipped: `"none"` (not skipped), `"cli"` (omitted from CLI `--steps`), `"config"` (omitted from `ship.steps[]` in `.sdlc/local.json`), `"auto"` (workspace rule), `"condition"` (precondition unmet), or `"default"` (excluded by built-in defaults).
 - **Review threshold**: The severity that triggers the fix loop is configurable via `reviewThreshold` in config (default: `high`). At `high`, critical and high findings trigger fixes; medium and below are deferred to the summary.
 
 ---
 
 ## What Gets Printed
 
-The pipeline prints every decision and state change. Here is a realistic full output for a run with `--auto --preset balanced`:
+The pipeline prints every decision and state change. Here is a realistic full output for a run with `--auto --quality balanced`:
 
 ```
 I'm using the ship-sdlc skill.
@@ -181,7 +186,7 @@ Ship Pipeline
 --------------------------------------------------------------------
 Step  Skill                 Status       Args           Pause?
 --------------------------------------------------------------------
-1     execute-plan-sdlc     will run     --preset balanced  no
+1     execute-plan-sdlc     will run     --quality balanced no
 2     commit-sdlc           will run     --auto         no
 3     review-sdlc           will run     --committed    no
 4     received-review-sdlc  conditional  (if crit/high) YES
@@ -195,7 +200,7 @@ Interactive pauses: received-review (if triggered)
 Auto mode — proceeding without confirmation.
 
 ━━━ Ship Pipeline — Step 1/7: Execute ━━━
-  Invoking: /execute-plan-sdlc --preset balanced
+  Invoking: /execute-plan-sdlc --quality balanced
   Reason: plan detected in context, preset balanced from config
   Expectation: execute all plan tasks in waves
 
@@ -263,7 +268,7 @@ Step  Skill                 Result
 ================================================================
 
 Decisions log:
-  - Steps resolved: [execute, commit, review, pr, archive-openspec] (from config; synthesized --preset balanced for execute-plan-sdlc)
+  - Steps resolved: [execute, commit, review, pr, archive-openspec] (from config; --quality balanced forwarded to execute-plan-sdlc because user passed --quality)
   - Version step skipped (from config default, bump type: patch)
   - Review found 2 medium, 1 low issues — below threshold, deferred
   - PR created (from --auto flag)
@@ -292,7 +297,7 @@ Loads config (if present), detects context, presents the pipeline plan, and asks
 ### Full auto mode with preset
 
 ```text
-/ship-sdlc --auto --preset minimal
+/ship-sdlc --auto --quality minimal
 ```
 
 Runs the quality preset with no confirmation prompts except at received-review-sdlc (if triggered) and version-sdlc.
@@ -300,7 +305,7 @@ Runs the quality preset with no confirmation prompts except at received-review-s
 ### Dry run to preview the pipeline
 
 ```text
-/ship-sdlc --dry-run --skip version
+/ship-sdlc --dry-run --steps execute,commit,review,pr,archive-openspec
 ```
 
 Displays the full pipeline table showing which steps will run, which are skipped, and which flags are forwarded. No steps are executed.
@@ -308,7 +313,7 @@ Displays the full pipeline table showing which steps will run, which are skipped
 ### Skip execute and version
 
 ```text
-/ship-sdlc --skip execute,version
+/ship-sdlc --steps commit,review,pr,archive-openspec
 ```
 
 Useful when you've already implemented the changes manually and want to commit, review, and open a PR.
@@ -380,7 +385,9 @@ Any legacy `skip[]` entries are subtracted from the expanded set. To trigger the
 ### Merge precedence
 
 ```
-CLI flag (incl. --preset/--skip sugar)  >  .sdlc/local.json (ship.steps)  >  built-in defaults
+CLI --steps  >  .sdlc/local.json (ship.steps)  >  built-in defaults
+
+(Legacy CLI sugar `--preset` and `--skip` are hard-removed in #190; passing them produces an error.)
 ```
 
 ### Team-specific examples
@@ -510,7 +517,7 @@ Then run `/ship-sdlc` without `--resume` to start a new pipeline.
 
 | Field | Value |
 |---|---|
-| `argument-hint` | `[--auto] [--skip <steps>] [--preset full\|balanced\|minimal] [--draft] [--dry-run]` |
+| `argument-hint` | `[--auto] [--steps <csv>] [--quality full\|balanced\|minimal] [--draft] [--dry-run]` |
 | Plan mode | Graceful refusal (Step 0) |
 
 ---

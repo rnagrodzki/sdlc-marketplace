@@ -1,6 +1,6 @@
 # execute-plan-sdlc Specification
 
-> Orchestrate plan execution with adaptive task classification, wave-based parallel dispatch, preset-driven model assignment, PCIDCI critique loops, inter-wave context propagation, and automatic error recovery with state persistence for resume.
+> Orchestrate plan execution with adaptive task classification, wave-based parallel dispatch, quality-tier-driven model assignment, PCIDCI critique loops, inter-wave context propagation, and automatic error recovery with state persistence for resume.
 
 **User-invocable:** yes
 **Model:** opus
@@ -9,16 +9,16 @@
 ## Arguments
 
 - A1: plan file path — path to the plan file (positional; optional if plan is already in conversation context)
-- A2: `--preset full|balanced|minimal` — model assignment preset; skips interactive preset selection (default: interactive prompt)
+- A2: `--quality full|balanced|minimal` — model tier (quality preset); selects the model assignment mapping for dispatched agents and skips the interactive selection prompt (default: interactive prompt). Independent of ship-sdlc step selection (see `ship-sdlc.md` A2). When invoked from ship-sdlc, `--quality` is forwarded only when the user explicitly passed `--quality` to ship; otherwise execute-plan-sdlc applies its own selection logic.
 - A3: `--resume` — resume execution from a saved state file (default: false)
 - A4: `--workspace branch|worktree|prompt` — workspace isolation mode when on default branch (default: prompt)
 - A5: `--rebase auto|prompt|skip` — rebase onto default branch before execution (default: skip)
-- A6: `--auto` — suppress interactive prompts; auto-resume, auto-approve high-risk gates, use `--preset` value (default: false)
+- A6: `--auto` — suppress interactive prompts; auto-resume, auto-approve high-risk gates, use `--quality` value (default: false). When `--auto` is set, `--quality` is required.
 
 ## Core Requirements
 
 - R1: Classify each task by complexity (Trivial/Standard/Complex), risk (Low/Medium/High), and dependencies
-- R2: Model assignment per preset — Speed: haiku/haiku/sonnet; Balanced: haiku/sonnet/opus; Quality: sonnet/opus/opus
+- R2: Model assignment per quality tier — `full` (Speed): haiku/haiku/sonnet; `balanced` (Balanced): haiku/sonnet/opus; `minimal` (Quality): sonnet/opus/opus
 - R3: Build waves via topological sort of dependency DAG with same-file constraint (no two tasks modifying same file in one wave)
 - R4: Adaptive wave size cap: 1-3 tasks→no cap, 4-8→4, 9-15→5, 16+→6; complex tasks count as 2
 - R5: Small-plan direct execution for total tasks ≤3 AND all Trivial/Standard AND no high-risk — no wave orchestration, no state file
@@ -27,11 +27,11 @@
 - R8: Every agent prompt includes full task text (never a reference to the plan file), exact file list, expected deliverable, and prior-wave context
 - R9: Filesystem verification mandatory after each wave: `git diff --stat` confirms claimed changes; canary check greps for verification token
 - R10: Completion checklist parsing: cross-check `files_created`/`files_modified` against `git diff --stat`, verify STATUS field, handle NEEDS_CONTEXT and BLOCKED statuses
-- R11: Spec compliance review after each wave for non-trivial tasks (skip for Speed preset)
+- R11: Spec compliance review after each wave for non-trivial tasks (skip for Speed quality tier — `--quality full`)
 - R12: Inter-wave critique: detect when actual output differs from what downstream tasks assumed
 - R13: Maximum 2 retries per task; model escalation on failure (haiku→sonnet, sonnet→opus, opus→user)
 - R14: State persistence after every wave via `state/execute.js`; cleanup on success, preserve on failure for `--resume`
-- R15: Resume verifies plan hash; mismatch offers resume-with-existing or restart
+- R15: Resume verifies plan hash; mismatch offers resume-with-existing or restart. Persisted state file uses field name `quality` (not `preset`) for the model tier.
 - R16: Workspace isolation when on default branch: derive branch name or create worktree
 - R17: Pre-execution rebase when `--rebase auto`: fetch, check ancestor, attempt rebase, abort on conflict
 - R18: Execution guardrails: pre-wave (error-severity only) and post-wave (all severities); error violations block, warning violations report only
@@ -56,10 +56,10 @@
 2. CLASSIFY — classify each task (complexity, risk, model); build dependency DAG and wave structure
 3. ROUTE — small-plan direct execution (≤3 tasks) or standard wave execution
 4. CRITIQUE — critique wave structure (file conflicts, dependencies, risk clustering, trivial aggregation)
-5. IMPROVE — fix critique issues; present final wave structure with preset (auto-selected or interactive)
+5. IMPROVE — fix critique issues; present final wave structure with quality tier (auto-selected via `--quality` or interactive)
 6. DO — execute waves sequentially: pre-wave guardrail check → high-risk gate → dispatch agents → collect and verify → spec compliance review → post-wave guardrails → progress report → inter-wave critique → state persistence
    - **Script:** `state/execute.js` (per-wave lifecycle)
-   - **Params:** subcommands: `init --branch --preset --total-tasks` (first wave), `wave-start --wave N`, `task-done/task-fail --wave --task --name --complexity --risk --files-changed`, `wave-done/wave-fail --wave N`, `context --data '<json>'`
+   - **Params:** subcommands: `init --branch --quality --total-tasks` (first wave), `wave-start --wave N`, `task-done/task-fail --wave --task --name --complexity --risk --files-changed`, `wave-done/wave-fail --wave N`, `context --data '<json>'`
    - **Output:** JSON state object persisted to `.sdlc/execution/execute-<branch>-<timestamp>.json` after each wave
 7. RECOVER — error recovery per failure type (model escalation, conflict resolution, inline fix, user escalation)
 8. VERIFY — final verification: full test suite, build, lint, `git diff --stat`
@@ -73,13 +73,13 @@
 
 - G1: Plan validated — no blocking validation issues (≥2 tasks, no cycles, clear deliverables)
 - G2: Wave structure critiqued — all file conflicts and dependency issues resolved
-- G3: User approved — preset selected or custom editing completed
+- G3: User approved — quality tier selected (`--quality` or interactive) or custom editing completed
 - G4: All tasks completed — no tasks skipped without user consent
 - G5: Per-wave verification — `git diff --stat` confirms changes, tests/build/lint pass
 - G6: Final verification — full suite green
 - G7: No drift — tasks match their specifications
 - G8: No orphans — all created files are referenced/used
-- G9: Spec compliance reviewed — non-trivial waves pass spec review (unless Speed preset)
+- G9: Spec compliance reviewed — non-trivial waves pass spec review (unless Speed quality tier `--quality full`)
 - G10: Pre-wave guardrail check — error-severity guardrails pass or user overrides
 - G11: Post-wave guardrail check — error-severity pass/fixed/overridden; warnings reported
 - G12: Completion checklists valid — each agent's COMPLETE/VERIFY/STATUS block present and cross-checked

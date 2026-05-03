@@ -5,7 +5,7 @@
  * Delegates all I/O to lib/state.js; zero npm dependencies.
  *
  * Usage:
- *   node execute-state.js init        --branch <b> --preset <X> --total-tasks <n> [--plan-path <p>] [--plan-hash <h>]
+ *   node execute-state.js init        --branch <b> --quality <X> --total-tasks <n> [--plan-path <p>] [--plan-hash <h>]
  *   node execute-state.js wave-start  --wave <n>
  *   node execute-state.js wave-done   --wave <n>
  *   node execute-state.js wave-fail   --wave <n>
@@ -40,8 +40,15 @@ function parseArgs(argv) {
     const a = args[i];
     if (a === '--branch' && args[i + 1]) {
       result.branch = args[++i];
-    } else if (a === '--preset' && args[i + 1]) {
-      result.preset = args[++i];
+    } else if (a === '--quality' && args[i + 1]) {
+      result.quality = args[++i];
+    } else if (a === '--preset') {
+      // Hard-removed (#190): --preset renamed to --quality. Consume the
+      // following value (if any) and surface a clear error so callers update
+      // their invocations. The error is written to stderr and exits non-zero;
+      // the orchestrator surfaces it in the agent prompt.
+      if (args[i + 1] && !args[i + 1].startsWith('--')) i++;
+      result._presetRejected = true;
     } else if (a === '--total-tasks' && args[i + 1]) {
       const val = parseInt(args[++i], 10);
       if (isNaN(val)) { process.stderr.write(`Error: --total-tasks requires a number, got "${args[i]}"\n`); process.exit(2); }
@@ -136,12 +143,16 @@ function deepMerge(target, source) {
 // ---------------------------------------------------------------------------
 
 function cmdInit(opts) {
+  if (opts._presetRejected) {
+    process.stderr.write('Error: --preset is no longer accepted by execute-plan-sdlc state init. Use --quality <full|balanced|minimal> instead (#190).\n');
+    process.exit(2);
+  }
   if (!opts.branch) {
     process.stderr.write('Error: --branch is required for init\n');
     process.exit(2);
   }
-  if (!opts.preset) {
-    process.stderr.write('Error: --preset is required for init\n');
+  if (!opts.quality) {
+    process.stderr.write('Error: --quality is required for init (--preset was renamed to --quality, #190)\n');
     process.exit(2);
   }
   if (opts.totalTasks == null || isNaN(opts.totalTasks)) {
@@ -156,7 +167,7 @@ function cmdInit(opts) {
     branch: opts.branch,
     planPath: opts.planPath || null,
     planHash: opts.planHash || null,
-    preset: opts.preset,
+    quality: opts.quality,
     totalTasks: opts.totalTasks,
     waves: [],
     context: {},

@@ -1,8 +1,8 @@
 ---
 name: ship-sdlc
-description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Chains execute-plan-sdlc, commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, and pr-sdlc with conditional review-fix loop. Arguments: [--auto] [--skip <steps>] [--preset full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
+description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Chains execute-plan-sdlc, commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, and pr-sdlc with conditional review-fix loop. Arguments: [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--init-config]. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
-argument-hint: "[--auto] [--skip <steps>] [--preset full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--openspec-change <name>] [--init-config]"
+argument-hint: "[--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--openspec-change <name>] [--init-config]"
 ---
 
 # Ship Pipeline
@@ -67,8 +67,12 @@ SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/shi
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --skip version --preset balanced --bump patch --workspace branch)
-# Note: --preset and --skip are legacy CLI sugar (deprecated). They expand to flags.steps internally.
+PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --bump patch --workspace branch)
+# Pipeline composition (which steps run) comes from config `ship.steps[]`. To override
+# the resolved step list for a single run, pass `--steps <csv>` (e.g.
+# `--steps execute,commit,pr`). To set the model tier forwarded to execute-plan-sdlc,
+# pass `--quality <full|balanced|minimal>` — only forwarded when explicitly passed.
+# Legacy `--preset` and `--skip` are hard-removed (#190) and produce errors.
 # The config-level field is `steps[]` (top-level `version: 2`); preset/skip are no longer persisted.
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
@@ -138,7 +142,7 @@ Auto-skip decisions (from skill/ship.js):
 ```
 
 The parenthetical after `skipped` reflects the step's `skipSource` field:
-- `(cli)` — user passed `--skip` on the command line
+- `(cli)` — user passed `--steps` on the command line
 - `(config)` — skip set loaded from `.sdlc/local.json`
 - `(auto)` — auto-skipped by `computeSteps` logic (e.g., worktree mode)
 - `(condition)` — conditional step whose condition was not met
@@ -160,7 +164,7 @@ The pipeline table is generated from the `steps` array in the `skill/ship.js` ou
 
 | Step | Skill | Status | Args | Pause |
 |------|-------|--------|------|-------|
-| 1 | execute-plan-sdlc | will_run | `--preset balanced` | no |
+| 1 | execute-plan-sdlc | will_run | (none, or `--quality <X>` if user passed `--quality` to ship) | no |
 | 2 | commit-sdlc | will_run | `--auto` | no |
 | 3 | review-sdlc | will_run | `--committed` | no |
 | 4 | received-review-sdlc | conditional | (if crit/high) | YES |
@@ -174,7 +178,7 @@ Not all sub-skills support `--auto`. This table is the source of truth:
 
 | Sub-skill | --auto support | Behavior when ship runs with --auto |
 |-----------|---------------|--------------------------------------|
-| execute-plan-sdlc | No | Forwards a synthesized `--preset <full\|balanced\|minimal>` derived from the resolved `steps[]`. Preset selection prompt is skipped when preset is provided. (execute-plan-sdlc semantics unchanged; ship synthesizes preset at the boundary.) |
+| execute-plan-sdlc | No | Forwards `--quality <X>` only when the user explicitly passed `--quality` to ship; otherwise no quality flag is forwarded and execute-plan-sdlc applies its own selection logic. (Renamed from `--preset` in #190 to disambiguate from ship's step-selection semantics.) |
 | commit-sdlc | Yes | `--auto` forwarded. Skips commit approval prompt. |
 | review-sdlc | No | No interactive prompts to skip — runs fully automatically already. |
 | received-review-sdlc | Yes | `--auto` forwarded. Skips Step 10 consent prompt and Step 12 reply/resolve prompt. Critique gates and verification still run. Only "will fix" items auto-implemented; threads for "will fix" items auto-resolved. |
@@ -226,7 +230,7 @@ Pipeline validation:
 Validation checks:
 - `gh auth status` succeeds
 - Current branch is not the default branch (warn if it is — do not block)
-- All `--skip` values are recognized step names: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`
+- All `--steps` values are recognized step names: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`
 - At least one step will run
 - Flag combinations are coherent (`--bump` without version step → warn)
 
@@ -242,7 +246,7 @@ Ship Pipeline (dry run)
 ────────────────────────────────────────────────────────────────
 Step  Skill                 Status       Args              Pause?
 ────────────────────────────────────────────────────────────────
-1     execute-plan-sdlc     will run     --preset balanced  no
+1     execute-plan-sdlc     will run     (none)             no
 2     commit-sdlc           will run     --auto            no
 3     review-sdlc           will run     --committed       no
 4     received-review-sdlc  conditional  (if crit/high)    YES
@@ -338,8 +342,8 @@ Ship-sdlc retains full control of: pipeline table display, validation output, st
 
 **Execute step resume:** When the pipeline is resuming (`--resume` active) and the execute step's status in the ship state file is `in_progress`:
 1. Check for `<main-worktree>/.sdlc/execution/execute-<branch>-*.json` (an execute-plan-sdlc state file for the current branch). Resolve `<main-worktree>` via `git worktree list --porcelain` (first `worktree` line).
-2. If found, dispatch Agent with args: `"--preset <X> --resume"`
-3. If not found, dispatch Agent normally with args: `"--preset <X>"` (execute restarts from scratch)
+2. If found, dispatch Agent with args from `step.invocation` plus `--resume` (e.g. `"--quality <X> --resume"` if the user passed `--quality` to ship; `"--resume"` otherwise)
+3. If not found, dispatch Agent normally using `step.invocation` (execute restarts from scratch)
 
 ship-sdlc does not manage execute-plan-sdlc's state file — execute-plan-sdlc handles its own creation, updates, and cleanup.
 
@@ -352,7 +356,7 @@ git worktree list --porcelain
 Match the branch from the ship state file against worktree entries. If found and directory exists, `cd <path>` before continuing. If the worktree directory is gone, warn and fall back to running on the current branch.
 
 Example dispatch sequence (use `step.invocation` for actual args):
-- Agent: execute-plan-sdlc, args: `"--preset balanced"`
+- Agent: execute-plan-sdlc, args: from `step.invocation` (e.g. `""` when no `--quality` was forwarded, `"--quality balanced"` when the user passed `--quality balanced` to ship)
 - Agent: commit-sdlc, args: `"--auto"`
 - Agent: review-sdlc, args: `"--committed"`
 - Agent: received-review-sdlc, args: `"--auto"` (when `flags.auto`; otherwise no args)
@@ -521,7 +525,7 @@ Step  Skill                 Result
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Decisions log:
-  - Steps resolved: [execute, commit, review, pr, archive-openspec] (from config default; synthesized --preset balanced for execute-plan-sdlc)
+  - Steps resolved: [execute, commit, review, pr, archive-openspec] (from config default; --quality not forwarded to execute-plan-sdlc — user did not pass --quality)
   - Version step skipped (from config default, bump type: patch)
   - Review found 2 medium issues — below threshold, deferred
   - PR created as draft (from --draft flag)
@@ -612,7 +616,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Proceed past a failed sub-skill — stop, save state, inform user
 - Skip pipeline steps that were marked "will run" in the pipeline plan. The pipeline plan is a contract with the user. If a step was planned to run and the user confirmed the pipeline, it MUST run. The LLM does not have authority to skip planned steps based on its own assessment of change complexity or risk. Only the skip set and auto-skip rules (computed by skill/ship.js) control which steps run.
 - Copy example args from this document when dispatching sub-skill Agents — use the `invocation` field from the skill/ship.js output, which contains the exact computed args
-- Add `--skip` flags not present in the user's original invocation or ship config. The skip set is user/config-controlled. If skill/ship.js output shows `skipSource` as unexpected (e.g., `flags.skip.length > 0` but `flagSources.skip === 'default'`), warn before proceeding.
+- Add `--steps` flags not present in the user's original invocation. Pipeline composition derives from CLI `--steps` > config `ship.steps[]` > built-in defaults. Legacy `--preset` and `--skip` are hard-removed (#190); passing them produces an error.
 - Dispatch pipeline step Agents without `model: step.model` — the model field is computed by skill/ship.js from each skill's spec. Omitting it defaults all steps to opus.
 - Ignore cleanup validation failures — if `state/ship.js cleanup` exits with code 1, the pipeline contract was violated. Surface the violation and preserve state.
 
@@ -632,7 +636,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Config file is optional.** The pipeline runs with built-in defaults when no ship config exists in `.sdlc/local.json`. Do not error on missing config.
 
-**Skip set validation matters.** Unrecognized values in `--skip` (e.g., `--skip reviw`) should warn, not silently ignore. Typos in skip values cause steps to run when the user expected them skipped.
+**Step set validation matters.** Unrecognized values in `--steps` (e.g., `--steps reviw`) produce an error from `skill/ship.js parseArgs` and abort the run. The single source of truth for step composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. The legacy `--preset` and `--skip` flags are hard-removed (#190) and rejected with a migration-pointer error.
 
 **.sdlc/ must be gitignored.** The `.sdlc/` directory contains developer-local config (`local.json`) and ephemeral pipeline state (`execution/`). `--init-config` creates `.sdlc/.gitignore` automatically via `ship-init.js`. If `.sdlc/` is not gitignored, the staging command (`git add -A -- ':!.sdlc/'`) provides a fallback exclusion, but the gitignore is the primary defense.
 
@@ -652,13 +656,13 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Version step is auto-skipped in worktree mode.** `computeSteps` in skill/ship.js skips the version step when `workspace === 'worktree'`. Tags are repo-global — creating them from an isolated worktree risks collisions with parallel pipelines. The pipeline prints a post-merge advisory: run `/version-sdlc` on main after the PR merges. This also handles changelog — `version-sdlc` generates changelog from `previousTag..HEAD`, capturing all commits from all merged branches regardless of their source worktree.
 
-**Worktree PRs auto-label `skip-version-check`.** When `workspace === 'worktree'` causes the version step to be auto-skipped, `skill/ship.js` adds `--label skip-version-check` to the PR step args. The label is included in `gh pr create` from the start (not added post-creation), so `check-version-bump.yml` sees it on the `opened` event. Only fires for worktree auto-skip, not manual `--skip version`. Prerequisite: the label must exist in the repository (pr-sdlc creates it automatically if missing).
+**Worktree PRs auto-label `skip-version-check`.** When `workspace === 'worktree'` causes the version step to be auto-skipped, `skill/ship.js` adds `--label skip-version-check` to the PR step args. The label is included in `gh pr create` from the start (not added post-creation), so `check-version-bump.yml` sees it on the `opened` event. Only fires for worktree auto-skip, not when `version` is omitted from `ship.steps[]`. Prerequisite: the label must exist in the repository (pr-sdlc creates it automatically if missing).
 
 **Auto mode does not auto-resume without --resume.** When `--auto` is set but `--resume` is not, the pipeline starts fresh even if a state file exists for the current branch. This prevents accidental continuation from stale state. The state file is preserved (not deleted) so the user can explicitly `--resume` later.
 
 **Sub-skill loading and agent isolation.** Each sub-skill's SKILL.md is 200–550 lines. Agent dispatch is the primary mitigation: each Agent loads SKILL.md in its own context and returns only a structured result (5–10 lines). The ship pipeline's context receives structured data, not sub-skill definitions. Without agent dispatch, the Skill tool would load all definitions into the pipeline's context (2000+ lines), degrading context quality in later steps (version, PR) and increasing the risk of hallucination or skipped logic.
 
-**skipSource tracks provenance.** Each step's `skipSource` field records why a step was skipped: `"none"` (not skipped), `"cli"` (user `--skip` flag), `"config"` (from `.sdlc/local.json`), `"auto"` (auto-skipped by `computeSteps` logic), `"condition"` (conditional step not triggered), `"default"` (skip source unresolved — likely fabricated). If a step has `skipSource: "default"`, the fabrication guard in `runValidation` fires a warning. The per-step `skipSource` and the fabrication guard are complementary: `skipSource` makes the issue visible per step, the guard makes it visible at the pipeline level.
+**skipSource tracks provenance.** Each step's `skipSource` field records why a step was skipped: `"none"` (not skipped), `"cli"` (step omitted from CLI `--steps`), `"config"` (omitted from `ship.steps[]` in `.sdlc/local.json`), `"auto"` (auto-skipped by `computeSteps` logic), `"condition"` (conditional step not triggered), `"default"` (built-in defaults excluded the step). The per-step `skipSource` makes the exclusion provenance auditable per step.
 
 ---
 
@@ -669,7 +673,7 @@ After completing the pipeline, append to `.claude/learnings/log.md`:
 - Review verdicts that surprised (threshold too aggressive or too lenient)
 - Sub-skills that failed in unexpected ways during chaining
 - Config combinations that produced unintended pipeline shapes
-- Projects where the default `steps[]` behavior was wrong (or where legacy `--preset`/`--skip` sugar misled users)
+- Projects where the default `steps[]` behavior was wrong, or migrations from legacy v1 configs (`ship.preset`/`ship.skip`) that produced unexpected `steps[]` after auto-migration. CLI `--preset`/`--skip` are no longer accepted (#190 hard-remove); ship-sdlc emits a migration-pointer error if either is passed.
 
 Format:
 ```

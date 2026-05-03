@@ -12,13 +12,17 @@
  * Options:
  *   --has-plan              Plan is present in conversation context
  *   --auto                  Skip interactive approval prompts
- *   --skip <csv>            Comma-separated steps to skip
- *   --preset full|balanced|minimal  Pipeline preset (legacy A|B|C accepted)
+ *   --steps <csv>           Comma-separated steps to run (overrides config)
+ *   --quality full|balanced|minimal  Forwarded to execute-plan-sdlc as --quality (only when explicitly passed)
  *   --bump patch|minor|major  Version bump type
  *   --draft                 Mark PR as draft
  *   --dry-run               Print plan without executing
  *   --resume                Resume from last checkpoint
  *   --workspace branch|worktree|prompt  Workspace isolation mode
+ *
+ * Removed (legacy CLI sugar — passing these now produces a hard error):
+ *   --preset                Use --steps <csv> instead.
+ *   --skip                  Use --steps <csv> with the desired steps listed instead.
  *
  * Exit codes:
  *   0 = success, JSON on stdout
@@ -36,40 +40,13 @@ const LIB = path.join(__dirname, '..', 'lib');
 
 const { exec, checkGitState, detectBaseBranch } = require(path.join(LIB, 'git'));
 const { resolveMainWorktree } = require(path.join(LIB, 'state'));
-const { readSection, normalizePreset, PRESET_TO_STEPS } = require(path.join(LIB, 'config'));
+const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
-const { VALID_SKIP, VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS } = require(path.join(LIB, 'ship-fields'));
+const { VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS } = require(path.join(LIB, 'ship-fields'));
 const { detectActiveChanges, isArchived } = require(path.join(LIB, 'openspec'));
 const { getAdvisory } = require(path.join(LIB, 'context-advisory'));
 
-/**
- * Reverse-map the resolved steps[] back to the nearest canonical preset
- * (`full`, `balanced`, or `minimal`). Used solely to synthesize a `--preset`
- * argument for execute-plan-sdlc, which still requires one for state init.
- *
- * Exact set match wins. Non-canonical step combinations fall back to `full`
- * — execute-plan-sdlc's preset is decorative for state seeding only; the
- * actual pipeline shape is controlled by ship's resolved steps[].
- *
- * Compatibility seam tied to issue #180: decoupling execute-plan-sdlc from
- * --preset is explicitly out of scope.
- *
- * @param {string[]} steps  Resolved step list
- * @returns {'full'|'balanced'|'minimal'}
- */
-function stepsToPreset(steps) {
-  if (!Array.isArray(steps)) return 'full';
-  const set = new Set(steps);
-  const eq = (canonical) => {
-    if (set.size !== canonical.length) return false;
-    for (const s of canonical) if (!set.has(s)) return false;
-    return true;
-  };
-  if (eq(PRESET_TO_STEPS.full))     return 'full';
-  if (eq(PRESET_TO_STEPS.balanced)) return 'balanced';
-  if (eq(PRESET_TO_STEPS.minimal))  return 'minimal';
-  return 'full';
-}
+const VALID_QUALITY = ['full', 'balanced', 'minimal'];
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -79,8 +56,8 @@ function parseArgs(argv) {
   const args = argv.slice(2);
   let hasPlan   = false;
   let auto      = false;
-  let skip      = null;
-  let preset    = null;
+  let steps     = null;
+  let quality   = null;
   let bump      = null;
   let draft     = false;
   let dryRun    = false;
@@ -88,6 +65,7 @@ function parseArgs(argv) {
   let workspace       = null;
   let rebase          = null;
   let openspecChange  = null;
+  const errors = [];
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -95,10 +73,18 @@ function parseArgs(argv) {
       hasPlan = true;
     } else if (a === '--auto') {
       auto = true;
-    } else if (a === '--skip' && args[i + 1]) {
-      skip = args[++i].split(',').map(s => s.trim()).filter(Boolean);
-    } else if (a === '--preset' && args[i + 1]) {
-      preset = args[++i];
+    } else if (a === '--steps' && args[i + 1]) {
+      steps = args[++i].split(',').map(s => s.trim()).filter(Boolean);
+    } else if (a === '--quality' && args[i + 1]) {
+      quality = args[++i];
+    } else if (a === '--preset') {
+      // Hard-removed: --preset is no longer accepted (#190). Consume the
+      // following value (if any) so it doesn't get parsed as a positional.
+      if (args[i + 1] && !args[i + 1].startsWith('--')) i++;
+      errors.push('--preset is no longer accepted by ship-sdlc. Use --steps <csv> to control which steps run, or --quality <full|balanced|minimal> to set the model tier forwarded to execute-plan-sdlc.');
+    } else if (a === '--skip') {
+      if (args[i + 1] && !args[i + 1].startsWith('--')) i++;
+      errors.push('--skip is no longer accepted by ship-sdlc. Use --steps <csv> with the desired steps listed instead.');
     } else if (a === '--bump' && args[i + 1]) {
       bump = args[++i];
     } else if (a === '--draft') {
@@ -116,7 +102,7 @@ function parseArgs(argv) {
     }
   }
 
-  return { hasPlan, auto, skip, preset, bump, draft, dryRun, resume, workspace, rebase, openspecChange };
+  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -164,8 +150,7 @@ function mergeFlags(cli, config) {
     }
   }
 
-  // Value flags (no preset here — preset is legacy CLI sugar that expands to
-  // steps[]; synthesized from steps[] later for execute-plan-sdlc forwarding).
+  // Value flags
   for (const key of ['bump', 'workspace']) {
     if (cli[key] !== null && cli[key] !== undefined) {
       merged[key]  = cli[key];
@@ -179,23 +164,20 @@ function mergeFlags(cli, config) {
     }
   }
 
-  // -- Step resolution (replaces preset/skip as the canonical source) --
+  // -- Step resolution --
   //
-  // Resolution order:
-  //   1. config.steps (from .sdlc/local.json — already migrated to v2 by lib/config.js)
-  //   2. BUILT_IN_DEFAULTS.steps (all six canonical steps)
+  // Single source of truth: `ship.steps[]`. Resolution order:
+  //   1. CLI --steps (one-shot override; fully replaces resolved list)
+  //   2. config.steps from .sdlc/local.json
+  //   3. BUILT_IN_DEFAULTS.steps
   //
-  // CLI overrides applied in order:
-  //   3. --preset <X>: legacy sugar — expands to canonical PRESET_TO_STEPS[X]
-  //      and OVERRIDES the resolved steps[] entirely.
-  //   4. --skip <a,b>: legacy sugar — subtracts the named steps from the
-  //      currently resolved steps[].
-  //
-  // The persistent config field is `ship.steps[]`. CLI `--preset` and
-  // `--skip` are not persisted — they're parse-time sugar only.
+  // No --preset/--skip override paths exist (#190 — hard-removed).
   let stepsList;
   let stepsSource;
-  if (Array.isArray(cfg.steps)) {
+  if (Array.isArray(cli.steps) && cli.steps.length > 0) {
+    stepsList   = cli.steps.slice();
+    stepsSource = 'cli';
+  } else if (Array.isArray(cfg.steps)) {
     stepsList   = cfg.steps.slice();
     stepsSource = 'config';
   } else {
@@ -203,43 +185,19 @@ function mergeFlags(cli, config) {
     stepsSource = 'default';
   }
 
-  // CLI --preset (legacy sugar) — full override
-  let cliPreset = null;
-  if (cli.preset !== null && cli.preset !== undefined) {
-    cliPreset = normalizePreset(cli.preset);
-    if (PRESET_TO_STEPS[cliPreset]) {
-      stepsList   = PRESET_TO_STEPS[cliPreset].slice();
-      stepsSource = 'cli (preset)';
-    }
+  merged.steps  = stepsList;
+  sources.steps = stepsSource;
+
+  // -- Quality (model tier forwarded to execute-plan-sdlc) --
+  //
+  // Only emitted when CLI explicitly passed --quality. When absent, ship does
+  // not forward the flag and execute-plan-sdlc applies its own selection
+  // logic (interactive prompt or its own config default).
+  if (cli.quality !== null && cli.quality !== undefined) {
+    merged.quality  = cli.quality;
+    sources.quality = 'cli';
   }
-
-  // CLI --skip (legacy sugar) — subtraction
-  if (Array.isArray(cli.skip) && cli.skip.length > 0) {
-    const skipSet = new Set(cli.skip);
-    stepsList = stepsList.filter(s => !skipSet.has(s));
-    stepsSource = stepsSource + ' (cli --skip)';
-  }
-
-  merged.steps    = stepsList;
-  sources.steps   = stepsSource;
-
-  // skip stays in the merged object purely as the subtraction list users
-  // supplied on the CLI — surfaced for validation (unrecognized values) and
-  // diagnostic output. It is NOT a source of truth for which steps run.
-  merged.skip   = Array.isArray(cli.skip) ? cli.skip : [];
-  sources.skip  = Array.isArray(cli.skip) && cli.skip.length > 0 ? 'cli' : 'none';
-
-  // Synthesize preset from resolved steps[] for execute-plan-sdlc forwarding.
-  // CLI --preset (if passed) takes precedence as the synthesized value, since
-  // the user's explicit choice is more informative than a reverse-mapped
-  // approximation. Otherwise reverse-map from steps[].
-  if (cliPreset && ['full', 'balanced', 'minimal'].includes(cliPreset)) {
-    merged.preset = cliPreset;
-    sources.preset = 'cli';
-  } else {
-    merged.preset = stepsToPreset(stepsList);
-    sources.preset = 'synthesized';
-  }
+  // Otherwise: no merged.quality / no sources.quality — intentionally absent.
 
   // reviewThreshold: not a CLI flag, comes from config or default.
   if (cfg.reviewThreshold !== undefined) {
@@ -286,25 +244,18 @@ function mergeFlags(cli, config) {
 
 function computeSteps(flags, flagSources, { openspecContext } = {}) {
   // Steps[] is the canonical source of truth for which top-level steps run.
-  // A step IS skipped when it is NOT in flags.steps. The legacy `skip[]`
-  // semantics are now derived: a step is "skipped" iff it's missing from
-  // flags.steps; the original skip provenance is whatever determined the
-  // resolved steps[] (config / cli --preset / cli --skip).
+  // A step IS skipped when it is NOT in flags.steps. The provenance for an
+  // exclusion is whatever determined the resolved steps[] (cli --steps /
+  // config / built-in default).
   const stepsSet = new Set(Array.isArray(flags.steps) ? flags.steps : []);
-  const skipSetCli = new Set(Array.isArray(flags.skip) ? flags.skip : []);
 
   // Derive the skipSource for a given step name. Convention preserved for
   // downstream consumers (state files, hooks, learnings).
   function skipSource(name) {
     if (stepsSet.has(name)) return 'none';
-    // CLI --skip explicitly excluded this step
-    if (skipSetCli.has(name)) return 'cli';
-    // The resolved steps[] came from config (or default) and doesn't include
-    // this step. Treat as 'config' if config provided a steps[]; otherwise
-    // 'default' (built-in default — would only happen for an unknown step).
     const src = flagSources && flagSources.steps;
-    if (src && src.startsWith('config')) return 'config';
-    if (src && src.startsWith('cli'))    return 'cli';
+    if (src === 'cli')    return 'cli';
+    if (src === 'config') return 'config';
     return 'default';
   }
 
@@ -322,10 +273,10 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           ? 'condition'
           : skipSource('execute'),
       args: [
-        // Forward synthesized preset to execute-plan-sdlc (compatibility seam
-        // — execute-plan-sdlc still requires --preset for state init; see
-        // stepsToPreset() comment above).
-        flags.preset ? `--preset ${flags.preset}` : '',
+        // Forward --quality to execute-plan-sdlc only when the user
+        // explicitly passed --quality to ship. Otherwise execute-plan-sdlc
+        // applies its own selection logic (interactive or its own default).
+        flags.quality ? `--quality ${flags.quality}` : '',
         flags.workspace !== 'prompt' ? `--workspace ${flags.workspace}` : '',
         flags.rebase !== 'prompt' ? `--rebase ${flags.rebase}` : '',
       ].filter(Boolean).join(' '),
@@ -521,29 +472,26 @@ function runValidation(flags, flagSources, steps, context) {
     warnings.push(`You are on the default branch "${context.defaultBranch}". Ship pipelines should run on feature branches.`);
   }
 
-  // All --skip values must be recognized (legacy CLI sugar; subtraction list)
-  let skipValuesRecognized = true;
-  for (const s of flags.skip) {
-    if (!VALID_STEPS.includes(s)) {
-      warnings.push(`Unrecognized skip value "${s}". Valid values: ${VALID_STEPS.join(', ')}`);
-      skipValuesRecognized = false;
-    }
-  }
-
-  // All steps[] values must be recognized
+  // All steps[] values must be recognized; CLI --steps unrecognized values
+  // are errors (the user passed something invalid). Config-sourced unknowns
+  // remain warnings to avoid breaking pre-existing configs that drift.
+  let stepValuesRecognized = true;
   if (Array.isArray(flags.steps)) {
     for (const s of flags.steps) {
       if (!VALID_STEPS.includes(s)) {
-        warnings.push(`Unrecognized step "${s}" in steps[]. Valid values: ${VALID_STEPS.join(', ')}`);
+        if (flagSources.steps === 'cli') {
+          errors.push(`Unrecognized step "${s}" in --steps. Valid values: ${VALID_STEPS.join(', ')}`);
+          stepValuesRecognized = false;
+        } else {
+          warnings.push(`Unrecognized step "${s}" in steps[]. Valid values: ${VALID_STEPS.join(', ')}`);
+        }
       }
     }
   }
 
-  // Fabrication guard: --skip values present but source is 'none' would
-  // indicate the LLM hallucinated --skip arguments that were never actually
-  // passed. (skip source is 'cli' when --skip was passed, 'none' otherwise.)
-  if (flags.skip.length > 0 && flagSources.skip === 'none') {
-    errors.push("Skip flags present but source is 'none' — likely fabricated. Remove --skip or pass explicitly via CLI.");
+  // Validate --quality value when forwarded
+  if (flags.quality !== undefined && !VALID_QUALITY.includes(flags.quality)) {
+    errors.push(`Invalid --quality "${flags.quality}". Valid values: ${VALID_QUALITY.join(', ')}`);
   }
 
   // At least one non-conditional step must run (conditional steps only
@@ -569,7 +517,7 @@ function runValidation(flags, flagSources, steps, context) {
   return {
     ghAuth: context.ghAuthenticated,
     notOnDefault,
-    skipValuesRecognized,
+    stepValuesRecognized,
     atLeastOneStepRuns,
     coherentFlags,
     warnings,
@@ -634,6 +582,11 @@ function main() {
 
   const errors   = [];
   const warnings = [];
+
+  // Surface argument-parsing errors first (legacy --preset/--skip rejection).
+  if (Array.isArray(cli.errors) && cli.errors.length > 0) {
+    errors.push(...cli.errors);
+  }
 
   // Load config
   const { config: fileConfig, source: configSource } = loadConfig(projectRoot);
@@ -764,8 +717,11 @@ function main() {
     flags: {
       auto: flags.auto,
       steps: flags.steps,
-      preset: flags.preset, // synthesized for execute-plan-sdlc forwarding
-      skip: flags.skip,     // legacy CLI subtraction list (diagnostic only)
+      // quality is included only when explicitly passed via CLI (forwarded to
+      // execute-plan-sdlc as --quality); absent otherwise so downstream
+      // consumers can rely on `flags.quality === undefined` to detect "user
+      // did not specify".
+      ...(flags.quality !== undefined ? { quality: flags.quality } : {}),
       bump: flags.bump,
       draft: flags.draft,
       dryRun: flags.dryRun,
@@ -781,7 +737,7 @@ function main() {
     validation: {
       ghAuth: validation.ghAuth,
       notOnDefault: validation.notOnDefault,
-      skipValuesRecognized: validation.skipValuesRecognized,
+      stepValuesRecognized: validation.stepValuesRecognized,
       atLeastOneStepRuns: validation.atLeastOneStepRuns,
       coherentFlags: validation.coherentFlags,
       warnings: validation.warnings,
