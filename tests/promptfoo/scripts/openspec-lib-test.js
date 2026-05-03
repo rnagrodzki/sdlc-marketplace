@@ -57,7 +57,7 @@ switch (op) {
       hasRunArchive:            typeof lib.runArchive === 'function',
       hasDetectActiveChanges:   typeof lib.detectActiveChanges === 'function',
       hasValidateChange:        typeof lib.validateChange === 'function',
-    }));
+    }, null, 2));
     break;
   }
 
@@ -67,7 +67,7 @@ switch (op) {
       process.exit(1);
     }
     const result = lib.isArchived(projectRoot, changeName);
-    console.log(JSON.stringify({ isArchived: result }));
+    console.log(JSON.stringify({ isArchived: result }, null, 2));
     break;
   }
 
@@ -77,7 +77,7 @@ switch (op) {
       process.exit(1);
     }
     const result = lib.validateChangeStrict(projectRoot, changeName);
-    console.log(JSON.stringify(result));
+    console.log(JSON.stringify(result, null, 2));
     break;
   }
 
@@ -87,7 +87,7 @@ switch (op) {
       process.exit(1);
     }
     const result = lib.runArchive(projectRoot, changeName);
-    console.log(JSON.stringify(result));
+    console.log(JSON.stringify(result, null, 2));
     break;
   }
 

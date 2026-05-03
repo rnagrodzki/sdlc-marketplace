@@ -53,7 +53,7 @@ class HookRunnerProvider {
       stdout: result.stdout || '',
       stderr: result.stderr || '',
       exitCode: result.status ?? -1,
-    });
+    }, null, 2);
 
     return { output };
   }

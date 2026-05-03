@@ -3,8 +3,6 @@
 # They validate that the git guard blocks dangerous commands and allows safe ones.
 
 - description: "git guard: non-git command exits 0"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"npm install express"}}'
@@ -15,8 +13,6 @@
       value: '"stderr": ""'
 
 - description: "git guard: git status exits 0 silently"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"git status"}}'
@@ -27,8 +23,6 @@
       value: '"stderr": ""'
 
 - description: "git guard: blocks git push --force"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"git push --force origin main"}}'
@@ -41,8 +35,6 @@
       value: "--force-with-lease"
 
 - description: "git guard: blocks git push -f"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"git push -f origin feat/branch"}}'
@@ -53,8 +45,6 @@
       value: "Blocked"
 
 - description: "git guard: allows git push --force-with-lease"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"git push --force-with-lease origin feat/branch"}}'
@@ -65,8 +55,6 @@
       value: "Blocked"
 
 - description: "git guard: blocks git reset --hard"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"git reset --hard HEAD~1"}}'
@@ -79,8 +67,6 @@
       value: "git stash"
 
 - description: "git guard: blocks git checkout ."
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"git checkout ."}}'
@@ -91,8 +77,6 @@
       value: "Blocked"
 
 - description: "git guard: blocks git checkout -- ."
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"git checkout -- ."}}'
@@ -103,8 +87,6 @@
       value: "Blocked"
 
 - description: "git guard: blocks git clean -f"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"git clean -fd"}}'
@@ -117,8 +99,6 @@
       value: "dry run"
 
 - description: "git guard: warns on git push origin main"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"git push origin main"}}'
@@ -131,8 +111,6 @@
       value: "main/master"
 
 - description: "git guard: empty/invalid stdin exits 0"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: "not valid json"
@@ -143,8 +121,6 @@
       value: "Blocked"
 
 - description: "git guard: multi-command with force push blocked"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-git-guard.js"
     script_stdin: '{"tool_input":{"command":"git add . && git push --force origin main"}}'

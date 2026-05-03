@@ -23,7 +23,7 @@
       value: |
         const names = JSON.parse(output).shipFields.map(f => f.name);
         const expected = ['steps','bump','draft','auto','workspace','rebase','reviewThreshold'];
-        JSON.stringify(names) === JSON.stringify(expected)
+        return JSON.stringify(names) === JSON.stringify(expected)
 
 - description: "setup-prepare: shipFields entries have the full 6-key descriptor shape"
   vars:
@@ -34,7 +34,7 @@
     - type: javascript
       value: |
         const keys = ['name','label','type','options','default','description'];
-        JSON.parse(output).shipFields.every(f => keys.every(k => k in f))
+        return JSON.parse(output).shipFields.every(f => keys.every(k => k in f))
 
 - description: "setup-prepare: shipFields.steps has exactly 6 canonical options"
   vars:
@@ -46,7 +46,7 @@
       value: |
         const steps = JSON.parse(output).shipFields.find(f => f.name === 'steps');
         const expected = ['execute','commit','review','version','pr','archive-openspec'];
-        steps.type === 'multi-select' && JSON.stringify(steps.options) === JSON.stringify(expected)
+        return steps.type === 'multi-select' && JSON.stringify(steps.options) === JSON.stringify(expected)
 
 - description: "setup-prepare: shipFields no longer emits preset or skip fields"
   vars:
@@ -57,7 +57,7 @@
     - type: javascript
       value: |
         const fields = JSON.parse(output).shipFields;
-        !fields.some(f => f.name === 'preset') && !fields.some(f => f.name === 'skip')
+        return !fields.some(f => f.name === 'preset') && !fields.some(f => f.name === 'skip')
 
 - description: "setup-prepare: still emits P1-P6 fields alongside shipFields"
   vars:
@@ -87,4 +87,4 @@
     - type: javascript
       value: |
         const out = JSON.parse(output);
-        out.needsMigration === true && out.localIsV1 === true
+        return out.needsMigration === true && out.localIsV1 === true

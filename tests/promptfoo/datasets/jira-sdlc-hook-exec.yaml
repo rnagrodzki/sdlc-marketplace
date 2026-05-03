@@ -1,0 +1,19 @@
+# Hook-runner tests for skill/jira.js — stdin-piped scenarios.
+# Extracted from jira-sdlc-exec.yaml: tests that require script_stdin (hook-runner interface).
+
+- description: "jira-prepare: --save writes to home-cache layout (saved: true, path contains site host)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/jira.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/jira-save-roundtrip"
+    script_home: "{{project_root}}"
+    script_args: "--project SAVETEST --save"
+    script_stdin: |
+      {"version":1,"cloudId":"test-cloud","siteUrl":"https://mycompany.atlassian.net","project":{"key":"SAVETEST","name":"Save Test","id":"10001"},"currentUser":{"accountId":"u1","displayName":"Test User","email":"test@example.com"},"issueTypes":{"Task":{"id":"10001","subtask":false,"hierarchyLevel":0}},"fieldSchemas":{"Task":{"summary":{"required":true,"type":"string"}}},"workflows":{"Task":{"unsampled":true}},"linkTypes":[],"userMappings":{}}
+  assert:
+    - type: icontains
+      value: '\"saved\": true'
+    - type: icontains
+      value: 'mycompany_atlassian_net'
+    - type: icontains
+      value: 'SAVETEST.json'

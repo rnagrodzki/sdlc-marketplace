@@ -12,5 +12,5 @@ cat > .sdlc/local.json <<'EOF'
 }
 EOF
 echo '*' > .sdlc/.gitignore
-git add .sdlc/.gitignore
+git add -f .sdlc/.gitignore
 git commit -q -m "init"

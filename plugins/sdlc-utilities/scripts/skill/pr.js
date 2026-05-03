@@ -170,7 +170,7 @@ function main() {
     );
     if (!exists) {
       errors.push(`Base branch "origin/${baseBranchOverride}" does not exist on the remote.`);
-      writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
+      writeOutput({ errors, warnings, currentBranch, baseBranchOverride }, 'pr-context', 1);
       return;
     }
     baseBranch = baseBranchOverride;
@@ -220,7 +220,7 @@ function main() {
 
   if (modeError) {
     errors.push(modeError);
-    writeOutput({ errors, warnings, currentBranch, baseBranch, remoteState }, 'pr-context', 1);
+    writeOutput({ errors, warnings, currentBranch, baseBranch, remoteState, forceUpdate }, 'pr-context', 1);
     return;
   }
 

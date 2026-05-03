@@ -3,8 +3,6 @@
 # They validate that the error report hook detects skill script crashes.
 
 - description: "error report: non-skill Bash failure exits 0"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/post-failure-error-report.js"
     script_stdin: '{"tool_input":{"command":"npm test"},"exit_code":1,"stderr":"test failed"}'
@@ -15,8 +13,6 @@
       value: "error-report-sdlc"
 
 - description: "error report: skill script crash (exit 2) produces reminder"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/post-failure-error-report.js"
     script_stdin: '{"tool_input":{"command":"node scripts/skill/commit.js --project-root /tmp/test"},"exit_code":2,"stderr":"TypeError: Cannot read properties of undefined"}'
@@ -31,8 +27,6 @@
       value: "skill/commit.js"
 
 - description: "error report: skill script non-crash (exit 0) exits 0"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/post-failure-error-report.js"
     script_stdin: '{"tool_input":{"command":"node scripts/skill/review.js --project-root /tmp"},"exit_code":0}'
@@ -43,8 +37,6 @@
       value: "error-report-sdlc"
 
 - description: "error report: invalid stdin exits 0"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/post-failure-error-report.js"
     script_stdin: "garbage data {{"
@@ -55,8 +47,6 @@
       value: "error-report-sdlc"
 
 - description: "error report: skill script exit 1 (non-crash) exits 0"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/post-failure-error-report.js"
     script_stdin: '{"tool_input":{"command":"node scripts/skill/pr.js --auto"},"exit_code":1,"stderr":"validation failed"}'
@@ -67,8 +57,6 @@
       value: "error-report-sdlc"
 
 - description: "error report: extracts correct skill name from path"
-  provider:
-    id: file://providers/hook-runner.js
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/post-failure-error-report.js"
     script_stdin: '{"tool_input":{"command":"node /long/path/to/scripts/skill/ship-prepare.js --flag"},"exit_code":2,"stderr":"ENOENT"}'

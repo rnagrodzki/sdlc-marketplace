@@ -3,11 +3,10 @@ description: "Script execution tests for sdlc-marketplace (runs real scripts aga
 evaluateOptions:
   concurrency: 8
 
-# Each test case uses the script-runner.js provider directly.
+# Script-runner tests only. Hook-runner tests live in promptfooconfig-exec-hooks.yaml.
 # The prompt is unused for script tests but required by the promptfoo config schema.
 providers:
   - id: file://providers/script-runner.js
-  - id: file://providers/hook-runner.js
 
 prompts:
   - "run"
@@ -30,8 +29,6 @@ tests:
   - file://datasets/setup-prepare-exec.yaml
   - file://datasets/plan-prepare-exec.yaml
   - file://datasets/plan-format-exec.yaml
-  - file://datasets/hook-git-guard-exec.yaml
-  - file://datasets/hook-error-report-exec.yaml
   - file://datasets/session-start-exec.yaml
   - file://datasets/markdown-to-adf-exec.yaml
   - file://datasets/openspec-lib-exec.yaml

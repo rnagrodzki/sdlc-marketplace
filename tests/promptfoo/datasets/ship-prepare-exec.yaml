@@ -186,7 +186,7 @@
       value: |
         const o = JSON.parse(output);
         const expected = ['execute','commit','review','pr','archive-openspec'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected)
+        return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
     - type: icontains
       value: '"bump": "patch"'
     - type: icontains
@@ -245,7 +245,7 @@
         const cfIdx = steps.indexOf('commit-fixes');
         const aoIdx = steps.indexOf('archive-openspec');
         const vIdx = steps.indexOf('version');
-        cfIdx < aoIdx && aoIdx < vIdx
+        return cfIdx < aoIdx && aoIdx < vIdx
 
 - description: "ship-prepare: --openspec-change triggers conditional archive-openspec step"
   vars:
@@ -259,7 +259,7 @@
     - type: javascript
       value: |
         const step = JSON.parse(output).steps.find(s => s.name === 'archive-openspec');
-        step.status === 'conditional' && step.args.includes('add-auth')
+        return step.status === 'conditional' && step.args.includes('add-auth')
 
 - description: "ship-prepare: archive-openspec skipped when change already archived"
   vars:
@@ -271,7 +271,7 @@
     - type: javascript
       value: |
         const step = JSON.parse(output).steps.find(s => s.name === 'archive-openspec');
-        step.status === 'skipped' && step.reason === 'change already archived'
+        return step.status === 'skipped' && step.reason === 'change already archived'
 
 - description: "ship-prepare: --steps without archive-openspec marks step as skipped"
   vars:
@@ -283,7 +283,7 @@
     - type: javascript
       value: |
         const step = JSON.parse(output).steps.find(s => s.name === 'archive-openspec');
-        step.status === 'skipped' && step.reason === 'not in steps[]'
+        return step.status === 'skipped' && step.reason === 'not in steps[]'
 
 - description: "ship-prepare: VALID_STEPS includes archive-openspec"
   vars:
@@ -313,7 +313,7 @@
         const o = JSON.parse(output);
         const steps = o.flags.steps;
         const expected = ['execute','commit','review','pr','archive-openspec'];
-        JSON.stringify(steps) === JSON.stringify(expected)
+        return JSON.stringify(steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: legacy preset:minimal + skip:[pr] migrates to [execute, commit]"
   vars:
@@ -325,7 +325,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        JSON.stringify(o.flags.steps) === JSON.stringify(['execute','commit'])
+        return JSON.stringify(o.flags.steps) === JSON.stringify(['execute','commit'])
 
 - description: "ship-prepare: legacy preset:full migrates to all six canonical steps"
   vars:
@@ -338,7 +338,7 @@
       value: |
         const o = JSON.parse(output);
         const expected = ['execute','commit','review','version','pr','archive-openspec'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected)
+        return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: legacy A/B/C preset codes resolve to canonical equivalents (B → balanced)"
   vars:
@@ -351,7 +351,7 @@
       value: |
         const o = JSON.parse(output);
         const expected = ['execute','commit','review','pr','archive-openspec'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected)
+        return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: already-migrated v2 config passes through unchanged"
   vars:
@@ -364,7 +364,7 @@
       value: |
         const o = JSON.parse(output);
         const expected = ['execute','commit','review','pr','archive-openspec'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected)
+        return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: CLI --steps fully overrides config (#190)"
   vars:
@@ -377,7 +377,7 @@
       value: |
         const o = JSON.parse(output);
         const expected = ['execute','commit','pr'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected) && o.flags.sources.steps === 'cli'
+        return JSON.stringify(o.flags.steps) === JSON.stringify(expected) && o.flags.sources.steps === 'cli'
 
 # #190 repro: config-only steps[] excluding `version` MUST produce a pipeline
 # plan where version is skipped. This is the smoking gun fixed by removing the
@@ -395,7 +395,7 @@
         const o = JSON.parse(output);
         const versionStep = o.steps.find(s => s.name === 'version');
         const expected = ['execute','commit','review','pr','archive-openspec'];
-        JSON.stringify(o.flags.steps) === JSON.stringify(expected)
+        return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
           && versionStep.status === 'skipped'
           && versionStep.skipSource === 'config'
 
@@ -413,7 +413,7 @@
       value: |
         const o = JSON.parse(output);
         const exec = o.steps.find(s => s.name === 'execute');
-        o.flags.quality === 'balanced'
+        return o.flags.quality === 'balanced'
           && o.flags.sources.quality === 'cli'
           && exec.args.includes('--quality balanced')
 
@@ -428,6 +428,6 @@
       value: |
         const o = JSON.parse(output);
         const exec = o.steps.find(s => s.name === 'execute');
-        o.flags.quality === undefined
+        return o.flags.quality === undefined
           && !exec.args.includes('--quality')
           && !exec.args.includes('--preset')

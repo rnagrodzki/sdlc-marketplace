@@ -21,6 +21,7 @@ tasks:
     dir: tests/promptfoo
     cmds:
       - promptfoo eval --config promptfooconfig-exec.yaml --env-file .env
+      - promptfoo eval --config promptfooconfig-exec-hooks.yaml --env-file .env
 
   test:skill:
     desc: "Run tests for specific skills (args: skill name, e.g. task test:skill -- pr-sdlc)"

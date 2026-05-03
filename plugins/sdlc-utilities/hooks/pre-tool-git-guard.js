@@ -76,7 +76,7 @@ const BLOCKED = [
     message: 'Blocked: git checkout . discards all uncommitted changes. Use git stash to preserve changes.',
   },
   {
-    test: (cmd) => /\bgit\s+clean\s+[^;&|]*-f\b/.test(cmd),
+    test: (cmd) => /\bgit\s+clean\s+[^;&|]*-[a-zA-Z]*f/.test(cmd),
     message: 'Blocked: git clean -f permanently deletes untracked files. Use git clean -n for a dry run first.',
   },
 ];

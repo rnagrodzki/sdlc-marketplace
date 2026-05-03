@@ -1,0 +1,19 @@
+description: "Hook-runner script execution tests (stdin-based hooks, no LLM)"
+
+evaluateOptions:
+  concurrency: 8
+
+providers:
+  - id: file://providers/hook-runner.js
+
+prompts:
+  - "run"
+
+defaultTest:
+  options:
+    transformVars: "file://scripts/extract-skill-content.js"
+
+tests:
+  - file://datasets/hook-git-guard-exec.yaml
+  - file://datasets/hook-error-report-exec.yaml
+  - file://datasets/jira-sdlc-hook-exec.yaml
