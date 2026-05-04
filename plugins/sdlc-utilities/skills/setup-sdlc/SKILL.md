@@ -20,7 +20,7 @@ delegates content creation to specialized skills.
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--migrate` | Force migration of legacy config files even if no legacy files are auto-detected | off |
-| `--skip <section>` | Skip a config section during setup. Valid values: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `content` | none |
+| `--skip <section>` | Skip a config section during setup. Valid values: `version`, `ship`, `jira`, `review`, `commit`, `pr` | none |
 | `--force` | Pre-check every menu row (reconfigure everything) instead of selecting only `not-set` rows | off |
 | `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid ids match `prepare.sections[].id`: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | none |
 | `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | off |
@@ -130,17 +130,7 @@ Render every row in `prepare.sections[]` exactly once, in array order. Use `sect
 | `--only <ids>` passed | only the listed ids; other rows hidden, menu skipped |
 | Otherwise | rows where `section.state === 'not-set'` |
 
-**Flag aliases** (legacy direct-entry flags map onto `--only`):
-
-| Flag | Equivalent `--only` |
-|---|---|
-| `--dimensions` | `--only review-dimensions` |
-| `--pr-template` | `--only pr-template` |
-| `--guardrails` | `--only plan-guardrails` |
-| `--execution-guardrails` | `--only execution-guardrails` |
-| `--openspec-enrich` | `--only openspec-block` |
-
-When any of these flags is passed (and `--only` is not), translate to the equivalent `--only <id>`, skip the menu, and proceed to Step 3 with that single id selected. Pass through `--add`, `--no-copilot`, and `--remove-openspec` to the corresponding sub-flow when invoked.
+**Flag aliases:** See the flag-alias routing table in Step 0. When any direct-entry flag is passed (and `--only` is not), the translation is already applied before Step 1 runs — skip the menu and proceed to Step 3 with the resolved id selected.
 
 **Empty selection guard:** If the user confirms with no rows selected (and `--only` was not passed), print:
 
@@ -148,7 +138,7 @@ When any of these flags is passed (and `--only` is not), translate to the equiva
 No sections selected — no changes made.
 ```
 
-Skip Steps 2–4, jump to Step 5 (which will print "no changes" since nothing was written).
+Skip Steps 2–3b, jump to Step 4 (which will print "no changes" since nothing was written).
 
 **Locked rows refuse toggle:** If the user attempts to uncheck a `locked: true` row, re-display the menu with a one-line note: `"<id> is locked — needsMigration is true; complete migration first."` Locked rows always proceed into Step 3 regardless of selection.
 
@@ -452,7 +442,7 @@ If validation fails (sections missing or file unreadable), warn the user and off
 ---
 
 
-### Step 5 -- Summary
+### Step 4 -- Summary
 
 Show what was created or updated:
 

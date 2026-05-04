@@ -18,6 +18,7 @@ const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH, PROJECT_SECTIONS } = req
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { SHIP_FIELDS } = require(path.join(LIB, 'ship-fields'));
 const { SETUP_SECTIONS } = require(path.join(LIB, 'setup-sections'));
+const { OPENSPEC_ENRICH_VERSION } = require(path.join(__dirname, '..', 'util', 'openspec-enrich'));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -258,13 +259,12 @@ function detect(projectRoot) {
     }
     if (section.id === 'jira' && result.legacy.jira.exists) return 'legacy';
     if (section.id === 'openspec-block') {
-      // Legacy when managed block version is set but below current. The current
-      // plugin-shipped version is encoded inside util/openspec-enrich.js; we
-      // approximate "legacy" here as managedBlockVersion < 2 (v1 was the first
-      // shipped block version). Keep this conservative — a false 'set' is
-      // safer than a false 'legacy', the user can re-run with --force anyway.
+      // Legacy when managed block version is set but below the current plugin-shipped
+      // version (OPENSPEC_ENRICH_VERSION from util/openspec-enrich.js). Keep this
+      // conservative — a false 'set' is safer than a false 'legacy'; the user can
+      // re-run with --force anyway.
       const v = result.openspecConfig.managedBlockVersion;
-      if (v != null && v < 2) return 'legacy';
+      if (v != null && v < OPENSPEC_ENRICH_VERSION) return 'legacy';
     }
     // Misplaced section in project config (e.g., `ship` keyed at project level)
     if (misplacedSections.includes(section.id)) return 'legacy';
@@ -312,7 +312,8 @@ function detect(projectRoot) {
     let summary = '';
     try {
       summary = section.summarize(cfg, detectedContext) || '';
-    } catch (_) {
+    } catch (err) {
+      process.stderr.write(`[setup.js] summarize() failed for section "${section.id}": ${err.message}\n`);
       summary = '';
     }
     return {

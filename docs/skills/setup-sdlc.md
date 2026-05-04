@@ -35,7 +35,7 @@ Pre-check every row in the menu (reconfigure everything) instead of pre-selectin
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--migrate` | Migrate legacy config files (`.claude/version.json`, `.sdlc/ship-config.json`, etc.) into unified config | — |
-| `--skip <section>` | Skip a config section during setup (version, ship, jira, review, commit, pr, content) | — |
+| `--skip <section>` | Skip a config section during setup (version, ship, jira, review, commit, pr) | — |
 | `--force` | Pre-check every menu row (reconfigure all sections) | — |
 | `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | — |
 | `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | — |

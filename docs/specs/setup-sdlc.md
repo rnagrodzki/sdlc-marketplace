@@ -19,7 +19,7 @@
 - A9: `--no-copilot` — skip GitHub Copilot instructions, used with `--dimensions` (default: false)
 - A10: `--openspec-enrich` — jump directly to openspec enrichment sub-flow (default: false)
 - A11: `--remove-openspec` — remove the managed block from `openspec/config.yaml` and exit (default: false)
-- A12: Unnamed flag routing: `--dimensions`, `--pr-template`, `--guardrails`, `--execution-guardrails`, `--openspec-enrich` each bypass the main config builder flow and enter their sub-flow directly
+- A12: Flag routing: `--dimensions`, `--pr-template`, `--guardrails`, `--execution-guardrails`, `--openspec-enrich` are sugar for `--only <id>` (translated in Step 0 before the menu runs); they skip the menu and enter the corresponding sub-flow directly
 - A13: `--only <ids>` — comma-separated section ids (matching `prepare.sections[].id`) configured non-interactively; skips the Step 1 menu (default: none). Legacy direct-entry flags (`--dimensions` etc.) are sugar for `--only <id>`.
 
 ## Core Requirements
