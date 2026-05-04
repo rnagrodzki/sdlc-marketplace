@@ -18,6 +18,7 @@ tests:
   - file://datasets/pr-sdlc.yaml
   - file://datasets/review-sdlc.yaml
   - file://datasets/version-sdlc.yaml
+  - file://datasets/setup-sdlc.yaml
   - file://datasets/setup-sdlc-dimensions.yaml
   - file://datasets/setup-sdlc-pr-template.yaml
   - file://datasets/execute-plan-sdlc.yaml

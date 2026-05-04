@@ -17,6 +17,7 @@ const { detectVersionFile } = require(path.join(LIB, 'version'));
 const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH, PROJECT_SECTIONS } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { SHIP_FIELDS } = require(path.join(LIB, 'ship-fields'));
+const { SETUP_SECTIONS } = require(path.join(LIB, 'setup-sections'));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -194,6 +195,143 @@ function detect(projectRoot) {
     misplacedSections.length > 0 ||
     localIsV1;
   result.localIsV1 = localIsV1;
+
+  // ---------------------------------------------------------------------------
+  // sections[] — joined view of SETUP_SECTIONS × detect() state. Drives the
+  // selective-section menu in setup-sdlc/SKILL.md Step 1 and the verbose
+  // dispatch loop in Step 3. See lib/setup-sections.js for the manifest.
+  // Existing top-level keys above are preserved for back-compat.
+  // ---------------------------------------------------------------------------
+
+  // Read local config once (parsed) so summarize() can render set-state rows.
+  let parsedLocalConfig = null;
+  if (localExists) {
+    try {
+      parsedLocalConfig = JSON.parse(fs.readFileSync(localPath, 'utf8'));
+    } catch (_) { /* unreadable — leave null */ }
+  }
+
+  // Build a detected-context object for summarize() consumers. The leading
+  // underscore on _parsedProjectConfig signals "internal — not part of the
+  // P-field contract" but it is still serialized in the JSON output, which is
+  // fine because summarize() runs server-side here, not in the LLM.
+  const detectedContext = {
+    versionFile: detectedVersionFile,
+    fileType: detectedFileType,
+    tagPrefix,
+    defaultBranch,
+    content: result.content,
+    openspecConfig: result.openspecConfig,
+    _parsedProjectConfig: parsedProjectConfig,
+  };
+
+  // Resolve current config slice for a given section, used as `summarize(cfg, detected)`.
+  function currentCfgFor(section) {
+    if (section.configFile === '.claude/sdlc.json' && section.configPath) {
+      // Walk dot-path. `plan.guardrails`, `execute.guardrails` need split.
+      let cfg = parsedProjectConfig;
+      if (!cfg) return null;
+      for (const key of section.configPath.split('.')) {
+        cfg = cfg?.[key];
+        if (cfg == null) return null;
+      }
+      return cfg;
+    }
+    if (section.configFile === '.sdlc/local.json' && section.configPath) {
+      return parsedLocalConfig?.[section.configPath] ?? null;
+    }
+    // Delegated/content sections — no direct config slice; summarize reads detected
+    return null;
+  }
+
+  // Compute state: 'set' | 'not-set' | 'legacy'
+  function computeState(section) {
+    // Legacy detection per section
+    if (section.id === 'version' && result.legacy.version.exists) return 'legacy';
+    if (section.id === 'ship') {
+      if (result.legacy.ship.exists) return 'legacy';
+      if (localIsV1) return 'legacy';
+    }
+    if (section.id === 'review') {
+      if (result.legacy.review.exists || result.legacy.reviewLegacy.exists) return 'legacy';
+      if (localIsV1) return 'legacy';
+    }
+    if (section.id === 'jira' && result.legacy.jira.exists) return 'legacy';
+    if (section.id === 'openspec-block') {
+      // Legacy when managed block version is set but below current. The current
+      // plugin-shipped version is encoded inside util/openspec-enrich.js; we
+      // approximate "legacy" here as managedBlockVersion < 2 (v1 was the first
+      // shipped block version). Keep this conservative — a false 'set' is
+      // safer than a false 'legacy', the user can re-run with --force anyway.
+      const v = result.openspecConfig.managedBlockVersion;
+      if (v != null && v < 2) return 'legacy';
+    }
+    // Misplaced section in project config (e.g., `ship` keyed at project level)
+    if (misplacedSections.includes(section.id)) return 'legacy';
+
+    // Set detection
+    if (section.configFile === '.claude/sdlc.json') {
+      // Top-level key for simple sections (version, jira, commit, pr); nested
+      // for plan-guardrails (plan.guardrails) and execution-guardrails
+      // (execute.guardrails).
+      if (section.configPath) {
+        const slice = currentCfgFor(section);
+        if (slice != null) {
+          // For arrays (guardrails), require length > 0 to count as set
+          if (Array.isArray(slice)) return slice.length > 0 ? 'set' : 'not-set';
+          return 'set';
+        }
+      }
+    }
+    if (section.configFile === '.sdlc/local.json') {
+      if (parsedLocalConfig?.[section.configPath] != null) return 'set';
+    }
+    // Content/delegated sections
+    if (section.id === 'review-dimensions') {
+      return result.content.reviewDimensions.count > 0 ? 'set' : 'not-set';
+    }
+    if (section.id === 'pr-template') {
+      return result.content.prTemplate.exists ? 'set' : 'not-set';
+    }
+    if (section.id === 'openspec-block') {
+      return result.openspecConfig.managedBlockVersion != null ? 'set' : 'not-set';
+    }
+    return 'not-set';
+  }
+
+  // Locked: row cannot be unchecked when migration applies and this section is
+  // a migration trigger. The user must run migration; the menu auto-selects it.
+  function computeLocked(section, state) {
+    if (!result.needsMigration) return false;
+    return state === 'legacy';
+  }
+
+  result.sections = SETUP_SECTIONS.map(section => {
+    const state = computeState(section);
+    const cfg = currentCfgFor(section);
+    let summary = '';
+    try {
+      summary = section.summarize(cfg, detectedContext) || '';
+    } catch (_) {
+      summary = '';
+    }
+    return {
+      id: section.id,
+      label: section.label,
+      state,
+      summary,
+      locked: computeLocked(section, state),
+      purpose: section.purpose,
+      configFile: section.configFile,
+      configPath: section.configPath,
+      consumedBy: section.consumedBy,
+      filesModified: section.filesModified,
+      optional: section.optional,
+      delegatedTo: section.delegatedTo,
+      confirmDetected: section.confirmDetected || false,
+      fields: section.fields,
+    };
+  });
 
   return result;
 }

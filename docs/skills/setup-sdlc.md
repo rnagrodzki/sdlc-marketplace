@@ -2,7 +2,9 @@
 
 ## Overview
 
-Configures the SDLC plugin for a project in one interactive flow. Creates `.claude/sdlc.json` (project-level config) and `.sdlc/local.json` (user-local preferences), and orchestrates content setup (review dimensions, PR template). Replaces the fragmented first-use experience of running multiple init commands separately.
+Configures the SDLC plugin for a project. On invocation, `/setup-sdlc` shows a single multi-select menu listing every section it manages — version tracking, ship pipeline preferences, Jira, review scope, commit/PR patterns, review dimensions, PR template, plan and execution guardrails, and openspec enrichment. Each row shows a state badge (`set`, `not set`, or `legacy`), and only the sections you tick get configured. For every selected section, the skill prints a verbose header before any prompt — purpose, files modified, consuming skills, and a per-option description block — so you know exactly what each toggle controls before you answer.
+
+Creates `.claude/sdlc.json` (project-level config), `.sdlc/local.json` (user-local preferences), and content artifacts (`.claude/review-dimensions/*.yaml`, `.claude/pr-template.md`, `openspec/config.yaml` managed block).
 
 ---
 
@@ -12,6 +14,20 @@ Configures the SDLC plugin for a project in one interactive flow. Creates `.clau
 /setup-sdlc
 ```
 
+Renders the selective-section menu. Sections in state `not set` are pre-checked; `legacy` (migration-required) sections are locked and auto-checked; `set` sections are unchecked by default. Confirm with no rows selected to exit without changes.
+
+```text
+/setup-sdlc --only jira,review
+```
+
+Skip the menu, configure only `jira` and `review`. Useful for scripted runs or follow-up tweaks. Valid ids: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block`.
+
+```text
+/setup-sdlc --force
+```
+
+Pre-check every row in the menu (reconfigure everything) instead of pre-selecting only `not set` rows.
+
 ---
 
 ## Flags
@@ -20,8 +36,9 @@ Configures the SDLC plugin for a project in one interactive flow. Creates `.clau
 |------|-------------|---------|
 | `--migrate` | Migrate legacy config files (`.claude/version.json`, `.sdlc/ship-config.json`, etc.) into unified config | — |
 | `--skip <section>` | Skip a config section during setup (version, ship, jira, review, commit, pr, content) | — |
-| `--force` | Reconfigure already-configured sections | — |
-| `--dimensions` | Jump directly to review dimensions sub-flow (skip config builder) | — |
+| `--force` | Pre-check every menu row (reconfigure all sections) | — |
+| `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | — |
+| `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | — |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | — |
 | `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | — |
 | `--execution-guardrails` | Jump directly to execution guardrails sub-flow (skip config builder) | — |
@@ -112,6 +129,58 @@ Expansion mode: proposes only guardrails not already configured.
 
 - Must be inside a git repository
 - Node.js >= 16 (for `setup-prepare.js`)
+
+---
+
+## Sections
+
+Every section the menu can configure. The label, purpose, files modified, and consumed-by columns mirror `scripts/lib/setup-sections.js` — the single source of truth that drives both the menu and the per-prompt help text.
+
+| Section id | Purpose | Files modified | Consumed by |
+|---|---|---|---|
+| `version` | Tells `/version-sdlc` and `/ship-sdlc` where the canonical version lives (file or git tags) and how releases are tagged. | `.claude/sdlc.json` | `/version-sdlc`, `/ship-sdlc` |
+| `ship` | Developer-local pipeline preferences for `/ship-sdlc`: steps, default bump, draft PRs, auto-approve, workspace, rebase policy, review threshold. Stored in gitignored `.sdlc/local.json`. | `.sdlc/local.json` | `/ship-sdlc` |
+| `jira` | Default Jira project key used by `/jira-sdlc`, `/commit-sdlc`, and `/pr-sdlc` when extracting or assigning ticket IDs. | `.claude/sdlc.json` | `/jira-sdlc`, `/commit-sdlc`, `/pr-sdlc` |
+| `review` | Default scope for `/review-sdlc` (committed/staged/working/worktree/all). Local to each developer. | `.sdlc/local.json` | `/review-sdlc` |
+| `commit` | Commit message validation rules used by `/commit-sdlc` (subject regex, allowed types/scopes, required trailers). | `.claude/sdlc.json` | `/commit-sdlc` |
+| `pr` | PR title validation rules used by `/pr-sdlc` (title regex, allowed types/scopes, required trailers). | `.claude/sdlc.json` | `/pr-sdlc` |
+| `review-dimensions` | Review dimensions installed under `.claude/review-dimensions/*.yaml`. Each dimension is a focused check set used by `/review-sdlc`. | `.claude/review-dimensions/*.yaml` | `/review-sdlc` |
+| `pr-template` | PR description template at `.claude/pr-template.md`, used by `/pr-sdlc` when drafting PRs. | `.claude/pr-template.md` | `/pr-sdlc` |
+| `plan-guardrails` | Custom rules at `.claude/sdlc.json#plan.guardrails` evaluated by `/plan-sdlc` during critique phases. | `.claude/sdlc.json` | `/plan-sdlc` |
+| `execution-guardrails` | Runtime guardrails at `.claude/sdlc.json#execute.guardrails` evaluated by `/execute-plan-sdlc` and `/ship-sdlc` before/after each wave. | `.claude/sdlc.json` | `/execute-plan-sdlc`, `/ship-sdlc` |
+| `openspec-block` | Managed block in `openspec/config.yaml` providing sdlc-utilities workflow guidance to OpenSpec-aware skills. Idempotent across plugin versions. | `openspec/config.yaml` | `/plan-sdlc`, `/execute-plan-sdlc`, `/ship-sdlc` |
+
+### Field reference (selected sections)
+
+For each non-delegated section, these are the fields the verbose header reveals before any prompt. Descriptions are the same strings shown at runtime.
+
+#### `version`
+
+| Field | Default | Description |
+|---|---|---|
+| `mode` | `file` | Tells `/version-sdlc` and `/ship-sdlc` whether the canonical version lives in a file or only in git tags. The default `file` mode requires a versionFile path; pick `tag` for projects that derive every release from `git describe`. |
+| `versionFile` | `package.json` | Path to the file that holds the canonical version string. `/version-sdlc` reads and rewrites this file on each bump; setup auto-detects common paths. Ignored when mode is `tag`. |
+| `fileType` | `package.json` | Format used by `/version-sdlc` to parse and rewrite the version file. The default `package.json` reads the top-level `version` key; `version-file` is a plain-text file containing only the version string. |
+| `tagPrefix` | `v` | Prefix prepended to the version when `/version-sdlc` creates a release tag (e.g., prefix `v` produces `v1.2.3`). Empty string is allowed. |
+| `changelog` | `false` | When true, `/version-sdlc` and `/ship-sdlc` append a release entry to `changelogFile` on every bump. |
+| `changelogFile` | `CHANGELOG.md` | Path to the changelog file appended by `/version-sdlc` when changelog is enabled. |
+| `preRelease` | (empty) | When set (e.g., `rc`, `beta`), `/version-sdlc` and `/ship-sdlc` default to a pre-release bump on every default invocation until an explicit `major\|minor\|patch` graduates the release. Must match `^[a-z][a-z0-9]*$`. |
+
+#### `jira`
+
+| Field | Default | Description |
+|---|---|---|
+| `defaultProject` | (empty) | Project key (2–10 uppercase letters, e.g., `PROJ`) used by `/jira-sdlc` when no explicit project is supplied. `/commit-sdlc` and `/pr-sdlc` also use it when extracting ticket IDs from branch names. |
+
+#### `review`
+
+| Field | Default | Description |
+|---|---|---|
+| `scope` | `committed` | Default scope for `/review-sdlc` when no `--committed`/`--staged`/`--working`/`--worktree` flag is passed. `committed` reviews commits on the current branch vs the default branch; `working` reviews staged + unstaged; `all` includes untracked. |
+
+#### `ship`
+
+The seven `ship` fields are imported verbatim from `scripts/lib/ship-fields.js` (single source of truth for both `/ship-sdlc` and `/setup-sdlc`). Run `/setup-sdlc --only ship` to see each field's default and description in the verbose header before answering.
 
 ---
 
