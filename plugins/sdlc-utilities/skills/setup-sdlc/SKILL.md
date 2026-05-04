@@ -1,8 +1,8 @@
 ---
 name: setup-sdlc
-description: "Use this skill when setting up the SDLC plugin for a project, initializing configuration, or when any skill reports missing config. Handles unified config creation (.claude/sdlc.json), local config (.sdlc/local.json), and orchestrates content setup (review dimensions, PR template, plan guardrails, execution guardrails, openspec enrichment). Supports direct sub-flow entry via --dimensions, --pr-template, --guardrails, --execution-guardrails, --openspec-enrich. Arguments: [--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--openspec-enrich] [--remove-openspec] [--add] [--no-copilot]"
+description: "Use this skill when setting up the SDLC plugin for a project, initializing configuration, or when any skill reports missing config. Renders a selective-section menu so users choose which sections to configure; each selected section prints a verbose header (purpose, files-modified, consuming skills, per-option description) before any prompt. Supports direct sub-flow entry via --only, --dimensions, --pr-template, --guardrails, --execution-guardrails, --openspec-enrich. Arguments: [--migrate] [--skip <section>] [--force] [--only <ids>] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--openspec-enrich] [--remove-openspec] [--add] [--no-copilot]"
 user-invocable: true
-argument-hint: "[--migrate] [--skip <section>] [--force] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--openspec-enrich] [--remove-openspec] [--add] [--no-copilot]"
+argument-hint: "[--migrate] [--skip <section>] [--force] [--only <ids>] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--openspec-enrich] [--remove-openspec] [--add] [--no-copilot]"
 ---
 
 # SDLC Setup
@@ -20,9 +20,10 @@ delegates content creation to specialized skills.
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--migrate` | Force migration of legacy config files even if no legacy files are auto-detected | off |
-| `--skip <section>` | Skip a config section during setup. Valid values: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `content` | none |
-| `--force` | Reconfigure all sections even if already configured | off |
-| `--dimensions` | Jump directly to review dimensions sub-flow (skip config builder) | off |
+| `--skip <section>` | Skip a config section during setup. Valid values: `version`, `ship`, `jira`, `review`, `commit`, `pr` | none |
+| `--force` | Pre-check every menu row (reconfigure everything) instead of selecting only `not-set` rows | off |
+| `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid ids match `prepare.sections[].id`: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | none |
+| `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | off |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | off |
 | `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | off |
 | `--execution-guardrails` | Jump directly to execution guardrails sub-flow (skip config builder) | off |
@@ -65,29 +66,19 @@ Parse the JSON output from `$PREPARE_OUTPUT_FILE`. If exit code != 0, display th
 
 **Flag routing (check after pre-flight succeeds):**
 
-If `--dimensions` was passed:
-1. Run the shared project scan phase (same scan defined in Step 4, scan phase).
-2. Read and follow `@setup-dimensions.md`, passing the scan results as "Scan Input". Pass through `--add` and `--no-copilot` modifiers if present.
-3. Jump to Step 5 (summary). Skip Steps 1–4.
+The legacy direct-entry flags map onto `--only` (which now drives Step 3 directly):
 
-If `--pr-template` was passed:
-1. Run the shared project scan phase (same scan defined in Step 4, scan phase).
-2. Read and follow `@setup-pr-template.md`, passing the scan results as "Scan Input". Pass through `--add` if present.
-3. Jump to Step 5 (summary). Skip Steps 1–4.
+| Flag passed | Equivalent `--only <id>` |
+|---|---|
+| `--dimensions` | `--only review-dimensions` |
+| `--pr-template` | `--only pr-template` |
+| `--guardrails` | `--only plan-guardrails` |
+| `--execution-guardrails` | `--only execution-guardrails` |
+| `--openspec-enrich` | `--only openspec-block` |
 
-If `--guardrails` was passed:
-1. Read and follow `@setup-guardrails.md` (it runs its own skill/guardrails.js script internally). Pass through `--add` if present.
-2. Jump to Step 5 (summary). Skip Steps 1–4.
+If any of those flags is passed (and `--only` is not), translate it into `--only <id>`. If `--only <ids>` is passed (directly or via translation), skip Step 1's menu and proceed to Step 2 → Step 3 with `selectedIds = <ids>`. Pass through `--add`, `--no-copilot`, and `--remove-openspec` to the relevant sub-flow when invoked.
 
-If `--execution-guardrails` was passed:
-1. Read and follow `@setup-execution-guardrails.md`. Pass through `--add` if present.
-2. Jump to Step 5 (summary). Skip Steps 1–4.
-
-If `--openspec-enrich` was passed:
-1. Read and follow `@setup-openspec.md`. Pass through `--remove-openspec` as `--remove` if present.
-2. Jump to Step 5 (summary). Skip Steps 1–4.
-
-If none of `--dimensions`, `--pr-template`, `--guardrails`, `--execution-guardrails`, or `--openspec-enrich` was passed: continue with the full interactive flow (Steps 1–4) as normal.
+If none of the direct-entry flags or `--only` were passed: continue with the full interactive flow (Steps 1 → 2 → 3 → 5).
 
 The JSON contains these top-level keys:
 - `projectConfig` -- `{ exists, sections, misplaced, path }`
@@ -97,63 +88,61 @@ The JSON contains these top-level keys:
 - `content` -- `{ reviewDimensions: { count, path }, prTemplate: { exists, path }, jiraTemplates: { count, path } }`
 - `detected` -- `{ versionFile, fileType, tagPrefix, defaultBranch }`
 - `needsMigration` -- boolean: `true` when any legacy file exists OR any misplaced section found in project config
+- `sections` -- array of section descriptors driving Steps 1 and 3 (selective menu + verbose dispatch). Each row: `{ id, label, state ('set'|'not-set'|'legacy'), summary, locked, purpose, configFile, configPath, consumedBy, filesModified, optional, delegatedTo, confirmDetected, fields[] }`. Source of truth: `scripts/lib/setup-sections.js`.
 
 ---
 
-### Step 1 -- Status Report
+### Step 1 -- Selective-Section Menu
 
-Display what is configured vs missing. Use this exact format:
+Render a single multi-select menu populated from `prepare.sections[]`. Every visible row, badge, and per-option description is sourced from the manifest in `scripts/lib/setup-sections.js` — do NOT hardcode option labels here.
+
+**State badge per row** (driven by `section.state`):
+- `[set]` — section is already configured (greyed-out toggle, off by default).
+- `[not set]` — section has no config (toggle on by default).
+- `[legacy]` — section needs migration; toggle is auto-checked AND locked when `section.locked` is true.
+
+**Layout:**
 
 ```
-SDLC Setup Status
+SDLC Setup
 ---------------------------------------------------
-Project config (.claude/sdlc.json):
-  version:  [checkmark] configured / [x] not configured
-  jira:     [checkmark] configured / [x] not configured (optional)
-  commit:   [checkmark] configured / [x] not configured (optional)
-  pr:       [checkmark] configured / [x] not configured (optional)
+Detected configuration:
 
-Local config (.sdlc/local.json):
-  review:   [checkmark] configured / [x] not configured (defaults work)
-  ship:     [checkmark] configured / [x] not configured (defaults work)
+  [set]      <id>            <summary>
+  [not set]  <id>            <summary or "—">
+  [legacy]   <id>            <summary>  (locked — migration required)
+  ...
 
-Content:
-  Review dimensions:  N installed [checkmark] / [x] not installed (required for /review-sdlc)
-  PR template:        installed [checkmark] / [x] not installed (optional, fallback exists)
-  Jira templates:     N installed [checkmark] / [x] not installed (optional)
-
-Legacy files found:
-  .claude/version.json -- will migrate
-  .sdlc/ship-config.json -- will migrate
+Select sections to configure (space toggle, enter confirm):
+  [ ] <id>  — <one-line: section.purpose first sentence>
+  [x] <id>  — <one-line: section.purpose first sentence>
   ...
 ```
 
-Determine configured status:
-- `version`: configured if `projectConfig.sections` includes `"version"`
-- `jira`: configured if `projectConfig.sections` includes `"jira"`
-- `commit`: configured if `projectConfig.sections` includes `"commit"`
-- `pr`: configured if `projectConfig.sections` includes `"pr"`
-- `review`: configured if `localConfig.exists` is true
-- `ship`: configured if `localConfig.exists` is true and local config includes a `"ship"` section
-- Review dimensions: installed if `content.reviewDimensions.count > 0`
-- PR template: installed if `content.prTemplate.exists` is true
-- Jira templates: installed if `content.jiraTemplates.count > 0`
+Render every row in `prepare.sections[]` exactly once, in array order. Use `section.label` and `section.summary` verbatim for the status block; use the first sentence of `section.purpose` for the menu hint.
 
-Legacy files: list each legacy entry where `exists` is true. If none, omit the "Legacy files found" section.
+**Default selection (which rows are pre-checked):**
 
-Misplaced sections: if `projectConfig.misplaced` is non-empty, display a warning:
-```
-Misplaced sections in project config:
-  ship — should be in .sdlc/local.json (will migrate)
-```
+| Condition | Pre-checked rows |
+|---|---|
+| `section.locked` is `true` | always checked, cannot toggle |
+| `--force` passed | every row |
+| `--only <ids>` passed | only the listed ids; other rows hidden, menu skipped |
+| Otherwise | rows where `section.state === 'not-set'` |
 
-**Early exit:** If everything is configured (all project config sections present, local config exists, review dimensions count > 0) AND `needsMigration` is `false` AND `--force` was NOT passed, print:
+**Flag aliases:** See the flag-alias routing table in Step 0. When any direct-entry flag is passed (and `--only` is not), the translation is already applied before Step 1 runs — skip the menu and proceed to Step 3 with the resolved id selected.
+
+**Empty selection guard:** If the user confirms with no rows selected (and `--only` was not passed), print:
 
 ```
-All configured. Use --force to reconfigure.
+No sections selected — no changes made.
 ```
 
-And stop.
+Skip Steps 2–3b, jump to Step 4 (which will print "no changes" since nothing was written).
+
+**Locked rows refuse toggle:** If the user attempts to uncheck a `locked: true` row, re-display the menu with a one-line note: `"<id> is locked — needsMigration is true; complete migration first."` Locked rows always proceed into Step 3 regardless of selection.
+
+Use AskUserQuestion with `multiSelect` to dispatch the menu. The question text is `"Select sections to configure"`; choices are the rows; selected values are the section ids to process. Defer migration and field collection to Step 2 / Step 3.
 
 ---
 
@@ -212,137 +201,85 @@ On **no** (configure from scratch): proceed directly to Step 3 without migration
 
 ---
 
-### Step 3 -- Config Builder
+### Step 3 -- Dispatch Loop (Verbose Per-Section Configuration)
 
-For each missing section (skip any section passed via `--skip`), interactively configure it. When `--force` is passed, treat all sections as missing (reconfigure everything).
+For each id selected in Step 1 (call this list `selectedIds`), in `prepare.sections[]` order, look up the row `section = prepare.sections.find(s => s.id === id)` and:
 
-Write config files via inline Node.js that calls `writeProjectConfig` and `writeLocalConfig` from `lib/config.js`. Resolve the script directory using the same pattern as Step 2.
+1. **Print the verbose header** (every line below sourced from `section.*` — do NOT hardcode):
 
-#### 3a. Version section
+   ```
+   --- Configuring: <section.label> ----------------------------------
+   Purpose:        <section.purpose>
 
-Use the `detected` values from skill/setup.js output to pre-fill. Use AskUserQuestion:
+   Files modified: <section.filesModified joined with ", ">
+   Consumed by:    <section.consumedBy joined with ", ">
+   Config file:    <section.configFile> (path: <section.configPath || "—">)
+   Current value:  <section.summary or "<none>">
+   ```
 
-> Version configuration detected:
->   Version file: {detected.versionFile} ({detected.fileType})
->   Tag prefix: {detected.tagPrefix} (from existing tags)
->
-> Confirm version setup?
+   The header text comes verbatim from the manifest (`scripts/lib/setup-sections.js`). Do NOT rewrite, paraphrase, or omit any of these four lines for any selected section.
 
-Options:
-- **yes** -- use detected settings
-- **customize** -- change settings
-- **skip** -- don't configure versioning
+2. **Print the per-option description block** (only when `section.fields.length > 0`):
 
-On **yes**: write version section with detected values:
-```json
-{
-  "version": {
-    "mode": "file",
-    "versionFile": "{detected.versionFile}",
-    "fileType": "{detected.fileType}",
-    "tagPrefix": "{detected.tagPrefix}",
-    "changelog": false
-  }
-}
-```
+   ```
+   Options:
+     <field.name>  ({field.type}, default: <field.default>)
+                   <field.description>
+     ...
+   ```
 
-If `detected.versionFile` is null (no version file detected), set `mode` to `"tag"` and omit `versionFile` and `fileType`.
+3. **Run the dispatcher for the section's `delegatedTo` value**:
 
-On **customize**: ask about each field individually using AskUserQuestion:
-1. **mode** -- `file` (version tracked in a file) or `tag` (version from git tags only). Required.
-2. **versionFile** -- path to version file (only if mode is `file`)
-3. **fileType** -- format: package.json, cargo.toml, pyproject.toml, pubspec.yaml, plugin.json, version-file (only if mode is `file`)
-4. **tagPrefix** -- prefix for git tags (default: `v`)
-5. **changelog** -- generate changelog on release? yes/no (default: no)
-6. **changelogFile** -- path to changelog file (only if changelog is yes, default: `CHANGELOG.md`)
-7. **preRelease** -- default pre-release label for `version-sdlc` and `ship-sdlc`. Leave empty for stable releases, or set to `rc`/`beta`/`alpha`/etc. Must match `^[a-z][a-z0-9]*$` (lowercase, start with a letter, alphanumeric). When set, running `version-sdlc` (or `ship-sdlc`) without an explicit `major|minor|patch` and without `--pre` produces a pre-release version using this label. Empty/skipped omits the field. Validate against the regex; on mismatch, re-prompt showing the regex.
+   | `delegatedTo` value | Dispatcher |
+   |---|---|
+   | `null` | Generic field-loop (3.G below) — dispatch one AskUserQuestion per `section.fields[]` entry, optionally gated by `section.confirmDetected` |
+   | `'inline-commit-builder'` | Inline commit-pattern builder (3.commit below) — same conditional logic as legacy Step 3e, gated by the verbose header above |
+   | `'inline-pr-builder'` | Inline PR-pattern builder (3.pr below) — same conditional logic as legacy Step 3f |
+   | `'setup-dimensions'` | Run scan phase (Step 3.S below), then read and follow `@setup-dimensions.md` passing scan results as "Scan Input". Pass through `--add` and `--no-copilot` modifiers if present. |
+   | `'setup-pr-template'` | Run scan phase (Step 3.S), then read and follow `@setup-pr-template.md` passing scan results. Pass through `--add` if present. |
+   | `'setup-guardrails'` | Read and follow `@setup-guardrails.md` (it runs its own scan internally). Pass through `--add` if present. |
+   | `'setup-execution-guardrails'` | Read and follow `@setup-execution-guardrails.md`. Pass through `--add` if present. |
+   | `'setup-openspec'` | Read and follow `@setup-openspec.md`. Pass through `--remove-openspec` as `--remove` if present. |
 
-On **skip**: do not write a version section.
+After the loop, write any pending project-config and local-config slices via the "Writing config files" sub-section at the end of Step 3.
 
-Write the version section with the collected answers. The `preRelease` field is written only if the user supplied a non-empty answer that matched the regex (matching the existing optional-field pattern used for `versionFile` / `changelogFile`):
-```json
-{
-  "version": {
-    "mode": "file",
-    "versionFile": "...",
-    "fileType": "...",
-    "tagPrefix": "v",
-    "changelog": false,
-    "preRelease": "rc"
-  }
-}
-```
+#### 3.G. Generic field loop (delegatedTo === null)
 
-The "yes-defaults" path above does NOT write `preRelease` — defaults preserve stable-release behavior.
+For sections with `delegatedTo: null` (`version`, `ship`, `jira`, `review`):
 
-#### 3b. Ship section
+If `section.confirmDetected === true` (currently only `version`), dispatch a meta-prompt FIRST using AskUserQuestion:
 
-Note to the user: "Ship config is stored in `.sdlc/local.json` (developer-local, gitignored). Each developer has their own ship preferences."
+> Use detected settings, customize each field, or skip this section?
 
-Iterate over every entry in `prepare.shipFields` (the P7 contract field from Step 0 prepare output). For each entry, dispatch exactly one `AskUserQuestion` using:
-- **Question prompt:** the entry's `label`
-- **Helper text / description:** the entry's `description`
-- **Answer choices:** the entry's `options`
-- **Default answer:** the entry's `default`
+Options: `yes` (write detected values directly), `customize` (iterate `section.fields`), `skip` (write nothing for this section).
 
-You must issue exactly `prepare.shipFields.length` `AskUserQuestion` calls. Do not skip, reorder, batch, or infer answers. Do not hand-enumerate the field list — the shared lib owns it.
+- On **yes**: Build the section value from `prepare.detected.*` (e.g., for `version`: `{ mode: 'file', versionFile, fileType, tagPrefix }`; if `prepare.detected.versionFile` is null, use `{ mode: 'tag', tagPrefix }`). Do NOT write `preRelease` on the yes path.
+- On **customize**: continue to the field iteration below.
+- On **skip**: stop processing this section; do not write anything.
 
-**Answer mapping when writing `.sdlc/local.json`:**
-- `enum` fields → write the selected option string verbatim (no translation)
-- `multi-select` fields → write the selected options as a JSON array
-- `boolean` fields (`draft`, `auto`) → map `yes`→`true`, `no`→`false`
-- For `rebase` specifically, write the selected string (`auto`, `skip`, or `prompt`) verbatim — do NOT translate to `yes`/`no`, as `ship.js` only accepts those three strings or legacy booleans
+For each entry `field` in `section.fields` (when iterating), dispatch one AskUserQuestion:
 
-After the loop, collect answers into a `ship` object (keys = entry `name`, values = normalized per above) and write via the existing `setup-init.js --local-config '{"ship":{...}}'` path.
+- **Question prompt:** `field.label`
+- **Helper text:** `field.description` (verbatim from manifest)
+- **Choices:** `field.options` (or free-text input when `options` is `null`)
+- **Default:** `field.default`
+- **Validation:** if `field.validate` is defined, re-prompt on failure showing the regex/constraint inline
 
-Implements R15; reads P7.
+Skip a field when an upstream answer makes it irrelevant: for `version`, skip `versionFile` and `fileType` if `mode === 'tag'`; skip `changelogFile` if `changelog === false`; omit `preRelease` from the written config when the user enters an empty string.
 
-#### 3c. Jira section
+**Answer mapping when assembling the section object:**
+- `enum` fields → write the selected option string verbatim
+- `multi-select` fields → write the array of selected options
+- `boolean` fields → map `yes` → `true`, `no` → `false` (exception: `rebase` writes `auto`/`skip`/`prompt` verbatim — do NOT translate to yes/no)
+- `string` fields → write the entered string; omit when empty (and the field is optional)
 
-Use AskUserQuestion:
+You MUST issue exactly one AskUserQuestion per `section.fields[]` entry that survives the gating above. Do not batch, reorder, or hand-enumerate fields — the manifest owns the list.
 
-> Do you use Jira for this project?
+After the field loop, store the assembled section object keyed by id; the "Writing config files" step will persist it.
 
-Options:
-- **yes** -- configure Jira integration
-- **no** -- skip Jira setup
+#### 3.commit. Inline commit-pattern builder (delegatedTo === 'inline-commit-builder')
 
-On **yes**: ask for the default project key (2-10 uppercase letters, e.g., PROJ). Write the jira section:
-```json
-{
-  "jira": {
-    "defaultProject": "PROJ"
-  }
-}
-```
-
-On **no**: do not write a jira section.
-
-#### 3d. Review section (local config)
-
-Use AskUserQuestion:
-
-> Default review scope for /review-sdlc?
-
-Options:
-- **all** -- review all changes (staged + unstaged + untracked)
-- **committed** -- only committed changes vs base branch
-- **staged** -- only staged changes
-- **working** -- staged + unstaged (no untracked)
-- **worktree** -- all changes in the worktree
-
-Default: committed
-
-Write `.sdlc/local.json` with the review section:
-```json
-{
-  "review": {
-    "scope": "committed"
-  }
-}
-```
-
-#### 3e. Commit message patterns
+The verbose header from Step 3 (purpose / files-modified / consumed-by / config-file / current-value) has already been printed. Then run the existing conditional builder:
 
 Use AskUserQuestion:
 
@@ -370,33 +307,15 @@ On **conventional**: Use AskUserQuestion for sequential refinement:
 
 5. "Required trailers?" -- free text comma-separated (e.g., `Ticket`, `Reviewed-By`) or skip → Sets `trailers` array
 
-Assemble the `commit` section object with the following fields:
-```json
-{
-  "commit": {
-    "subjectPattern": "regex-here",
-    "subjectPatternError": "Commit subject must follow Conventional Commits format",
-    "allowedTypes": ["feat", "fix", ...],
-    "allowedScopes": ["scope1", "scope2"],
-    "requiresBody": ["feat", "fix"],
-    "trailers": ["Ticket", "Reviewed-By"]
-  }
-}
-```
-
-Only include optional fields if the user provided values. Omit empty arrays.
+Assemble the `commit` section object. Only include optional fields if the user provided values; omit empty arrays.
 
 On **ticket-prefix**: Use AskUserQuestion for sequential refinement:
 
 1. "Ticket pattern?" -- free text regex (default: `[A-Z]{2,10}-\\d+` for `PROJ-123`) → Sets `ticketPattern`
-
 2. "Combine with conventional type?" -- yes / no:
    - yes: `subjectPattern` becomes `^PROJ-\\d+ (feat|fix|...)(\\(.*\\))?: .+$`
    - no: `subjectPattern` becomes `^PROJ-\\d+: .+$`
-
 3. If combined with types, ask the same type/scope/body/trailer refinement questions as **conventional**.
-
-Assemble the `commit` section with `ticketPattern` and `subjectPattern`.
 
 On **custom**: Use AskUserQuestion:
 
@@ -407,33 +326,22 @@ On **skip**: Do not write a commit section.
 
 Store the assembled `commit` config for use in the "Writing config files" step.
 
-#### 3f. PR title patterns
+#### 3.pr. Inline PR-pattern builder (delegatedTo === 'inline-pr-builder')
+
+Verbose header from Step 3 already printed. Then:
 
 Use AskUserQuestion:
 
 > Do you enforce PR title patterns?
 
 Options:
-- **same-as-commit** -- Use the same pattern as commit messages (only if Step 3e produced a config)
-- **conventional** -- Conventional format for PR titles
+- **same-as-commit** -- Use the same pattern as commit (only when 3.commit produced a config)
+- **conventional** -- Conventional format
 - **ticket-prefix** -- Ticket prefix format
 - **custom** -- Enter your own regex
 - **skip** -- Don't configure PR title patterns
 
-On **same-as-commit** (if available): Copy the commit config fields to PR config with renamed fields:
-- `subjectPattern` → `titlePattern`
-- `subjectPatternError` → `titlePatternError`
-- Keep `allowedTypes`, `allowedScopes`, `requiresBody`, `trailers` as-is
-
-Assemble the `pr` section:
-```json
-{
-  "pr": {
-    "titlePattern": "regex-from-commit",
-    "titlePatternError": "PR title must follow Conventional Commits format"
-  }
-}
-```
+On **same-as-commit** (if available): Copy the commit config fields to PR config with renamed fields: `subjectPattern` → `titlePattern`, `subjectPatternError` → `titlePatternError`. Keep `allowedTypes`, `allowedScopes`, `requiresBody`, `trailers` as-is.
 
 On **conventional**: Use sequential AskUserQuestion:
 
@@ -442,17 +350,55 @@ On **conventional**: Use sequential AskUserQuestion:
 3. "Allowed scopes?" -- free text comma-separated or skip
 4. "Required trailers?" -- free text comma-separated or skip
 
-Assemble the `pr` section with `titlePattern`, `titlePatternError`, `allowedTypes`, `allowedScopes`, `trailers`.
-
-On **ticket-prefix**: Ask same questions as commit (ticket pattern, combine with types, etc.). Assemble `pr` section with `titlePattern`.
+On **ticket-prefix**: Ask same questions as commit (ticket pattern, combine with types, etc.).
 
 On **custom**: Ask:
+
 1. "Enter your regex pattern for PR title:" → free text → `titlePattern`
 2. "Enter error message if pattern doesn't match:" → free text → `titlePatternError`
 
 On **skip**: Do not write a pr section.
 
 Store the assembled `pr` config for use in the "Writing config files" step.
+
+#### 3.S. Scan phase (delegated content sections only)
+
+Before invoking `setup-dimensions` or `setup-pr-template`, run the project signal scan:
+
+> **Shell safety:** Use the **Glob** tool for all file/directory existence checks.
+> Do NOT use Bash `ls` with glob patterns — zsh (macOS default) errors on unmatched globs.
+> Use Bash only for `git` commands, `gh` CLI, and `which`.
+
+- **Dependency manifests:** Use Glob for `package.json`, `requirements.txt`, `Pipfile`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle`. Read each found file.
+- **Framework config:** Use Glob for `**/jest.config.*`, `**/vitest.config.*`, `**/.eslintrc*`, `**/tsconfig.json`, `**/openapi.yaml`, `**/openapi.json`, `**/.prettierrc*`.
+- **Directory structure:** Use Glob for `src/`, `lib/`, `controllers/`, `services/`, `middleware/`, `models/`, `routes/`, `api/`, `pkg/`, `cmd/`, `internal/` and patterns from `@scan-patterns.md`.
+- **CI/CD config:** Use Glob for `.github/workflows/*.yml`, `Jenkinsfile`, `.circleci/config.yml`, `.gitlab-ci.yml`.
+- **Database presence:** Use Glob for `prisma/`, `migrations/`, `alembic.ini`, `db/migrate/`, `**/sequelize*`, `**/typeorm*`, `**/sqlalchemy*`.
+- **Test structure:** Use Glob for `test/`, `tests/`, `spec/`, `__tests__/`, `cypress/`, `**/playwright.config.*`.
+- **Existing review dimensions:** Use Glob for `.claude/review-dimensions/*` (count and names).
+- **Existing guardrails:** Use Read on `.claude/sdlc.json` → `plan.guardrails` array if present.
+- **GitHub hosting detection:** Bash for `git remote -v` and `gh repo view` (safe). Use Glob for `.github/`.
+- **CLAUDE.md / AGENTS.md:** Use Read on `CLAUDE.md`, `AGENTS.md`, `.claude/CLAUDE.md` if present.
+- **PR template:** Use Glob for `.github/PULL_REQUEST_TEMPLATE.md`, `.github/pull_request_template.md`.
+- **Recent PRs:** Bash for `gh pr list --limit 5 --json title,body` (safe).
+- **Existing PR template:** Use Glob for `.claude/pr-template.md`.
+- **JIRA evidence:** Bash for `git log --oneline -20` and `git rev-parse --abbrev-ref HEAD` (safe).
+
+Collect all signals into a "Scan Input" object to pass to the sub-flow. Run the scan once per setup invocation; cache the result for any subsequent delegated section in the same selectedIds list.
+
+#### Legacy section reference
+
+The historical step labels map onto the dispatcher above for anyone updating tests or docs:
+
+| Legacy step | Manifest section id | Dispatcher branch |
+|---|---|---|
+| 3a | `version` | 3.G with `confirmDetected: true` |
+| 3b | `ship` | 3.G |
+| 3c | `jira` | 3.G |
+| 3d | `review` | 3.G |
+| 3e | `commit` | 3.commit |
+| 3f | `pr` | 3.pr |
+
 
 #### Writing config files
 
@@ -495,68 +441,8 @@ If validation fails (sections missing or file unreadable), warn the user and off
 
 ---
 
-### Step 4 -- Content Setup
 
-#### Scan Phase
-
-Before presenting the content menu, collect all project signals needed by the sub-flows:
-
-> **Shell safety:** Use the **Glob** tool for all file/directory existence checks.
-> Do NOT use Bash `ls` with glob patterns — zsh (macOS default) errors on unmatched globs.
-> Use Bash only for `git` commands, `gh` CLI, and `which`.
-
-- **Dependency manifests:** Use Glob for `package.json`, `requirements.txt`, `Pipfile`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`, `build.gradle`. Read each found file.
-- **Framework config:** Use Glob for `**/jest.config.*`, `**/vitest.config.*`, `**/.eslintrc*`, `**/tsconfig.json`, `**/openapi.yaml`, `**/openapi.json`, `**/.prettierrc*`.
-- **Directory structure:** Use Glob for `src/`, `lib/`, `controllers/`, `services/`, `middleware/`, `models/`, `routes/`, `api/`, `pkg/`, `cmd/`, `internal/` and patterns from `@scan-patterns.md`.
-- **CI/CD config:** Use Glob for `.github/workflows/*.yml`, `Jenkinsfile`, `.circleci/config.yml`, `.gitlab-ci.yml`.
-- **Database presence:** Use Glob for `prisma/`, `migrations/`, `alembic.ini`, `db/migrate/`, `**/sequelize*`, `**/typeorm*`, `**/sqlalchemy*`.
-- **Test structure:** Use Glob for `test/`, `tests/`, `spec/`, `__tests__/`, `cypress/`, `**/playwright.config.*`.
-- **Existing review dimensions:** Use Glob for `.claude/review-dimensions/*` (count and names).
-- **Existing guardrails:** Use Read on `.claude/sdlc.json` → `plan.guardrails` array if present.
-- **GitHub hosting detection:** Bash for `git remote -v` and `gh repo view` (safe). Use Glob for `.github/`.
-- **CLAUDE.md / AGENTS.md:** Use Read on `CLAUDE.md`, `AGENTS.md`, `.claude/CLAUDE.md` if present.
-- **PR template:** Use Glob for `.github/PULL_REQUEST_TEMPLATE.md`, `.github/pull_request_template.md`.
-- **Recent PRs:** Bash for `gh pr list --limit 5 --json title,body` (safe).
-- **Existing PR template:** Use Glob for `.claude/pr-template.md`.
-- **JIRA evidence:** Bash for `git log --oneline -20` and `git rev-parse --abbrev-ref HEAD` (safe).
-
-Collect all signals into a "Scan Input" object to pass to sub-flows.
-
-#### Content Menu
-
-Use AskUserQuestion with multiSelect:
-
-> Content setup (optional):
->   1. Review dimensions -- required for /review-sdlc
->   2. PR template -- customized PR descriptions
->   3. Plan guardrails -- custom rules for /plan-sdlc critique phases
->   4. OpenSpec enrichment -- add sdlc guidance block to openspec/config.yaml (shown only when `openspecConfig.exists` is true)
->   5. All (dimensions → guardrails → PR template + openspec if detected)
->   6. Skip content setup
-
-Options:
-- **review-dimensions** -- install review dimensions
-- **pr-template** -- create PR template
-- **plan-guardrails** -- configure plan guardrails
-- **openspec-enrich** -- enrich openspec/config.yaml with managed block (shown only when prepare output `openspecConfig.exists` is true AND `openspecConfig.managedBlockVersion` is null)
-- **all** -- run all sequentially (dimensions → guardrails → PR template → openspec enrichment if detected)
-- **skip** -- skip content setup
-
-On **review-dimensions**: Read and follow `@setup-dimensions.md`, passing the scan results as "Scan Input".
-
-On **pr-template**: Read and follow `@setup-pr-template.md`, passing the scan results as "Scan Input".
-
-On **plan-guardrails**: Read and follow `@setup-guardrails.md` (it runs skill/guardrails.js internally).
-
-On **openspec-enrich**: Read and follow `@setup-openspec.md`.
-
-On **all**: Run sequentially in this order: read and follow `@setup-dimensions.md` (passing scan results), then `@setup-guardrails.md`, then `@setup-pr-template.md` (passing scan results), then `@setup-openspec.md` (only if `openspecConfig.exists` is true).
-
-On **skip**: proceed to Step 5.
-
----
-
-### Step 5 -- Summary
+### Step 4 -- Summary
 
 Show what was created or updated:
 

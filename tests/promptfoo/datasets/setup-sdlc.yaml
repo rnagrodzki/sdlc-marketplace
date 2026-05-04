@@ -1,0 +1,167 @@
+# Behavioral tests for setup-sdlc selective-section menu (issue #191).
+# Covers: full-flow menu, single-section selection, legacy migration row locking,
+# empty selection no-op, --only flag bypassing menu, and verbose-header rendering.
+#
+# Fixture appropriateness:
+#   setup-fully-configured  -- all rows state:'set'; user picks one section to tweak
+#   setup-clean-project     -- all rows state:'not-set'; pre-checked; full flow
+#   setup-legacy-migration  -- legacy rows locked; auto-selected; cannot toggle off
+#
+# All cases run via the LLM provider against `plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md`.
+
+- description: "setup-sdlc: fully-configured project + user picks one section, only that section runs"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc. The menu appears; I want to reconfigure only the `jira` section.
+      Show me what the menu looks like, accept my selection of `jira`, then walk me through
+      configuring just that section.
+  assert:
+    # Menu must surface every section row at least by id
+    - type: icontains-all
+      value:
+        - "version"
+        - "ship"
+        - "jira"
+        - "review"
+    # Must render state badges
+    - type: regex
+      value: "(\\[set\\]|set\\b)"
+    # Must show only jira's verbose header in the dispatch (not all sections)
+    - type: icontains
+      value: "jira"
+    # Behavioral
+    - type: llm-rubric
+      value: >
+        The response renders the multi-select menu populated from prepare.sections[]. All 11
+        rows show up at least by id. The user's selection of `jira` is honored, and ONLY the
+        jira section enters the dispatch loop in Step 3 — the response does NOT walk through
+        version, ship, review, commit, or pr. Before asking any jira-specific question, the
+        response prints a verbose header for jira including Purpose, Files modified, and
+        Consumed by lines sourced from the manifest.
+
+- description: "setup-sdlc: clean project + user accepts pre-checked menu, full flow runs"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-clean-project.md"
+    user_request: >
+      Run /setup-sdlc. Nothing is configured; the menu should pre-check every not-set row.
+      Confirm the default selection and show me the first verbose header you'd render
+      (for the `version` section).
+  assert:
+    - type: icontains
+      value: "version"
+    # Pre-check expectation: every row defaulted on
+    - type: regex
+      value: "(\\[x\\]|pre-check|default selection|all selected)"
+    # Verbose header for version
+    - type: icontains-all
+      value:
+        - "Purpose"
+        - "Files modified"
+        - "Consumed by"
+    - type: llm-rubric
+      value: >
+        The response acknowledges that on a clean project all not-set rows are pre-checked
+        in the multi-select menu by default. It confirms the default selection and proceeds
+        to render Step 3 for the first selected section (`version`). The verbose header for
+        version contains four labelled lines: Purpose, Files modified, Consumed by, and
+        Config file (or equivalent). The header text comes from the manifest, not freeform copy.
+
+- description: "setup-sdlc: legacy fixture + migration row locked and cannot be toggled off"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-legacy-migration.md"
+    user_request: >
+      Run /setup-sdlc. The version row is `legacy` (locked: true) and so are ship and review.
+      I want to UNCHECK the `version` row to skip migration. Tell me what happens.
+  assert:
+    - type: icontains-any
+      value:
+        - "locked"
+        - "cannot toggle"
+        - "auto-selected"
+        - "migration"
+    # Must NOT silently allow uncheck
+    - type: llm-rubric
+      value: >
+        The response refuses to allow the user to uncheck the `version` row because it is
+        locked (locked: true in prepare.sections). It explains that locked rows are
+        auto-selected and proceed into Step 3 regardless of user input — migration must
+        complete first. The response does NOT proceed with version skipped; instead it
+        either re-displays the menu with a note, or confirms migration will run.
+
+- description: "setup-sdlc: empty selection at menu exits cleanly with no changes"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc. The menu appears. I uncheck every (non-locked) row and confirm
+      with no rows selected. Tell me what happens.
+  assert:
+    - type: icontains-any
+      value:
+        - "no changes"
+        - "no sections selected"
+        - "nothing to configure"
+    # Must NOT walk through any section
+    - type: llm-rubric
+      value: >
+        The response detects the empty selection and exits cleanly with a "no changes" /
+        "no sections selected" summary. It does NOT enter the Step 3 dispatch loop, does
+        NOT run any AskUserQuestion for individual fields, and does NOT write any config
+        files. The summary at Step 5 reflects "nothing was configured."
+
+- description: "setup-sdlc --only jira,review: menu skipped, both sections run"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc --only jira,review. Skip the menu entirely; configure only those
+      two sections in dispatch order.
+  assert:
+    - type: icontains-all
+      value:
+        - "jira"
+        - "review"
+    # Must not enumerate sections that were not selected
+    - type: llm-rubric
+      value: >
+        The response treats --only jira,review as bypassing the Step 1 menu and proceeds
+        straight to Step 3 with only those two ids selected. It prints a verbose header
+        for jira and another for review (in that order), runs the per-field prompts (or
+        delegates) for each, and does NOT touch version, ship, commit, pr, or any content
+        sub-flow. The final summary lists only jira and review as configured.
+
+- description: "setup-sdlc: verbose header sourced from manifest precedes any prompt"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-clean-project.md"
+    user_request: >
+      Run /setup-sdlc --only jira. Before asking me anything, print the verbose header
+      that the manifest drives — purpose, files modified, consuming skills, and per-option
+      description block.
+  assert:
+    # The four verbose-header labels must appear before any AskUserQuestion
+    - type: icontains-all
+      value:
+        - "Purpose"
+        - "Files modified"
+        - "Consumed by"
+        - "/jira-sdlc"
+    # Field description sentence (substring from manifest)
+    - type: icontains-any
+      value:
+        - "default Jira project"
+        - "ticket"
+        - "PROJ"
+    - type: llm-rubric
+      value: >
+        Before asking any AskUserQuestion, the response prints a verbose header for the
+        jira section. The header contains at minimum: a Purpose line explaining what the
+        jira section does at runtime, a Files modified line listing .claude/sdlc.json,
+        a Consumed by line listing /jira-sdlc, /commit-sdlc, /pr-sdlc, and an Options
+        block describing the defaultProject field with at least one full sentence covering
+        what runtime behavior changes when set. The header copy comes from the manifest
+        (scripts/lib/setup-sections.js), not freeform LLM-generated text.
