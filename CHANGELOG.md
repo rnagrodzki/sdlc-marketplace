@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.36] - 2026-05-04
+
+### Added
+- setup-sdlc: replaced linear configuration flow with a selective multiselect menu; each section now shows a verbose header with purpose, affected files, and current value before prompting (#191)
+
+### Fixed
+- setup-sdlc: corrected stale documentation references, improved error logging, and replaced magic literals with named constants (#191)
+
 ## [0.17.35] - 2026-05-04
 
 ### Added
