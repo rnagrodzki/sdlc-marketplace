@@ -160,4 +160,4 @@
 - I11: `setup-openspec.md` — sub-flow for openspec config enrichment
 - I12: `util/openspec-enrich.js` — deterministic script for managed-block operations on `openspec/config.yaml`
 - I13: `setup-pr-labels.md` — sub-flow for PR label assignment policy ([issue #197](https://github.com/rnagrodzki/sdlc-marketplace/issues/197)); writes `pr.labels` (mode: off|rules|llm) into `.claude/sdlc.json`
-- I13: `lib/setup-sections.js` — single source of truth for the `SETUP_SECTIONS` manifest consumed by `skill/setup.js` to emit `prepare.sections[]` (P-sections) and by SKILL.md Step 1 / Step 3 to render menu rows and verbose headers
+- I14: `lib/setup-sections.js` — single source of truth for the `SETUP_SECTIONS` manifest consumed by `skill/setup.js` to emit `prepare.sections[]` (P-sections) and by SKILL.md Step 1 / Step 3 to render menu rows and verbose headers

@@ -146,7 +146,7 @@ Key fields available (including `customTemplate` added for project-level PR temp
 | `existingPr` | `{ number, title, url, state, labels }` or `null` |
 | `jiraTicket` | Detected ticket reference or `null` |
 | `commits` | `[{ hash, subject, body, coAuthors }]` — all commits on this branch |
-| `diffStat` | `{ filesChanged, insertions, deletions, summary }` |
+| `diffStat` | `{ filesChanged, insertions, deletions, totalLinesChanged, summary }` |
 | `diffContent` | Full unified diff text |
 | `remoteState` | `{ pushed, remoteBranch, action }` |
 | `warnings` | Non-fatal notes already surfaced to the user by the command |

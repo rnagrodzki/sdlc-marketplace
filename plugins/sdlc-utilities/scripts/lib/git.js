@@ -553,10 +553,13 @@ function getDiffStat(base, projectRoot) {
   const insMatch   = summary.match(/(\d+) insertions?\(\+\)/);
   const delMatch   = summary.match(/(\d+) deletions?\(-\)/);
 
+  const insertions = insMatch ? parseInt(insMatch[1], 10) : 0;
+  const deletions  = delMatch ? parseInt(delMatch[1], 10) : 0;
   return {
-    filesChanged: filesMatch ? parseInt(filesMatch[1], 10) : 0,
-    insertions:   insMatch   ? parseInt(insMatch[1],   10) : 0,
-    deletions:    delMatch   ? parseInt(delMatch[1],   10) : 0,
+    filesChanged:      filesMatch ? parseInt(filesMatch[1], 10) : 0,
+    insertions,
+    deletions,
+    totalLinesChanged: insertions + deletions,
     summary,
   };
 }
