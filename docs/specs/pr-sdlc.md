@@ -23,9 +23,11 @@
 - R5: PR title must be under 72 characters
 - R6: When `prConfig.titlePattern` is set, validate title against the regex before executing `gh` CLI (hard gate)
 - R7: When `prConfig.allowedTypes` or `allowedScopes` are set, constrain title generation accordingly
-- R8: Label inference via fuzzy-match against `repoLabels` using 5 signal types: branch prefix, commit subjects, changed file paths, diff size, Jira ticket type
-- R9: Labels must exist in `repoLabels` — never fabricate labels not in the repository
-- R10: Forced labels (`--label`) are always included, merged with inferred labels, and created via `gh label create` if missing in repo
+- R8: Label assignment is mode-driven via `prConfig.labels.mode` (issue #197). Three modes: `off` (default — no automatic labels), `rules` (deterministic evaluation of `prConfig.labels.rules[]`), `llm` (legacy fuzzy match against `repoLabels` using 5 signal types: branch prefix, commit subjects, changed file paths, diff size, Jira ticket type). When `prConfig.labels` is absent, mode defaults to `off`. The fuzzy-match heuristic that ran unconditionally before #197 now runs only when the user explicitly opts in via `mode: "llm"`.
+- R8a: In `rules` mode, every rule is `{ label: string, when: <one signal> }` where the signal is exactly one of `branchPrefix: string[]`, `commitType: string[]`, `pathGlob: string[]`, `jiraType: string[]`, or `diffSizeUnder: integer`. `pathGlob` matches only when **every** changed file matches at least one glob (all-changed-files semantics); `commitType` matches when any commit subject begins with `<type>:` or `<type>(scope):`. Rules whose `label` is not in `repoLabels` are stripped at validation time in `pr.js` with a warning — the skill never receives invalid rules.
+- R8b: Each suggested label carries a provenance tag in the Step 5 display: `(forced)`, `(rule)`, or `(llm)`. The Labels line is omitted entirely when the final list is empty (e.g. `mode: "off"` with no forced labels).
+- R9: Labels must exist in `repoLabels` — never fabricate labels not in the repository (defense-in-depth gate that applies after rule stripping and to `llm` output)
+- R10: Forced labels (`--label`) bypass `prConfig.labels.mode` entirely — they apply in all three modes (including `off`), are always included, dedupe against rule/llm matches with forced winning provenance, and are created via `gh label create` if missing in repo
 - R11: In update mode, existing labels are preserved; only new labels are added via `--add-label`
 - R12: When `--auto` is set, skip AskUserQuestion approval and apply labels directly; critique gates still run
 - R13: OpenSpec enrichment: when an active OpenSpec change is detected, use proposal.md for Business Context/Benefits and design.md for Technical Design

@@ -110,9 +110,106 @@
       },
       "additionalProperties": false
     },
+    "prLabelsSection": {
+      "type": "object",
+      "description": "Configures how /pr-sdlc chooses labels (issue #197). Mode `off` (default) adds no labels except those forced via --label. Mode `rules` evaluates user-defined deterministic rules. Mode `llm` lets the LLM pick labels via fuzzy matching against repo labels (legacy behavior, opt-in only).",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["off", "rules", "llm"],
+          "default": "off",
+          "description": "Label selection mode. `off` = no automatic labels (forced labels still apply). `rules` = evaluate user-defined rules deterministically. `llm` = legacy LLM fuzzy match."
+        },
+        "rules": {
+          "type": "array",
+          "description": "Label rules evaluated when mode = `rules`. Each rule names exactly one target label and one signal type in `when`. Multiple rules may target the same label (OR semantics).",
+          "items": {
+            "type": "object",
+            "required": ["label", "when"],
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Repo label to apply when this rule matches. Must exist in the repository's label list."
+              },
+              "when": {
+                "description": "Signal that triggers this rule. Exactly one signal type per rule.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": ["branchPrefix"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "branchPrefix": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "minItems": 1,
+                        "description": "Match if currentBranch starts with any listed prefix (e.g. \"fix/\", \"feat/\")."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["commitType"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "commitType": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "minItems": 1,
+                        "description": "Match if any commit subject begins with `<type>:` or `<type>(scope):` (e.g. \"feat\", \"fix\")."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["pathGlob"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "pathGlob": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "minItems": 1,
+                        "description": "Match if every changed file matches one of the listed globs (e.g. \"**/*.md\")."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["jiraType"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "jiraType": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "minItems": 1,
+                        "description": "Match if jiraTicket.type is in the list (e.g. \"Bug\", \"Story\")."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["diffSizeUnder"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "diffSizeUnder": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Match if diffStat.totalLinesChanged is strictly less than this value."
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "prSection": {
       "type": "object",
-      "description": "Controls pull request title validation.",
+      "description": "Controls pull request title validation and label assignment.",
       "properties": {
         "titlePattern": {
           "type": "string",
@@ -135,6 +232,9 @@
             "type": "string"
           },
           "description": "Allowed PR title scopes."
+        },
+        "labels": {
+          "$ref": "#/$defs/prLabelsSection"
         }
       },
       "additionalProperties": false

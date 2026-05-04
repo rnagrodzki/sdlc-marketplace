@@ -165,3 +165,91 @@
         block describing the defaultProject field with at least one full sentence covering
         what runtime behavior changes when set. The header copy comes from the manifest
         (scripts/lib/setup-sections.js), not freeform LLM-generated text.
+
+# ---------------------------------------------------------------------------
+# Issue #197 — pr-labels sub-flow (setup-pr-labels.md)
+# ---------------------------------------------------------------------------
+
+- description: "setup-sdlc --only pr-labels: mode=off writes { mode: 'off' } and preserves sibling pr keys"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: >
+      Project at tests/promptfoo/fixtures-fs/setup-pr-labels-clean/ with an existing
+      .claude/sdlc.json that already has `pr.titlePattern` and `pr.allowedTypes`. The user
+      runs `/setup-sdlc --only pr-labels` and at the mode prompt picks "off". `gh label list`
+      returned a non-empty list (e.g. ["bug","feature","docs"]).
+    user_request: >
+      Walk through setup-pr-labels.md Steps 1-6 for this project and pick "off" at the
+      mode prompt. Show the exact JSON written into .claude/sdlc.json `pr` section,
+      including how titlePattern and allowedTypes are preserved.
+  assert:
+    - type: icontains
+      value: '"mode": "off"'
+    - type: icontains
+      value: "titlePattern"
+    - type: icontains
+      value: "allowedTypes"
+    - type: not-icontains
+      value: '"rules":'
+    - type: llm-rubric
+      value: >
+        The response demonstrates the off-mode write path: it reads the existing pr section,
+        spreads it, and only sets/replaces the labels key with `{ mode: "off" }`. The
+        existing pr.titlePattern and pr.allowedTypes survive unchanged (sub-flow gotcha #1).
+        No `rules` array is written. The user is shown a one-line summary like
+        "Wrote pr.labels: mode=off to .claude/sdlc.json".
+
+- description: "setup-sdlc --only pr-labels: mode=llm writes { mode: 'llm' } with no rules array"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: >
+      Project at tests/promptfoo/fixtures-fs/setup-pr-labels-clean/ with no existing
+      pr.labels block. `gh label list` returned ["bug","feature","docs","tests"]. The user
+      runs `/setup-sdlc --only pr-labels` and at the mode prompt explicitly picks "llm".
+    user_request: >
+      Walk through setup-pr-labels.md and pick "llm" at the mode prompt. Show the JSON
+      block written to .claude/sdlc.json `pr.labels` and explain why this is opt-in.
+  assert:
+    - type: icontains
+      value: '"mode": "llm"'
+    - type: not-icontains
+      value: '"rules":'
+    - type: llm-rubric
+      value: >
+        The response writes exactly `{ mode: "llm" }` under `pr.labels` with no `rules`
+        field. The rationale call-out makes clear that picking "llm" is the user's explicit
+        opt-in to the legacy fuzzy-match heuristic — addressing issue #197 by ensuring the
+        LLM never picks labels silently for projects that didn't choose this mode.
+
+- description: "setup-sdlc --only pr-labels: mode=rules with one branchPrefix rule writes valid block"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: >
+      Project at tests/promptfoo/fixtures-fs/setup-pr-labels-clean/ with no existing
+      pr.labels block. `gh label list` returned ["bug","feature","docs"]. The user runs
+      `/setup-sdlc --only pr-labels`, picks "rules", picks the "bug" label, picks the
+      "branchPrefix" signal, and enters "fix/, bugfix/" as values, then picks "done".
+    user_request: >
+      Walk through setup-pr-labels.md Step 4 with the inputs above. Show the final JSON
+      block written to .claude/sdlc.json `pr.labels` and identify which schema keys it
+      uses (mode, rules[*].label, rules[*].when.branchPrefix).
+  assert:
+    - type: icontains
+      value: '"mode": "rules"'
+    - type: icontains
+      value: '"label": "bug"'
+    - type: icontains
+      value: "branchPrefix"
+    - type: icontains
+      value: "fix/"
+    - type: icontains
+      value: "bugfix/"
+    - type: llm-rubric
+      value: >
+        The response builds a single rule
+        `{ label: "bug", when: { branchPrefix: ["fix/", "bugfix/"] } }`,
+        appends it to an empty rules array, and writes `{ mode: "rules", rules: [...] }`
+        under `pr.labels` via `writeSection(root, "pr", ...)`. The branchPrefix value is
+        parsed from comma-separated input, trimmed, deduped, and stored as an array. The
+        chosen label "bug" comes from the gh label list (not free text). No partial write
+        occurs — the writeSection call happens once after "done".

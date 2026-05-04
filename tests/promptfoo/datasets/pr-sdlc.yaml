@@ -231,3 +231,162 @@
         hint and proceeds to the existing failure fallback (no retry). It does not call
         the helper twice or invoke any matching/decision logic itself — all decisions
         come from the helper.
+
+# ---------------------------------------------------------------------------
+# Issue #197 — Configurable PR labels (mode: off | rules | llm)
+# ---------------------------------------------------------------------------
+
+- description: "pr-sdlc labels: mode=off + no forced labels → no Labels line, no fabrication"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: "file://fixtures/feature-branch-with-commits.md"
+    user_request: >
+      Run /pr-sdlc on this feature branch. Assume PR_CONTEXT_JSON.prConfig.labels.mode = "off"
+      and forcedLabels is empty. Show the Step 5 approval prompt verbatim — what is the
+      Labels line, if any? Justify your answer against the Step 2b dispatch rules.
+  assert:
+    # The Labels line must NOT appear in the approval prompt
+    - type: not-icontains
+      value: "Labels:"
+    # No fabricated labels regardless of repoLabels content
+    - type: not-icontains
+      value: "(rule)"
+    - type: not-icontains
+      value: "(llm)"
+    - type: llm-rubric
+      value: >
+        The response correctly states that under mode = "off" with no forced labels, no
+        Labels line is shown in the Step 5 approval output. It cites the Step 2b "Off mode"
+        rule and the Step 5 instruction to omit the Labels line entirely when there are no
+        labels. It does NOT fabricate any label suggestions, does NOT fall back to fuzzy
+        matching, and does NOT mention "(llm)" or "(rule)" provenance tags.
+
+- description: "pr-sdlc labels: mode=rules + matching branchPrefix → only the matched label is suggested"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-sdlc-labels-rules.md"
+    user_request: >
+      Run /pr-sdlc Step 2b on this branch. Walk through every rule in prConfig.labels.rules
+      against the PR context and report the final suggestedLabels list with provenance tags.
+      Use the dispatch rules from the SKILL.md exactly.
+  assert:
+    # branchPrefix rule matches "fix/" → bug
+    - type: icontains
+      value: "bug"
+    # diffSizeUnder rule matches (44 < 50) → small-change
+    - type: icontains
+      value: "small-change"
+    # commitType "feat" rule does NOT match (commits start with "fix")
+    - type: not-icontains
+      value: "feature (rule)"
+    # pathGlob "**/*.md" rule does NOT match (only .ts files)
+    - type: not-icontains
+      value: "documentation (rule)"
+    - type: llm-rubric
+      value: >
+        The response correctly evaluates each rule. It identifies that the branchPrefix
+        rule matches because the branch starts with "fix/", producing the "bug" label tagged
+        (rule). It identifies that the diffSizeUnder=50 rule matches because totalLinesChanged
+        is 44, producing "small-change" tagged (rule). It correctly REJECTS the commitType
+        "feat" rule (commits start with "fix(...)" not "feat(...)") and the pathGlob "**/*.md"
+        rule (the changed files are .ts, not all-markdown). The final suggestedLabels list
+        contains exactly two entries: bug (rule) and small-change (rule). No fabrication.
+
+- description: "pr-sdlc labels: mode=rules + forced label appears first, deduped against rule match"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-sdlc-labels-rules.md"
+    user_request: >
+      Run /pr-sdlc Step 2b but assume forcedLabels = ["bug", "needs-review"]. Show the
+      final ordered, deduped suggestedLabels list with provenance tags as it would appear
+      in the Step 5 Labels line.
+  assert:
+    - type: icontains
+      value: "bug (forced)"
+    - type: icontains
+      value: "needs-review (forced)"
+    # bug must NOT also appear with (rule) — forced wins
+    - type: not-icontains
+      value: "bug (rule)"
+    # small-change still emerges from the diffSizeUnder rule
+    - type: icontains
+      value: "small-change (rule)"
+    - type: llm-rubric
+      value: >
+        The response shows forced labels first ("bug (forced)", "needs-review (forced)"),
+        followed by the rule-derived "small-change (rule)". The "bug" label appears exactly
+        once with (forced) provenance — the rule match is deduplicated since forced wins
+        for provenance. needs-review appears even though it was not in any rule, because
+        forced labels apply regardless of mode.
+
+- description: "pr-sdlc labels: mode=rules + rule references missing label → warning + rule stripped"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-sdlc-labels-rules.md"
+    user_request: >
+      Run /pr-sdlc Step 2b but assume prConfig.labels.rules contains an additional rule
+      `{ label: "wontfix", when: { branchPrefix: ["fix/"] } }` and that "wontfix" is NOT
+      in repoLabels. Describe (a) where this rule is filtered, (b) what warning surfaces,
+      and (c) the final suggestedLabels list.
+  assert:
+    - type: icontains
+      value: "wontfix"
+    # Warning text from pr.js
+    - type: regex
+      value: "(does not exist|will be ignored|not in the repo|not in repoLabels)"
+    - type: not-icontains
+      value: "wontfix (rule)"
+    - type: llm-rubric
+      value: >
+        The response correctly explains that pr.js validates rules[].label against repoLabels
+        and strips any rule whose label is not present, emitting a warning ("Label \"wontfix\"
+        referenced in pr.labels.rules does not exist in the repo. Rule will be ignored." or
+        equivalent wording). The skill's Step 2b dispatch never sees the bad rule. The final
+        suggestedLabels list does NOT include "wontfix" with any provenance tag.
+
+- description: "pr-sdlc labels: mode=llm → fuzzy heuristic produces (llm)-tagged suggestions"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: "file://fixtures/feature-branch-with-commits.md"
+    user_request: >
+      Run /pr-sdlc Step 2b on this branch with PR_CONTEXT_JSON.prConfig.labels.mode = "llm"
+      and repoLabels = [{name:"feature"},{name:"enhancement"},{name:"tests"}]. Apply the
+      LLM-mode fuzzy heuristic from Step 2b and report the final suggestedLabels with
+      provenance tags as the Step 5 Labels line would render them.
+  assert:
+    - type: icontains
+      value: "(llm)"
+    # Branch starts with feat/ and commits are feat(...): fuzzy match → feature or enhancement
+    - type: regex
+      value: "(feature|enhancement)"
+    - type: llm-rubric
+      value: >
+        The response activates the LLM-mode fuzzy heuristic and produces label suggestions
+        from the branch prefix ("feat/") and conventional-commit subjects ("feat(...)",
+        "chore(...)") matched against the provided repoLabels. Each suggested label carries
+        the (llm) provenance tag in the Step 5 display. The response makes clear this
+        branch ran ONLY because mode = "llm" was explicitly selected (opt-in), and would
+        not have run under the default "off" mode.
+
+- description: "pr-sdlc labels: pr.labels absent (legacy project) → behaves as mode=off"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: "file://fixtures/feature-branch-with-commits.md"
+    user_request: >
+      Run /pr-sdlc Step 2b assuming PR_CONTEXT_JSON.prConfig is `{ "titlePattern": "..." }`
+      with NO `labels` block at all (legacy project that never ran setup-sdlc --only pr-labels).
+      What does Step 2b dispatch to, and what is the Labels line in Step 5?
+  assert:
+    - type: not-icontains
+      value: "Labels:"
+    - type: not-icontains
+      value: "(llm)"
+    - type: not-icontains
+      value: "(rule)"
+    - type: llm-rubric
+      value: >
+        The response identifies that when prConfig.labels is absent, the Step 2b mode
+        defaults to "off" (per the resolution rule "When absent, default to off"). No
+        evaluation runs, no Labels line appears in Step 5, and the LLM fuzzy heuristic is
+        NOT triggered. This is the explicit fix for issue #197 — legacy projects do not
+        get fabricated labels until they opt into rules or llm mode.

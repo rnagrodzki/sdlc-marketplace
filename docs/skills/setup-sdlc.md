@@ -20,7 +20,7 @@ Renders the selective-section menu. Sections in state `not set` are pre-checked;
 /setup-sdlc --only jira,review
 ```
 
-Skip the menu, configure only `jira` and `review`. Useful for scripted runs or follow-up tweaks. Valid ids: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block`.
+Skip the menu, configure only `jira` and `review`. Useful for scripted runs or follow-up tweaks. Valid ids: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block`.
 
 ```text
 /setup-sdlc --force
@@ -37,7 +37,7 @@ Pre-check every row in the menu (reconfigure everything) instead of pre-selectin
 | `--migrate` | Migrate legacy config files (`.claude/version.json`, `.sdlc/ship-config.json`, etc.) into unified config | — |
 | `--skip <section>` | Skip a config section during setup (version, ship, jira, review, commit, pr) | — |
 | `--force` | Pre-check every menu row (reconfigure all sections) | — |
-| `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | — |
+| `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | — |
 | `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | — |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | — |
 | `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | — |
@@ -144,6 +144,7 @@ Every section the menu can configure. The label, purpose, files modified, and co
 | `review` | Default scope for `/review-sdlc` (committed/staged/working/worktree/all). Local to each developer. | `.sdlc/local.json` | `/review-sdlc` |
 | `commit` | Commit message validation rules used by `/commit-sdlc` (subject regex, allowed types/scopes, required trailers). | `.claude/sdlc.json` | `/commit-sdlc` |
 | `pr` | PR title validation rules used by `/pr-sdlc` (title regex, allowed types/scopes, required trailers). | `.claude/sdlc.json` | `/pr-sdlc` |
+| `pr-labels` | PR label assignment policy under `pr.labels`. Mode `off` (default) adds no automatic labels — `--label` overrides still work. Mode `rules` evaluates user-defined deterministic rules (branch prefix, commit type, path glob, JIRA type, diff size). Mode `llm` opts into the legacy fuzzy match. Configured via `--only pr-labels`. | `.claude/sdlc.json` | `/pr-sdlc` |
 | `review-dimensions` | Review dimensions installed under `.claude/review-dimensions/*.yaml`. Each dimension is a focused check set used by `/review-sdlc`. | `.claude/review-dimensions/*.yaml` | `/review-sdlc` |
 | `pr-template` | PR description template at `.claude/pr-template.md`, used by `/pr-sdlc` when drafting PRs. | `.claude/pr-template.md` | `/pr-sdlc` |
 | `plan-guardrails` | Custom rules at `.claude/sdlc.json#plan.guardrails` evaluated by `/plan-sdlc` during critique phases. | `.claude/sdlc.json` | `/plan-sdlc` |

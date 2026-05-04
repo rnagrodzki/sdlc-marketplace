@@ -38,7 +38,7 @@
  *     consuming skill, what runtime behavior changes, and what the default
  *     produces. No bare labels.
  *   - Content sections (review-dimensions, pr-template, plan-guardrails,
- *     execution-guardrails, openspec-block) carry fields: [] and
+ *     execution-guardrails, pr-labels, openspec-block) carry fields: [] and
  *     delegatedTo: '<sub-skill-id>'. The menu still surfaces purpose,
  *     filesModified, consumedBy, and state.
  *   - Sections with conditional sub-prompts that don't fit a flat field
@@ -205,6 +205,20 @@ function summarizePr(cfg) {
   return parts.join('  ');
 }
 
+function summarizePrLabels(cfg) {
+  // cfg is the parent `pr` section; the labels block sits under cfg.labels.
+  const labels = cfg && cfg.labels;
+  if (!labels || typeof labels !== 'object') return 'not configured';
+  const mode = labels.mode;
+  if (mode === 'off') return 'off — no automatic labels';
+  if (mode === 'rules') {
+    const n = Array.isArray(labels.rules) ? labels.rules.length : 0;
+    return `rules: ${n} rule${n === 1 ? '' : 's'}`;
+  }
+  if (mode === 'llm') return 'llm — model picks labels';
+  return 'not configured';
+}
+
 function summarizeReviewDimensions(_cfg, detected) {
   if (!detected) return '';
   const count = detected?.content?.reviewDimensions?.count || 0;
@@ -331,6 +345,20 @@ const SETUP_SECTIONS = [
     confirmDetected: false,
     fields: [],
     summarize: summarizePr,
+  },
+  {
+    id: 'pr-labels',
+    label: 'pr-labels',
+    purpose: 'PR label assignment policy used by /pr-sdlc. Mode "off" (default) adds no labels except those forced via --label. Mode "rules" evaluates user-defined rules — each rule maps one signal (branch prefix, commit type, changed-path glob, JIRA issue type, or diff size) to one repo label. Mode "llm" lets the LLM suggest labels using fuzzy matching against repo labels (legacy behavior, opt-in only).',
+    configFile: '.claude/sdlc.json',
+    configPath: 'pr.labels',
+    consumedBy: ['pr-sdlc'],
+    filesModified: ['.claude/sdlc.json'],
+    optional: true,
+    delegatedTo: 'setup-pr-labels',
+    confirmDetected: false,
+    fields: [],
+    summarize: summarizePrLabels,
   },
   {
     id: 'review-dimensions',

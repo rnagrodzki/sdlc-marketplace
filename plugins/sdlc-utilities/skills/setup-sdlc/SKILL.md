@@ -22,7 +22,7 @@ delegates content creation to specialized skills.
 | `--migrate` | Force migration of legacy config files even if no legacy files are auto-detected | off |
 | `--skip <section>` | Skip a config section during setup. Valid values: `version`, `ship`, `jira`, `review`, `commit`, `pr` | none |
 | `--force` | Pre-check every menu row (reconfigure everything) instead of selecting only `not-set` rows | off |
-| `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid ids match `prepare.sections[].id`: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | none |
+| `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid ids match `prepare.sections[].id`: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | none |
 | `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | off |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | off |
 | `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | off |
@@ -237,6 +237,7 @@ For each id selected in Step 1 (call this list `selectedIds`), in `prepare.secti
    | `'inline-pr-builder'` | Inline PR-pattern builder (3.pr below) — same conditional logic as legacy Step 3f |
    | `'setup-dimensions'` | Run scan phase (Step 3.S below), then read and follow `@setup-dimensions.md` passing scan results as "Scan Input". Pass through `--add` and `--no-copilot` modifiers if present. |
    | `'setup-pr-template'` | Run scan phase (Step 3.S), then read and follow `@setup-pr-template.md` passing scan results. Pass through `--add` if present. |
+   | `'setup-pr-labels'` | Read and follow `@setup-pr-labels.md` (it runs `gh label list` itself; no scan input from parent required). |
    | `'setup-guardrails'` | Read and follow `@setup-guardrails.md` (it runs its own scan internally). Pass through `--add` if present. |
    | `'setup-execution-guardrails'` | Read and follow `@setup-execution-guardrails.md`. Pass through `--add` if present. |
    | `'setup-openspec'` | Read and follow `@setup-openspec.md`. Pass through `--remove-openspec` as `--remove` if present. |

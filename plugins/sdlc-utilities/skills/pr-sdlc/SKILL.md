@@ -249,9 +249,39 @@ Teams can configure their PR title patterns in `.claude/sdlc.json`. Here are fou
 
 #### Step 2b: Infer Labels
 
-If `PR_CONTEXT_JSON.repoLabels` is empty, skip this step entirely — produce no label suggestions.
+Label assignment is **mode-dispatched** based on `PR_CONTEXT_JSON.prConfig?.labels?.mode` (issue #197). Each suggested label carries a provenance tag — `(forced)`, `(rule)`, or `(llm)` — used in the Step 5 display.
 
-Otherwise, analyze the PR context and fuzzy-match against `repoLabels` to produce `suggestedLabels: string[]`.
+**Mode resolution:**
+
+- If `PR_CONTEXT_JSON.repoLabels` is empty, skip evaluation entirely and treat the result as `suggestedLabels = []`. Forced labels still apply (see "Forced labels" below).
+- Otherwise read `mode = PR_CONTEXT_JSON.prConfig?.labels?.mode`. When absent, default to `"off"`. Dispatch:
+  - `"off"` → see [Off mode](#off-mode)
+  - `"rules"` → see [Rules mode](#rules-mode)
+  - `"llm"` → see [LLM mode](#llm-mode)
+
+The mode dispatch produces an array of `{ label, source }` entries (where `source ∈ {"rule", "llm"}`). Forced labels are merged on top with `source = "forced"`.
+
+##### Off mode
+
+Set `inferredLabels = []`. No automatic suggestions are produced. The merged `suggestedLabels` array contains only forced labels (or is empty when none are forced).
+
+##### Rules mode
+
+Iterate `PR_CONTEXT_JSON.prConfig.labels.rules` (already validated against `repoLabels` by `pr.js` — unknown labels were stripped before this step). For each rule, evaluate the single signal in `rule.when` against the PR context:
+
+| Signal | Match condition |
+| ------ | --------------- |
+| `branchPrefix: string[]` | `currentBranch` starts with any listed prefix |
+| `commitType: string[]` | Any commit subject begins with `<type>:` or `<type>(scope):` (Conventional Commits) |
+| `pathGlob: string[]` | **Every** entry in `changedFiles` matches at least one glob (all-changed-files semantics, like the legacy `*.md → documentation` rule) |
+| `jiraType: string[]` | `jiraTicket.type` (when extracted) is in the list |
+| `diffSizeUnder: number` | `diffStat.totalLinesChanged < value` |
+
+Collect every matched `rule.label` and dedupe (multiple rules may target the same label — they OR together). Tag each survivor with `source = "rule"`.
+
+##### LLM mode
+
+Run the legacy fuzzy-match heuristic. This branch is **opt-in only** — the user must have explicitly selected `mode = "llm"` during `setup-sdlc --only pr-labels`.
 
 **Signals to match:**
 
@@ -268,13 +298,21 @@ Otherwise, analyze the PR context and fuzzy-match against `repoLabels` to produc
 1. Fuzzy-match each signal against `repoLabels[].name` and `repoLabels[].description` — e.g., repo has `type:bug` and branch is `fix/...` → match
 2. Never suggest a label not in `repoLabels` — only exact names from the list are valid
 3. Keep suggestions conservative: 1–4 labels typical; deduplicate (multiple signals matching the same label count as one)
-4. **Update mode:** note `existingPr.labels` as already applied; only suggest new labels not already present in `existingPr.labels`
 
-**Output:** `suggestedLabels` — a list of label names for use in Steps 5 and 6. If no labels match, produce an empty list.
+Tag each survivor with `source = "llm"`.
+
+##### Common post-processing
+
+Regardless of branch:
+
+1. **Update mode:** when `existingPr.labels` is non-empty, drop any inferred entry already present there — they are already applied.
+2. **Validity gate (defense-in-depth):** every entry must appear in `repoLabels[].name`. Drop fabricated entries (Step 3's "Label validity" gate is the contract; this drop ensures `rules` mode stays exact and catches `llm` hallucinations).
+3. **Forced labels:** if `PR_CONTEXT_JSON.forcedLabels` is non-empty, prepend each forced label with `source = "forced"`. Forced labels are always included regardless of mode (including `off`) — they cannot be removed during interactive edit. Deduplicate by label name; if the same name was inferred and forced, keep only the forced entry (forced wins for provenance).
+4. **Output:** `suggestedLabels` — the final ordered, deduped list of `{ label, source }` entries. Forced first, then rule/llm matches in iteration order. If empty, no Labels line is shown in Step 5.
 
 **Auto mode:** When `PR_CONTEXT_JSON.isAuto` is true, apply `suggestedLabels` directly without presenting them for approval. Labels are still validated against `repoLabels` — no fabricated labels. The applied labels are shown in the Step 5 output for visibility.
 
-**Forced labels:** If `PR_CONTEXT_JSON.forcedLabels` is non-empty, merge all forced labels into `suggestedLabels`. Forced labels are always included regardless of signal matching — they cannot be removed during interactive edit. Deduplicate: if a forced label was also inferred from signals, it appears only once. In the final `suggestedLabels` list, forced labels appear first.
+**Forced labels behavior summary:** The CLI `--label <name>` flag and ship-sdlc's `skip-version-check` injection bypass `pr.labels.mode` entirely. Forced labels apply in all three modes (`off`, `rules`, `llm`).
 
 ### Step 3 (CRITIQUE): Self-review the Draft
 
@@ -325,7 +363,7 @@ before receiving explicit user approval via AskUserQuestion.**
 
 ```text
 PR Title: <title>
-Labels: <label1> (forced), <label2>
+Labels: <label1> (forced), <label2> (rule), <label3> (llm)
 
 PR Description:
 ─────────────────────────────────────────────
@@ -333,7 +371,12 @@ PR Description:
 ─────────────────────────────────────────────
 ```
 
-Labels from `forcedLabels` are marked with `(forced)` suffix to distinguish them from inferred labels.
+Each label carries its provenance suffix from the Step 2b dispatch:
+- `(forced)` — applied via CLI `--label` or ship-sdlc injection (e.g. `skip-version-check`)
+- `(rule)` — matched a deterministic rule under `pr.labels.rules` (mode = `rules`)
+- `(llm)` — fuzzy-matched by the model (mode = `llm`, opt-in)
+
+When `pr.labels.mode = "off"` and no forced labels are present, omit the Labels line entirely (existing behavior — do not show "Labels: none").
 
 **Update mode** (with existing labels and new suggestions):
 

@@ -32,7 +32,8 @@
 - R6: Config writes go through `util/setup-init.js` which calls `lib/config.js` functions. The script deterministically creates `.sdlc/` directory, `.sdlc/.gitignore`, and config files — never use Edit/Write tools directly on config files
 - R7: Early exit when everything is configured, no migration needed, and `--force` not passed
 - R8: Ship config is developer-local (`.sdlc/local.json`, gitignored), not project-level
-- R9: Content setup sub-flows: review dimensions (`setup-dimensions.md`), PR template (`setup-pr-template.md`), plan guardrails (`setup-guardrails.md`), execution guardrails (`setup-execution-guardrails.md`)
+- R9: Content setup sub-flows: review dimensions (`setup-dimensions.md`), PR template (`setup-pr-template.md`), plan guardrails (`setup-guardrails.md`), execution guardrails (`setup-execution-guardrails.md`), PR labels (`setup-pr-labels.md`)
+- R9a: PR labels sub-flow (`setup-pr-labels.md`, [issue #197](https://github.com/rnagrodzki/sdlc-marketplace/issues/197)) — section id `pr-labels`, configFile `.claude/sdlc.json`, configPath `pr.labels`, `delegatedTo: 'setup-pr-labels'`. Writes a `pr.labels` block matching `schemas/sdlc-config.schema.json#$defs/prLabelsSection`: `mode: "off" | "rules" | "llm"`, optional `rules: { label, when }[]`. The sub-flow runs `gh label list` for the picker, presents an idempotency prompt (`keep`/`replace`/`append`) when the block already exists, and merges into the existing `pr` section without clobbering siblings (`titlePattern`, `allowedTypes`, etc.). The default state for projects that never run this sub-flow is "no `pr.labels` key" — `pr-sdlc` Step 2b interprets that as `mode = "off"`.
 - R10: Project scan phase runs before content sub-flows to collect signals (dependencies, framework, CI, DB, tests, etc.)
 - R11: Version section requires `mode` field (required by schema): `"file"` when version file detected, `"tag"` when not. Optional fields include `versionFile`, `fileType`, `tagPrefix`, `changelog`, `changelogFile`, `ticketPrefix`, and `preRelease`. The `preRelease` field, when set, is a string matching `^[a-z][a-z0-9]*$` that supplies a default pre-release label to version-sdlc when the user runs `version-sdlc` without an explicit base bump or `--pre`. Empty / skipped answers omit the field; the schema (`schemas/sdlc-config.schema.json`) does not require it.
 - R12: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
@@ -95,7 +96,7 @@
 - P7: `shipFields` (array) — authoritative list of interactive ship-config fields sourced from `scripts/lib/ship-fields.js`. Each entry: `{ name, label, type, options, default, description }`. `name` is the local-config key; `options` is an array of valid values; `default` is the value applied if the user accepts the default answer.
 - P8: `openspecConfig` (object) — `{ exists: boolean, path: string, managedBlockVersion: number|null }` state of `openspec/config.yaml` and its managed block
 - P-sections: `sections` (array) — joined view of `SETUP_SECTIONS` (manifest) × `detect()` state. Drives the Step 1 selective menu and the Step 3 verbose dispatch loop. Each row has shape:
-  - `id` (string) — canonical section id (used by `--only`); one of `version`, `ship`, `jira`, `review`, `commit`, `pr`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block`
+  - `id` (string) — canonical section id (used by `--only`); one of `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block`
   - `label` (string) — human-readable section name
   - `state` (string) — `'set'` (configured) | `'not-set'` (no config) | `'legacy'` (legacy file present, `localIsV1`, or managed-block-version below current)
   - `summary` (string) — one-line summary of the current configuration (empty for `not-set`)
@@ -106,7 +107,7 @@
   - `consumedBy` (string[]) — skill ids that read this section at runtime
   - `filesModified` (string[]) — workspace artifacts created or touched
   - `optional` (boolean) — `true` if the section is safe to leave unset
-  - `delegatedTo` (string|null) — sub-skill id (`setup-dimensions`, `setup-pr-template`, `setup-guardrails`, `setup-execution-guardrails`, `setup-openspec`), inline-builder id (`inline-commit-builder`, `inline-pr-builder`), or `null` for generic field-loop sections
+  - `delegatedTo` (string|null) — sub-skill id (`setup-dimensions`, `setup-pr-template`, `setup-guardrails`, `setup-execution-guardrails`, `setup-pr-labels`, `setup-openspec`), inline-builder id (`inline-commit-builder`, `inline-pr-builder`), or `null` for generic field-loop sections
   - `confirmDetected` (boolean) — `true` when the dispatcher must ask `yes` / `customize` / `skip` BEFORE iterating fields (currently only `version`)
   - `fields` (array) — entries with shape `{ name, label, type, options, default, description, validate? }` matching the `SHIP_FIELDS` shape; empty for delegated and inline-builder sections
 
@@ -158,4 +159,5 @@
 - I10: `jira-sdlc` — consumes jira config written by this skill
 - I11: `setup-openspec.md` — sub-flow for openspec config enrichment
 - I12: `util/openspec-enrich.js` — deterministic script for managed-block operations on `openspec/config.yaml`
+- I13: `setup-pr-labels.md` — sub-flow for PR label assignment policy ([issue #197](https://github.com/rnagrodzki/sdlc-marketplace/issues/197)); writes `pr.labels` (mode: off|rules|llm) into `.claude/sdlc.json`
 - I13: `lib/setup-sections.js` — single source of truth for the `SETUP_SECTIONS` manifest consumed by `skill/setup.js` to emit `prepare.sections[]` (P-sections) and by SKILL.md Step 1 / Step 3 to render menu rows and verbose headers
