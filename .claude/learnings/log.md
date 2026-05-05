@@ -3,6 +3,12 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-05 — pr-sdlc: PR #222 created for fix/217-openspec-enrich-yaml-block
+PR used the project custom template (.claude/pr-template.md). Custom template sections matched 1:1 with the 8 default sections by intent. Label `bug` inferred from `fix/` branch prefix and `fix(...)` commit subjects via LLM mode. Title pattern `^(feat|fix|...)\(#\d+\): .+ - .+$` required the issue number in parentheses — critical to get right for this repo.
+
+## 2026-05-05 — version-sdlc: patch release v0.17.45 on fix/217-openspec-enrich-yaml-block
+Released two fix commits (openspec-enrich YAML block template + duplicate-key guard). Remote had no upstream; `--set-upstream` auto-heal worked correctly. flags.changelog resolved to false despite config.changelog=true — the --auto flag + no explicit --changelog flag left changelog disabled for this release.
+
 ## 2026-05-05 — openspec-enrich: v1→v2 update path missing context-key duplicate guard
 Reviewer caught that the in-place update path (v1→v2 migration) in `openspec-enrich.js` skipped the `hasExistingContextKey` guard that the append path had. A config with a user-defined `context:` key plus a v1 managed block would produce a duplicate `context:` key on upgrade. Fix: call `hasExistingContextKey(content, block)` before writing and return `skipped-existing-context` with a warning if true. Rule: whenever adding a new code path that writes a structured key to a YAML file, mirror every guard from the existing path that prevents duplicate keys.
 
