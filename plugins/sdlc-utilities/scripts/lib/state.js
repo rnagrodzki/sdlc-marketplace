@@ -11,7 +11,8 @@
 const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
-const { exec } = require('./git');
+const { exec }         = require('./git');
+const { readSection }  = require('./config');
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -419,6 +420,38 @@ function migrateBranchSlug({ prefix, fromSlug, toBranch }) {
 }
 
 // ---------------------------------------------------------------------------
+// GC helpers shared by state/ship.js and state/execute.js
+// ---------------------------------------------------------------------------
+
+/**
+ * Return list of local branch names via `git branch --list`.
+ * @returns {string[]}
+ */
+function listBranches() {
+  try {
+    const out = exec("git branch --list --format='%(refname:short)'");
+    return out.split('\n').map(s => s.trim()).filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+/**
+ * Read `state.gc.ttlDays` from `.claude/sdlc.json`, falling back to 7.
+ * @returns {number}
+ */
+function readTtlDaysFromConfig() {
+  try {
+    const stateCfg = readSection(process.cwd(), 'state');
+    const v = stateCfg && stateCfg.gc && stateCfg.gc.ttlDays;
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
+  } catch (_) {
+    // fall through to default
+  }
+  return 7;
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -435,4 +468,6 @@ module.exports = {
   parseStateFilename,
   gcStateFiles,
   migrateBranchSlug,
+  listBranches,
+  readTtlDaysFromConfig,
 };

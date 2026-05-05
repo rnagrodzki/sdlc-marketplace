@@ -28,15 +28,14 @@
 
 const path = require('node:path');
 const fs   = require('node:fs');
-const { execSync } = require('node:child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const {
   slugifyBranch,
   readState, writeState, initState, deleteState, resolveBranch,
   gcStateFiles, migrateBranchSlug,
+  listBranches, readTtlDaysFromConfig,
 } = require(path.join(LIB, 'state'));
-const { readSection } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -86,46 +85,6 @@ function parseArgs(argv) {
   }
 
   return result;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Get the list of currently-existing local branch names via
- * `git branch --list --format='%(refname:short)'`. Returns an empty array on
- * failure (so GC errs on the safe side — no branches known means everything
- * is "branch-gone").
- *
- * Note: callers depending on this for safety should be aware that an empty
- * list will cause stale files to be aggressively pruned. The GC TTL is the
- * second safety net.
- *
- * @returns {string[]}
- */
-function listBranches() {
-  try {
-    const out = execSync("git branch --list --format='%(refname:short)'", { encoding: 'utf8' });
-    return out.split('\n').map(s => s.trim()).filter(Boolean);
-  } catch (_) {
-    return [];
-  }
-}
-
-/**
- * Read `state.gc.ttlDays` from `.claude/sdlc.json`, falling back to 7.
- * @returns {number}
- */
-function readTtlDaysFromConfig() {
-  try {
-    const stateCfg = readSection(process.cwd(), 'state');
-    const v = stateCfg && stateCfg.gc && stateCfg.gc.ttlDays;
-    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
-  } catch (_) {
-    // fall through to default
-  }
-  return 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -479,8 +438,6 @@ function cmdGc(opts) {
   if (opts.dryRun) {
     // Dry-run: enumerate without deleting. Re-implement with `now`/`fs.statSync`
     // pre-flight to compute what would happen, by temporarily filtering.
-    const fs2 = fs;
-    const path2 = require('node:path');
     const { resolveStateDir, parseStateFilename } = require(path.join(LIB, 'state'));
     const stateDir = resolveStateDir();
     const liveSlugs = new Set(knownBranches.map(slugifyBranch));
@@ -490,7 +447,7 @@ function cmdGc(opts) {
     const out = { ship: { wouldDelete: [], wouldKeep: [] }, execute: { wouldDelete: [], wouldKeep: [] } };
 
     let entries = [];
-    try { entries = fs2.readdirSync(stateDir); } catch (_) { /* empty */ }
+    try { entries = fs.readdirSync(stateDir); } catch (_) { /* empty */ }
 
     for (const name of entries) {
       if (!name.endsWith('.json')) continue;
@@ -499,7 +456,7 @@ function cmdGc(opts) {
       const bucket = out[parsed.prefix];
       if (!bucket) continue;
       let stat;
-      try { stat = fs2.statSync(path2.join(stateDir, name)); } catch (_) { continue; }
+      try { stat = fs.statSync(path.join(stateDir, name)); } catch (_) { continue; }
       const fresh = (now - stat.mtimeMs) < ttlMs;
       const branchExists = liveSlugs.has(parsed.slug);
       if (fresh) {
