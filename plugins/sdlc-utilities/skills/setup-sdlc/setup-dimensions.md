@@ -215,7 +215,7 @@ Present the markdown output table. If any file has errors, show the error detail
    | `severity` | Header note | "Default severity: {value}" |
    | Body checklist | Checklist section | Strip `- [ ]` → `- ` |
    | `skip-when` | Note section | Advisory text |
-   | `max-files`, `requires-full-diff` | — | Omit |
+   | `max-files`, `requires-full-diff`, `model` | — | Omit |
 
 3. Confirm each file with its path and character count. Print a final summary listing all generated files with sizes.
 

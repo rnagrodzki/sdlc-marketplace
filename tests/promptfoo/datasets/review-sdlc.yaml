@@ -384,6 +384,59 @@
         Mentioning received-review-sdlc in a general "available commands" context
         is acceptable, but it should not be presented as a recommended next action.
 
+- description: "review-sdlc: per-dimension model override (R15, #199) — orchestrator honors dimension.model"
+  vars:
+    skill_path: "plugins/sdlc-utilities/agents/review-orchestrator.md"
+    project_context: "file://fixtures/project-dimension-model-override.md"
+    user_request: >
+      The review-orchestrator is about to dispatch dimension subagents. The manifest in the
+      project context contains two dimensions: security-review (with model: claude-haiku-4-5-20251001)
+      and style-review (with model: null). manifest.subagent_model is "sonnet". Walk through the
+      Step 2 dispatch — what model is passed for each dimension and why?
+  assert:
+    # Must mention the per-dimension override mechanism
+    - type: regex
+      value: "(dimension\\.model|per-dimension|override)"
+    # Must explicitly name the haiku model for security-review
+    - type: icontains
+      value: "claude-haiku-4-5-20251001"
+    # Must mention the sonnet fallback for the dimension without an override
+    - type: icontains
+      value: "sonnet"
+    - type: llm-rubric
+      value: >
+        The response correctly explains that security-review is dispatched with
+        model: claude-haiku-4-5-20251001 (per-dimension override) and style-review is
+        dispatched with model: sonnet (manifest.subagent_model fallback because its
+        dimension.model is null). The response references the precedence rule
+        `dimension.model || manifest.subagent_model`. It does not invent model names not
+        present in the manifest, and it does not claim style-review uses opus or haiku.
+
+- description: "review-sdlc: Copilot transform omits per-dimension model field (R15, #199)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/setup-dimensions.md"
+    project_context: "file://fixtures/project-dimension-model-override.md"
+    user_request: >
+      The user runs /setup-sdlc --dimensions on a project where security-review.md declares
+      `model: claude-haiku-4-5-20251001` in its frontmatter. Generate the Copilot equivalent at
+      .github/instructions/security-review.instructions.md and explain which fields are dropped.
+  assert:
+    # The generated Copilot file must NOT contain a model field
+    - type: not-icontains
+      value: "model: claude-haiku"
+    - type: not-regex
+      value: "(?im)^model:\\s"
+    # Must explicitly mention the Omit transform behavior
+    - type: regex
+      value: "(omit|Omit|drop|stripped|excluded)"
+    - type: llm-rubric
+      value: >
+        The response generates a Copilot instructions file for security-review and explicitly
+        notes that the `model:` field is omitted in the Copilot transform (because Copilot has
+        no model-selector concept). The explanation references the transform table that groups
+        model with max-files and requires-full-diff in the Omit row. The generated file does
+        NOT contain any `model:` line in its frontmatter or body.
+
 - description: "review-sdlc: link verification (R14, #198) — invokes script gate before gh api comments POST"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"

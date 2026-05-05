@@ -121,3 +121,37 @@
       value: "D9"
     - type: regex
       value: '"total_errors":\s*[1-9]'
+
+- description: "sdlc-dimensions: valid model field passes (R15)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-dimensions.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/project-with-dimensions"
+  assert:
+    # Dimension carrying a valid `model:` string still passes overall
+    - type: icontains
+      value: '"overall": "PASS"'
+    - type: regex
+      value: '"total_errors":\s*0'
+    # The model-override fixture dimension is enumerated
+    - type: icontains
+      value: "model-override-review"
+
+- description: "sdlc-dimensions: non-string model field triggers D13 warning (R15)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-dimensions.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/project-invalid-dimension-model"
+  assert:
+    # D13 warning is present and names the field + expected type
+    - type: icontains
+      value: "D13"
+    - type: icontains
+      value: "model"
+    - type: icontains
+      value: "string"
+    # Warning, not error
+    - type: regex
+      value: '"total_errors":\s*0'
+    - type: icontains
+      value: "HAS_WARNINGS"

@@ -423,6 +423,7 @@ function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
       description:       fm.description || '',
       severity:          fm.severity || 'medium',
       requires_full_diff: fm['requires-full-diff'] || false,
+      model:             fm.model || null,
       status:            matched.length === 0 ? 'SKIPPED' : (truncated ? 'TRUNCATED' : 'ACTIVE'),
       matched_files:     matched,
       matched_count:     matched.length,

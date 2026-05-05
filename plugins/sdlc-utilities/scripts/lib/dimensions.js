@@ -134,7 +134,7 @@ function levenshtein(a, b) {
 
 const KNOWN_FIELDS = new Set([
   'name', 'description', 'triggers', 'skip-when',
-  'severity', 'max-files', 'requires-full-diff',
+  'severity', 'max-files', 'requires-full-diff', 'model',
 ]);
 
 const VALID_SEVERITIES = new Set(['critical', 'high', 'medium', 'low', 'info']);
@@ -249,6 +249,13 @@ function validateDimensionFile(filePath) {
   if (fm['requires-full-diff'] !== undefined) {
     if (typeof fm['requires-full-diff'] !== 'boolean') {
       warnings.push({ check: 'D12', message: `Field "requires-full-diff" must be a boolean (got: ${JSON.stringify(fm['requires-full-diff'])})`, line: null });
+    }
+  }
+
+  // D13 — model (optional)
+  if (fm.model !== undefined) {
+    if (typeof fm.model !== 'string' || fm.model.trim().length === 0) {
+      warnings.push({ check: 'D13', message: `Field "model" must be a non-empty string (got: ${JSON.stringify(fm.model)})`, line: null });
     }
   }
 

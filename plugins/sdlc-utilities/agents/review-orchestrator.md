@@ -107,7 +107,11 @@ For each dimension with `status: "ACTIVE"` or `status: "TRUNCATED"`:
      {end for}
      ```
 
-3. Dispatch via Agent tool (subagent_type: general-purpose, model: manifest.subagent_model)
+3. Dispatch via Agent tool (subagent_type: general-purpose, model: dimension.model || manifest.subagent_model)
+   - Per-dimension precedence: when a dimension declares a `model:` field in its
+     manifest entry (sourced from its frontmatter, see R15), that value wins. Otherwise
+     fall back to `manifest.subagent_model`. Forward the string verbatim — no
+     whitelist, no remap.
 
 **Dispatch ALL active dimensions in a SINGLE message** (multiple Agent tool calls in
 one response). Do not dispatch one at a time.
@@ -199,4 +203,4 @@ Before returning:
 - Implement `yes` / `save` / `cancel` branches or no-PR menu options
 - Invoke the `pr-sdlc` skill
 - Delete `manifest.diff_dir` or the manifest file — the skill cleans both up
-- Dispatch dimension subagents without `model: manifest.subagent_model` — omitting it defaults to opus
+- Dispatch dimension subagents without `model:` — omitting the parameter defaults to opus. Use `dimension.model || manifest.subagent_model` (per-dimension override wins; manifest is the fallback)

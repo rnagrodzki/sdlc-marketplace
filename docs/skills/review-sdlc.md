@@ -113,6 +113,37 @@ Use `--set-default` to create or update this file without editing it manually:
 
 Valid scope values: `all`, `committed`, `staged`, `working`, `worktree`.
 
+### Dimension frontmatter fields
+
+Each `.claude/review-dimensions/<name>.md` declares a dimension via YAML frontmatter. The full set of supported fields:
+
+| Field | Required | Type | Purpose |
+|---|---|---|---|
+| `name` | yes | string | Dimension identifier (lowercase, digits, hyphens; ≤64 chars) |
+| `description` | yes | string | One-line dimension purpose (≤256 chars) |
+| `triggers` | yes | string[] | Glob patterns selecting files this dimension reviews |
+| `severity` | no | string | Default severity bucket: `critical`, `high`, `medium`, `low`, `info` |
+| `skip-when` | no | string[] | Glob patterns that exclude files even when `triggers` match |
+| `max-files` | no | integer | Cap on files dispatched to this dimension's subagent |
+| `requires-full-diff` | no | boolean | Pass full diff (not file list) to the subagent |
+| `model` | no | string | Per-dimension model override; passed verbatim to the dispatched subagent (overrides `manifest.subagent_model`). Claude Code only — the Copilot transform in `setup-sdlc` omits it. |
+
+Example with `model:` override:
+
+```yaml
+---
+name: security-review
+description: Identify security risks in changed code.
+severity: high
+model: claude-haiku-4-5-20251001
+triggers:
+  - "**/*.ts"
+  - "**/*.js"
+---
+```
+
+When `model:` is absent, the orchestrator falls back to `manifest.subagent_model` (default: `sonnet`).
+
 ---
 
 ## Consolidated Comment Format
