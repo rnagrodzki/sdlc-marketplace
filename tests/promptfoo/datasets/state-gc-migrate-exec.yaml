@@ -128,12 +128,13 @@
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-ship-state-rename"
   assert:
-    # Output goes to a temp file path printed to stdout. We can't assert on
-    # the file content directly here (no follow-up read), but the script will
-    # exit non-zero and the script-runner provider's error path surfaces it.
-    # Use a sanity-style check that the script completed (path printed).
     - type: contains
       value: 'ship-prepare-'
+    - type: javascript
+      value: |
+        const fs = require('fs');
+        const data = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
+        return Array.isArray(data.errors) && data.errors.some(e => e.includes('"cleanup"') && e.includes('reserved'));
 
 # ---------------------------------------------------------------------------
 # hooks/context-stats.js: usage path produces transcript-usage source

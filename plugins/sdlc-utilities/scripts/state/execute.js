@@ -26,14 +26,13 @@
 
 const path = require('node:path');
 const fs   = require('node:fs');
-const { execSync } = require('node:child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const {
   slugifyBranch, readState, writeState, initState, deleteState, resolveBranch,
   gcStateFiles, resolveStateDir, parseStateFilename,
+  listBranches, readTtlDaysFromConfig,
 } = require(path.join(LIB, 'state'));
-const { readSection } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -92,30 +91,6 @@ function parseArgs(argv) {
   }
 
   return result;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers (gc)
-// ---------------------------------------------------------------------------
-
-function listBranches() {
-  try {
-    const out = execSync("git branch --list --format='%(refname:short)'", { encoding: 'utf8' });
-    return out.split('\n').map(s => s.trim()).filter(Boolean);
-  } catch (_) {
-    return [];
-  }
-}
-
-function readTtlDaysFromConfig() {
-  try {
-    const stateCfg = readSection(process.cwd(), 'state');
-    const v = stateCfg && stateCfg.gc && stateCfg.gc.ttlDays;
-    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
-  } catch (_) {
-    // fall through to default
-  }
-  return 7;
 }
 
 // ---------------------------------------------------------------------------
