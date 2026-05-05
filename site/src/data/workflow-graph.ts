@@ -23,6 +23,7 @@ export const workflowNodes: WorkflowNode[] = [
   { slug: 'setup-sdlc', command: '/setup-sdlc', category: 'review', lane: 'review', col: 0, tagline: 'Configure review dimensions, PR template, guardrails' },
   { slug: 'review-sdlc', command: '/review-sdlc', category: 'review', lane: 'review', col: 1, tagline: 'Multi-dimension code review' },
   { slug: 'received-review-sdlc', command: '/received-review-sdlc', category: 'review', lane: 'review', col: 2, tagline: 'Process review feedback' },
+  { slug: 'harden-sdlc', command: '/harden-sdlc', category: 'review', lane: 'review', col: 3, tagline: 'Harden guardrails after failure' },
   // Ship lane
   { slug: 'commit-sdlc', command: '/commit-sdlc', category: 'gitops', lane: 'ship', col: 0, tagline: 'Smart commit message generation' },
   { slug: 'pr-sdlc', command: '/pr-sdlc', category: 'gitops', lane: 'ship', col: 1, tagline: 'Create structured pull requests' },
@@ -53,6 +54,9 @@ export const workflowEdges: WorkflowEdge[] = [
   { from: 'ship-sdlc', to: 'received-review-sdlc', label: 'invokes conditionally', style: 'dashed' },
   { from: 'ship-sdlc', to: 'version-sdlc', label: 'invokes', style: 'dashed' },
   { from: 'ship-sdlc', to: 'pr-sdlc', label: 'invokes', style: 'dashed' },
+  // Harden loop
+  { from: 'ship-sdlc', to: 'harden-sdlc', label: 'on failure', style: 'cross-lane' },
+  { from: 'harden-sdlc', to: 'setup-sdlc', label: 'tightens guardrails', style: 'dashed' },
 ];
 
 export const laneLabels: Record<string, string> = {
