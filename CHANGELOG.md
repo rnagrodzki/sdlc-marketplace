@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-05-06
+
+### Added
+- harden-sdlc: new skill for analyzing SDLC pipeline failures and proposing targeted hardening changes across plan guardrails, execute guardrails, review dimensions, copilot instructions, and plugin self-bugs (#221)
+
+### Fixed
+- harden-sdlc: corrected orchestrator agent behavior to ensure failure analysis correctly routes through all five hardening surfaces (#220)
+- state module: lifted shared `listBranches()` and `readTtlDaysFromConfig()` helpers to `lib/state.js`, eliminating duplicate implementations across ship and execute state modules (#227)
+
 ## [0.17.46] - 2026-05-05
 
 ### Added
