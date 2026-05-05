@@ -3,6 +3,11 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-05 — received-review-sdlc: three HIGH fixes on fix/version-sdlc-bugs-211-212-213
+HIGH-1: `--output-file` handler had a conditional `i++` that ate the next positional arg (e.g. `patch`), causing `requestedBump` to stay null. `output.js` only checks `process.argv.includes('--output-file')` — no value consumption — so the handler must be a pure no-op. Rule: boolean flags that delegate value-reading to another module must not advance the parse index.
+HIGH-2: Exec test for #212 used `--output-file` in `script_args`, which made the script write JSON to a temp file and print only the path to stdout. The `not-icontains "Unknown flag: --output-file"` assertion against a file path was a guaranteed false positive. Fix: remove `--output-file` from args so full JSON hits stdout; replace the file-path regex with a `requestedBump` content assertion.
+HIGH-3: `docs/skills/version-sdlc.md` was never updated after #211 (git diff hard-gate) and #213 (unified flags.changelog). Rule: when SKILL.md gains a new hard gate or behavior change, update the user-facing reference doc in the same PR.
+
 ## 2026-05-05 — version-sdlc: plugin.json corruption during release v0.17.41 (#211)
 Root cause: SKILL.md Step 8.1 only mandated targeted Edit for TOML/YAML version files; JSON formats (package.json, plugin.json) were left to LLM discretion. The agent rewrote plugin.json from memory during the release commit, truncating the `description` field. Mitigation: Step 8.1 now mandates a single targeted Edit-tool call for ALL version-file formats (JSON included) plus a post-edit `git diff` HARD GATE — exactly one line must differ; otherwise abort and `git checkout -- <versionFile>`. Spec R8 generalized; gotcha bullet rewritten. Behavioral test added (multi-field plugin.json fixture).
 

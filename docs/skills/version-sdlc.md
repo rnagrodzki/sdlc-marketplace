@@ -22,7 +22,7 @@ Manages the full semantic release workflow: detects the version source, bumps th
 | `--init` | Run the setup wizard and write `.claude/version.json`. Safe to re-run. | — |
 | `--pre <label>` | Create a pre-release version (e.g. `beta`, `rc`). Label must match `^[a-z][a-z0-9]*$`. Auto-increments the counter on repeated runs. | — |
 | `--no-push` | Commit and tag locally, skip `git push`. | — |
-| `--changelog` | With a bump type: generate a CHANGELOG entry as part of the release. Without a bump type: update the changelog for the already-tagged current version (no new tag created). | off |
+| `--changelog` | With a bump type: generate a CHANGELOG entry as part of the release. Without a bump type: update the changelog for the already-tagged current version (no new tag created). Can also be enabled permanently by setting `"changelog": true` in `.claude/version.json` — the CLI flag and config value are OR'd together as `flags.changelog`. | off |
 | `--hotfix` | Mark this release as a hotfix for DORA metrics tracking. Annotates the commit message with `[hotfix]` and the tag message body with `Type: hotfix`. | off |
 | `--auto` | Skip interactive approval prompts. Release plan is still displayed for visibility; critique gates and pre-condition checks still run. | off |
 
@@ -282,6 +282,14 @@ git tag -l --format='%(refname:short)%09%(contents:subject)%09%(contents:body)'
 | `package.json` / version file | Version field bumped in-place |
 | git tag | Annotated tag (e.g. `v1.3.0`) pushed to origin. With `--hotfix`, tag body includes `Type: hotfix`. |
 | `CHANGELOG.md` | New entry prepended (only with `--changelog`) |
+
+---
+
+## Version-File Edit Hard Gate
+
+After bumping the version string in the version file, the skill runs `git diff <versionFile>` and enforces that **exactly one line changed**. If more than one line differs, the release is aborted immediately: the file is restored with `git checkout -- <versionFile>` and the diff is surfaced verbatim to the user.
+
+This gate applies to all supported file formats (JSON, TOML, YAML — `package.json`, `plugin.json`, `Cargo.toml`, `pyproject.toml`, etc.). The Edit tool is used with a single targeted string replacement; the Write tool is never used to rewrite the file, because LLMs can silently truncate or paraphrase fields like `description`.
 
 ---
 
