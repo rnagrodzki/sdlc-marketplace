@@ -1,11 +1,7 @@
 {
   "version": {
-    "mode": "file",
-    "versionFile": "plugins/sdlc-utilities/.claude-plugin/plugin.json",
-    "fileType": "plugin.json",
-    "tagPrefix": "v",
-    "changelog": true,
-    "changelogFile": "CHANGELOG.md"
+    "mode": "tag",
+    "tagPrefix": "v"
   },
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
   "plan": {
@@ -93,5 +89,49 @@
   "pr": {
     "titlePattern": "^(feat|fix|refactor|chore|docs|test|ci)\\(#\\d+\\): .+ - .+$",
     "titlePatternError": "PR title must follow: type(#issue): scope - description"
+  },
+  "execute": {
+    "guardrails": [
+      {
+        "id": "test-coverage-required",
+        "description": "Code changes must include corresponding test coverage — verify tests exist and pass after each wave.",
+        "severity": "error"
+      },
+      {
+        "id": "no-ci-bypass",
+        "description": "Implemented code must not disable, skip, or weaken CI checks, linters, or pre-commit hooks.",
+        "severity": "error"
+      },
+      {
+        "id": "no-auto-eval",
+        "description": "Never run promptfoo eval automatically — evaluation must always be initiated manually by the user.",
+        "severity": "error"
+      },
+      {
+        "id": "spec-first",
+        "description": "New skills require an accepted spec (docs/specs/<skill-name>.md) before writing SKILL.md.",
+        "severity": "error"
+      },
+      {
+        "id": "skill-docs-required",
+        "description": "Every skill change must produce all three artifacts: spec at docs/specs/, SKILL.md, and docs/skills/ reference doc.",
+        "severity": "error"
+      },
+      {
+        "id": "no-scope-creep",
+        "description": "Implementation must stay within the task stated scope — no additional features, refactoring, or cleanup beyond what was specified.",
+        "severity": "warning"
+      },
+      {
+        "id": "single-responsibility-tasks",
+        "description": "Each implemented change must address exactly one concern — no bundled fixes or unrelated modifications.",
+        "severity": "warning"
+      },
+      {
+        "id": "yagni",
+        "description": "Do not add functionality until it is actually needed. No speculative abstractions, premature generalization, or unused parameters.",
+        "severity": "warning"
+      }
+    ]
   }
 }
