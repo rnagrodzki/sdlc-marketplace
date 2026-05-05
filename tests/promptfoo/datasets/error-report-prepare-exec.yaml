@@ -1,0 +1,61 @@
+# Script execution tests for error-report-prepare.js.
+# These tests run error-report-prepare.js directly (no LLM).
+# They validate manifest assembly, --output-file mode, and required-field
+# validation for the prepare script consumed by error-report-orchestrator.
+
+- description: "error-report-prepare: assembles manifest with all required fields and writes JSON inline (no --output-file)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/error-report-prepare.js"
+    script_args: "--skill commit-sdlc --step Step-0 --operation skill/commit.js --error-text exit-2-crash"
+  assert:
+    - type: icontains
+      value: '"skill": "commit-sdlc"'
+    - type: icontains
+      value: '"step": "Step-0"'
+    - type: icontains
+      value: '"operation": "skill/commit.js"'
+    - type: icontains
+      value: '"errorText": "exit-2-crash"'
+    - type: icontains
+      value: '"targetRepo": "rnagrodzki/sdlc-marketplace"'
+    # labels include both tooling-error and the skill name
+    - type: icontains
+      value: '"tooling-error"'
+
+- description: "error-report-prepare: --output-file writes manifest to temp file and prints absolute path"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/error-report-prepare.js"
+    script_args: "--skill pr-sdlc --step Step-2 --operation gh-pr-create --error-text 401-Bad-credentials --output-file"
+  assert:
+    # stdout is an absolute path, not the JSON manifest
+    - type: regex
+      value: '^/.+/sdlc-error-report-[0-9a-f]+\.json\s*$'
+    # The manifest payload should NOT be on stdout when --output-file is set
+    - type: not-icontains
+      value: '"targetRepo":'
+
+- description: "error-report-prepare: missing required field exits non-zero with errors[] in payload"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/error-report-prepare.js"
+    script_args: "--skill commit-sdlc"
+  assert:
+    - type: icontains
+      value: '"errors":'
+    - type: icontains
+      value: 'Missing required field: step'
+    - type: icontains
+      value: 'Missing required field: operation'
+    - type: icontains
+      value: 'Missing required field: errorText'
+
+- description: "error-report-prepare: target repo and labels are produced by the script (not the agent)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/error-report-prepare.js"
+    script_args: "--skill version-sdlc --step Step-3 --operation git-push --error-text remote-rejected"
+  assert:
+    - type: icontains
+      value: '"targetRepo": "rnagrodzki/sdlc-marketplace"'
+    - type: icontains
+      value: '"tooling-error"'
+    - type: icontains
+      value: '"version-sdlc"'

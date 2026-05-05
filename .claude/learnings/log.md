@@ -37,6 +37,9 @@ that capture non-obvious gotchas not yet reflected in code, docs, or skills.
 - version-sdlc auto-set-upstream → #183
 - pr-sdlc post-failure gh-switch → #184
 - plan-sdlc README reminder → #185
+- version-sdlc --output-file unknown flag warning → #212
+- version-sdlc config.changelog not honored → #213
+- pr-sdlc remoteState.pushed stale → #214
 
 ## 2026-04-29 — received-review-sdlc processing of review findings for fix(#183)
 - `not-icontains` on `--set-upstream` would match the string anywhere in the response (including explanatory text), producing false negatives on regression-guard assertions; `not-regex: 'git push.*--set-upstream'` scopes the check to actual push command lines only.
