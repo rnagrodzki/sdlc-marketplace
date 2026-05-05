@@ -4,6 +4,12 @@ Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
 ## 2026-05-05 — pr-sdlc: gh account auto-switch on CreatePullRequest permission error
+During PR creation for fix/#208-#209-#214-pipeline-bugs, `gh pr create` failed with `rnagrodzkicl does not have the correct permissions to execute CreatePullRequest`. The recovery helper (`pr-recover-gh-account.js`) returned `recovered: false` with a hint for `gh auth login --hostname github-rn`, but `gh auth switch` to `rnagrodzki` (the repo owner) succeeded manually and the retry PR creation worked. The recovery helper's `hint` path did not trigger an account switch because the host was `github-rn` (a custom hostname) rather than the standard `github.com` — the helper found no local account matching `github-rn`. Rule: when the recovery hint points to a non-standard hostname and a `rnagrodzki` account exists on `github.com`, try `gh auth switch` to `rnagrodzki` before escalating to the user.
+
+## 2026-05-05 — version-sdlc: patch release v0.17.44 from fix/#208-#209-#214-pipeline-bugs
+Branch had no upstream; auto `--set-upstream` on push worked correctly. `flags.changelog` resolved to `false` despite `config.changelog: true` — changelog requires explicit `--changelog` flag or a bump invocation that sets it. CI scripts were up to date.
+
+## 2026-05-05 — pr-sdlc: gh account auto-switch on CreatePullRequest permission error
 The active gh account (rnagrodzkicl) lacked CreatePullRequest permissions on the rnagrodzki/sdlc-marketplace repo. pr-recover-gh-account.js returned `recovered: false` with hint `gh auth login --hostname github-rn` because the remote URL uses a custom SSH host alias. The correct account (rnagrodzki) was already configured locally as an inactive account — manual `gh auth switch --user rnagrodzki` resolved it before the retry. Rule: when the recovery helper returns `recovered: false`, check `gh auth status` for inactive matching accounts and switch manually before the retry.
 
 ## 2026-05-05 — version-sdlc: patch release v0.17.43 on fix branch
