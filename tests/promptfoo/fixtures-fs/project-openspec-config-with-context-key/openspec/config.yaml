@@ -1,0 +1,8 @@
+version: "1.0"
+project: test-project
+
+context: |
+  Existing project context defined by the user.
+
+rules:
+  - All changes must have a proposal
