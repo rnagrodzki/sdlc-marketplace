@@ -255,6 +255,7 @@ The release proceeds regardless of the user's answer. This is informational, not
    ```bash
    LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | head -1)
    [ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
+   [ -z "$LINKS_LIB" ] && { echo "ERROR: Could not locate scripts/lib/links.js. Is the sdlc plugin installed?" >&2; exit 2; }
    # Validate the new CHANGELOG entry only (not the entire historical file).
    printf '%s' "$new_changelog_entry" | node "$LINKS_LIB" --json
    LINK_EXIT=$?
