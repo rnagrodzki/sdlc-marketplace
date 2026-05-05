@@ -253,3 +253,89 @@
         parsed from comma-separated input, trimmed, deduped, and stored as an array. The
         chosen label "bug" comes from the gh label list (not free text). No partial write
         occurs — the writeSection call happens once after "done".
+
+# ---------------------------------------------------------------------------
+# Issue #205 — pr-labels section-menu summary
+# ---------------------------------------------------------------------------
+
+- description: "setup-sdlc Step 1 menu: pr.labels mode=off renders [set] and 'off — no automatic labels'"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: >
+      Project at tests/promptfoo/fixtures-fs/setup-pr-labels-menu-off/ with an existing
+      .claude/sdlc.json containing `pr.labels: { mode: "off" }`. The user runs
+      `/setup-sdlc` (no flags) and reaches the Step 1 selective-section menu.
+    user_request: >
+      Render the Step 1 selective-section menu for this project. Show how the pr-labels
+      row is presented, including its state marker and the per-section summary string
+      produced by summarizePrLabels.
+  assert:
+    - type: icontains
+      value: "pr-labels"
+    - type: icontains
+      value: "[set]"
+    - type: icontains
+      value: "off — no automatic labels"
+    - type: not-icontains
+      value: "not configured"
+    - type: llm-rubric
+      value: >
+        The pr-labels row in the Step 1 menu shows the configured state: marker `[set]`
+        (not `[not set]`) and the summary `off — no automatic labels`. The summarizer
+        receives the `pr.labels` leaf object directly (currentCfgFor walks the
+        configPath dot-path), reads `cfg.mode === "off"`, and returns the off-mode
+        message. The legacy bug behavior — reading `cfg.labels.mode` from the parent
+        `pr` slice and returning `not configured` — must NOT appear (issue #205).
+
+- description: "setup-sdlc Step 1 menu: pr.labels mode=rules with 1 rule renders [set] and 'rules: 1 rule'"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: >
+      Project at tests/promptfoo/fixtures-fs/setup-pr-labels-menu-rules/ with an existing
+      .claude/sdlc.json containing
+      `pr.labels: { mode: "rules", rules: [{ label: "bug", when: { branchPrefix: ["fix/"] } }] }`.
+      The user runs `/setup-sdlc` (no flags) and reaches the Step 1 selective-section menu.
+    user_request: >
+      Render the Step 1 selective-section menu for this project. Show how the pr-labels
+      row is presented, including its state marker and the per-section summary string
+      produced by summarizePrLabels.
+  assert:
+    - type: icontains
+      value: "pr-labels"
+    - type: icontains
+      value: "[set]"
+    - type: icontains
+      value: "rules: 1 rule"
+    - type: not-icontains
+      value: "not configured"
+    - type: llm-rubric
+      value: >
+        The pr-labels row shows marker `[set]` and summary `rules: 1 rule` (singular,
+        because the rules array has length 1). The summarizer reads `cfg.rules.length`
+        from the leaf, not `cfg.labels.rules.length` from the parent. The pluralization
+        is correct (`rule` not `rules`).
+
+- description: "setup-sdlc Step 1 menu: no pr.labels key renders [not set] without 'not configured' string"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: >
+      Project at tests/promptfoo/fixtures-fs/setup-pr-labels-menu-unset/ with an existing
+      .claude/sdlc.json that has a `pr` block (titlePattern, allowedTypes) but NO
+      `pr.labels` key at all. The user runs `/setup-sdlc` (no flags) and reaches the
+      Step 1 selective-section menu.
+    user_request: >
+      Render the Step 1 selective-section menu for this project. Show how the pr-labels
+      row is presented, including its state marker and any per-section summary string.
+  assert:
+    - type: icontains
+      value: "pr-labels"
+    - type: icontains
+      value: "[not set]"
+    - type: not-icontains
+      value: "not configured"
+    - type: llm-rubric
+      value: >
+        The pr-labels row shows marker `[not set]` because `pr.labels` is undefined.
+        The per-section summary is empty (the helper returns `''` for missing config,
+        matching sibling summarizers). The literal string `not configured` does NOT
+        appear — the legacy regression must not be reintroduced (issue #205).

@@ -1,0 +1,7 @@
+{
+  "$schema": "../../../../../../schemas/sdlc-config.schema.json",
+  "pr": {
+    "titlePattern": "^(feat|fix|chore): .+$",
+    "allowedTypes": ["feat", "fix", "chore"]
+  }
+}
