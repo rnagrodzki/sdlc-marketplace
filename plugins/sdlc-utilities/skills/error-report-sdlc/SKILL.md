@@ -7,6 +7,11 @@ disable-model-invocation: true
 
 # Error-to-GitHub Issue Proposal
 
+<!-- disable-model-invocation: true prevents the harness from auto-triggering this skill
+     when conversation content matches the description. It does NOT prevent explicit
+     dispatch from another skill's error-handling path — that is the only intended
+     activation route. user-invocable: false hides the skill from the / menu. -->
+
 Internal procedure invoked by SDLC skills when an actionable error occurs.
 Captures error context, verifies gh CLI availability, gets user consent, and
 creates a tracking issue in `rnagrodzki/sdlc-marketplace` using the gh CLI.
@@ -98,7 +103,7 @@ context-isolation knob" for the rationale.
 Use the `Agent` tool with:
 
 - `subagent_type`: `sdlc:error-report-orchestrator`
-- `model`: `haiku` (the orchestrator pins `haiku` itself; pass it explicitly so the harness honours it)
+- `model`: `haiku` (the Agent tool `model:` parameter takes precedence over agent frontmatter; passing `haiku` here keeps this bounded task on a lightweight model regardless of the parent context's model)
 - `prompt` (exactly two lines, no other content):
 
   ```text

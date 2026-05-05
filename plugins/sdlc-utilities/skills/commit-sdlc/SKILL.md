@@ -64,18 +64,18 @@ rm -f "$COMMIT_CONTEXT_FILE"
 
 ---
 
-### Step 1 (CONSUME): Quick Context Read
+### Step 1 (CONSUME): Quick Context Read <!-- implements R1, R2 -->
 
 Read just enough from `COMMIT_CONTEXT_JSON` for the main-context flow (Step 5 onwards): `currentBranch`, `flags`, `staged.files`, `staged.fileCount`, `staged.diffStat`, `unstaged.hasChanges`, `commitConfig.subjectPattern`, `commitConfig.subjectPatternError`. Heavy fields — `staged.diff`, `recentCommits`, `lastCommitMessage`, full `commitConfig` — are consumed by the orchestrator agent below; do **not** read or quote them in main context.
 
-### Step 2 (PLAN): Dispatch the commit-orchestrator Agent
+### Step 2 (PLAN): Dispatch the commit-orchestrator Agent <!-- implements R3, R4, R5, R6 -->
 
 Issue #202: pinning `model:` in skill frontmatter routes the skill into a subagent that inherits the entire conversation transcript and overflows the smaller-window models on long sessions. To keep the main context clean and bound the orchestrator's input to the prepared payload only, dispatch the dedicated `commit-orchestrator` agent. See `docs/skill-best-practices.md` → "Why frontmatter `model:` is the wrong context-isolation knob" for the rationale.
 
 Use the `Agent` tool with:
 
 - `subagent_type`: `sdlc:commit-orchestrator`
-- `model`: `haiku` (the orchestrator pins `haiku` itself; pass it explicitly so the harness honours it)
+- `model`: `haiku` (the Agent tool `model:` parameter takes precedence over agent frontmatter; passing `haiku` here keeps this bounded task on a lightweight model regardless of the parent context's model)
 - `prompt` (exactly two lines, no other content):
 
   ```text

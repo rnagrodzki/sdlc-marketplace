@@ -3,7 +3,7 @@
 > Internal procedure invoked by other SDLC skills to create a GitHub issue tracking an actionable error, with full context capture and two-gate user consent.
 
 **User-invocable:** no
-**Model:** haiku
+**Model:** haiku (pinned on orchestrator agent, not skill frontmatter — see issue #202)
 
 ## Core Requirements
 

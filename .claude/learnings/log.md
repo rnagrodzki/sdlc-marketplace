@@ -47,3 +47,12 @@ that capture non-obvious gotchas not yet reflected in code, docs, or skills.
 
 ## 2026-05-05 -- setup-sdlc: review-dimensions count mismatch
 setup.js reported reviewDimensions.count: 0 despite 12 valid .md files in .claude/review-dimensions/. Root cause: setup.js likely checks for .yaml extensions but this project uses .md. Validate script (validate-dimensions.js) correctly found all 12. Added type-safety-review as the one genuine gap (code-quality.md only triggers on *.js, not *.ts). GitHub Copilot instruction added for new dimension. Also added 8 execution guardrails including 3 project-specific ones derived from AGENTS.md (no-auto-eval, spec-first, skill-docs-required).
+
+## 2026-05-05 — version-sdlc: patch bump on feat commit, first push from new branch
+Patch bump (0.17.41 → 0.17.42) was explicitly requested despite conventionalSummary.suggestedBump being "minor" (one feat commit). Explicit user request takes precedence. Branch fix/skill-subagents-minimal-payload had no upstream — used --set-upstream on first push; succeeded cleanly.
+
+## 2026-05-05 — ship-sdlc: issue #202 - skill subagent minimal payload
+execute-plan-sdlc created feature branch fix/skill-subagents-minimal-payload from main. Previous in_progress state file (from 09:51) was silently bypassed by starting fresh — state was keyed to `main` but execute created a new branch, requiring state re-init. version-sdlc suggested minor bump (feat commit) but explicit patch override worked as expected. Review found call-site model:haiku inconsistency vs review-sdlc pattern (medium) — verify if agent frontmatter model: is honored without call-site override.
+
+## 2026-05-05 — received-review-sdlc: issue #202 follow-up fixes
+Review finding #2 (medium): "call-site model:haiku inconsistent with review-sdlc" — the asymmetry is intentional. review-orchestrator runs at parent model; commit/error-report orchestrators want haiku specifically. The Agent tool model: parameter takes precedence over agent frontmatter (per tool docs). The original comment "pass it explicitly so the harness honours it" was misleading — the call-site IS the correct mechanism, frontmatter is redundant. Finding accepted (improve comment clarity), not change of mechanism.
