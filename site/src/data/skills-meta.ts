@@ -265,6 +265,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'validate', label: 'Schema validation', type: 'verify', description: 'Validates approved sdlc.json edits via ci/validate-guardrails.js before write' },
       { id: 'apply', label: 'Write approved edits', type: 'llm', description: 'Edits surface files only after explicit approval and validation pass' },
       { id: 'route', label: 'Plugin-defect routing', type: 'dispatch', description: 'When classification is plugin-defect, dispatches error-report-sdlc with prepared payload' },
+      { id: 'learn', label: 'Learning capture', type: 'llm', description: 'Appends a one-line summary entry to .claude/learnings/log.md' },
     ],
     connections: [
       { to: 'plan-sdlc', label: 'hardens after failure of' },

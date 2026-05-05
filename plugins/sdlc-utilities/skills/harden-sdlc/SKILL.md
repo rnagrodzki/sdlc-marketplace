@@ -43,7 +43,7 @@ MANIFEST_FILE=$(node "$SCRIPT" \
   --skill "$SKILL_NAME" \
   --step "$STEP_NAME" \
   --operation "$OPERATION" \
-  --exit-code "$EXIT_CODE" \
+  --exit-code "$EXIT_CODE_ARG" \
   --error-type "$ERROR_TYPE" \
   --user-intent "$USER_INTENT" \
   --args-string "$ARGS_STRING" \
@@ -51,9 +51,9 @@ MANIFEST_FILE=$(node "$SCRIPT" \
 EXIT_CODE_PREPARE=$?
 echo "MANIFEST_FILE=$MANIFEST_FILE"
 echo "EXIT_CODE=$EXIT_CODE_PREPARE"
-# Single canonical cleanup: trap fires unconditionally so the manifest is
-# removed even if the user cancels at the approval gate or the agent crashes.
-trap 'rm -f "$MANIFEST_FILE"' EXIT INT TERM
+# Single canonical cleanup: trap fires only when MANIFEST_FILE was written so
+# we do not attempt `rm -f ""` on a failed script invocation.
+trap '[ -n "$MANIFEST_FILE" ] && rm -f "$MANIFEST_FILE"' EXIT INT TERM
 ```
 
 Substitute the shell variables with values from the parsed arguments. Empty
@@ -129,11 +129,11 @@ the failure being analyzed).
 ## Step 4 — Branch on Classification (R9)
 
 If `RESULT.classification == "plugin-defect"` AND `RESULT.routeToErrorReport ==
-true`: jump to **Step 6 — PLUGIN-DEFECT ROUTE**. Skip Steps 4 (PRESENT) and 5
-(APPLY) entirely — no surface edits are appropriate for plugin defects.
+true`: jump to **Step 6 — PLUGIN-DEFECT ROUTE**. Skip Step 5 (PRESENT and APPLY)
+entirely — no surface edits are appropriate for plugin defects.
 
 Otherwise (`user-code` or `ambiguous`), display the classification and rationale
-to the user, then continue to Step 5 (PRESENT).
+to the user, then continue to Step 5 (PRESENT and APPLY).
 
 ```
 Classification: {RESULT.classification}

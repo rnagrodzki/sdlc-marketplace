@@ -98,7 +98,7 @@ Each proposal:
 The `patch` is a **preview**, not a diff to be auto-applied. The skill's main
 context performs the actual write after user approval.
 
-## Step 4 — Self-Critique
+## Step 4 — Self-Critique (first pass)
 
 Before emitting JSON, verify:
 
@@ -110,7 +110,17 @@ Before emitting JSON, verify:
   `routeToErrorReport` is `true` with a non-empty `errorReportPayload`
 - No proposal targets a path outside `PROJECT_ROOT`
 
-Fix any failure and re-check.
+Note every failing check.
+
+## Step 4b — Improve
+
+For each failing check noted in Step 4:
+- Reclassify if the rationale does not cite a specific source
+- Rewrite generic rationale with direct reference to the failure signal
+- Remove or invert any proposal that relaxes an existing rule
+- Correct severity vocabulary mismatches
+
+Re-run all Step 4 checks after improvements. Continue until all checks pass (max 2 iterations).
 
 ## Step 5 — Emit the JSON Object
 

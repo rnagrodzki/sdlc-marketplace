@@ -57,15 +57,17 @@ function readStdinJson() {
     const buf = fs.readFileSync(0, 'utf8');
     if (!buf.trim()) return {};
     return JSON.parse(buf);
-  } catch (_) {
+  } catch (err) {
+    process.stderr.write(`harden-prepare: stdin JSON parse failed — ${err.message}\n`);
     return {};
   }
 }
 
 function safeExec(cmd) {
   try {
-    return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-  } catch (_) {
+    return execSync(cmd, { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
+  } catch (err) {
+    process.stderr.write(`harden-prepare: git command failed (${cmd.split(' ')[0]}): ${err.stderr ? err.stderr.toString().trim() : err.message}\n`);
     return '';
   }
 }
@@ -90,7 +92,9 @@ function readPipelineState(projectRoot) {
           currentStep: data.currentStep || null,
           lastFailedStep: data.lastFailedStep || null,
         };
-      } catch (_) { /* ignore parse errors */ }
+      } catch (err) {
+        process.stderr.write(`harden-prepare: skipping ship state file ${f} — ${err.message}\n`);
+      }
     }
     if (!executeState && f.startsWith('execute-')) {
       try {
@@ -99,7 +103,9 @@ function readPipelineState(projectRoot) {
           failedTask: data.failedTask || null,
           failedWave: data.failedWave || null,
         };
-      } catch (_) { /* ignore parse errors */ }
+      } catch (err) {
+        process.stderr.write(`harden-prepare: skipping execute state file ${f} — ${err.message}\n`);
+      }
     }
   }
   return { shipState, executeState };

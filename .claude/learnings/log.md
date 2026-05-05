@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-06 — received-review-sdlc: harden-sdlc review round — 9 findings fixed, 2 pushed back
+Fixed HIGH: silent catches in harden-prepare.js now log to stderr (H1, H2), EXIT_CODE_ARG rename avoids bash variable collision (H3), dual critique gate added to harden-orchestrator (H4), Step 4 skip-label corrected (H5), review-sdlc spec R16 step reference corrected to Step 5 (H6), commit-sdlc spec R13 narrowed to subjectPattern only (H7). Fixed MEDIUM: stdin JSON parse error now logged (M1), pipeline array in skills-meta.ts gains "learn" step (M2), trap guarded with [ -n ] (M3). Pushed back: M4 (P11 vs R4 — different concerns, no defect), L1 (no requirement for dimensions to cover log.md).
+
 ## 2026-05-05 — version-sdlc: patch release v0.17.47 from fix/220-223-context-stats-ship-state-cleanup
 Single fix commit (context-stats token calculation + ship-state GC cleanup). Branch had no upstream — first push used --set-upstream automatically. Changelog disabled (flags.changelog === false despite config.changelog === true; --auto mode without explicit --changelog flag). All CI scripts current at their installed versions.
 
