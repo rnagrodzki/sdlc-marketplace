@@ -275,7 +275,9 @@ Before dispatching any agents in this wave, evaluate each error-severity guardra
   > Wave N would violate guardrail `<id>`: <description>
   > Rationale: <one-line explanation>
   >
-  > Options: **override** (proceed anyway) | **cancel** (stop execution)
+  > Options: **override** (proceed anyway) | **harden** (run `/harden-sdlc` to analyze why this failed and propose stronger guardrails / dimensions / instructions that would catch it earlier next time — opt-in, no surface is edited without your approval) | **cancel** (stop execution)
+
+  When the user selects **harden** (interactive mode only — suppressed when `--auto` is set), dispatch `Skill(harden-sdlc)` with `--failure-text "Wave <N> guardrail <id> violated: <description>"`, `--skill execute-plan-sdlc`, `--step "5a-pre"`, `--operation "pre-wave guardrail evaluation"`. After harden-sdlc completes, re-evaluate the guardrail before continuing. Implements R28.
 
   If `--auto` is set, treat error-severity violations as blocking — do NOT auto-override. Print the violation and stop execution. Guardrails exist to prevent drift; auto-mode should not silently bypass them.
 
@@ -364,9 +366,11 @@ For each guardrail in `activeGuardrails`:
   > Wave N output violates guardrail `<id>`: <description>
   > Rationale: <one-line explanation of what specifically violated it>
   >
-  > Options: **fix** (attempt inline fix before proceeding) | **override** (accept and continue) | **cancel** (stop execution)
+  > Options: **fix** (attempt inline fix before proceeding) | **override** (accept and continue) | **harden** (run `/harden-sdlc` to analyze why this failed and propose stronger guardrails / dimensions / instructions that would catch it earlier next time — opt-in, no surface is edited without your approval) | **cancel** (stop execution)
 
   On "fix": attempt to fix the violation inline (no agent dispatch). After fixing, re-evaluate the specific guardrail. If still failing after one fix attempt, escalate to user with override/cancel options.
+
+  On "harden" (interactive mode only — suppressed when `--auto` is set): dispatch `Skill(harden-sdlc)` with `--failure-text "Wave <N> output violates <id>: <description> — <rationale>"`, `--skill execute-plan-sdlc`, `--step "5c-ter"`, `--operation "post-wave guardrail evaluation"`. After harden-sdlc completes, return to this menu. Implements R28.
 
   If `--auto` is set: print the violation and stop execution (same as pre-wave — do not auto-override).
 
@@ -426,7 +430,7 @@ On failure: preserve the state file for `--resume`.
 | Build failure | Stop immediately; fix before next wave |
 | Lint failure | Fix inline; never block a wave on lint-only failures |
 | Phantom success (agent reports done, files unchanged) | Re-dispatch with model escalation and Edit-tool-only constraint; see `./recovering-from-failures.md` (read on failure only) |
-| Persistent failure (2+ retries) | Escalate to user with full context |
+| Persistent failure (2+ retries) | Escalate to user with full context. Offer **harden** (run `/harden-sdlc` to analyze why this failed and propose stronger guardrails / dimensions / instructions that would catch it earlier next time — opt-in, no surface is edited without your approval) alongside other escalation options. When the user selects **harden** (interactive mode only — suppressed when `--auto` is set), dispatch `Skill(harden-sdlc)` with `--failure-text <full failure context>`, `--skill execute-plan-sdlc`, `--step "Step 6 — RECOVER"`, `--operation "persistent task-failure escalation"`. Implements R28. |
 | Agent status: NEEDS_CONTEXT | Provide missing context, re-dispatch (counts as retry) |
 | Agent status: BLOCKED | Assess blocker: provide context + re-dispatch, escalate model, break task, or escalate to user |
 | Malformed or missing completion checklist | Re-dispatch once with checklist format reminder; do not escalate purely for missing checklist |

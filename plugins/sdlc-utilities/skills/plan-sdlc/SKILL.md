@@ -269,7 +269,7 @@ Note every issue. Do NOT write to the plan file in this step.
 
 Fix all issues from Step 3. Rewrite the plan file with fixes applied (edit the existing file, don't append).
 
-If `activeGuardrails` is non-empty, append a `## Guardrail Compliance` section to the plan file listing each guardrail's evaluation result. Error-severity failures must be resolved before presenting to user. Format:
+If `activeGuardrails` is non-empty, append a `## Guardrail Compliance` section to the plan file listing each guardrail's evaluation result. Error-severity failures must be resolved before presenting to user. When an error-severity failure cannot be resolved by plan revision and blocks the workflow, offer **harden** (run `/harden-sdlc` to analyze why this failed and propose stronger guardrails / dimensions / instructions that would catch it earlier next time — opt-in, no surface is edited without your approval) alongside the user-revision options. When the user selects **harden** (interactive mode only — suppressed when `--auto` is set), dispatch `Skill(harden-sdlc)` with `--failure-text "Plan blocked by error-severity guardrail <id>: <description> — <rationale>"`, `--skill plan-sdlc`, `--step "Step 4 — IMPROVE"`, `--operation "error-severity guardrail block"`. Implements R19. Format:
 
 ```markdown
 ## Guardrail Compliance
@@ -315,7 +315,7 @@ Dispatch a plan reviewer subagent using `./plan-reviewer-prompt.md`. Provide:
 **Review loop:**
 - Approved → Step 6 is a no-op, proceed to Step 7
 - Issues found → go to Step 6
-- Max 3 iterations → use AskUserQuestion to surface unresolved issues to user
+- Max 3 iterations → use AskUserQuestion to surface unresolved issues to user. Offer **harden** (run `/harden-sdlc` to analyze why this failed and propose stronger guardrails / dimensions / instructions that would catch it earlier next time — opt-in, no surface is edited without your approval) alongside the existing escalation options. When the user selects **harden** (interactive mode only — suppressed when `--auto` is set), dispatch `Skill(harden-sdlc)` with `--failure-text "Plan reviewer loop did not converge after 3 iterations. Outstanding issues: <issues>"`, `--skill plan-sdlc`, `--step "Step 5 — review loop"`, `--operation "reviewer-loop max iterations"`. Implements R19.
 
 ## Step 6 (IMPROVE): Apply Review Fixes
 

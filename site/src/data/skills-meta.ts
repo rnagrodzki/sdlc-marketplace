@@ -251,6 +251,29 @@ export const skillsMeta: SkillMeta[] = [
       { to: 'jira-sdlc', label: 'configures project key for' },
     ],
   },
+  {
+    slug: 'harden-sdlc',
+    command: '/harden-sdlc',
+    category: 'workflows',
+    userInvocable: true,
+    tagline: 'After a pipeline failure, analyzes hardening surfaces (guardrails, review dimensions, copilot instructions) and proposes user-approved edits that would catch the same class of failure earlier next time. Strengthen-only in v1.',
+    pipeline: [
+      { id: 'consume', label: 'Run prepare script', type: 'script', description: 'Runs harden-prepare.js to load all five hardening surfaces deterministically' },
+      { id: 'classify', label: 'Surface classification', type: 'llm', description: 'Surfaces failure context and classification hint to user' },
+      { id: 'analyze', label: 'Dispatch orchestrator agent', type: 'dispatch', description: 'harden-orchestrator (haiku) classifies failure and drafts per-surface proposals as JSON' },
+      { id: 'present', label: 'Present proposals', type: 'user', description: 'AskUserQuestion per proposal — apply / skip / cancel — with full patch preview' },
+      { id: 'validate', label: 'Schema validation', type: 'verify', description: 'Validates approved sdlc.json edits via ci/validate-guardrails.js before write' },
+      { id: 'apply', label: 'Write approved edits', type: 'llm', description: 'Edits surface files only after explicit approval and validation pass' },
+      { id: 'route', label: 'Plugin-defect routing', type: 'dispatch', description: 'When classification is plugin-defect, dispatches error-report-sdlc with prepared payload' },
+    ],
+    connections: [
+      { to: 'plan-sdlc', label: 'hardens after failure of' },
+      { to: 'execute-plan-sdlc', label: 'hardens after failure of' },
+      { to: 'review-sdlc', label: 'hardens after failure of' },
+      { to: 'commit-sdlc', label: 'hardens after failure of' },
+      { to: 'setup-sdlc', label: 'strengthens what is configured by' },
+    ],
+  },
 ];
 
 export function getSkillMeta(slug: string): SkillMeta | undefined {

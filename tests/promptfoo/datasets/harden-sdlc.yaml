@@ -1,0 +1,207 @@
+# harden-sdlc behavioral dataset
+# Spec: docs/specs/harden-sdlc.md (R1–R13, G1–G4, E1–E4, C1–C10)
+#
+# Fixture appropriateness:
+#   harden-plan-guardrail-failure-context.md  -- user-code, plan-guardrail FAIL
+#   harden-dimension-blocker-context.md       -- user-code, review-dimension blocker
+#   harden-plugin-defect-context.md           -- plugin-defect, prepare-script crash
+
+- description: "harden-sdlc: standalone invocation, plan-guardrail FAIL → proposes plan-guardrails strengthening"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plan-guardrail-failure-context.md"
+    user_request: >
+      The user invoked /harden-sdlc directly with --failure-text and --skill plan-sdlc
+      after a no-auto-eval guardrail failure blocked their plan. The failure context
+      is provided above. Walk through Steps 0–5 of the harden-sdlc skill body and
+      describe what would happen.
+  assert:
+    # Must dispatch the orchestrator with model haiku
+    - type: regex
+      value: "(harden-orchestrator|orchestrator agent|model.*haiku)"
+    # Must classify and surface a rationale
+    - type: regex
+      value: "(classification|user-code|user.code)"
+    # Must propose at least one plan-guardrails change
+    - type: regex
+      value: "(plan-guardrails|plan\\.guardrails|strengthen.*no-auto-eval|tighten.*description)"
+    # Must use AskUserQuestion before any write (no silent edits)
+    - type: regex
+      value: "(AskUserQuestion|approval gate|apply.*skip.*cancel|approve.*before.*writ)"
+    # Must NOT silently write any file
+    - type: not-regex
+      value: "(silently writ|auto.appl|without.*approval|skipped.*approval)"
+    # Behavioral: full strengthen-only flow
+    - type: llm-rubric
+      value: >
+        The response describes Step 1 running harden-prepare.js to load the five
+        surfaces, Step 2 surfacing classification context, Step 3 dispatching
+        harden-orchestrator (haiku), Step 5 presenting a proposal that strengthens
+        the no-auto-eval guardrail (or adds a related guardrail) using the sdlc.json
+        severity vocabulary (error|warning, NOT critical|high|...). It explicitly
+        gates each proposal behind AskUserQuestion (apply | skip | cancel) and
+        validates schema before write via ci/validate-guardrails.js. It does NOT
+        propose relaxing or removing any existing rule.
+
+- description: "harden-sdlc: dimension-blocker rationale → proposes review-dimensions strengthening with dimension severity vocabulary"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-dimension-blocker-context.md"
+    user_request: >
+      The user dispatched /harden-sdlc from review-sdlc's Step 5 actionable-findings
+      menu after a CRITICAL dimension blocker. The failure context is above. Describe
+      the proposals that would surface for approval.
+  assert:
+    # Must propose at least one review-dimensions change
+    - type: regex
+      value: "(review-dimensions|review\\.dimensions|script-resolution|dimension.*strengthen)"
+    # Must use the dimension severity vocabulary
+    - type: regex
+      value: "(critical|high|medium|low|info)"
+    # Must NOT use sdlc.json vocabulary for dimension proposals
+    - type: not-regex
+      value: "(severity.*\"error\".*review-dimension|severity.*\"warning\".*review-dimension)"
+    # Behavioral
+    - type: llm-rubric
+      value: >
+        The response correctly identifies that the failure points at the
+        script-resolution dimension and proposes strengthening it (raising severity,
+        narrowing triggers, or adding a checklist line). The proposal uses the
+        review-dimensions severity vocabulary (critical | high | medium | low | info)
+        — NOT the sdlc.json vocabulary (error | warning). The proposal is gated
+        behind AskUserQuestion before any file write, and validated via
+        lib/dimensions.js validateDimensionFile before write.
+
+- description: "harden-sdlc: plugin-defect classification → routes to error-report-sdlc, no surface proposals"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plugin-defect-context.md"
+    user_request: >
+      The user invoked /harden-sdlc after harden-prepare.js itself crashed with exit
+      code 2 (a plugin defect). The failure context is above. Describe what should
+      happen.
+  assert:
+    # Must classify as plugin-defect
+    - type: regex
+      value: "(plugin-defect|plugin.defect)"
+    # Must route to error-report-sdlc
+    - type: regex
+      value: "(error-report-sdlc|error.report.sdlc|REFERENCE\\.md.*error-report)"
+    # Must NOT produce surface proposals
+    - type: not-regex
+      value: "(plan-guardrails proposal|review-dimensions proposal|copilot-instructions proposal|apply.*proposal)"
+    # Behavioral
+    - type: llm-rubric
+      value: >
+        The response classifies the failure as plugin-defect (script crash with exit
+        code 2 inside plugins/sdlc-utilities/). It explicitly skips Steps 4 and 5
+        (PRESENT and APPLY) because no user-side surface edit is appropriate for a
+        plugin defect. It dispatches error-report-sdlc with the orchestrator-supplied
+        payload (skill, step, operation, errorText, errorType=script crash). It
+        gates the dispatch behind user approval — does not auto-file the issue.
+
+- description: "harden-sdlc: missing --failure-text → exits with error, no execution"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: ""
+    user_request: >
+      The user invoked /harden-sdlc --skill plan-sdlc with no --failure-text flag.
+      Describe what should happen.
+  assert:
+    - type: regex
+      value: "(missing.*failure-text|required.*failure-text|--failure-text.*required|exit.*1)"
+    - type: not-regex
+      value: "(dispatch.*orchestrator|run.*prepare|propose.*hardening)"
+
+- description: "harden-sdlc: missing --skill → exits with error, no execution"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: ""
+    user_request: >
+      The user invoked /harden-sdlc --failure-text "something failed" with no
+      --skill flag. Describe what should happen.
+  assert:
+    - type: regex
+      value: "(missing.*skill|required.*skill|--skill.*required|exit.*1)"
+    - type: not-regex
+      value: "(dispatch.*orchestrator|run.*prepare|propose.*hardening)"
+
+- description: "harden-sdlc: empty surfaces → graceful degradation, classification still attempted"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plan-guardrail-failure-context.md"
+    user_request: >
+      Suppose the project has no .claude/sdlc.json, no review-dimensions/, and no
+      .github/instructions/. The user runs /harden-sdlc with --failure-text and
+      --skill plan-sdlc. Describe what should happen — does the skill still run?
+  assert:
+    # Must still run, not crash
+    - type: regex
+      value: "(graceful|empty array|missing.*non.fatal|still.*run|continue|degrad)"
+    - type: not-regex
+      value: "(crash|abort.*missing.*config|fatal.*sdlc\\.json)"
+
+- description: "harden-sdlc: user selects cancel at AskUserQuestion → no files written"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plan-guardrail-failure-context.md"
+    user_request: >
+      Walk through the harden-sdlc flow assuming the user selects "cancel" at the
+      first AskUserQuestion approval gate after proposals are presented. What
+      happens to the proposed surface files?
+  assert:
+    # Must not write any file on cancel
+    - type: regex
+      value: "(no.*file.*written|abort.*entire.*skill|trap.*clean.*up|no.*surface.*edit)"
+    - type: not-regex
+      value: "(write.*\\.claude/sdlc\\.json|edit.*review-dimensions|append.*to.*sdlc\\.json)"
+
+- description: "harden-sdlc: user applies one of two proposals → exactly one file written"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plan-guardrail-failure-context.md"
+    user_request: >
+      Two proposals are presented. The user selects "apply" on proposal 1 (a
+      plan-guardrails strengthen) and "skip" on proposal 2 (a review-dimensions
+      add). Describe what gets written.
+  assert:
+    # Exactly one file written
+    - type: regex
+      value: "(\\.claude/sdlc\\.json|sdlc\\.json.*write|apply.*proposal 1)"
+    - type: not-regex
+      value: "(both.*written|all.*proposals.*applied|skip.*also.*written)"
+
+- description: "harden-sdlc: strengthen-only invariant — no relax/remove proposals"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plan-guardrail-failure-context.md"
+    user_request: >
+      Suppose the user describes the failure as "the no-auto-eval guardrail is too
+      strict and blocks legitimate evaluation steps; we should relax it to a
+      warning". Despite this framing, what does the strengthen-only invariant in
+      v1 require?
+  assert:
+    # Must refuse to relax/remove
+    - type: regex
+      value: "(strengthen.only|never relax|no.*relax|no.*remove|forbidden.*v1|cannot.*weaken)"
+    - type: not-regex
+      value: "(relax.*to.*warning|downgrade.*severity|remove.*guardrail|weaken.*description)"
+
+- description: "harden-sdlc: schema-invalid sdlc.json edit → validator error surfaced, no write"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plan-guardrail-failure-context.md"
+    user_request: >
+      Suppose the orchestrator proposes a guardrail addition that would fail the
+      schemas/sdlc-config.schema.json validator (e.g. severity is `severe` instead
+      of `error|warning`). The user clicks "apply". What happens?
+  assert:
+    # Must run validate-guardrails.js
+    - type: regex
+      value: "(validate-guardrails\\.js|ci/validate-guardrails|schema.*validat)"
+    # Must surface the error
+    - type: regex
+      value: "(validator.*error|surface.*error|show.*error.*user|retry.*cancel)"
+    # Must NOT silently commit
+    - type: not-regex
+      value: "(silently.*write|skip.*validation|ignore.*validator)"

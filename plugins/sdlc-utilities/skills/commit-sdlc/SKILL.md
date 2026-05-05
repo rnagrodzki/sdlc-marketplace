@@ -145,7 +145,11 @@ Show `Amend:` instead of `Commit:` heading when `flags.amend` is true.
    ```
 
    - If the check **passes** (exit 0): continue to step 1.
-   - If the check **fails** (exit 1): show the error message from `commitConfig.subjectPatternError` if set, otherwise show the pattern itself as a fallback. Do **not** proceed with the commit. Ask the user to edit the subject to match the pattern. Do not allow overriding this gate.
+   - If the check **fails** (exit 1): show the error message from `commitConfig.subjectPatternError` if set, otherwise show the pattern itself as a fallback. Do **not** proceed with the commit. Use AskUserQuestion to offer:
+     - **edit subject** — let the user revise the subject line to match the pattern; re-run the gate
+     - **harden** — run `/harden-sdlc` to analyze why this failed and propose stronger guardrails / dimensions / instructions that would catch it earlier next time. Opt-in — no surface is edited without your approval. (This option targets refining the regex or error message in `commitConfig`, not the current subject. Suppressed when `--auto` is set.) When the user selects **harden**, dispatch `Skill(harden-sdlc)` with `--failure-text "Subject pattern reject: subject '<line>' does not match pattern '<subjectPattern>' — error: <subjectPatternError>"`, `--skill commit-sdlc`, `--step "Step 5 — subject pattern gate"`, `--operation "subject pattern validation"`. Implements R13.
+     - **cancel** — abort the commit
+     Do not allow overriding this gate via a non-edit choice.
 
 1. **Link verification (issue #198, R12) — HARD GATE.** Before `git commit`, validate every URL embedded in the commit message body via the shared link validator. The script reads the body from stdin and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
 

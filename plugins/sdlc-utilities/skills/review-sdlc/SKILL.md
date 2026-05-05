@@ -228,7 +228,10 @@ If the verdict is **CHANGES REQUESTED** or **APPROVED WITH NOTES**, offer to fix
 > The review found actionable items. Address them now?
 
 - **fix** — invoke `received-review-sdlc` (findings are in conversation context)
+- **harden** — run `/harden-sdlc` to analyze why this failed and propose stronger guardrails / dimensions / instructions that would catch it earlier next time. Opt-in — no surface is edited without your approval. (Offered only when verdict is **CHANGES REQUESTED** with at least one dimension blocker; suppressed when `--auto` is set.)
 - **no** — done
+
+When the user selects **harden**, dispatch `Skill(harden-sdlc)` with `--failure-text "Review verdict CHANGES REQUESTED — dimension blocker(s): <dimension-list>"`, `--skill review-sdlc`, `--step "Step 5 — actionable findings"`, `--operation "self-fix offer"`. Implements R16.
 
 If verdict is **APPROVED**: skip — nothing to fix.
 

@@ -28,3 +28,4 @@ tests:
   - file://datasets/received-review-sdlc.yaml
   - file://datasets/error-report-sdlc.yaml
   - file://datasets/ship-sdlc.yaml
+  - file://datasets/harden-sdlc.yaml
