@@ -139,3 +139,67 @@
       value: 'mycompany_atlassian_net'
     - type: icontains
       value: '"projectKey": "SAVETEST"'
+
+# Link verification gate (issue #198) — jira.js --validate-body
+# Reads description / comment body from --file (or stdin) and validates URLs
+# via lib/links.js. jiraSite is resolved deterministically from the cached
+# ~/.sdlc-cache/jira/<site>/<KEY>.json or from --site fallback.
+
+- description: "jira.js --validate-body: clean atlassian URL with cache-resolved site passes"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/jira.js"
+    script_args: "--validate-body --project PROJ --file {{project_root}}/body-clean.txt --json"
+    script_cwd: "{{project_root}}"
+    script_home: "{{project_root}}"
+    project_root: "file://fixtures-fs/jira-validate-body"
+    script_env: '{"SDLC_LINKS_OFFLINE":"1"}'
+  assert:
+    - type: contains
+      value: '"ok":true'
+
+- description: "jira.js --validate-body: wrong-host atlassian URL aborts with atlassian-site-mismatch"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/jira.js"
+    script_args: "--validate-body --project PROJ --file {{project_root}}/body-atlassian-mismatch.txt --json"
+    script_cwd: "{{project_root}}"
+    script_home: "{{project_root}}"
+    project_root: "file://fixtures-fs/jira-validate-body"
+    script_env: '{"SDLC_LINKS_OFFLINE":"1"}'
+  assert:
+    - type: contains
+      value: '"ok":false'
+    - type: contains
+      value: 'atlassian-site-mismatch'
+    - type: contains
+      value: '"observed":"wrong-tenant.atlassian.net"'
+    - type: contains
+      value: '"expected":"acme.atlassian.net"'
+
+- description: "jira.js --validate-body: wrong-owner github URL embedded in jira description aborts"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/jira.js"
+    script_args: "--validate-body --project PROJ --file {{project_root}}/body-github-mismatch.txt --json"
+    script_cwd: "{{project_root}}"
+    script_home: "{{project_root}}"
+    project_root: "file://fixtures-fs/jira-validate-body"
+    script_env: '{"SDLC_LINKS_OFFLINE":"1"}'
+  assert:
+    - type: contains
+      value: '"ok":false'
+    - type: contains
+      value: 'github-context-mismatch'
+    - type: contains
+      value: '"observed":"rafalnagr/sdlc-marketplace"'
+
+- description: "jira.js --validate-body: generic 404 URL aborts with url-not-found"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/jira.js"
+    script_args: "--validate-body --project PROJ --file {{project_root}}/body-generic-404.txt --json"
+    script_cwd: "{{project_root}}"
+    script_home: "{{project_root}}"
+    project_root: "file://fixtures-fs/jira-validate-body"
+  assert:
+    - type: contains
+      value: '"ok":false'
+    - type: contains
+      value: 'url-not-found'

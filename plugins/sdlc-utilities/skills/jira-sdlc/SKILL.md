@@ -365,9 +365,32 @@ Skip for read operations. Implements R17 + the cooperative half of R21.
    ```
 4. Proceed to Step 3.
 
+## Step 2.7 — Link verification (write-ops only, R22, issue #198) — HARD GATE
+
+Skip for read operations. After approval (Step 2.6) and before MCP dispatch, validate every URL embedded in the description payload (for `createJiraIssue`/`editJiraIssue`) and the comment body (for `addCommentToJiraIssue`) via `scripts/skill/jira.js --validate-body`. The script reads the body from stdin and resolves the expected Jira site (`siteUrl`) deterministically from the cached `~/.sdlc-cache/jira/<site>/<KEY>.json` — the skill MUST NOT construct ctx JSON.
+
+```bash
+JIRA_PREPARE=$(find ~/.claude/plugins -name "jira.js" -path "*/sdlc*/scripts/skill/jira.js" 2>/dev/null | head -1)
+[ -z "$JIRA_PREPARE" ] && [ -f "plugins/sdlc-utilities/scripts/skill/jira.js" ] && JIRA_PREPARE="plugins/sdlc-utilities/scripts/skill/jira.js"
+printf '%s' "$body_or_description" | node "$JIRA_PREPARE" --validate-body --project <KEY> --json
+LINK_EXIT=$?
+```
+
+For ADF description payloads: extract every `text` node value, concatenate with newlines, and feed that as the body. URLs in ADF link marks must also appear in extracted text or be added explicitly to the validation input.
+
+On non-zero exit (`LINK_EXIT != 0`):
+- The script has already printed the violation list to stderr (URL, line, reason code, observed/expected detail)
+- Do NOT dispatch the MCP write tool — the payload is never sent to Jira
+- Surface the violation list verbatim to the user
+- Stop. Do not retry. Do not edit URLs without user input. Do not bypass.
+
+On zero exit, proceed to Step 3.
+
+`SDLC_LINKS_OFFLINE=1` skips network reachability checks but keeps structural context-aware checks (GitHub identity match, Atlassian host match) — use this in sandboxed CI runs.
+
 ## Step 3 — Execute Operation
 
-For write operations: precondition — Step 2.6 returned `approve` and both artifacts (`approval-<hash>.token`, `critique-<hash>.json`) are on disk. The PreToolUse hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the hash from `tool_input`, verifies both artifacts, and BLOCKS dispatch otherwise (R21). If dispatch is blocked, surface the hook's `permissionDecisionReason` to the user verbatim — do not retry by guessing what changed.
+For write operations: precondition — Step 2.6 returned `approve`, Step 2.7 link verification passed, and both artifacts (`approval-<hash>.token`, `critique-<hash>.json`) are on disk. The PreToolUse hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the hash from `tool_input`, verifies both artifacts, and BLOCKS dispatch otherwise (R21). If dispatch is blocked, surface the hook's `permissionDecisionReason` to the user verbatim — do not retry by guessing what changed.
 
 After Step 2 classifies the operation type, read `./operations-reference.md` and follow the procedure for the matching operation type.
 
@@ -440,6 +463,7 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 | Placeholders resolved (G11) | No `low`-confidence `{name}` or `[prose]` marker dispatched without explicit user resolution (R19) |
 | Critique surfaced (G12) | No proposal presented to the user without a preceding `Initial:` / `Critique:` / `Final:` block (R20) |
 | Hook verified (G13) | No write MCP call dispatched without the PreToolUse hook successfully verifying R21 artifacts (payload-hash bound, < 10 min old) |
+| Link verified (G14, R22, #198) | No write MCP call (`createJiraIssue`, `editJiraIssue`, `addCommentToJiraIssue`) dispatched without `scripts/skill/jira.js --validate-body` returning exit 0. The script enforces — SKILL.md only invokes it. See Step 2.7. |
 
 ---
 

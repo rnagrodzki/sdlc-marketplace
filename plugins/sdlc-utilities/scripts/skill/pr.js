@@ -41,10 +41,12 @@ const {
   ensureGhAccount,
   fetchRepoLabels,
   getChangedFiles,
+  parseRemoteOwner,
 } = require(path.join(LIB, 'git'));
 
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -335,12 +337,61 @@ function main() {
   writeOutput(result, 'pr-context', 0);
 }
 
+// ---------------------------------------------------------------------------
+// --validate-body mode: link verification (issue #198, R15)
+// ---------------------------------------------------------------------------
+
+/**
+ * Read the proposed PR body from stdin and validate every embedded URL via
+ * `lib/links.js`. The expected GitHub repo identity is derived deterministically
+ * from `parseRemoteOwner(projectRoot)` — the SKILL.md never constructs ctx.
+ *
+ * Exit codes:
+ *   0 — ok (no violations)
+ *   1 — violations found (formatted list on stderr; JSON result on stdout when --json)
+ *   2 — usage error
+ */
+async function validateBodyMode(argv) {
+  const projectRoot = process.cwd();
+  const wantJson = argv.includes('--json');
+  const fileIdx = argv.indexOf('--file');
+  let body = '';
+  if (fileIdx !== -1 && argv[fileIdx + 1]) {
+    body = fs.readFileSync(argv[fileIdx + 1], 'utf8');
+  } else {
+    process.stdin.setEncoding('utf8');
+    for await (const chunk of process.stdin) body += chunk;
+  }
+
+  const expectedRepo = parseRemoteOwner(projectRoot);
+  const result = await validateLinks(body, { projectRoot, expectedRepo });
+
+  if (wantJson) {
+    process.stdout.write(JSON.stringify(result) + '\n');
+  } else if (result.ok) {
+    const skipNote = result.skipped.length ? ` (${result.skipped.length} skipped)` : '';
+    process.stdout.write('OK: PR body link verification passed' + skipNote + '\n');
+  } else {
+    process.stderr.write('PR body link verification FAILED before gh pr create/edit:\n');
+    process.stderr.write(formatViolations(result.violations));
+    process.stderr.write('\n');
+  }
+  process.exit(result.ok ? 0 : 1);
+}
+
 if (require.main === module) {
-  try {
-    main();
-  } catch (err) {
-    process.stderr.write(`pr-prepare.js error: ${err.message}\n${err.stack}\n`);
-    process.exit(2);
+  if (process.argv.includes('--validate-body')) {
+    validateBodyMode(process.argv).catch(err => {
+      process.stderr.write(`pr.js --validate-body error: ${err && err.stack || err}\n`);
+      process.exit(2);
+    });
+  } else {
+    try {
+      main();
+    } catch (err) {
+      process.stderr.write(`pr-prepare.js error: ${err.message}\n${err.stack}\n`);
+      process.exit(2);
+    }
   }
 }
 

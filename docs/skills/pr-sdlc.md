@@ -374,6 +374,20 @@ fix: correct login session expiration
 |-----------------|-------------|
 | GitHub PR | Opens a new PR or updates the description of an existing one |
 
+## Link Verification (issue #198)
+
+Before any `gh pr create` or `gh pr edit` call, the skill pipes the finalized PR body through the shared validator (`scripts/skill/pr.js --validate-body`, which delegates to `scripts/lib/links.js`). Validation runs deterministically — the skill never constructs the validator context.
+
+URL classes checked:
+
+| Class | Check | Failure code |
+|-------|-------|--------------|
+| GitHub `github.com/<owner>/<repo>/(issues\|pull)/<n>` | Owner/repo identity matches the current `git remote origin`; issue/PR number exists on that repo | `github-context-mismatch`, `github-not-found` |
+| Atlassian `*.atlassian.net/browse/<KEY-N>` | Host matches the configured/cached Jira site | `atlassian-site-mismatch`, `atlassian-site-ambiguous` |
+| Generic `http(s)://...` | HEAD reachable (falls back to GET on 405), 5s timeout | `url-not-found`, `url-server-error`, `url-unreachable` |
+
+Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability checks while keeping context-aware checks (GitHub identity, Atlassian host) — useful in sandboxed CI runs. On non-zero exit, the PR is **not** created/edited; the violation list (URL, line, reason, observed/expected) is surfaced verbatim. No flag toggles this gate — it is hard.
+
 ## OpenSpec Integration
 
 When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this skill pre-fills PR sections from the active change's proposal.

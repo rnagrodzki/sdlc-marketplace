@@ -162,3 +162,23 @@
         (spec-first). No companion is omitted. The plan does not include a step that runs
         promptfoo eval automatically.
 
+
+- description: "plan-sdlc: link verification (R18, #198) — invokes script gate at Step 6.5 before handoff"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-creates-skill.md"
+    user_request: >
+      You wrote a plan file that references https://github.com/wrong-owner/sdlc-marketplace/issues/999.
+      Walk through Step 6.5 (Link Verification). Show the exact bash command(s) you would run and what
+      happens on non-zero exit. Do not skip to Step 7.
+  assert:
+    - type: icontains
+      value: "scripts/lib/links.js"
+    - type: icontains
+      value: "Step 7"
+    - type: llm-rubric
+      value: >
+        The response describes invoking plugins/sdlc-utilities/scripts/lib/links.js as a hard gate
+        before Step 7 (Handoff), passing the plan file via --file, and explicitly states that on
+        non-zero exit Step 7 is NOT entered. The gate is script-enforced. The skill does not propose
+        retrying, editing URLs without user input, or bypassing.

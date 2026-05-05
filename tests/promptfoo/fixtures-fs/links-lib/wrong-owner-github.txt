@@ -1,0 +1,5 @@
+## Summary
+
+This is the PR #192 bug case — the URL points to a non-existent owner.
+
+See https://github.com/rafalnagr/sdlc-marketplace/issues/190

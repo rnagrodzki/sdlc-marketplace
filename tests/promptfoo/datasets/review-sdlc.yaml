@@ -383,3 +383,24 @@
         or high findings exist). The tone is positive — the review passed cleanly.
         Mentioning received-review-sdlc in a general "available commands" context
         is acceptable, but it should not be presented as a recommended next action.
+
+- description: "review-sdlc: link verification (R14, #198) — invokes script gate before gh api comments POST"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
+    project_context: "file://fixtures/review-post-confirm-yes.md"
+    user_request: >
+      The consolidated review-comment.md body contains a wrong-owner github URL
+      (https://github.com/rafalnagr/sdlc-marketplace/issues/190). The user just answered "yes" to the
+      posting prompt. Walk through Step 4 in detail — what runs before gh api ... /comments, and what
+      happens if the link validator exits non-zero?
+  assert:
+    - type: icontains
+      value: "scripts/lib/links.js"
+    - type: icontains
+      value: "gh api"
+    - type: llm-rubric
+      value: >
+        The response describes invoking plugins/sdlc-utilities/scripts/lib/links.js as a hard gate
+        before gh api ... /comments, passes the comment_file via --file, and explicitly states that
+        on non-zero exit gh api is NOT executed. The gate is script-enforced. The skill does not
+        propose retrying, editing URLs without user input, or bypassing.

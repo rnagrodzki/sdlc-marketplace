@@ -250,6 +250,23 @@ The release proceeds regardless of the user's answer. This is informational, not
 1. **Update version file** (only if `config.mode === "file"`): Use the Edit tool to replace the old version string with the new version in the version file. For TOML/YAML files, use targeted string replacement rather than a full file rewrite.
 2. **Update CHANGELOG** (only if changelog is enabled): Use the Edit or Write tool to prepend the new entry after the `## [Unreleased]` section if present, or after the file header if not. Create `CHANGELOG.md` if it does not exist.
 3. **Stage changed files**: `git add <versionFile> CHANGELOG.md` — include only files that were actually changed.
+3b. **Link verification (R17, issue #198) — HARD GATE.** Before `git commit`, validate every URL embedded in the staged CHANGELOG entry (and any release-notes body) via the shared link validator. The script reads the body via `--file` and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON. Skip this sub-step entirely when changelog is disabled and no release-notes body was generated.
+
+   ```bash
+   LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | head -1)
+   [ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
+   # Validate the new CHANGELOG entry only (not the entire historical file).
+   printf '%s' "$new_changelog_entry" | node "$LINKS_LIB" --json
+   LINK_EXIT=$?
+   ```
+
+   On non-zero exit (`LINK_EXIT != 0`):
+   - The script has already printed the violation list to stderr.
+   - Do NOT execute `git commit` or `git tag`. Surface the violation list verbatim to the user.
+   - Stop. Do not retry. Do not edit URLs without user input. Do not bypass.
+
+   On zero exit, proceed to step 4. `SDLC_LINKS_OFFLINE=1` skips network reachability while keeping context-aware checks — use in sandboxed CI.
+
 4. **Commit**:
    - If `flags.hotfix === true`: `git commit -m "chore(release): ${newTag} [hotfix]"`
    - Otherwise: `git commit -m "chore(release): ${newTag}"`

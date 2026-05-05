@@ -255,6 +255,12 @@ See [OpenSpec Integration Guide](../openspec-integration.md) for the full workfl
 
 ---
 
+## Link Verification (issue #198)
+
+Before `git commit`, the skill pipes the commit message body through `scripts/lib/links.js` as a hard gate. The validator auto-derives `expectedRepo` from `git remote origin` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill never constructs the validator context. URL classes checked: GitHub issues/PRs (owner/repo identity + existence), Atlassian `*.atlassian.net/browse/<KEY>` (host match), and any other `http(s)://` URL (HEAD reachability, 5s timeout). Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability while keeping context-aware checks (GitHub identity, Atlassian host) — useful in sandboxed CI runs. On non-zero exit, the commit is **not** executed and the violation list is surfaced verbatim. No flag toggles this gate — it is hard.
+
+---
+
 ## Related Skills
 
 - [`/pr-sdlc`](pr-sdlc.md) — create a pull request after committing

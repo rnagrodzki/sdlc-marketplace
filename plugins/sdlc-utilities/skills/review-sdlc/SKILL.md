@@ -153,11 +153,27 @@ Post this review comment to PR #{pr.number}? (yes / save / cancel)
 
 Wait for the user's reply.
 
-- `yes` → post via `gh api` using the file body form (safe for large markdown, backticks, quotes):
+- `yes` → **link verification (R14, issue #198) — HARD GATE.** Before `gh api … /comments`, validate every URL embedded in the consolidated review comment body via the shared link validator. The script reads the body from `--file` and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
+
+  ```bash
+  LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | head -1)
+  [ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
+  node "$LINKS_LIB" --file "{comment_file}" --json
+  LINK_EXIT=$?
+  ```
+
+  On non-zero exit (`LINK_EXIT != 0`):
+  - The script has already printed the violation list to stderr.
+  - Do NOT execute `gh api … /comments`. Surface the violation list verbatim to the user.
+  - Stop. Do not retry. Do not edit URLs without user input. Do not bypass.
+
+  On zero exit, post the comment via `gh api` using the file body form (safe for large markdown, backticks, quotes):
 
   ```bash
   gh api repos/{pr.owner}/{pr.repo}/issues/{pr.number}/comments -F body=@{comment_file}
   ```
+
+  `SDLC_LINKS_OFFLINE=1` skips network reachability while keeping context-aware checks — use in sandboxed CI.
 
 - `save` →
 

@@ -30,6 +30,8 @@ const os   = require('os');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
+const { parseRemoteOwner } = require(path.join(LIB, 'git'));
 
 // ---------------------------------------------------------------------------
 // Home-cache path helpers
@@ -171,6 +173,8 @@ function parseArgs(argv) {
   let copyFrom               = null;
   let site                   = null;
   let skipWorkflowDiscovery  = false;
+  let bodyFile               = null;   // for --validate-body
+  let wantJson               = false;  // for --validate-body output format
   const errors               = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -206,10 +210,17 @@ function parseArgs(argv) {
       copyType = args[++i];
     } else if (a === '--from' && args[i + 1]) {
       copyFrom = args[++i];
+    } else if (a === '--validate-body') {
+      subcommand = 'validate-body';
+    } else if (a === '--file' && args[i + 1]) {
+      // Body source for --validate-body (alternative to stdin)
+      bodyFile = args[++i];
+    } else if (a === '--json') {
+      wantJson = true;
     }
   }
 
-  if (!projectKey) {
+  if (!projectKey && subcommand !== 'validate-body') {
     errors.push('--project <KEY> is required');
   }
 
@@ -228,6 +239,8 @@ function parseArgs(argv) {
     copyFrom,
     site,
     skipWorkflowDiscovery,
+    bodyFile,
+    wantJson,
     flags,
     errors,
   };
@@ -805,9 +818,68 @@ function copyTemplate(copyType, copyFrom, templatesDir) {
 // Main
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Subcommand: --validate-body (issue #198, R22)
+// ---------------------------------------------------------------------------
+//
+// Reads a Jira description or comment body from stdin (or --file <path>) and
+// validates every embedded URL via lib/links.js. Exit 0 if ok, 1 on violation.
+// jiraSite is resolved deterministically: if a cache for projectKey is found,
+// its `siteUrl` is used; otherwise --site (if provided) is used; otherwise
+// validator falls back to home-cache discovery (which returns ambiguous when
+// multiple sites are cached).
+
+async function validateBodySubcommand({ projectKey, cacheDir, site, bodyFile, wantJson }) {
+  const projectRoot = process.cwd();
+
+  let body = '';
+  if (bodyFile) {
+    body = fs.readFileSync(bodyFile, 'utf8');
+  } else {
+    process.stdin.setEncoding('utf8');
+    for await (const chunk of process.stdin) body += chunk;
+  }
+
+  // Resolve jiraSite from cache (if projectKey is provided)
+  let jiraSite = null;
+  if (projectKey) {
+    try {
+      const resolved = resolveEffectiveCachePath({ projectKey, cacheDir, site });
+      if (resolved.path && fs.existsSync(resolved.path)) {
+        const cache = JSON.parse(fs.readFileSync(resolved.path, 'utf8'));
+        if (cache && cache.siteUrl) jiraSite = cache.siteUrl;
+      }
+    } catch (_) {
+      // best-effort — fall through to ctx.site
+    }
+  }
+  if (!jiraSite && site) {
+    // Allow explicit --site to override even without a cache present
+    jiraSite = site.startsWith('http') ? site : `https://${site}`;
+  }
+
+  // expectedRepo is derived from current git remote (same source as pr.js)
+  let expectedRepo = null;
+  try { expectedRepo = parseRemoteOwner(projectRoot); } catch (_) { /* no remote → null */ }
+
+  const result = await validateLinks(body, { projectRoot, expectedRepo, jiraSite });
+
+  if (wantJson) {
+    process.stdout.write(JSON.stringify(result) + '\n');
+  } else if (result.ok) {
+    const skipNote = result.skipped.length ? ` (${result.skipped.length} skipped)` : '';
+    process.stdout.write('OK: Jira body link verification passed' + skipNote + '\n');
+  } else {
+    process.stderr.write('Jira body link verification FAILED before MCP call:\n');
+    process.stderr.write(formatViolations(result.violations));
+    process.stderr.write('\n');
+  }
+  process.exit(result.ok ? 0 : 1);
+}
+
 function main() {
   const parsed = parseArgs(process.argv);
-  const { projectKey, cacheDir, templatesDir: templatesOverride, subcommand, saveFieldName, copyType, copyFrom, site, skipWorkflowDiscovery, errors } = parsed;
+  const { projectKey, cacheDir, templatesDir: templatesOverride, subcommand, saveFieldName, copyType, copyFrom, site, skipWorkflowDiscovery, bodyFile, wantJson, errors } = parsed;
 
   if (errors.length > 0) {
     writeOutput({ errors }, 'jira-context', 1);
@@ -842,6 +914,13 @@ function main() {
     case 'copy-template':
       copyTemplate(copyType, copyFrom, templatesDir);
       break;
+    case 'validate-body':
+      // Async — return the promise so main() can be awaited or process exits when settled
+      validateBodySubcommand({ projectKey, cacheDir, site, bodyFile, wantJson }).catch(err => {
+        process.stderr.write(`jira.js --validate-body error: ${err && err.stack || err}\n`);
+        process.exit(2);
+      });
+      return;
     default:
       writeOutput({ errors: [`Unknown subcommand: ${subcommand}`] }, 'jira-context', 1);
   }

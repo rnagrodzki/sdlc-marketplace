@@ -218,6 +218,12 @@ See [OpenSpec Integration Guide](../openspec-integration.md) for the full workfl
 
 ---
 
+## Link Verification (issue #198)
+
+Before declaring the plan ready (Step 7 handoff), the skill pipes the finalized plan file through `scripts/lib/links.js` as a hard gate. The validator auto-derives `expectedRepo` from `git remote origin` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill never constructs the validator context. URL classes checked: GitHub issues/PRs (owner/repo identity + existence), Atlassian `*.atlassian.net/browse/<KEY>` (host match), and any other `http(s)://` URL (HEAD reachability, 5s timeout). Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability while keeping context-aware checks. On non-zero exit, Step 7 is **not** entered and the violation list is surfaced verbatim. No flag toggles this gate — it is hard.
+
+---
+
 ## Related Skills
 
 - [`/execute-plan-sdlc`](execute-plan-sdlc.md) — executes the plans this skill produces

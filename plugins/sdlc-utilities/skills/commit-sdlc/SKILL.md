@@ -180,14 +180,30 @@ Show `Amend:` instead of `Commit:` heading when `flags.amend` is true.
    - If the check **passes** (exit 0): continue to step 1.
    - If the check **fails** (exit 1): show the error message from `commitConfig.subjectPatternError` if set, otherwise show the pattern itself as a fallback. Do **not** proceed with the commit. Ask the user to edit the subject to match the pattern. Do not allow overriding this gate.
 
-1. If `unstaged.hasChanges` is true AND `flags.noStash` is false:
+1. **Link verification (issue #198, R12) — HARD GATE.** Before `git commit`, validate every URL embedded in the commit message body via the shared link validator. The script reads the body from stdin and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
+
+   ```bash
+   LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | head -1)
+   [ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
+   printf '%s' "$message" | node "$LINKS_LIB" --json
+   LINK_EXIT=$?
+   ```
+
+   On non-zero exit (`LINK_EXIT != 0`):
+   - The script has already printed the violation list to stderr (URL, line, reason code, observed/expected detail).
+   - Do NOT execute `git commit`. Surface the violation list verbatim to the user.
+   - Stop. Do not retry. Do not edit URLs without user input. Do not bypass.
+
+   On zero exit, proceed to the stash + commit steps below. `SDLC_LINKS_OFFLINE=1` skips network reachability while keeping context-aware checks (GitHub identity match, Atlassian host match) — use in sandboxed CI.
+
+2. If `unstaged.hasChanges` is true AND `flags.noStash` is false:
    ```bash
    git stash push --keep-index -m "commit-sdlc: temp stash"
    ```
-2. Execute the commit:
+3. Execute the commit:
    - If `flags.amend` is true: `git commit --amend -m "<message>"`
    - Otherwise: `git commit -m "<message>"`
-3. If stash was created in step 1:
+4. If stash was created in step 2:
    ```bash
    git stash pop
    ```

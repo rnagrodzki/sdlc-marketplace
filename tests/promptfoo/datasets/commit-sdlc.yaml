@@ -142,3 +142,27 @@
         code-level details (like function names, variable names, or line changes) for
         files that were in the truncated set. The message follows conventional commit
         format with an imperative subject line.
+
+- description: "commit-sdlc: link verification (R12, #198) — invokes script gate before git commit"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-staged-changes.md"
+    user_request: >
+      Run /commit-sdlc on a body that references https://github.com/rafalnagr/sdlc-marketplace/issues/190
+      (wrong owner — the real repo is rnagrodzki/sdlc-marketplace). What does the skill do before
+      executing git commit? Walk through Step 5 in detail. Show the exact bash command(s) you would
+      run and what happens if the validator returns non-zero exit.
+  assert:
+    - type: icontains
+      value: "scripts/lib/links.js"
+    - type: icontains
+      value: "validate"
+    - type: icontains
+      value: "git commit"
+    - type: llm-rubric
+      value: >
+        The response describes invoking plugins/sdlc-utilities/scripts/lib/links.js as a hard gate
+        before git commit, pipes the message body through it, and explicitly states that on non-zero
+        exit the commit must NOT be executed. It does not describe LLM-side validation logic. It does
+        not propose retrying, editing URLs without user input, or bypassing the gate. The gate is
+        described as script-enforced, not advisory.

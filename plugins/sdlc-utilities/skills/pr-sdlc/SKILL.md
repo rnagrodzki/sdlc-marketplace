@@ -332,6 +332,7 @@ Before presenting to the user, review the draft against every quality gate:
 | Documentation sync | If diff adds new commands, changes structure, renames concepts, or adds new directories/scripts: check that at least one `docs:` commit exists on this branch OR ask the user to confirm docs are updated | PR does not silently ship structural changes without a corresponding docs update |
 | Label validity | Every label in `suggestedLabels` exists in `repoLabels` | Zero fabricated labels |
 | Forced label inclusion | Every label in `forcedLabels` appears in the final `suggestedLabels` list | Zero forced labels dropped |
+| Link verification (R15, #198) | Every URL in the body is validated by `scripts/skill/pr.js --validate-body` before `gh pr create` / `gh pr edit`. The script enforces — SKILL.md only invokes it. See the Link verification block in the publish step. | `LINK_EXIT === 0`; on non-zero, abort and surface violations |
 
 > **Note**: When a custom template is active, the "No file paths in Changes Overview"
 > gate applies only if the custom template includes a section named "Changes Overview".
@@ -434,7 +435,26 @@ On failure:
 - Ask the user to edit the title and retry
 
 On success:
-- Continue to label creation and `gh pr create` / `gh pr edit`
+- Continue to link verification, label creation, and `gh pr create` / `gh pr edit`
+
+**Link verification (issue #198, implements spec R15) — HARD GATE:** Before executing `gh pr create` or `gh pr edit`, validate every URL embedded in the final PR body via `scripts/skill/pr.js --validate-body`. The script reads the body from stdin and derives the expected GitHub repo identity (`parseRemoteOwner(projectRoot)`) deterministically — the skill MUST NOT construct ctx JSON.
+
+```bash
+PR_PREPARE=$(find ~/.claude/plugins -name "pr.js" -path "*/sdlc*/scripts/skill/pr.js" 2>/dev/null | head -1)
+[ -z "$PR_PREPARE" ] && [ -f "plugins/sdlc-utilities/scripts/skill/pr.js" ] && PR_PREPARE="plugins/sdlc-utilities/scripts/skill/pr.js"
+printf '%s' "$body" | node "$PR_PREPARE" --validate-body
+LINK_EXIT=$?
+```
+
+On non-zero exit (`LINK_EXIT != 0`):
+- The script has already printed the violation list to stderr (URL, line, reason code, observed/expected detail)
+- Do NOT execute `gh pr create` or `gh pr edit`
+- Surface the violation list verbatim to the user
+- Stop. Do not retry. Do not edit URLs without user input. Do not bypass.
+
+On zero exit, continue to label creation and the publish step.
+
+`SDLC_LINKS_OFFLINE=1` skips network reachability checks but keeps structural context-aware checks (GitHub identity match, Atlassian host match) — use this in sandboxed CI runs.
 
 **Just-in-time label creation:** Before executing `gh pr create` or `gh pr edit`, check each label in `forcedLabels` against `repoLabels`. For any forced label NOT found in `repoLabels`, create it:
 

@@ -353,6 +353,10 @@ The automated changelog is a **draft**, not a source of truth. Squash merges, pa
 3. Run `/version-sdlc --changelog` to reconcile the changelog with the actual tag-to-tag commits
 4. The CI `check-changelog.cjs` (scaffolded during `--init` when changelog is enabled) validates that an entry exists on every push to main
 
+## Link Verification (issue #198)
+
+Before the release `git commit` (Step 8), the skill pipes the new CHANGELOG entry through `scripts/lib/links.js` as a hard gate. The validator auto-derives `expectedRepo` from `git remote origin` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill never constructs the validator context. URL classes checked: GitHub issues/PRs (owner/repo identity + existence), Atlassian `*.atlassian.net/browse/<KEY>` (host match), and any other `http(s)://` URL (HEAD reachability, 5s timeout). Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability while keeping context-aware checks. On non-zero exit, neither `git commit` nor `git tag` is executed, and the violation list is surfaced verbatim. No flag toggles this gate — it is hard. (Skipped entirely when changelog is disabled and no release-notes body was generated.)
+
 ## Related Skills
 
 - [`/commit-sdlc`](commit-sdlc.md) — commit changes before tagging a release

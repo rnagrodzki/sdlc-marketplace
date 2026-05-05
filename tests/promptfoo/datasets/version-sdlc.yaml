@@ -484,3 +484,25 @@
         plan does NOT include any pre-release suffix. bumpOptions.preRelease is absent
         from the output (script did not compute one). The user has graduated out of
         the rc train.
+
+- description: "version-sdlc: link verification (R17, #198) — invokes script gate at Step 8.3b before git commit"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-version-config.md"
+    user_request: >
+      The CHANGELOG entry you drafted contains a wrong-owner github URL
+      (https://github.com/rafalnagr/sdlc-marketplace/issues/190). The user approved the release plan in
+      Step 5. Walk through Step 8 sub-steps 3 → 3b → 4. What runs before the release commit, and what
+      happens if the validator exits non-zero?
+  assert:
+    - type: icontains
+      value: "scripts/lib/links.js"
+    - type: icontains
+      value: "git commit"
+    - type: llm-rubric
+      value: >
+        The response describes invoking plugins/sdlc-utilities/scripts/lib/links.js as a hard gate
+        before the release git commit (Step 8.4), validates the new CHANGELOG entry, and explicitly
+        states that on non-zero exit git commit and git tag are NOT executed. The gate is
+        script-enforced. The skill does not propose retrying, editing URLs without user input, or
+        bypassing.

@@ -275,3 +275,23 @@
         threads are replied to but left open for the reviewer. No pipeline-context
         reasoning is used to justify skipping — the behavior is driven by
         flags.auto === true from the prepare script manifest.
+
+- description: "received-review-sdlc: link verification (R17, #198) — invokes script gate at Step 11.5 before posting replies"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-reply-step.md"
+    user_request: >
+      One of your drafted reply bodies in Step 7 contains https://github.com/rafalnagr/sdlc-marketplace/issues/190
+      (wrong owner). Walk through Step 11.5 (Link Verification) in detail. Show the exact bash command
+      you would run and what happens if the validator exits non-zero — do you proceed to Step 12?
+  assert:
+    - type: icontains
+      value: "scripts/lib/links.js"
+    - type: icontains
+      value: "Step 12"
+    - type: llm-rubric
+      value: >
+        The response describes invoking plugins/sdlc-utilities/scripts/lib/links.js as a hard gate
+        before Step 12, validates concatenated reply bodies, and explicitly states that on non-zero
+        exit no gh api replies are posted and Step 12 is NOT entered. The gate is script-enforced.
+        The skill does not propose retrying, editing URLs without user input, or bypassing.

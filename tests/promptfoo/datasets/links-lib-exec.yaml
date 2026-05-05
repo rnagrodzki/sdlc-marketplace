@@ -1,0 +1,128 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/lib/links.js — issue #198.
+# Validates the link-verification gate against fixture artifact bodies.
+# Network-dependent cases use httpbin.org (404) and a guaranteed-unreachable .invalid host.
+# Offline-mode cases set SDLC_LINKS_OFFLINE=1 to skip generic reachability while keeping
+# context-aware checks (GitHub identity, Atlassian host).
+
+- description: "links: clean github URL passes (offline, identity match)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/links.js"
+    script_args: "--file {{project_root}}/clean-github.txt --json --ctx {{ctx}}"
+    project_root: "file://fixtures-fs/links-lib"
+    ctx: '{"expectedRepo":{"host":"github.com","owner":"rnagrodzki","repo":"sdlc-marketplace"},"offline":true}'
+  assert:
+    - type: contains
+      value: '"ok":true'
+    - type: not-contains
+      value: 'github-context-mismatch'
+
+- description: "links: github wrong-owner mismatch (PR #192 case) violates"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/links.js"
+    script_args: "--file {{project_root}}/wrong-owner-github.txt --json --ctx {{ctx}}"
+    project_root: "file://fixtures-fs/links-lib"
+    ctx: '{"expectedRepo":{"host":"github.com","owner":"rnagrodzki","repo":"sdlc-marketplace"},"offline":true}'
+  assert:
+    - type: contains
+      value: '"ok":false'
+    - type: contains
+      value: 'github-context-mismatch'
+    - type: contains
+      value: '"observed":"rafalnagr/sdlc-marketplace"'
+    - type: contains
+      value: '"expected":"rnagrodzki/sdlc-marketplace"'
+
+- description: "links: atlassian wrong-host mismatch violates"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/links.js"
+    script_args: "--file {{project_root}}/atlassian-mismatch.txt --json --ctx {{ctx}}"
+    project_root: "file://fixtures-fs/links-lib"
+    ctx: '{"jiraSite":"https://acme.atlassian.net","offline":true}'
+  assert:
+    - type: contains
+      value: '"ok":false'
+    - type: contains
+      value: 'atlassian-site-mismatch'
+    - type: contains
+      value: '"observed":"wrong-site.atlassian.net"'
+
+- description: "links: atlassian matching host passes"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/links.js"
+    script_args: "--file {{project_root}}/atlassian-clean.txt --json --ctx {{ctx}}"
+    project_root: "file://fixtures-fs/links-lib"
+    ctx: '{"jiraSite":"https://acme.atlassian.net","offline":true}'
+  assert:
+    - type: contains
+      value: '"ok":true'
+
+- description: "links: atlassian-site-ambiguous when multiple cached sites and no jiraSite"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/links.js"
+    script_args: "--file {{project_root}}/atlassian-ambiguous.txt --json --ctx {{ctx}}"
+    project_root: "file://fixtures-fs/links-lib"
+    script_home: "{{project_root}}/home-multi-site"
+    ctx: '{"offline":true}'
+  assert:
+    - type: contains
+      value: '"ok":false'
+    - type: contains
+      value: 'atlassian-site-ambiguous'
+
+- description: "links: skip-list hosts (linkedin, twitter) reported as skipped not violations"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/links.js"
+    script_args: "--file {{project_root}}/skip-list.txt --json --ctx {{ctx}}"
+    project_root: "file://fixtures-fs/links-lib"
+    ctx: '{"offline":true}'
+  assert:
+    - type: contains
+      value: '"ok":true'
+    - type: contains
+      value: '"reason":"skip-list"'
+
+- description: "links: offline mode skips generic URL reachability checks"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/links.js"
+    script_args: "--file {{project_root}}/generic-offline.txt --json --ctx {{ctx}}"
+    project_root: "file://fixtures-fs/links-lib"
+    ctx: '{"offline":true}'
+  assert:
+    - type: contains
+      value: '"ok":true'
+    - type: contains
+      value: '"reason":"offline"'
+
+- description: "links: generic 404 URL violates with url-not-found"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/links.js"
+    script_args: "--file {{project_root}}/url-not-found.txt --json"
+    project_root: "file://fixtures-fs/links-lib"
+  assert:
+    - type: contains
+      value: '"ok":false'
+    - type: contains
+      value: 'url-not-found'
+
+- description: "links: unresolvable hostname violates with url-unreachable"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/links.js"
+    script_args: "--file {{project_root}}/url-unreachable.txt --json"
+    project_root: "file://fixtures-fs/links-lib"
+  assert:
+    - type: contains
+      value: '"ok":false'
+    - type: contains
+      value: 'url-unreachable'
+
+- description: "links: CLI exits 0 with --json on clean body (skipped only)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/links.js"
+    script_args: "--file {{project_root}}/clean-github.txt --json --ctx {{ctx}}"
+    project_root: "file://fixtures-fs/links-lib"
+    ctx: '{"expectedRepo":{"host":"github.com","owner":"rnagrodzki","repo":"sdlc-marketplace"},"offline":true}'
+  assert:
+    - type: contains
+      value: '"ok":true'
+    - type: contains
+      value: '"violations":[]'

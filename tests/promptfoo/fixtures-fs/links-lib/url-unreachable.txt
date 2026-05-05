@@ -1,0 +1,3 @@
+## Notes
+
+This host does not resolve: https://this-hostname-definitely-does-not-resolve.invalid/path

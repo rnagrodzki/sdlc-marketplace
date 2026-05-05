@@ -1,0 +1,3 @@
+## Description
+
+Documentation link: https://httpbin.org/status/404

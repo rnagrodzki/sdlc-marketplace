@@ -1,0 +1,3 @@
+## Notes
+
+See https://httpbin.org/status/404 — should return 404.

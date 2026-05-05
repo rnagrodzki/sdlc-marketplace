@@ -318,6 +318,25 @@ State the correction factually and move on.
 
 ---
 
+## Step 11.5 — LINK VERIFICATION (R17, issue #198) — HARD GATE
+
+Before any `gh api` reply is posted, validate every URL embedded in every drafted reply body via the shared link validator. Concatenate all reply bodies (one per line) and feed them to the validator on stdin. The script auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
+
+```bash
+LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | head -1)
+[ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
+printf '%s\n' "$reply_bodies_concatenated" | node "$LINKS_LIB" --json
+LINK_EXIT=$?
+```
+
+On non-zero exit (`LINK_EXIT != 0`):
+- The script has already printed the violation list to stderr.
+- Do NOT post any replies. Do NOT proceed to Step 12.
+- Surface the violation list verbatim to the user.
+- Stop. Do not retry. Do not edit URLs without user input. Do not bypass.
+
+On zero exit, proceed to Step 12. `SDLC_LINKS_OFFLINE=1` skips network reachability while keeping context-aware checks (GitHub identity match, Atlassian host match) — use in sandboxed CI.
+
 ## Step 12 — REPLY & RESOLVE: Post PR Thread Replies
 
 **Mandatory step — always presented after Step 11 completes.**

@@ -152,6 +152,10 @@ Selecting "yes" posts in-thread replies and resolves addressed threads automatic
 | Source code changes | Edits implementing accepted review feedback, in priority order |
 | Resolved review threads | Threads for addressed comments are resolved via GraphQL mutation |
 
+## Link Verification (issue #198)
+
+Before any `gh api` reply is posted (Step 12), the skill pipes the concatenated reply bodies through `scripts/lib/links.js` as a hard gate (Step 11.5). The validator auto-derives `expectedRepo` from `git remote origin` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill never constructs the validator context. URL classes checked: GitHub issues/PRs (owner/repo identity + existence), Atlassian `*.atlassian.net/browse/<KEY>` (host match), and any other `http(s)://` URL (HEAD reachability, 5s timeout). Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability while keeping context-aware checks. On non-zero exit, no replies are posted and the violation list is surfaced verbatim. No flag toggles this gate — it is hard.
+
 ## Related Skills
 
 - [`/review-sdlc`](review-sdlc.md) — source of findings this skill responds to

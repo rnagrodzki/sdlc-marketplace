@@ -322,6 +322,25 @@ Re-dispatch the reviewer (back to Step 5 loop).
 
 If this is the 3rd iteration, use AskUserQuestion to surface remaining issues instead of looping.
 
+## Step 6.5 (LINK VERIFICATION): Validate URLs in plan content (R18, issue #198) — HARD GATE
+
+After the reviewer loop converges (or the user resolves remaining issues), validate every URL embedded in the finalized plan file via the shared link validator. The script reads the plan content from stdin and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
+
+```bash
+LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | head -1)
+[ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
+node "$LINKS_LIB" --file "$plan_path" --json
+LINK_EXIT=$?
+```
+
+On non-zero exit (`LINK_EXIT != 0`):
+- The script has already printed the violation list to stderr.
+- Do NOT proceed to Step 7 (Handoff). The plan is not ready.
+- Surface the violation list verbatim to the user.
+- Stop. Do not retry. Do not edit URLs without user input. Do not bypass.
+
+On zero exit, proceed to Step 7. `SDLC_LINKS_OFFLINE=1` skips network reachability while keeping context-aware checks (GitHub identity match, Atlassian host match) — use in sandboxed CI.
+
 ## Step 7: Handoff
 
 **Context-heaviness advisory (implements R17):** Before printing either branch below, locate and run the advisory wrapper. If it prints text, prepend that text verbatim to the handoff menu (above the `ship` / `execute` / `done` lines). If it prints nothing, skip the prepend.

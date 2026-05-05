@@ -97,3 +97,47 @@
   assert:
     - type: icontains
       value: '"prConfig": null'
+
+# Link verification gate (issue #198) — pr.js --validate-body
+# Reads PR body from --file (or stdin) and validates URLs via lib/links.js.
+# Uses SDLC_LINKS_OFFLINE=1 so generic URLs are skipped; identity checks still run.
+
+- description: "pr.js --validate-body: clean body with matching repo owner passes"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_args: "--validate-body --file {{project_root}}/body-clean.md --json"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-link-validate"
+    script_env: '{"SDLC_LINKS_OFFLINE":"1"}'
+  assert:
+    - type: contains
+      value: '"ok":true'
+
+- description: "pr.js --validate-body: wrong-owner github URL (PR #192 case) aborts with github-context-mismatch"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_args: "--validate-body --file {{project_root}}/body-wrong-owner.md --json"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-link-validate"
+    script_env: '{"SDLC_LINKS_OFFLINE":"1"}'
+  assert:
+    - type: contains
+      value: '"ok":false'
+    - type: contains
+      value: 'github-context-mismatch'
+    - type: contains
+      value: '"observed":"rafalnagr/sdlc-marketplace"'
+    - type: contains
+      value: '"expected":"rnagrodzki/sdlc-marketplace"'
+
+- description: "pr.js --validate-body: generic 404 URL aborts with url-not-found"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_args: "--validate-body --file {{project_root}}/body-generic-404.md --json"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-link-validate"
+  assert:
+    - type: contains
+      value: '"ok":false'
+    - type: contains
+      value: 'url-not-found'

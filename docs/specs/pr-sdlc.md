@@ -32,6 +32,7 @@
 - R12: When `--auto` is set, skip AskUserQuestion approval and apply labels directly; critique gates still run
 - R13: OpenSpec enrichment: when an active OpenSpec change is detected, use proposal.md for Business Context/Benefits and design.md for Technical Design
 - R14: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
+- R15: Link verification (issue #198) — every URL embedded in the PR body MUST be validated by `plugins/sdlc-utilities/scripts/lib/links.js` before any `gh pr create` / `gh pr edit` invocation. Three URL classes are checked: (1) `github.com/<owner>/<repo>/(issues|pull)/<n>` — owner/repo identity must match the current remote, and the issue/PR number must exist on that repo; (2) `*.atlassian.net/browse/<KEY-N>` — host must match the configured Jira site; (3) any other `http(s)://` URL — generic reachability via HEAD (fall back to GET on 405), 5s timeout. Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) and any `ctx.skipHosts` entries are reported as `skipped`, not violations. `SDLC_LINKS_OFFLINE=1` skips network checks but keeps structural context-aware checks (GitHub identity match, Atlassian host match). Any violation aborts publication with non-zero exit and a structured violation list — no soft-warning mode.
 
 ## Workflow Phases
 

@@ -269,6 +269,20 @@ A `PreToolUse` hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the payloa
 | `$TMPDIR/jira-sdlc/approval-<hash>.token` | Per-operation approval token (write-ops only); created on `approve`; verified and deleted by the PreToolUse hook after dispatch |
 | Jira issues | Created or updated via the Atlassian MCP |
 
+## Link Verification (issue #198)
+
+Before any `createJiraIssue`, `editJiraIssue`, or `addCommentToJiraIssue` MCP call, the skill pipes the description / comment body through `scripts/skill/jira.js --validate-body` (which delegates to `scripts/lib/links.js`). The Jira site (`jiraSite`) is resolved deterministically from the cached `~/.sdlc-cache/jira/<site>/<KEY>.json` — the skill never constructs the validator context.
+
+URL classes checked:
+
+| Class | Check | Failure code |
+|-------|-------|--------------|
+| GitHub `github.com/<owner>/<repo>/(issues\|pull)/<n>` | Owner/repo identity matches the current `git remote origin`; issue/PR number exists on that repo | `github-context-mismatch`, `github-not-found` |
+| Atlassian `*.atlassian.net/browse/<KEY-N>` | Host matches the cached `siteUrl` for the active project | `atlassian-site-mismatch`, `atlassian-site-ambiguous` |
+| Generic `http(s)://...` | HEAD reachable (falls back to GET on 405), 5s timeout | `url-not-found`, `url-server-error`, `url-unreachable` |
+
+Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability checks while keeping context-aware checks (GitHub identity, Atlassian host). On non-zero exit, the MCP write call is **not** dispatched and the payload is never sent to Jira. No flag toggles this gate — it is hard.
+
 ## Related Skills
 
 - [`/plan-sdlc`](plan-sdlc.md) — write an implementation plan from a Jira ticket

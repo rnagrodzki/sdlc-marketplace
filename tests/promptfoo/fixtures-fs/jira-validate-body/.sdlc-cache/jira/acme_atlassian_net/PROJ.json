@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "cloudId": "fake-cloud-id",
+  "siteUrl": "https://acme.atlassian.net",
+  "project": { "key": "PROJ", "id": "10000", "name": "Test Project" }
+}
