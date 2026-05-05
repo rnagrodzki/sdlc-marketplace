@@ -25,24 +25,23 @@ const os   = require('os');
 // Constants
 // ---------------------------------------------------------------------------
 
-const OPENSPEC_ENRICH_VERSION = 1;
+const OPENSPEC_ENRICH_VERSION = 2;
 
 const BEGIN_RE = /^# BEGIN MANAGED BY sdlc-utilities \(v(\d+)\)$/m;
 const END_RE   = /^# END MANAGED BY sdlc-utilities \(v\d+\)$/m;
 
 const BLOCK_TEMPLATE = `# BEGIN MANAGED BY sdlc-utilities (v${OPENSPEC_ENRICH_VERSION})
-#
-# This block is maintained by the sdlc-utilities plugin. Do not edit manually.
-# Re-run /setup-sdlc --openspec-enrich to update, or --remove-openspec to remove.
-#
-# Workflow for contributors:
-#   1. /plan-sdlc --from-openspec <change-name>  — create an implementation plan from the change
-#   2. /execute-plan-sdlc                         — execute the plan in waves
-#   3. /ship-sdlc                                 — commit, review, version, and open a PR
-#
-# Do not invoke \`openspec archive\` directly — /ship-sdlc handles archival
-# as a conditional pipeline step after validation passes.
-#
+context: |
+  SDLC workflow managed by sdlc-utilities. Do not edit this block manually.
+  To update: /setup-sdlc --openspec-enrich. To remove: /setup-sdlc --remove-openspec.
+
+  Contributor workflow:
+    1. /plan-sdlc --from-openspec <change-name>  — create an implementation plan from the change
+    2. /execute-plan-sdlc                         — execute the plan in waves
+    3. /ship-sdlc                                 — commit, review, version, and open a PR
+
+  Do not invoke \`openspec archive\` directly — /ship-sdlc handles archival
+  as a conditional pipeline step after validation passes.
 # END MANAGED BY sdlc-utilities (v${OPENSPEC_ENRICH_VERSION})`;
 
 // ---------------------------------------------------------------------------
@@ -97,6 +96,21 @@ function detectBlock(content) {
 }
 
 /**
+ * Check whether the file declares a top-level `context:` key OUTSIDE the managed block.
+ * The managed block region is sliced out so an in-place update (which produces a new
+ * `context:` key inside the block) does not trigger the duplicate-key guard.
+ * @param {string} content
+ * @param {{ found: boolean, startIdx: number, endIdx: number }} block
+ * @returns {boolean}
+ */
+function hasExistingContextKey(content, block) {
+  const outsideBlock = block && block.found
+    ? content.slice(0, block.startIdx) + content.slice(block.endIdx)
+    : content;
+  return /^context\s*:/m.test(outsideBlock);
+}
+
+/**
  * Enrich the config file with the managed block.
  * @param {string} configPath  Absolute path to openspec/config.yaml
  * @param {{ remove: boolean }} options
@@ -148,8 +162,18 @@ function enrich(configPath, { remove } = {}) {
     };
   }
 
-  // No block present → append
+  // No block present → append (unless an existing top-level `context:` key would collide)
   if (!block.found) {
+    if (hasExistingContextKey(content, block)) {
+      return {
+        ok: true,
+        action: 'skipped-existing-context',
+        version: OPENSPEC_ENRICH_VERSION,
+        path: configPath,
+        changed: false,
+        warning: 'Top-level context: key already present in openspec/config.yaml. Refusing to inject a duplicate. Manually fold sdlc-utilities guidance into your existing context: value, then re-run --openspec-enrich.',
+      };
+    }
     const separator = content.endsWith('\n') ? '\n' : '\n\n';
     const newContent = content + separator + BLOCK_TEMPLATE + '\n';
     fs.writeFileSync(configPath, newContent, 'utf8');
@@ -186,6 +210,20 @@ function enrich(configPath, { remove } = {}) {
   }
 
   // Block at lower version → update in place
+  // Guard: if the user has a top-level `context:` key OUTSIDE the managed block,
+  // replacing the block would produce a duplicate key. Skip with a warning, same
+  // as the append-path guard.
+  if (hasExistingContextKey(content, block)) {
+    return {
+      ok: true,
+      action: 'skipped-existing-context',
+      version: block.version,
+      path: configPath,
+      changed: false,
+      warning: 'Top-level context: key already present outside the managed block in openspec/config.yaml. Refusing to update — a duplicate context: key would result. Manually fold sdlc-utilities guidance into your existing context: value, then re-run --openspec-enrich.',
+    };
+  }
+
   const before     = content.slice(0, block.startIdx);
   const after      = content.slice(block.endIdx);
   const newContent = before + BLOCK_TEMPLATE + after;
@@ -232,4 +270,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { parseArgs, detectBlock, enrich, OPENSPEC_ENRICH_VERSION };
+module.exports = { parseArgs, detectBlock, enrich, hasExistingContextKey, OPENSPEC_ENRICH_VERSION };

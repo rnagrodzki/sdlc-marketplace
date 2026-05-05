@@ -1,5 +1,6 @@
-# Script execution tests for openspec-enrich.js (issue #162).
-# Tests managed-block append, update, unchanged, remove, and missing-file behavior.
+# Script execution tests for openspec-enrich.js (issues #162, #217).
+# Tests managed-block append, update, unchanged, remove, missing-file, and
+# duplicate-context-key skip behavior.
 
 - description: "openspec-enrich: appends managed block to plain config"
   vars:
@@ -15,12 +16,12 @@
     - type: icontains
       value: '"ok": true'
 
-- description: "openspec-enrich: unchanged on already-enriched v1 config"
+- description: "openspec-enrich: unchanged on already-enriched v2 config"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/util/openspec-enrich.js"
     script_args: "--project-root {{project_root}}"
     script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-openspec-config-enriched-v1"
+    project_root: "file://fixtures-fs/project-openspec-config-enriched-v2"
   assert:
     - type: icontains
       value: '"action": "unchanged"'
@@ -38,6 +39,34 @@
       value: '"action": "update"'
     - type: icontains
       value: '"changed": true'
+
+- description: "openspec-enrich: updates v1 block (now legacy comment-only) to v2"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/openspec-enrich.js"
+    script_args: "--project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-config-enriched-v1"
+  assert:
+    - type: icontains
+      value: '"action": "update"'
+    - type: icontains
+      value: '"changed": true'
+
+- description: "openspec-enrich: skips append when existing context: key present"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/openspec-enrich.js"
+    script_args: "--project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-config-with-context-key"
+  assert:
+    - type: icontains
+      value: '"action": "skipped-existing-context"'
+    - type: icontains
+      value: '"changed": false'
+    - type: icontains
+      value: '"ok": true'
+    - type: icontains
+      value: "Top-level context: key already present"
 
 - description: "openspec-enrich: --remove removes block from enriched config"
   vars:

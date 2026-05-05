@@ -1,0 +1,20 @@
+version: "1.0"
+project: test-project
+
+# Custom user rules
+rules:
+  - All changes must have a proposal
+
+# BEGIN MANAGED BY sdlc-utilities (v2)
+context: |
+  SDLC workflow managed by sdlc-utilities. Do not edit this block manually.
+  To update: /setup-sdlc --openspec-enrich. To remove: /setup-sdlc --remove-openspec.
+
+  Contributor workflow:
+    1. /plan-sdlc --from-openspec <change-name>  — create an implementation plan from the change
+    2. /execute-plan-sdlc                         — execute the plan in waves
+    3. /ship-sdlc                                 — commit, review, version, and open a PR
+
+  Do not invoke `openspec archive` directly — /ship-sdlc handles archival
+  as a conditional pipeline step after validation passes.
+# END MANAGED BY sdlc-utilities (v2)

@@ -3,6 +3,15 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-05 — pr-sdlc: PR #222 created for fix/217-openspec-enrich-yaml-block
+PR used the project custom template (.claude/pr-template.md). Custom template sections matched 1:1 with the 8 default sections by intent. Label `bug` inferred from `fix/` branch prefix and `fix(...)` commit subjects via LLM mode. Title pattern `^(feat|fix|...)\(#\d+\): .+ - .+$` required the issue number in parentheses — critical to get right for this repo.
+
+## 2026-05-05 — version-sdlc: patch release v0.17.45 on fix/217-openspec-enrich-yaml-block
+Released two fix commits (openspec-enrich YAML block template + duplicate-key guard). Remote had no upstream; `--set-upstream` auto-heal worked correctly. flags.changelog resolved to false despite config.changelog=true — the --auto flag + no explicit --changelog flag left changelog disabled for this release.
+
+## 2026-05-05 — openspec-enrich: v1→v2 update path missing context-key duplicate guard
+Reviewer caught that the in-place update path (v1→v2 migration) in `openspec-enrich.js` skipped the `hasExistingContextKey` guard that the append path had. A config with a user-defined `context:` key plus a v1 managed block would produce a duplicate `context:` key on upgrade. Fix: call `hasExistingContextKey(content, block)` before writing and return `skipped-existing-context` with a warning if true. Rule: whenever adding a new code path that writes a structured key to a YAML file, mirror every guard from the existing path that prevents duplicate keys.
+
 ## 2026-05-05 — pr-sdlc: gh account auto-switch on CreatePullRequest permission error
 During PR creation for fix/#208-#209-#214-pipeline-bugs, `gh pr create` failed with `rnagrodzkicl does not have the correct permissions to execute CreatePullRequest`. The recovery helper (`pr-recover-gh-account.js`) returned `recovered: false` with a hint for `gh auth login --hostname github-rn`, but `gh auth switch` to `rnagrodzki` (the repo owner) succeeded manually and the retry PR creation worked. The recovery helper's `hint` path did not trigger an account switch because the host was `github-rn` (a custom hostname) rather than the standard `github.com` — the helper found no local account matching `github-rn`. Rule: when the recovery hint points to a non-standard hostname and a `rnagrodzki` account exists on `github.com`, try `gh auth switch` to `rnagrodzki` before escalating to the user.
 
@@ -79,3 +88,6 @@ Review finding #2 (medium): "call-site model:haiku inconsistent with review-sdlc
 
 ## 2026-05-05 — execute-plan-sdlc: pipeline-bugs plan executed without Agent tool
 Resumed execution on `fix/#208-#209-#214-pipeline-bugs` where the prior wave 0 had been built but no tasks dispatched. The harness exposed TeamCreate but not the one-shot Agent tool the skill was designed around, so all 11 tasks ran inline in the main context, sequentially, with `git diff --stat` after each task as filesystem verification (Step 5c.1) and the existing 14 active guardrails passing on the final diff. Rule: when Agent dispatch is unavailable, fall through to inline execution rather than aborting — plan tasks remain the source of truth, and `state/execute.js` still tracks completion. The advisor catch was correct (skip Spec Compliance Reviewer dispatch in 5c-bis when no Agent tool — equivalent to `--quality full` for that step alone).
+
+## 2026-05-05 — execute-plan-sdlc: Agent dispatch tool unavailable in environment
+When the Agent/Task dispatch tool is not registered in the runtime tool list, the orchestrator must fall back to direct main-context execution rather than failing. The skill protocol allows this implicitly (small-plan path), but the heuristic should be: if dispatch is unavailable, treat all tasks as inline regardless of complexity and rely on per-task verification + post-execution acceptance-criteria checks. Tasks 1–4 of plan #217 executed sequentially in main context with full verification — outcome equivalent to wave dispatch for a 4-task plan.
