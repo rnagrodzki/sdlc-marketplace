@@ -160,7 +160,7 @@ function detect(projectRoot) {
     },
     content: {
       reviewDimensions: {
-        count: countFiles(reviewDimensionsDir, '.yaml') + countFiles(reviewDimensionsDir, '.yml'),
+        count: countFiles(reviewDimensionsDir, '.md'),
         path: path.join('.claude', 'review-dimensions') + path.sep,
       },
       prTemplate: {
