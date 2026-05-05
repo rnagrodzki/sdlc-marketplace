@@ -15,17 +15,16 @@ function createOutputFile(prefix) {
 }
 
 /**
- * Unified output: if --output-file is in argv, write to temp file and print path.
- * Otherwise print JSON to stdout (backward compatible).
+ * Unified output: always writes JSON to a temp file under `os.tmpdir()` and
+ * prints only the path on stdout. The previous stdout-JSON fallback was
+ * removed (issue #209) because shell redirects of that fallback could
+ * materialize transient `*-context-*.json` artifacts in the consumer cwd.
+ * Callers that previously relied on stdout JSON must read the printed path.
  */
 function writeOutput(data, prefix, exitCode = 0) {
-  if (process.argv.includes('--output-file')) {
-    const filePath = createOutputFile(prefix);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
-    process.stdout.write(filePath + '\n');
-  } else {
-    process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-  }
+  const filePath = createOutputFile(prefix);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
+  process.stdout.write(filePath + '\n');
   process.exit(exitCode);
 }
 

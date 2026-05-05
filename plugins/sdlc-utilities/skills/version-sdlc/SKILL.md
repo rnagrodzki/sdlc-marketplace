@@ -45,13 +45,12 @@ SCRIPT=$(find ~/.claude/plugins -name "version.js" -path "*/sdlc*/scripts/skill/
 
 VERSION_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
+# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM, so
+# the manifest is removed even if the release is cancelled or errors out.
+trap 'rm -f "$VERSION_CONTEXT_FILE"' EXIT INT TERM
 ```
 
-Read and parse `VERSION_CONTEXT_FILE` as `VERSION_CONTEXT_JSON`. Clean up after the release completes or is cancelled:
-
-```bash
-rm -f "$VERSION_CONTEXT_FILE"
-```
+Read and parse `VERSION_CONTEXT_FILE` as `VERSION_CONTEXT_JSON`. The `trap` above guarantees cleanup on any exit path — do not add scattered `rm -f` calls in success/cancel branches.
 
 **On non-zero `EXIT_CODE`:**
 

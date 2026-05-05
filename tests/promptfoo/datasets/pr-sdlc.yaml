@@ -390,3 +390,58 @@
         evaluation runs, no Labels line appears in Step 5, and the LLM fuzzy heuristic is
         NOT triggered. This is the explicit fix for issue #197 — legacy projects do not
         get fabricated labels until they opt into rules or llm mode.
+
+- description: "pr-sdlc: synced branch reports pushed=true, action=none (issue #214 regression)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: >
+      The branch `feat/auth-jwt` has an upstream `origin/feat/auth-jwt` that is fully
+      synced — `git status -sb` reports neither "ahead" nor "behind". The branch was
+      pushed by a previous /pr-sdlc run; this run does not push anything new.
+      pr.js produced this remoteState section in the context JSON:
+        { "remoteState": { "pushed": true, "remoteBranch": "origin/feat/auth-jwt", "action": "none" } }
+    user_request: >
+      Run /pr-sdlc on this branch. The remoteState shows `pushed: true, action: none`
+      because the branch is in sync with origin. Walk through how pr.js arrives at
+      this state and explain the new semantics (issue #214). Why is `pushed: true`
+      correct here even though this run did NOT perform a push?
+  assert:
+    - type: icontains
+      value: "pushed"
+    - type: icontains
+      value: "sync"
+    - type: llm-rubric
+      value: >
+        The response explains the redefined `pushed` field (issue #214): it now
+        reports whether the branch is in sync with origin, NOT whether the current
+        run performed a push. The synced case (`hasUpstream && !isAhead && !isBehind`)
+        produces `pushed: true, action: 'none'` because the branch is up to date —
+        the prior bug was that this state reported `pushed: false` and triggered
+        spurious "needs push" warnings. The response distinguishes the two fields:
+        `pushed` is sync state, `action` is the audit log of what this run did
+        (`none` | `pushed` | `pushed-new` | `error`). The response also notes that
+        `getRemoteState` now performs a best-effort `git fetch` so the local view
+        of upstream is fresh before the comparison.
+
+- description: "pr-sdlc: ahead branch after push reports pushed=true, action=pushed"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/pr-sdlc/SKILL.md"
+    project_context: >
+      The branch `feat/login` has an upstream `origin/feat/login` and was 2 commits
+      ahead before pr-sdlc ran. pr-sdlc invoked pushToRemote which succeeded. The
+      resulting remoteState in the context JSON:
+        { "remoteState": { "pushed": true, "remoteBranch": "origin/feat/login", "action": "pushed" } }
+    user_request: >
+      Walk through why pushed is true in this case even though the cached
+      remoteInfo.isAhead snapshot was true at the moment remoteState was constructed.
+  assert:
+    - type: icontains
+      value: "pushed"
+    - type: llm-rubric
+      value: >
+        The response explains that after a successful `pushToRemote` call, the branch
+        is in sync with origin — even though `remoteInfo.isAhead` was captured BEFORE
+        the push and still reports true. The implementation uses
+        `justPushed = remoteAction === 'pushed' || 'pushed-new'` as a short-circuit
+        so a successful push always yields `pushed: true`, regardless of the stale
+        cached `isAhead` snapshot. `action` is `pushed` (audit log: this run pushed).

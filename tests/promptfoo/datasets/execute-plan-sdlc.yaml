@@ -167,3 +167,28 @@
         The response falls back to a static advisory mentioning /opsx:verify and /opsx:archive
         (or similar non-CLI suggestions) without fabricating a validation result. It does NOT
         claim validation passed. It may note that the openspec CLI is not available.
+
+- description: "execute-plan-sdlc: Learning Capture writes to log.md before Step 9 REPORT (issue #208)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      A 2-task plan has just finished executing. A guardrail was overridden by the
+      user during Wave 1 (so a learning entry should be appended). Walk through
+      Step 8-ter (Learning Capture) and Step 9 (REPORT) in order, narrating exactly
+      what gets written to `.claude/learnings/log.md` and confirming the working
+      tree contains that change BEFORE the final summary is emitted.
+  assert:
+    - type: icontains
+      value: "learnings/log.md"
+    - type: icontains
+      value: "Step 9"
+    - type: llm-rubric
+      value: >
+        The narration shows the Learning Capture append happening in Step 8-ter,
+        BEFORE Step 9 (REPORT) emits the final summary. The response references
+        R27 or paraphrases the ordering rule: the log.md write must be part of
+        the working tree when execute-plan-sdlc returns control, so ship-sdlc's
+        staging window picks it up and the entry lands in the feature commit.
+        The response does NOT describe Learning Capture as running after Step 9
+        or as a standalone post-summary section.

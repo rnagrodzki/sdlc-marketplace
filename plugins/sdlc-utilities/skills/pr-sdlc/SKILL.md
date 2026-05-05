@@ -104,13 +104,12 @@ SCRIPT=$(find ~/.claude/plugins -name "pr.js" -path "*/sdlc*/scripts/skill/pr.js
 
 PR_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
+# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM, so
+# the manifest is removed even if a PR creation/update path errors out.
+trap 'rm -f "$PR_CONTEXT_FILE"' EXIT INT TERM
 ```
 
-Read and parse `PR_CONTEXT_FILE` as `PR_CONTEXT_JSON`. Clean up after PR is created or cancelled:
-
-```bash
-rm -f "$PR_CONTEXT_FILE"
-```
+Read and parse `PR_CONTEXT_FILE` as `PR_CONTEXT_JSON`. The `trap` above guarantees cleanup on any exit path — do not add scattered `rm -f` calls in success/cancel branches.
 
 **On non-zero `EXIT_CODE`:**
 

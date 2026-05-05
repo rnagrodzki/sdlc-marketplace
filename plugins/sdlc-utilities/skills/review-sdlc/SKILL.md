@@ -28,6 +28,9 @@ MANIFEST_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --json)
 EXIT_CODE=$?
 echo "MANIFEST_FILE=$MANIFEST_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
+# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM, so
+# the manifest is removed even if dispatch errors or the agent crashes.
+trap 'rm -f "$MANIFEST_FILE"' EXIT INT TERM
 ```
 
 **On non-zero `EXIT_CODE`:**
@@ -66,7 +69,7 @@ Plan critique:
 To execute the full review, run /review-sdlc (without --dry-run).
 ```
 
-Clean up: `rm -f "$MANIFEST_FILE"`. Stop here.
+Stop here. The `trap` declared at Step 1 cleans up `$MANIFEST_FILE` automatically on shell exit.
 
 ---
 
@@ -233,11 +236,9 @@ If verdict is **APPROVED**: skip — nothing to fix.
 
 ## Step 6 — Cleanup
 
-Runs on every terminal branch of Step 4 — including `cancel`, terminal-only, errors,
-and orchestrator failures. Must not be skipped.
+The `$MANIFEST_FILE` is removed by the `trap` declared at Step 1 on every exit path. The diff directory is removed here because it is not covered by the trap:
 
 ```bash
-rm -f "$MANIFEST_FILE"
 rm -rf "{diff_dir}"
 ```
 

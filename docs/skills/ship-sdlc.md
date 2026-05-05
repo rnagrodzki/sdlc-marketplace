@@ -39,7 +39,7 @@ This skill is for **expert users working on projects with established quality gu
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
-| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
+| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`, `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
 | `--quality <full\|balanced\|minimal>` | Forwarded to execute-plan-sdlc as `--quality` (model tier). Only forwarded when the user explicitly passes `--quality` to ship; otherwise execute-plan-sdlc applies its own selection. (Renamed from `--preset` in #190 to disambiguate from `--steps`.) | Not forwarded |
 | `--bump patch\|minor\|major\|<label>` | Version bump type forwarded to version-sdlc. The `<label>` form (e.g. `--bump rc`, `--bump beta`) is forwarded verbatim and interpreted by version-sdlc as `--bump patch --pre <label>`. Labels must match `^[a-z][a-z0-9]*$` (lowercase, start with a letter, alphanumeric). Example: `ship-sdlc --bump rc` produces a `1.2.4-rc.1` style release. | `patch` |
 | `--draft` | Create the PR as a draft. | Off |
@@ -58,7 +58,7 @@ To omit the `archive-openspec` step from a single run: `--steps <csv>` listing t
 
 ## How the Pipeline Works
 
-The pipeline runs 7 steps sequentially. Two steps are conditional on the review verdict, and two steps pause even in `--auto` mode because they require human sign-off.
+The pipeline runs 8 steps sequentially. Two steps are conditional on the review verdict, and two steps pause even in `--auto` mode because they require human sign-off. The final step (`learnings-commit`) is a no-op when no learnings were captured this run.
 
 ```
                           /ship-sdlc
@@ -122,6 +122,12 @@ plan-sdlc      (--auto if     (--committed)
                                 pr-sdlc
                                 (--auto, --draft
                                  if applicable)
+                                     |
+                                     v
+                                Step 5h:
+                                learnings-commit
+                                (inline shell —
+                                 no-op if log unchanged)
                                      |
                                      v
                               Step 6: Summary
@@ -364,7 +370,7 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `version` (top-level) | `2` | `2` | Schema version literal. New configs MUST include `version: 2`. Legacy v1 configs are auto-migrated on read. |
-| `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`. Replaces legacy `preset` / `skip`. |
+| `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`, `learnings-commit`. Replaces legacy `preset` / `skip`. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type. |
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |
 | `auto` | `boolean` | `false` | Run in non-interactive mode by default. |

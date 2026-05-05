@@ -14,7 +14,7 @@ const { PRESET_TO_STEPS } = require('./config');
 // Canonical pipeline steps that may appear in ship.steps[]. Order matters
 // — used as default ordering for the multi-select question and as the
 // iteration order for resolving steps[] -> pipeline steps in ship.js.
-const CANONICAL_STEPS = ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec'];
+const CANONICAL_STEPS = ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec', 'learnings-commit'];
 
 const SHIP_FIELDS = [
   {

@@ -43,13 +43,13 @@ SCRIPT=$(find ~/.claude/plugins -name "commit.js" -path "*/sdlc*/scripts/skill/c
 
 COMMIT_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
+# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM, so
+# the manifest is removed even if an error path (subject-pattern gate, link
+# validator, pre-commit hook) skips the explicit cleanup branches below.
+trap 'rm -f "$COMMIT_CONTEXT_FILE"' EXIT INT TERM
 ```
 
-Read and parse `COMMIT_CONTEXT_FILE` as `COMMIT_CONTEXT_JSON`. Clean up after the commit completes or is cancelled:
-
-```bash
-rm -f "$COMMIT_CONTEXT_FILE"
-```
+Read and parse `COMMIT_CONTEXT_FILE` as `COMMIT_CONTEXT_JSON`. The `trap` above guarantees cleanup on any exit path — do not add scattered `rm -f` calls in success/cancel branches.
 
 **On non-zero `EXIT_CODE`:**
 
@@ -178,7 +178,7 @@ Show `Amend:` instead of `Commit:` heading when `flags.amend` is true.
 
 **On `edit`:** Ask what to change, revise the message, and present again. Loop until explicit `yes` or `cancel`. Re-dispatching the orchestrator is not required for small wording tweaks — apply user-supplied edits to `MESSAGE` directly and re-validate against the subject-pattern gate before re-presenting.
 
-**On `cancel`:** Abort without changes. Run `rm -f "$COMMIT_CONTEXT_FILE"` to remove the manifest.
+**On `cancel`:** Abort without changes. The `trap` at Step 1 cleans up `$COMMIT_CONTEXT_FILE` automatically on shell exit.
 
 **Hook failure handling**: If `git commit` fails due to a pre-commit hook, the stash is still in place. Inform the user: "Pre-commit hook failed. Your unstaged changes are stashed (`git stash list` to see). Fix the hook issue, re-stage your changes, and re-run `/commit-sdlc`."
 
@@ -196,11 +196,7 @@ Show the result:
 
 Omit the `Stash:` line if no stash was used.
 
-After verification, remove the manifest temp file:
-
-```bash
-rm -f "$COMMIT_CONTEXT_FILE"
-```
+The manifest temp file is removed automatically by the `trap` declared at Step 1 — no explicit cleanup is needed here.
 
 ---
 

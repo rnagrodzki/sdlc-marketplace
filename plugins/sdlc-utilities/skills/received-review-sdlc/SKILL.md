@@ -41,6 +41,8 @@ if [ -n "$SCRIPT" ]; then
   EXIT_CODE=$?
   echo "MANIFEST_FILE=$MANIFEST_FILE"
   echo "EXIT_CODE=$EXIT_CODE"
+  # Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM.
+  trap 'rm -f "$MANIFEST_FILE"' EXIT INT TERM
 fi
 ```
 

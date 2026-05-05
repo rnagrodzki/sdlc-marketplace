@@ -5,3 +5,9 @@ tests/promptfoo/.promptfoo-data/
 site/node_modules/
 site/dist/
 site/.astro/
+
+# >>> sdlc-utilities managed (do not edit) — transient skill artifacts
+*-context-*.json
+*-manifest-*.json
+*-prepare-*.json
+# <<< sdlc-utilities managed
