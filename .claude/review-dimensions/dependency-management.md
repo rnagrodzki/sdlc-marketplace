@@ -7,6 +7,7 @@ triggers:
 skip-when:
   - "**/node_modules/**"
 severity: medium
+model: haiku
 max-files: 10
 ---
 

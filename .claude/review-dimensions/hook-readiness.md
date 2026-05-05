@@ -10,6 +10,7 @@ skip-when:
   - "docs/**"
   - "tests/**"
 severity: medium
+model: sonnet
 ---
 
 # Hook Readiness Review

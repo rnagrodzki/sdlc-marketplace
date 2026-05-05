@@ -10,6 +10,7 @@ skip-when:
   - "**/node_modules/**"
   - "tests/**"
 severity: high
+model: haiku
 requires-full-diff: true
 ---
 

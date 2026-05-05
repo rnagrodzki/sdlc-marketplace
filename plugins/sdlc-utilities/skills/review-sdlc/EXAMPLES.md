@@ -28,6 +28,7 @@ skip-when:
   - "**/__fixtures__/**"
 severity: high
 max-files: 50
+model: sonnet
 ---
 
 # Security Review
@@ -61,6 +62,8 @@ Review all changes for security vulnerabilities.
 | Overly broad CORS policy | medium |
 | Missing rate limiting on auth endpoints | low |
 ```
+
+> `model:` — optional. Forces this dimension's subagent onto the named model. Omit to inherit the manifest default.
 
 ---
 

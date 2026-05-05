@@ -9,6 +9,7 @@ skip-when:
   - "site/dist/**"
   - "site/.astro/**"
 severity: medium
+model: haiku
 max-files: 30
 ---
 

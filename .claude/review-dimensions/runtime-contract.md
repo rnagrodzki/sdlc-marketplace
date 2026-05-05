@@ -9,6 +9,7 @@ skip-when:
   - "**/node_modules/**"
   - "docs/**"
 severity: high
+model: opus
 ---
 
 # Runtime Contract Review
