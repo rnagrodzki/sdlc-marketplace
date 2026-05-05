@@ -29,7 +29,7 @@ This skill is for **expert users working on projects with established quality gu
 ## Usage
 
 ```text
-/ship-sdlc [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config]
+/ship-sdlc [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config] [--gc] [--ttl-days <N>]
 ```
 
 ---
@@ -48,6 +48,8 @@ This skill is for **expert users working on projects with established quality gu
 | `--init-config` | Launch interactive config creation for `.sdlc/local.json`, then stop. No pipeline execution. | Off |
 | `--workspace branch\|worktree\|prompt` | Workspace isolation mode forwarded to execute-plan-sdlc. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. In worktree mode, the version step is auto-skipped (tags are repo-global) and `--label skip-version-check` is added to the PR step to bypass the CI version check. | `prompt` |
 | `--openspec-change <name>` | Explicitly select the OpenSpec change to archive, overriding branch-name matching. Used when the branch name does not match the change directory name. | — |
+| `--gc` | Prune stale ship- and execute- state files from `.sdlc/execution/`, then stop without running the pipeline. A file is pruned only when it is older than the TTL AND its branch is no longer in `git branch --list`. Fixes orphan accumulation from interrupted runs (issue #223). | Off |
+| `--ttl-days <N>` | TTL in days used by `--gc` and the terminal cleanup step. Files newer than this are kept regardless of branch existence (in-flight pipelines on detached HEAD or freshly-deleted branches must not be wiped). Configurable via `state.gc.ttlDays` in `.claude/sdlc.json`; CLI overrides config. | `7` (or `state.gc.ttlDays`) |
 
 
 **Removed (#190 hard-remove):** `--preset` and `--skip` are no longer accepted. Passing either produces an error pointing at `--steps <csv>` (for step composition) and `--quality <full|balanced|minimal>` (for the execute-plan-sdlc model tier). Legacy on-disk v1 configs (`ship.preset`/`ship.skip`) are still auto-migrated to v2 by `lib/config.js`.
@@ -347,6 +349,31 @@ Finds the most recent state file for the current branch, skips completed steps, 
 ```
 
 Walks through an interactive questionnaire and writes `.sdlc/local.json`. Does not run the pipeline.
+
+### Prune stale state files (issue #223)
+
+```text
+/ship-sdlc --gc
+```
+
+Prunes orphaned `ship-*.json` and `execute-*.json` state files in `.sdlc/execution/` whose branches no longer exist (older than 7 days by default). Skips the pipeline entirely. Useful after interrupted runs leave stale state behind.
+
+```text
+/ship-sdlc --gc --ttl-days 0
+```
+
+Prunes every state file whose branch is absent from `git branch --list`, regardless of age. Files for currently-existing branches are always kept.
+
+---
+
+## Terminal cleanup
+
+Every ship pipeline run ends with a deterministic `cleanup` step (after `pr`, `archive-openspec`, and `learnings-commit`). The step is added by `skill/ship.js`, is not user-configurable, and runs as a direct Bash invocation of `state/ship.js cleanup-pipeline` (not as an Agent). Behavior:
+
+- **Success path:** validates the pipeline contract (no `pending`/`in_progress` steps), deletes the current run's state file, then sweeps stale ship- and execute- state files older than the TTL whose branch is no longer present.
+- **Failure path:** when an earlier step ended in `failed`, the skill invokes the same script with `--force` — the contract check is skipped and the current run's state file is preserved (so `--resume` works), but stale orphans are still pruned.
+
+Listing `cleanup` in `--steps` or `ship.steps[]` produces a validation error. See issue #223 for the rationale.
 
 ---
 

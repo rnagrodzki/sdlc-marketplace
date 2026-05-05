@@ -2,7 +2,7 @@
 name: ship-sdlc
 description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Chains execute-plan-sdlc, commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, and pr-sdlc with conditional review-fix loop. Arguments: [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config]. The `<label>` form for --bump (e.g. `--bump rc`) is forwarded to version-sdlc, where it is interpreted as `--bump patch --pre <label>`; labels must match `^[a-z][a-z0-9]*$`. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
-argument-hint: "[--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--openspec-change <name>] [--init-config]"
+argument-hint: "[--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
 ---
 
 # Ship Pipeline
@@ -46,6 +46,27 @@ trap 'rm -f "$INIT_OUTPUT_FILE"' EXIT INT TERM
    - If `errors` is non-empty, display them and stop.
    - Otherwise display the `created` files list and `config` JSON for user confirmation.
 4. Stop. No pipeline execution.
+
+### 1a-gc. --gc handler (R39, issue #223)
+
+If `--gc` (with optional `--ttl-days <N>`) was passed, run `skill/ship.js --gc` and stop — no pipeline composition. The prepare script short-circuits: it scans `<main-worktree>/.sdlc/execution/` for stale ship- and execute- state files (older than TTL AND whose branch is no longer in `git branch --list`), removes them, and emits a JSON report.
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | head -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
+PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --gc)  # add --ttl-days <N> when provided
+trap 'rm -f "$PREPARE_OUTPUT_FILE"' EXIT INT TERM
+```
+
+Read the prepare output. The top-level `action` field will be `"gc"`; the `report` field contains `{ttlDays, ship: {deleted, kept}, execute: {deleted, kept}}`.
+
+Print one line per file:
+```
+[deleted] ship-deletedbranch-20240101T000000Z.json — stale+branch-gone
+[kept]    ship-main-20260505T120000Z.json — ttl-fresh
+```
+
+Then stop. Do not proceed to step 1b. The pipeline does not run.
 
 ### 1b. Load ship config
 
@@ -372,6 +393,23 @@ Example dispatch sequence (use `step.invocation` for actual args):
 - Agent: version-sdlc, args: `"patch"`
 - Agent: pr-sdlc, args: `"--auto --draft"`
 
+### Post-execute branch migration (R37)
+
+After execute-plan-sdlc returns success but **before** the next step's record-start, detect whether execute-plan-sdlc created a new branch (the common case when `/ship-sdlc` was invoked from `main` with `--workspace branch`).
+
+```bash
+CURRENT_BRANCH=$(git branch --show-current)
+STATE_BRANCH=$(node "$SCRIPT" read | node -e "process.stdin.on('data',d=>{try{console.log(JSON.parse(d).branch)}catch(_){}})")
+if [ -n "$CURRENT_BRANCH" ] && [ -n "$STATE_BRANCH" ] && [ "$CURRENT_BRANCH" != "$STATE_BRANCH" ]; then
+  FROM_SLUG=$(echo "$STATE_BRANCH" | sed 's|[^a-zA-Z0-9-]|-|g')
+  node "$SCRIPT" migrate --from "$FROM_SLUG" --to "$CURRENT_BRANCH"
+fi
+```
+
+The `migrate` subcommand renames `ship-<oldSlug>-<ts>.json` → `ship-<newSlug>-<ts>.json` and updates `data.branch`. On `migrated: false` (e.g. file already cleaned, slug already correct), warn and continue — do not abort the pipeline; the orphaned file will be cleaned by the terminal `cleanup` step or by `--gc`.
+
+Subsequent state operations (`start`, `complete`, `read`) automatically pick up the renamed file because `state/ship.js` resolves by current branch.
+
 ### Between execute and commit
 
 execute-plan-sdlc does not stage files. Run `git add -A -- ':!.sdlc/'` with verbose output:
@@ -521,9 +559,37 @@ After each step: `node "$SCRIPT" complete --step <name> --result "<summary>"` (o
 Record decisions: `node "$SCRIPT" decide --step <name> --text "<decision>"`
 Defer findings: `node "$SCRIPT" defer --severity <s> --file <f> --title "<t>"`
 
-On successful completion: `node "$SCRIPT" cleanup`
+### Terminal cleanup step (R38, issue #223)
 
-If cleanup exits with code 1 (pipeline contract violation), read the JSON output. Print:
+The prepare-script output (`steps[]` array) ends with a synthetic step named `cleanup` (`status: "will_run"`, `skill: null`, `reserved: true`). It is appended unconditionally by `skill/ship.js::computeSteps` and is NOT user-configurable — listing `cleanup` in `--steps` or `ship.steps[]` produces a validation error in Step 1c.
+
+Dispatch the cleanup step **as a direct Bash call**, not as an Agent. Each `cleanup` step entry has an `invocation` object with two precomputed command variants:
+
+```json
+{
+  "method": "bash",
+  "normal": "node \"$SCRIPT\" cleanup-pipeline",
+  "forced": "node \"$SCRIPT\" cleanup-pipeline --force"
+}
+```
+
+Selection rule: walk `steps[]` and check whether any prior step's recorded status (from the live state file, not the prepare snapshot) is `failed`. If so, dispatch with `step.invocation.forced`; otherwise dispatch with `step.invocation.normal`. `$SCRIPT` is the same `state/ship.js` path resolved in the state-persistence section above.
+
+Behavior:
+- **Normal:** validates pipeline contract (no `pending`/`in_progress` steps), deletes the current run's state file, then sweeps stale ship- and execute- state files older than `state.gc.ttlDays` (default 7 days) whose branch is no longer in `git branch --list`.
+- **Forced:** preserves the current run's state file (so `--resume` works after a failure), skips the contract check, and runs only the GC sweep.
+
+If `--ttl-days <N>` was passed to ship-sdlc, append it to whichever variant you select.
+
+The script prints a JSON report to stdout. Surface it verbatim:
+
+```
+Terminal cleanup:
+  Current run: deleted ship-<branch>-<ts>.json
+  GC swept: 1 ship-* file, 0 execute-* files (1 deleted, kept 1 ttl-fresh)
+```
+
+If `currentRun.valid === false` (contract violation on the normal path), print:
 
 ```
 PIPELINE CONTRACT VIOLATION
@@ -536,7 +602,7 @@ This is a pipeline bug — all will_run steps must be dispatched.
 
 Do NOT proceed to the success summary. The pipeline did not complete correctly.
 
-On failure: preserve the state file for `--resume`.
+The cleanup step ALWAYS runs, even on failure paths — orphaned state files from interrupted runs are pruned regardless of whether the current pipeline succeeded.
 
 ---
 

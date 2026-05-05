@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-05 — version-sdlc: patch release v0.17.47 from fix/220-223-context-stats-ship-state-cleanup
+Single fix commit (context-stats token calculation + ship-state GC cleanup). Branch had no upstream — first push used --set-upstream automatically. Changelog disabled (flags.changelog === false despite config.changelog === true; --auto mode without explicit --changelog flag). All CI scripts current at their installed versions.
+
 ## 2026-05-05 — version-sdlc: flags.changelog vs config.changelog in auto mode
 When `--auto` is combined with `config.changelog: true` but the script (pre-fix) emits `flags.changelog: false`, the skill must still honor the task-level intent (`config.changelog`). The script bug (#219) was the root cause; the fix is in `skill/version.js`. Post-fix, `flags.changelog` will correctly reflect `config.changelog` even in auto mode.
 
@@ -97,3 +100,9 @@ When the Agent/Task dispatch tool is not registered in the runtime tool list, th
 
 ## 2026-05-05 — version-sdlc: changelog skip under auto-dispatch (#219)
 Even though prepare script (#213) correctly resolved flags.changelog, residual SKILL.md sites that read config.changelog directly or used vague "if changelog is enabled" wording let the LLM skip the changelog write under sub-agent dispatch. Fix: every gate (draft, write, release-plan display) now cites `flags.changelog === true` verbatim. Step 7.5 CI-scaffold remains config.changelog-gated by design (persistent project setup, not per-release). Lesson: when a script-emitted resolved value is the contract, every consumer site must cite that exact field name; vague phrasing leaks back to original-source semantics.
+
+## 2026-05-05 — execute-plan-sdlc: 8-task plan executed inline; cleanup-pipeline reserved-step semantics
+Plan 220-223-steady-clarke.md (#220 context-stats fix + #223 ship-state lifecycle) executed end-to-end inline because the Agent dispatch tool was again absent from the runtime. Three additional learnings worth keeping:
+- **Reserved synthetic steps:** the cleanup step is appended unconditionally by `skill/ship.js::computeSteps`, NOT user-configurable. The validator must reject it from `--steps`/`ship.steps[]` regardless of `flagSources.steps` source. Source check (`cli`-only error, `config`-warning) is wrong for reserved names — always an error.
+- **Atomic file rename + content edit pattern:** `migrateBranchSlug` writes the new path first (atomic temp+rename) then unlinks the old. There is a brief window where both files exist; `findStateFile` sorts by mtime descending and picks the newest. Acceptable for state files (single-writer), don't generalize this pattern to multi-writer scenarios.
+- **Hook context advisory bug surfaced its own irony:** the context-stats hook reported 100% transcript usage at the start of this very session (using the broken bytes/4 heuristic), which the advisor correctly flagged as stale data — the issue we were fixing. Test fixture `project-context-advisory-real-transcript` with `usage.input_tokens=50000 + cache_read=10000 = 60000 → 30%` validates the fix produces the right answer (and the heavy/light/missing tests in `context-advisory-exec.yaml` still cover the consumer-side advisory text).

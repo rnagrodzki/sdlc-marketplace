@@ -219,6 +219,206 @@ function resolveBranch(argBranch) {
 }
 
 // ---------------------------------------------------------------------------
+// Garbage collection
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a state-file basename into its components.
+ * Format: <prefix>-<branchSlug>-<timestamp>.json
+ *
+ * The slug may itself contain dashes (e.g. `fix-220-foo`) and the timestamp
+ * is always 16 chars of `YYYYMMDDTHHmmssZ`. We anchor on the trailing
+ * `-<timestamp>.json` so the slug captures everything between the prefix and
+ * the timestamp regardless of internal dashes.
+ *
+ * @param {string} name  basename (no directory)
+ * @returns {{prefix: string, slug: string, timestamp: string} | null}
+ */
+function parseStateFilename(name) {
+  // Trailing `-<16 chars>.json` where timestamp pattern is ISO-compact:
+  // 8 digits (date) + 'T' + 6 digits (time) + 'Z'.
+  const m = name.match(/^(ship|execute)-(.+)-(\d{8}T\d{6}Z)\.json$/);
+  if (!m) return null;
+  return { prefix: m[1], slug: m[2], timestamp: m[3] };
+}
+
+/**
+ * Garbage-collect stale state files in `<mainWorktree>/.sdlc/execution/`.
+ *
+ * Pure function: takes an explicit `knownBranches` list and `now` timestamp
+ * (no shell-out, no clock read) so it is deterministic and unit-testable.
+ *
+ * Pruning rule:
+ *   - File mtime within TTL → KEEP, reason "ttl-fresh".
+ *   - File branch (slug-matched against knownBranches) is currently live → KEEP, reason "branch-exists".
+ *   - File is older than TTL AND its branch is gone → DELETE, reason "stale+branch-gone".
+ *   - Filename does not match `<prefix>-<slug>-<timestamp>.json` → KEEP, reason "unparseable-name" (warn-and-skip).
+ *
+ * Slug matching: branches in `knownBranches` may contain `/` and other chars
+ * that get collapsed by `slugifyBranch`. Match by slug equality after
+ * slugifying every known branch, NOT by reverse-mapping the slug.
+ *
+ * @param {object} opts
+ * @param {string|null} [opts.prefix]    "ship" | "execute" | null (both)
+ * @param {number}      [opts.ttlDays=7] retention window in days
+ * @param {string[]}    opts.knownBranches  current `git branch --list` output
+ * @param {number}      [opts.now]       current time (ms); defaults to Date.now()
+ * @returns {{ deleted: Array<{file,prefix,branch,mtime,reason}>, kept: Array<{file,prefix,branch,reason}> }}
+ */
+function gcStateFiles({ prefix = null, ttlDays = 7, knownBranches = [], now } = {}) {
+  const stateDir = resolveStateDir();
+  const result = { deleted: [], kept: [] };
+
+  if (!fs.existsSync(stateDir)) return result;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(stateDir);
+  } catch (_) {
+    return result;
+  }
+
+  const nowMs = typeof now === 'number' ? now : Date.now();
+  const ttlMs = ttlDays * 86400000;
+  const liveSlugs = new Set(knownBranches.map(slugifyBranch));
+
+  for (const name of entries) {
+    if (!name.endsWith('.json')) continue;
+
+    const parsed = parseStateFilename(name);
+    if (!parsed) {
+      result.kept.push({ file: name, prefix: null, branch: null, reason: 'unparseable-name' });
+      continue;
+    }
+
+    if (prefix && parsed.prefix !== prefix) continue;
+
+    const fullPath = path.join(stateDir, name);
+    let stat;
+    try {
+      stat = fs.statSync(fullPath);
+    } catch (_) {
+      continue;
+    }
+
+    const ageMs = nowMs - stat.mtimeMs;
+    const branchExists = liveSlugs.has(parsed.slug);
+
+    if (ageMs < ttlMs) {
+      result.kept.push({ file: name, prefix: parsed.prefix, branch: parsed.slug, reason: 'ttl-fresh' });
+      continue;
+    }
+
+    if (branchExists) {
+      result.kept.push({ file: name, prefix: parsed.prefix, branch: parsed.slug, reason: 'branch-exists' });
+      continue;
+    }
+
+    try {
+      fs.unlinkSync(fullPath);
+      result.deleted.push({
+        file: name,
+        prefix: parsed.prefix,
+        branch: parsed.slug,
+        mtime: stat.mtimeMs,
+        reason: 'stale+branch-gone',
+      });
+    } catch (_) {
+      // Best-effort: another process may have deleted it; report as kept.
+      result.kept.push({ file: name, prefix: parsed.prefix, branch: parsed.slug, reason: 'unlink-failed' });
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Branch-slug migration
+// ---------------------------------------------------------------------------
+
+/**
+ * Rename a state file to use a new branch slug, preserving its timestamp,
+ * and update `data.branch` to the new branch name.
+ *
+ * Atomicity: we read the JSON, atomic-write to the new path (via temp
+ * file + rename), then unlink the old path. This is the same pattern used
+ * for `writeState`/`initState` — a brief window where both files exist on
+ * disk after the new write but before the old delete is acceptable; readers
+ * (`findStateFile`) sort by mtime descending and would pick the newest.
+ *
+ * @param {object} opts
+ * @param {string} opts.prefix     "ship" | "execute"
+ * @param {string} opts.fromSlug   Current slug (already slugified)
+ * @param {string} opts.toBranch   New branch name (raw — slugified internally)
+ * @returns {{migrated: true, from: string, to: string, filePath: string}
+ *         | {migrated: false, reason: string}}
+ */
+function migrateBranchSlug({ prefix, fromSlug, toBranch }) {
+  if (!prefix || !fromSlug || !toBranch) {
+    return { migrated: false, reason: 'missing-args' };
+  }
+
+  const found = findStateFile(prefix, fromSlug);
+  if (!found) {
+    return { migrated: false, reason: 'no-state-file' };
+  }
+
+  const stateDir   = resolveStateDir();
+  const oldName    = path.basename(found.fullPath);
+  const parsed     = parseStateFilename(oldName);
+  if (!parsed) {
+    return { migrated: false, reason: 'unparseable-name' };
+  }
+
+  const newSlug = slugifyBranch(toBranch);
+  if (newSlug === parsed.slug) {
+    return { migrated: false, reason: 'same-slug' };
+  }
+
+  const newName = `${prefix}-${newSlug}-${parsed.timestamp}.json`;
+  const newPath = path.join(stateDir, newName);
+
+  let raw;
+  try {
+    raw = fs.readFileSync(found.fullPath, 'utf8');
+  } catch (e) {
+    return { migrated: false, reason: `read-failed: ${e.message}` };
+  }
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    return { migrated: false, reason: `parse-failed: ${e.message}` };
+  }
+
+  data.branch = toBranch;
+
+  try {
+    atomicWriteSync(newPath, JSON.stringify(data, null, 2));
+  } catch (e) {
+    return { migrated: false, reason: `write-failed: ${e.message}` };
+  }
+
+  // Unlink the old file. If the new and old paths somehow collide
+  // (shouldn't, since slugs differ by check above), don't delete what we just wrote.
+  if (newPath !== found.fullPath) {
+    try {
+      fs.unlinkSync(found.fullPath);
+    } catch (_) {
+      // Non-fatal: the new file is in place; orphan will be GC'd.
+    }
+  }
+
+  return {
+    migrated: true,
+    from: oldName,
+    to: newName,
+    filePath: newPath,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -232,4 +432,7 @@ module.exports = {
   initState,
   deleteState,
   resolveBranch,
+  parseStateFilename,
+  gcStateFiles,
+  migrateBranchSlug,
 };

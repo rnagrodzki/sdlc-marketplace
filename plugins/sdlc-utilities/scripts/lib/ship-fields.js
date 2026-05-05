@@ -14,7 +14,17 @@ const { PRESET_TO_STEPS } = require('./config');
 // Canonical pipeline steps that may appear in ship.steps[]. Order matters
 // — used as default ordering for the multi-select question and as the
 // iteration order for resolving steps[] -> pipeline steps in ship.js.
+//
+// Note: `cleanup` is a synthetic terminal step added unconditionally by
+// `skill/ship.js::computeSteps` (issue #223 / R38) and is NOT user-configurable.
+// It does not appear here. See RESERVED_STEPS below — listing `cleanup` in
+// CLI `--steps` or `ship.steps[]` is a validation error.
 const CANONICAL_STEPS = ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec', 'learnings-commit'];
+
+// Steps that the prepare script appends unconditionally and that users MUST
+// NOT pass via CLI `--steps` or set in `ship.steps[]`. The validator in
+// `skill/ship.js` rejects any of these names with a clear error.
+const RESERVED_STEPS = ['cleanup'];
 
 const SHIP_FIELDS = [
   {
@@ -107,4 +117,4 @@ const BUILT_IN_DEFAULTS = {
   rebase: true,
 };
 
-module.exports = { SHIP_FIELDS, VALID_SKIP, VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS };
+module.exports = { SHIP_FIELDS, VALID_SKIP, VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS, RESERVED_STEPS };
