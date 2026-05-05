@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.46] - 2026-05-05
+
+### Added
+- review-sdlc: added runtime-contract and skill-architecture review dimensions to prevent changelog-related regressions (#224)
+
+### Fixed
+- version-sdlc: fixed CHANGELOG generation being skipped when `--auto` mode is active; `config.changelog` is now correctly honored in auto mode (#219)
+
 ## [0.17.43] - 2026-05-05
 
 ### Fixed
