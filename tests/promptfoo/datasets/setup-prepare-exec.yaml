@@ -88,3 +88,12 @@
       value: |
         const out = JSON.parse(output);
         return out.needsMigration === true && out.localIsV1 === true
+
+- description: "setup-prepare: counts .md review-dimension files (regression #203)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-with-dimensions"
+  assert:
+    - type: javascript
+      value: "JSON.parse(output).content.reviewDimensions.count === 3"
