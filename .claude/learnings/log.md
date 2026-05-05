@@ -3,6 +3,12 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-05 — pr-sdlc: gh account auto-switch on CreatePullRequest permission error
+The active gh account (rnagrodzkicl) lacked CreatePullRequest permissions on the rnagrodzki/sdlc-marketplace repo. pr-recover-gh-account.js returned `recovered: false` with hint `gh auth login --hostname github-rn` because the remote URL uses a custom SSH host alias. The correct account (rnagrodzki) was already configured locally as an inactive account — manual `gh auth switch --user rnagrodzki` resolved it before the retry. Rule: when the recovery helper returns `recovered: false`, check `gh auth status` for inactive matching accounts and switch manually before the retry.
+
+## 2026-05-05 — version-sdlc: patch release v0.17.43 on fix branch
+Released v0.17.43 on `fix/version-sdlc-bugs-211-212-213` — first push required `--set-upstream`; auto-healed correctly. The `--output-file` "Unknown flag" warning was expected (the very bug being fixed in this release) and is non-blocking. `config.changelog = true` drove CHANGELOG generation without an explicit `--changelog` flag, confirming #213 fix works correctly during its own release.
+
 ## 2026-05-05 — received-review-sdlc: three HIGH fixes on fix/version-sdlc-bugs-211-212-213
 HIGH-1: `--output-file` handler had a conditional `i++` that ate the next positional arg (e.g. `patch`), causing `requestedBump` to stay null. `output.js` only checks `process.argv.includes('--output-file')` — no value consumption — so the handler must be a pure no-op. Rule: boolean flags that delegate value-reading to another module must not advance the parse index.
 HIGH-2: Exec test for #212 used `--output-file` in `script_args`, which made the script write JSON to a temp file and print only the path to stdout. The `not-icontains "Unknown flag: --output-file"` assertion against a file path was a guaranteed false positive. Fix: remove `--output-file` from args so full JSON hits stdout; replace the file-path regex with a `requestedBump` content assertion.
