@@ -79,6 +79,21 @@
         "id": "project-agnostic",
         "description": "Plugin behaviour must work in any consumer project, not only sdlc-marketplace. Tasks that modify repo-local files (.gitignore, project configs, root scripts) must instead implement the change in plugin code (setup-sdlc helpers, hooks, SKILL.md) so it ships to every consumer. Direct edits to sdlc-marketplace files are allowed only when verifying the plugin's own dogfooding.",
         "severity": "error"
+      },
+      {
+        "id": "flag-coherence-cross-skill",
+        "description": "When skill A dispatches skill B (e.g., ship-sdlc → version-sdlc) and B's prepare script resolves a flag from CLI + config inputs, every SKILL.md decision site in B that gates on that flag must cite the resolved field from prepare output (e.g., flags.X === true). Sites that inspect raw $ARGUMENTS, the original CLI string, or config.X directly after Step 1 (CONSUME) fail this guardrail. The only exception is sites that genuinely concern persistent project state (e.g., CI scaffolding) — these must cite config.X AND include an inline rationale comment explaining the divergence.",
+        "severity": "error"
+      },
+      {
+        "id": "no-opposite-logical-vectors",
+        "description": "Within a single skill, when two or more SKILL.md sites gate the same behavioral concept (e.g., 'draft changelog' at Step 2 and 'write changelog' at Step 8), the gate condition must be expressed identically (same field reference, same operator, same constant). Plans that introduce or retain divergent gate phrasings for the same concept fail this guardrail.",
+        "severity": "error"
+      },
+      {
+        "id": "flag-resolution-single-source",
+        "description": "Each contractual flag must have exactly one resolution site — typically the prepare script. Downstream consumers (SKILL.md, sub-skills, CI scripts) reference the resolved field by name; they must not re-derive the value via OR-ing, fallback logic, or argument re-parsing.",
+        "severity": "warning"
       }
     ]
   },
@@ -143,6 +158,16 @@
         "id": "yagni",
         "description": "Do not add functionality until it is actually needed. No speculative abstractions, premature generalization, or unused parameters.",
         "severity": "warning"
+      },
+      {
+        "id": "flag-coherence-cross-skill",
+        "description": "When skill A dispatches skill B (e.g., ship-sdlc → version-sdlc) and B's prepare script resolves a flag from CLI + config inputs, every SKILL.md decision site in B that gates on that flag must cite the resolved field from prepare output (e.g., flags.X === true). Sites that inspect raw $ARGUMENTS, the original CLI string, or config.X directly after Step 1 (CONSUME) fail this guardrail. The only exception is sites that genuinely concern persistent project state (e.g., CI scaffolding) — these must cite config.X AND include an inline rationale comment explaining the divergence.",
+        "severity": "error"
+      },
+      {
+        "id": "no-opposite-logical-vectors",
+        "description": "Within a single skill, when two or more SKILL.md sites gate the same behavioral concept (e.g., 'draft changelog' at Step 2 and 'write changelog' at Step 8), the gate condition must be expressed identically (same field reference, same operator, same constant). Implementations that introduce or retain divergent gate phrasings for the same concept fail this guardrail.",
+        "severity": "error"
       }
     ]
   }

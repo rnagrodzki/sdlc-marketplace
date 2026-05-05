@@ -30,6 +30,7 @@ Review the command→script→skill execution pipeline for correctness and resil
 - [ ] Commands delegate to exactly one skill and pass the parsed JSON context as the primary input — they do not partially process JSON fields or add derived fields before delegation
 - [ ] Scripts write valid JSON to `stdout` and all error/diagnostic messages to `stderr` — commands capture `stdout` only (e.g., `node "$SCRIPT" ... > "$TEMP_FILE"`) and use `$?` for error detection
 - [ ] When a command specifies `allowed-tools` in its frontmatter, `Skill` is listed (needed for delegation) and `Bash` is listed (needed for script execution)
+- [ ] When a script resolves a flag from CLI + config inputs (e.g., `flags.X = config.X === true || args.X === true`), every SKILL.md decision site that gates on that concept references the resolved field (`flags.X`) — no SKILL.md site re-derives via `config.X`, raw `$ARGUMENTS`, or the original CLI string after Step 1 (CONSUME). Carve-outs that legitimately depend on persistent project state (e.g., CI scaffold install sites) must include an inline rationale comment explaining the divergence.
 
 ## Severity Guide
 
@@ -46,3 +47,5 @@ Review the command→script→skill execution pipeline for correctness and resil
 | `diff_dir` cleanup responsibility ambiguous between command and skill | medium |
 | `allowed-tools` missing `Skill` or `Bash` | medium |
 | Command performs non-trivial JSON processing before delegation | low |
+| SKILL.md decision site re-derives a script-resolved flag (e.g., reads `config.X` instead of `flags.X` after Step 1) | high |
+| Carve-out site (legitimately reads `config.X`) lacks inline rationale comment | medium |

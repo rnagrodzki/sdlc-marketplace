@@ -176,7 +176,7 @@ Version:    1.2.3 → 1.3.0
 Tag:        v1.3.0 (annotated)
 File:       package.json
 Push:       yes (to origin/main)
-Changelog:  no
+Changelog:  yes             ← render 'yes' when flags.changelog === true, else 'no' (substitute from flags.changelog)
 Hotfix:     yes             ← only shown when flags.hotfix === true
 ────────────────────────────────────────────
 
@@ -189,7 +189,7 @@ Options:
 - **cancel** — abort
 ```
 
-If changelog is enabled, show the draft CHANGELOG entry between the release plan table and the prompt.
+If `flags.changelog === true`, show the draft CHANGELOG entry between the release plan table and the prompt.
 
 If the user chooses `edit`, ask what to change, revise, and present again. Loop until explicit `yes` or `cancel`.
 
@@ -225,7 +225,9 @@ SCRIPT=$(find ~/.claude/plugins -name "scaffold-ci.js" -path "*/sdlc*/scripts/ut
 [ -z "$SCRIPT" ] && { echo "WARN: Could not locate util/scaffold-ci.js — skipping CI script check" >&2; exit 0; }
 ```
 
-Run the check (include `--changelog` only when `config.changelog === true`):
+Run the check (include `--changelog` only when `config.changelog === true`).
+
+> **Why `config.changelog`, not `flags.changelog`, here?** Step 7.5 scaffolds *persistent* CI scripts that ship with the project; the relevant question is whether the project opts into changelog enforcement long-term, not whether `--changelog` was passed for this single release. This is the only legitimate post-CONSUME reference to `config.changelog` per spec R18 — every other site (Step 2 draft, Step 5 display, Step 8.2 write) gates on `flags.changelog`. Do not "fix" this divergence.
 
 ```bash
 SCAFFOLD_OUTPUT_FILE=$(node "$SCRIPT" --check-only --output-file)
@@ -250,7 +252,7 @@ The release proceeds regardless of the user's answer. This is informational, not
    - **For all version-file formats (JSON, TOML, YAML — package.json, plugin.json, Cargo.toml, pyproject.toml, etc.):** use the Edit tool with a single targeted string replacement. The `old_string` must contain the current version string in its on-disk form (e.g. `"version": "<currentVersion>"` for JSON, `version = "<currentVersion>"` for TOML). The `new_string` substitutes the new version only.
    - **DO NOT use the Write tool. DO NOT rewrite the file. DO NOT touch any other field.**
    - **Verify after edit (HARD GATE):** run `git diff <versionFile>`. Exactly one line must differ — the version line. If more than one line differs, abort the release immediately, restore with `git checkout -- <versionFile>`, and surface the diff to the user.
-2. **Update CHANGELOG** (only if changelog is enabled): Use the Edit or Write tool to prepend the new entry after the `## [Unreleased]` section if present, or after the file header if not. Create `CHANGELOG.md` if it does not exist.
+2. **Update CHANGELOG** (only if `flags.changelog === true` — same gate as Step 2 draft): Use the Edit or Write tool to prepend the new entry after the `## [Unreleased]` section if present, or after the file header if not. Create `CHANGELOG.md` if it does not exist.
 3. **Stage changed files**: `git add <versionFile> CHANGELOG.md` — include only files that were actually changed.
 3b. **Link verification (R17, issue #198) — HARD GATE.** Before `git commit`, validate every URL embedded in the staged CHANGELOG entry (and any release-notes body) via the shared link validator. The script reads the body via `--file` and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON. Skip this sub-step entirely when changelog is disabled and no release-notes body was generated.
 
@@ -309,7 +311,7 @@ If `flags.hotfix === true`, show instead:
 
 ### Branch C: Changelog-Update Workflow (`flow === "changelog-update"`)
 
-> If the user invoked with `--changelog` (without a bump type), read `./changelog-workflow.md` now for the complete changelog-update workflow steps.
+> When `VERSION_CONTEXT_JSON.flow === 'changelog-update'` (set by the script when `--changelog` is passed without a bump type), read `./changelog-workflow.md` now for the complete changelog-update workflow steps.
 
 ---
 

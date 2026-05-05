@@ -599,3 +599,35 @@
         states that on non-zero exit git commit and git tag are NOT executed. The gate is
         script-enforced. The skill does not propose retrying, editing URLs without user input, or
         bypassing.
+
+- description: "version-sdlc: patch --auto with config.changelog=true drafts and writes CHANGELOG (#219)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: "file://fixtures/project-with-version-config-auto-changelog.md"
+    user_request: >
+      Run /version-sdlc patch --auto. The version-prepare.js output is provided in the project
+      context. Note: flags.changelog is true (resolved from config.changelog), flags.auto is true.
+      Show the release plan, the draft CHANGELOG entry, and describe the Step 8 execution.
+  assert:
+    # Release plan must show "Changelog: yes" — NOT "no" (the bug)
+    - type: icontains
+      value: "Changelog:  yes"
+    # Must NOT show "Changelog: no" — that is the bug being fixed
+    - type: not-icontains
+      value: "Changelog:  no"
+    # Must reference the resolved field name, not raw CLI arg
+    - type: icontains
+      value: "flags.changelog"
+    # Must mention writing CHANGELOG.md (Step 8.2)
+    - type: icontains
+      value: "CHANGELOG"
+    - type: llm-rubric
+      value: >
+        The response correctly interprets flags.changelog === true (resolved from config.changelog,
+        not from a CLI flag) and: (1) renders "Changelog: yes" in the release plan, (2) presents
+        a draft CHANGELOG entry showing the version 0.17.44 with the two commits (one fix and one
+        feat) categorized appropriately under Keep a Changelog sections, (3) describes Step 8.2
+        as writing the new entry to CHANGELOG.md. It must NOT say it will skip the changelog,
+        say "Changelog: no", or claim --changelog was not passed as a reason to skip. Auto mode
+        skips the AskUserQuestion approval but still displays the plan and runs the changelog
+        write step.

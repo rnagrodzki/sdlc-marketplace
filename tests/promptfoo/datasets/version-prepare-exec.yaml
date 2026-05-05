@@ -54,3 +54,18 @@
     # Fixture has config.changelog=false and no --changelog flag — resolved value must be false
     - type: icontains
       value: '"changelog": false'
+
+- description: "version-prepare: patch --auto with config.changelog=true emits flags.changelog=true (#219, regression net for #213)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "patch --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-config-changelog"
+  assert:
+    # Reproduces issue #219 path: --auto sub-agent dispatch from ship-sdlc must still resolve flags.changelog from config
+    - type: icontains
+      value: '"changelog": true'
+    - type: icontains
+      value: '"auto": true'
+    - type: not-icontains
+      value: "Unknown flag"

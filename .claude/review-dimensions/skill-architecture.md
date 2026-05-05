@@ -42,6 +42,7 @@ This project mandates (from AGENTS.md):
 - [ ] Independent steps within a workflow are marked for parallel execution
 - [ ] Error handling steps specify what to do on failure (exit codes, user messages)
 - [ ] REFERENCE.md and EXAMPLES.md files are consistent with their parent SKILL.md
+- [ ] Within a single SKILL.md, gate conditions for the same behavioral concept (e.g., 'draft artifact' at one step vs 'write artifact' at a later step) use identical condition phrasing and reference the same field. Divergent phrasings for the same concept are flagged.
 
 ## Severity Guide
 
@@ -57,3 +58,4 @@ This project mandates (from AGENTS.md):
 | Vague or generic instructions (not project-specific) | medium |
 | Minor formatting inconsistency | low |
 | Missing description in frontmatter | low |
+| Two or more gates for the same concept use different conditions (e.g., one says `flags.X === true`, another says `config.X === true`, another says "if X is enabled") | high |

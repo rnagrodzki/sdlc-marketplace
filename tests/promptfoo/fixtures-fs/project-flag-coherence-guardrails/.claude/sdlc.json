@@ -1,0 +1,35 @@
+{
+  "plan": {
+    "guardrails": [
+      {
+        "id": "flag-coherence-cross-skill",
+        "description": "When skill A dispatches skill B and B's prepare script resolves a flag from CLI + config inputs, every SKILL.md decision site in B that gates on that flag must cite the resolved field from prepare output. Sites that inspect raw $ARGUMENTS or config.X directly after Step 1 (CONSUME) fail this guardrail. Carve-outs for persistent project state (e.g., CI scaffolding) must include an inline rationale comment.",
+        "severity": "error"
+      },
+      {
+        "id": "no-opposite-logical-vectors",
+        "description": "Within a single skill, when two or more SKILL.md sites gate the same behavioral concept, the gate condition must be expressed identically.",
+        "severity": "error"
+      },
+      {
+        "id": "flag-resolution-single-source",
+        "description": "Each contractual flag must have exactly one resolution site — typically the prepare script. Downstream consumers must reference the resolved field by name; they must not re-derive the value.",
+        "severity": "warning"
+      }
+    ]
+  },
+  "execute": {
+    "guardrails": [
+      {
+        "id": "flag-coherence-cross-skill",
+        "description": "Every SKILL.md decision site that gates on a script-resolved flag must cite flags.X (not config.X or raw $ARGUMENTS) after Step 1 (CONSUME). Persistent project state carve-outs require an inline rationale comment.",
+        "severity": "error"
+      },
+      {
+        "id": "no-opposite-logical-vectors",
+        "description": "Implementations that introduce or retain divergent gate phrasings for the same concept fail this guardrail.",
+        "severity": "error"
+      }
+    ]
+  }
+}
