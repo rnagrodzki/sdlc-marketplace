@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-05 — version-sdlc: patch release v0.17.41 from fix/205-pr-labels-section-menu
+Branch had no upstream; `--set-upstream` auto-heal fired correctly on first push. Changelog disabled via CLI (no `--changelog` flag despite `config.changelog: true`). Single fix commit: setup-sdlc summarizePrLabels leaf config read.
+
 ## 2026-05-05 — pr-sdlc: per-dimension model override PR (#199)
 PR created for feat(#199) on branch fix/199-per-dimension-model-override. Custom template active — title pattern required `type(#issue): scope - description` format. sdlc.json version mode was already switched to `tag` on this branch, affecting how version-sdlc behaves in future sessions. "Fixes #199" placed in Github Issue section (custom template field) to link the issue for auto-close on merge.
 

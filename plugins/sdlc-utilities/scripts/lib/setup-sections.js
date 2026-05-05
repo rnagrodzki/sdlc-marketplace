@@ -206,17 +206,16 @@ function summarizePr(cfg) {
 }
 
 function summarizePrLabels(cfg) {
-  // cfg is the parent `pr` section; the labels block sits under cfg.labels.
-  const labels = cfg && cfg.labels;
-  if (!labels || typeof labels !== 'object') return 'not configured';
-  const mode = labels.mode;
+  // cfg is the `pr.labels` leaf (currentCfgFor walks the configPath dot-path).
+  if (!cfg || typeof cfg !== 'object') return '';
+  const mode = cfg.mode;
   if (mode === 'off') return 'off — no automatic labels';
   if (mode === 'rules') {
-    const n = Array.isArray(labels.rules) ? labels.rules.length : 0;
+    const n = Array.isArray(cfg.rules) ? cfg.rules.length : 0;
     return `rules: ${n} rule${n === 1 ? '' : 's'}`;
   }
   if (mode === 'llm') return 'llm — model picks labels';
-  return 'not configured';
+  return '';
 }
 
 function summarizeReviewDimensions(_cfg, detected) {
