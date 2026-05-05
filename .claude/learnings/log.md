@@ -3,6 +3,12 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-06 — pr-sdlc: PR #236 created for feat/harden-sdlc-skill → main
+Custom template active (.claude/pr-template.md). Title pattern required type(#issue): scope - description format. Installed pr.js was 0.17.47 (project at 0.18.0) — --validate-body still worked. Branch was already up to date on remote despite remoteState.pushed=false. Labels enhancement+documentation inferred via llm mode from feat/ prefix and docs/* changes.
+
+## 2026-05-06 — version-sdlc: v0.18.0 minor release from feat/harden-sdlc-skill
+First push from a fresh feature branch — `remoteState.hasUpstream === false` triggered `--set-upstream` auto-heal correctly. Release contained new harden-sdlc skill (feat) and two fix commits. All CI scripts were current (no scaffold updates needed).
+
 ## 2026-05-06 — received-review-sdlc: harden-sdlc review round — 9 findings fixed, 2 pushed back
 Fixed HIGH: silent catches in harden-prepare.js now log to stderr (H1, H2), EXIT_CODE_ARG rename avoids bash variable collision (H3), dual critique gate added to harden-orchestrator (H4), Step 4 skip-label corrected (H5), review-sdlc spec R16 step reference corrected to Step 5 (H6), commit-sdlc spec R13 narrowed to subjectPattern only (H7). Fixed MEDIUM: stdin JSON parse error now logged (M1), pipeline array in skills-meta.ts gains "learn" step (M2), trap guarded with [ -n ] (M3). Pushed back: M4 (P11 vs R4 — different concerns, no defect), L1 (no requirement for dimensions to cover log.md).
 
