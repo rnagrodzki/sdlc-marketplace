@@ -1,7 +1,11 @@
 {
   "version": {
-    "mode": "tag",
-    "tagPrefix": "v"
+    "mode": "file",
+    "versionFile": "plugins/sdlc-utilities/.claude-plugin/plugin.json",
+    "fileType": "plugin.json",
+    "tagPrefix": "v",
+    "changelog": true,
+    "changelogFile": "CHANGELOG.md"
   },
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-config.schema.json",
   "plan": {
@@ -88,7 +92,10 @@
   },
   "pr": {
     "titlePattern": "^(feat|fix|refactor|chore|docs|test|ci)\\(#\\d+\\): .+ - .+$",
-    "titlePatternError": "PR title must follow: type(#issue): scope - description"
+    "titlePatternError": "PR title must follow: type(#issue): scope - description",
+    "labels": {
+      "mode": "llm"
+    }
   },
   "execute": {
     "guardrails": [
