@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-05 — version-sdlc: patch release v0.17.47 from fix/220-223-context-stats-ship-state-cleanup
+Single fix commit (context-stats token calculation + ship-state GC cleanup). Branch had no upstream — first push used --set-upstream automatically. Changelog disabled (flags.changelog === false despite config.changelog === true; --auto mode without explicit --changelog flag). All CI scripts current at their installed versions.
+
 ## 2026-05-05 — version-sdlc: flags.changelog vs config.changelog in auto mode
 When `--auto` is combined with `config.changelog: true` but the script (pre-fix) emits `flags.changelog: false`, the skill must still honor the task-level intent (`config.changelog`). The script bug (#219) was the root cause; the fix is in `skill/version.js`. Post-fix, `flags.changelog` will correctly reflect `config.changelog` even in auto mode.
 
