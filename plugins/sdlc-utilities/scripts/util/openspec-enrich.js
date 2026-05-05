@@ -210,6 +210,20 @@ function enrich(configPath, { remove } = {}) {
   }
 
   // Block at lower version → update in place
+  // Guard: if the user has a top-level `context:` key OUTSIDE the managed block,
+  // replacing the block would produce a duplicate key. Skip with a warning, same
+  // as the append-path guard.
+  if (hasExistingContextKey(content, block)) {
+    return {
+      ok: true,
+      action: 'skipped-existing-context',
+      version: block.version,
+      path: configPath,
+      changed: false,
+      warning: 'Top-level context: key already present outside the managed block in openspec/config.yaml. Refusing to update — a duplicate context: key would result. Manually fold sdlc-utilities guidance into your existing context: value, then re-run --openspec-enrich.',
+    };
+  }
+
   const before     = content.slice(0, block.startIdx);
   const after      = content.slice(block.endIdx);
   const newContent = before + BLOCK_TEMPLATE + after;

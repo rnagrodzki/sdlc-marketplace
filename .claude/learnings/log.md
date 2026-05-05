@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-05 — openspec-enrich: v1→v2 update path missing context-key duplicate guard
+Reviewer caught that the in-place update path (v1→v2 migration) in `openspec-enrich.js` skipped the `hasExistingContextKey` guard that the append path had. A config with a user-defined `context:` key plus a v1 managed block would produce a duplicate `context:` key on upgrade. Fix: call `hasExistingContextKey(content, block)` before writing and return `skipped-existing-context` with a warning if true. Rule: whenever adding a new code path that writes a structured key to a YAML file, mirror every guard from the existing path that prevents duplicate keys.
+
 ## 2026-05-05 — pr-sdlc: gh account auto-switch on CreatePullRequest permission error
 During PR creation for fix/#208-#209-#214-pipeline-bugs, `gh pr create` failed with `rnagrodzkicl does not have the correct permissions to execute CreatePullRequest`. The recovery helper (`pr-recover-gh-account.js`) returned `recovered: false` with a hint for `gh auth login --hostname github-rn`, but `gh auth switch` to `rnagrodzki` (the repo owner) succeeded manually and the retry PR creation worked. The recovery helper's `hint` path did not trigger an account switch because the host was `github-rn` (a custom hostname) rather than the standard `github.com` — the helper found no local account matching `github-rn`. Rule: when the recovery hint points to a non-standard hostname and a `rnagrodzki` account exists on `github.com`, try `gh auth switch` to `rnagrodzki` before escalating to the user.
 
