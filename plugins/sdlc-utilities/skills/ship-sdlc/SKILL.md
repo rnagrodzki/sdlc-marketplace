@@ -39,6 +39,8 @@ INIT_OUTPUT_FILE=$(node "$SCRIPT" --output-file --steps execute,commit,review,pr
 EXIT_CODE=$?
 echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
+# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM.
+trap 'rm -f "$INIT_OUTPUT_FILE"' EXIT INT TERM
 ```
 3. Parse the output JSON from `$INIT_OUTPUT_FILE`:
    - If `errors` is non-empty, display them and stop.
@@ -77,6 +79,12 @@ PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --bump patc
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
+# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM, so the
+# manifest is removed even if any pipeline step errors out, an Agent dispatch
+# crashes, or the user cancels. The 1a INIT trap (if previously set) is
+# replaced — the --init-config path exits before reaching 1c, so there is no
+# overlap in runtime lifecycle between the two manifest variables.
+trap 'rm -f "$PREPARE_OUTPUT_FILE"' EXIT INT TERM
 ```
 
 Parse the output JSON from `$PREPARE_OUTPUT_FILE`. If `errors` is non-empty, display them and stop. The parsed output replaces manual computation in subsequent sub-steps (1d–1g).
@@ -171,6 +179,7 @@ The pipeline table is generated from the `steps` array in the `skill/ship.js` ou
 | 5 | commit-sdlc (fixes) | conditional | `--auto` | no |
 | 6 | version-sdlc | skipped | — | — |
 | 7 | pr-sdlc | will_run | `--auto --draft` | no |
+| 8 | learnings-commit | will_run | (none — inline shell, see "After pr — learnings-commit" below) | no |
 
 ### --auto Mode Audit
 
@@ -230,7 +239,7 @@ Pipeline validation:
 Validation checks:
 - `gh auth status` succeeds
 - Current branch is not the default branch (warn if it is — do not block)
-- All `--steps` values are recognized step names: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`
+- All `--steps` values are recognized step names: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`, `learnings-commit`
 - At least one step will run
 - Flag combinations are coherent (`--bump` without version step → warn). `--bump` accepts `major|minor|patch` or any pre-release label matching `^[a-z][a-z0-9]*$` (e.g. `--bump rc` ships an RC release; the label is forwarded verbatim to version-sdlc).
 
@@ -418,6 +427,29 @@ If the `archive-openspec` step has `status: "conditional"` in the pipeline plan,
 7. If `isArchived(projectRoot, name)` already returns true (idempotence), skip with reason "already archived".
 
 If the step has `status: "skipped"`, print the skip reason from `step.reason`.
+
+### After pr — learnings-commit (final step)
+
+Pipeline-level learnings cannot land in the feature commit (issue #208) — review/version/pr/archive all run *after* the feature commit. The `learnings-commit` step exists to capture them in a trailing chore commit so post-pipeline `git status` is clean.
+
+If the `learnings-commit` step has `status: "will_run"`, execute it inline (no Agent dispatch — deterministic shell):
+
+1. Run the ship-level Learning Capture (see the `## Learning Capture` section below) — append any new entries to `.claude/learnings/log.md`.
+2. Check whether anything actually changed:
+   ```bash
+   git diff --quiet -- .claude/learnings/log.md
+   ```
+   - Exit `0` (no diff) → skip the commit and report `learnings-commit: no-op (no new learnings)`.
+3. If there is a diff:
+   ```bash
+   git add .claude/learnings/log.md
+   git commit -m "chore(ship-sdlc): capture pipeline learnings"
+   git push
+   ```
+   On push failure (offline, auth), report the error but do **not** halt the pipeline — the local commit still lands and a follow-up `git push` will deliver it.
+4. After the step, `git status --porcelain` MUST be empty.
+
+If the step has `status: "skipped"` (omitted from `--steps` or `ship.steps[]`), print the skip reason from `step.reason` and do not perform any of the above. The execute-plan-sdlc-level Learning Capture (`R27` in `docs/specs/execute-plan-sdlc.md`) still runs and lands in the feature commit; only the ship-level append is conditional on this step.
 
 ### Between last commit and version — rebase on default branch
 

@@ -471,6 +471,26 @@ The reviewer's focus in this final check is **cross-wave coverage**:
 
 **Verdict handling:** Same as Step 5c-bis — fix inline for 1–2 minor issues, re-dispatch the original task's agent with specific fix instructions for major spec gaps (counts toward the 2-retry budget).
 
+**8-ter. Learning Capture (runs before Step 9 returns control):**
+
+Append to `.claude/learnings/log.md`:
+
+- Tasks classified trivial that needed agent dispatch (or vice versa)
+- Wave structures that caused unexpected file conflicts
+- Recovery strategies that worked or failed for specific failure types
+- Plans that needed mid-execution restructuring and why
+- Projects where default wave sizing was too aggressive or too conservative
+- Tasks where missing context caused incorrect agent output
+- Tasks where the default model assignment was insufficient (e.g., a haiku task that needed sonnet, or a sonnet task that needed opus to handle edge cases)
+
+Format:
+```
+## YYYY-MM-DD — execute-plan-sdlc: <brief summary>
+<what happened, what was learned>
+```
+
+This sub-step must run **before** Step 9 emits its summary so the log.md write is part of the working tree when execute-plan-sdlc returns control. ship-sdlc's staging window runs between execute and commit; if Learning Capture happened after Step 9, the log write would land outside that window and the file would stay dirty post-pipeline.
+
 ## Step 9 (REPORT): Summary
 
 ```
@@ -594,23 +614,7 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 
 **Empty guardrails are the happy path for existing projects.** If `activeGuardrails` is empty (no guardrails configured in `.claude/sdlc.json` under `execute`), all guardrail steps are skipped. This is backward compatible — no existing behavior changes. Execution guardrails (`execute.guardrails`) and plan guardrails (`plan.guardrails`) are independent — configuring one does not affect the other.
 
-## Learning Capture
-
-After completing execution, append to `.claude/learnings/log.md`:
-
-- Tasks classified trivial that needed agent dispatch (or vice versa)
-- Wave structures that caused unexpected file conflicts
-- Recovery strategies that worked or failed for specific failure types
-- Plans that needed mid-execution restructuring and why
-- Projects where default wave sizing was too aggressive or too conservative
-- Tasks where missing context caused incorrect agent output
-- Tasks where the default model assignment was insufficient (e.g., a haiku task that needed sonnet, or a sonnet task that needed opus to handle edge cases)
-
-Format:
-```
-## YYYY-MM-DD — execute-plan-sdlc: <brief summary>
-<what happened, what was learned>
-```
+**Learning Capture runs before the final report.** See Step 8-ter. The append to `.claude/learnings/log.md` must happen before Step 9 returns control so ship-sdlc's staging window (`git add -A -- ':!.sdlc/'`) picks up the change and the log entry lands inside the feature commit. A standalone `## Learning Capture` section after Step 9 would leave the working tree dirty post-pipeline.
 
 ## What's Next
 

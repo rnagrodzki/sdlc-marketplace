@@ -420,6 +420,21 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           : 'in steps[]',
       pause: false,
     },
+    {
+      name: 'learnings-commit',
+      // No dispatched skill — this is a deterministic shell step the
+      // orchestrator runs inline (see ship-sdlc SKILL.md). The model field
+      // is unused but kept for table-rendering consistency.
+      skill: null,
+      model: 'haiku',
+      status: isIn('learnings-commit') ? 'will_run' : 'skipped',
+      skipSource: skipSource('learnings-commit'),
+      args: '',
+      reason: isIn('learnings-commit')
+        ? 'final step — appends pipeline learnings and commits if changed'
+        : 'not in steps[]',
+      pause: false,
+    },
   ];
 
   for (const step of steps) {

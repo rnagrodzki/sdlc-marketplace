@@ -243,6 +243,8 @@ Guardrails:       3/3 passed (1 warning, 0 overridden)
 ────────────────────────────────────────────
 ```
 
+**Learning Capture timing.** The append to `.claude/learnings/log.md` runs as part of Step 8-ter, immediately before the summary above is emitted. This ordering is intentional: `ship-sdlc` stages the working tree (`git add -A -- ':!.sdlc/'`) between the `execute` and `commit` pipeline steps, so the learnings entry only lands inside the feature commit if the log file is already modified when execute-plan-sdlc returns control. A pre-Step-9 capture keeps the post-pipeline working tree clean and folds learnings into the same commit as the feature work.
+
 ---
 
 ## Prerequisites

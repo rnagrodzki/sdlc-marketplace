@@ -94,6 +94,9 @@ PLAN_OUTPUT_FILE=$(node "$SCRIPT" --output-file)
 EXIT_CODE=$?
 echo "PLAN_OUTPUT_FILE=$PLAN_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
+# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM,
+# so the manifest is removed even if plan generation is cancelled or errors out.
+trap 'rm -f "$PLAN_OUTPUT_FILE"' EXIT INT TERM
 ```
 
 If `--from-openspec <name>` was passed to plan-sdlc, include it in the node command: `node "$SCRIPT" --output-file --from-openspec <name>`.

@@ -78,6 +78,10 @@ ERROR_CONTEXT_FILE=$(node "$SCRIPT" \
   --suggested-investigation "$SUGGESTED_INVESTIGATION" \
   --output-file)
 EXIT_CODE=$?
+# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM, so
+# the manifest is removed even if the caller cancels or errors out before
+# reaching the explicit cleanup branches.
+trap 'rm -f "$ERROR_CONTEXT_FILE"' EXIT INT TERM
 ```
 
 Substitute the shell variables with the values supplied by the calling skill. Optional
@@ -128,8 +132,7 @@ manifest fields are empty, and returns ONLY a JSON object:
 
 The orchestrator does not call `gh`, does not call `git`, does not write any file.
 
-Capture the returned object as `PROPOSAL = { title, body }`. If the parse fails,
-clean up the manifest (`rm -f "$ERROR_CONTEXT_FILE"`) and stop.
+Capture the returned object as `PROPOSAL = { title, body }`. If the parse fails, stop. The `trap` declared at Step 1 cleans up `$ERROR_CONTEXT_FILE` automatically on shell exit.
 
 ### Step 5 — Consent Gate 2: Review (main context)
 
@@ -142,8 +145,9 @@ calling skill's name) and the priority. Use `AskUserQuestion` for the
 `PROPOSAL.body` in the main context (do not re-dispatch the orchestrator for
 small edits) and re-present.
 
-**On `cancel`:** Run `rm -f "$ERROR_CONTEXT_FILE"` and return to the calling
-skill's normal error handling. Do not create anything.
+**On `cancel`:** Return to the calling skill's normal error handling. Do not
+create anything. The `trap` declared at Step 1 cleans up `$ERROR_CONTEXT_FILE`
+automatically on shell exit.
 
 **On `yes`:** Continue to Step 6.
 
@@ -168,11 +172,9 @@ failure after the retry, report the error per 6c.
 
 ### Step 7 — Cleanup and Return (main context)
 
-```bash
-rm -f "$ERROR_CONTEXT_FILE"
-```
+The `$ERROR_CONTEXT_FILE` is removed automatically by the `trap` declared at Step 1 on every exit path — no explicit cleanup is needed here.
 
-Then return to the calling skill's normal error handling per REFERENCE.md
+Return to the calling skill's normal error handling per REFERENCE.md
 section 7. The cleanup runs on every exit path (success, failure, cancel, edit
 loop exit).
 

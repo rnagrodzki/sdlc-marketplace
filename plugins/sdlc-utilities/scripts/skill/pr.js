@@ -210,8 +210,17 @@ function main() {
     }
   }
 
+  // `pushed` reports whether the branch is in sync with origin (issue #214) —
+  // not whether *this run* performed a push. The `action` field below is the
+  // audit log of what this run did. A branch already pushed and current
+  // returns `pushed: true, action: 'none'`. After a successful push
+  // (`pushed`/`pushed-new`), the branch is in sync regardless of the
+  // pre-push cached `isAhead` snapshot. A push failure returns
+  // `pushed: false, action: 'error'`.
+  const justPushed = remoteAction === 'pushed' || remoteAction === 'pushed-new';
+  const inSyncWithOrigin = remoteInfo.hasUpstream && !remoteInfo.isAhead && !remoteInfo.isBehind;
   const remoteState = {
-    pushed:       remoteAction !== 'none' && remoteAction !== 'error',
+    pushed:       justPushed || inSyncWithOrigin,
     remoteBranch: remoteInfo.remoteBranch || `origin/${currentBranch}`,
     action:       remoteAction,
   };

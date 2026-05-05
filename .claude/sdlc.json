@@ -74,6 +74,11 @@
         "id": "spec-first",
         "description": "Any task that modifies a skill's behavior (SKILL.md changes) must first update the corresponding spec in docs/specs/<skill-name>.md. The spec is the source of truth — implementation follows spec, not the other way around. Plans that change SKILL.md without a matching spec update task (ordered before the SKILL.md task) fail this guardrail.",
         "severity": "error"
+      },
+      {
+        "id": "project-agnostic",
+        "description": "Plugin behaviour must work in any consumer project, not only sdlc-marketplace. Tasks that modify repo-local files (.gitignore, project configs, root scripts) must instead implement the change in plugin code (setup-sdlc helpers, hooks, SKILL.md) so it ships to every consumer. Direct edits to sdlc-marketplace files are allowed only when verifying the plugin's own dogfooding.",
+        "severity": "error"
       }
     ]
   },

@@ -178,14 +178,33 @@
     - type: not-icontains
       value: '"flags":'
 
-- description: "commit-prepare: without --output-file, JSON payload is printed inline (backward compatible)"
+- description: "commit-prepare: without --output-file, output is still a tmpdir path (issue #209 — stdout-JSON fallback removed)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
   assert:
-    # JSON payload is printed inline, not a temp path
-    - type: icontains
+    # The stdout-JSON branch was removed in #209; writeOutput now always writes
+    # to os.tmpdir() and prints only the path. The legacy "JSON inline" branch
+    # is gone.
+    - type: regex
+      value: '^/(tmp|var|private)/.+commit-context-[0-9a-f]+\.json\s*$'
+    - type: not-icontains
       value: '"flags":'
-    - type: not-regex
-      value: '^/.+/sdlc-commit-context-[0-9a-f]+\.json\s*$'
+    # Cwd MUST NOT contain a stray *-context-*.json after the run.
+    - type: not-icontains
+      value: 'cwd-leak'
+
+- description: "commit-prepare: --output-file path is under os.tmpdir() (issue #209 regression test)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    # Path must start with /tmp, /var, or /private — never the project root.
+    - type: regex
+      value: '^/(tmp|var|private)/.+commit-context-[0-9a-f]+\.json\s*$'
+    # Sanity: payload absent from stdout
+    - type: not-icontains
+      value: '"flags":'

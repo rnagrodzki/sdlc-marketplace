@@ -33,6 +33,7 @@ const {
   writeProjectConfig,
   writeLocalConfig,
   ensureSdlcGitignore,
+  ensureRootGitignore,
 } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 
@@ -108,6 +109,11 @@ function main() {
     warnings.push('.sdlc/.gitignore already exists — skipped');
   }
 
+  // 1b. Ensure managed block in project-root .gitignore (issue #209 — defence
+  // in depth against transient skill artifacts leaking into VCS). Project-
+  // agnostic: works in any consumer repo, not only sdlc-marketplace.
+  const rootGitignoreAction = ensureRootGitignore(projectRoot);
+
   // 2. Write project config (.claude/sdlc.json) if sections provided
   let projectConfigAction = 'skipped';
   if (cli.projectConfig !== null) {
@@ -136,6 +142,7 @@ function main() {
     created: {
       directory: '.sdlc/',
       gitignore:     { path: '.sdlc/.gitignore',  action: gitignoreAction },
+      rootGitignore: { path: '.gitignore',         action: rootGitignoreAction },
       projectConfig: { path: '.claude/sdlc.json',  action: projectConfigAction },
       localConfig:   { path: '.sdlc/local.json',   action: localConfigAction },
     },

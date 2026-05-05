@@ -464,19 +464,32 @@ function recoverGhAccountForRepo(projectRoot, errorText, opts = {}) {
 
 /**
  * Check the remote tracking state of the current branch.
+ * Performs a best-effort `git fetch` so the local view of the upstream ref is
+ * fresh; offline or auth failures do not throw — callers fall back to whatever
+ * the cached ref reports.
  * @param {string} projectRoot
- * @returns {{ hasUpstream: boolean, remoteBranch: string|null, isAhead: boolean }}
+ * @returns {{ hasUpstream: boolean, remoteBranch: string|null, isAhead: boolean, isBehind: boolean }}
  */
 function getRemoteState(projectRoot) {
   const upstream = exec(
     'git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null',
     { cwd: projectRoot }
   );
-  if (!upstream) return { hasUpstream: false, remoteBranch: null, isAhead: false };
+  if (!upstream) return { hasUpstream: false, remoteBranch: null, isAhead: false, isBehind: false };
+
+  // Best-effort fetch so isAhead/isBehind reflect actual remote state.
+  // Upstream form is "<remote>/<branch>"; fetch only that branch from that remote.
+  const slash = upstream.indexOf('/');
+  if (slash > 0) {
+    const remote = upstream.slice(0, slash);
+    const remoteBranch = upstream.slice(slash + 1);
+    spawnSync('git', ['fetch', '--quiet', remote, remoteBranch], { cwd: projectRoot, encoding: 'utf8' });
+  }
 
   const aheadBehind = exec(`git status -sb`, { cwd: projectRoot }) || '';
   const isAhead = /ahead/.test(aheadBehind);
-  return { hasUpstream: true, remoteBranch: upstream, isAhead };
+  const isBehind = /behind/.test(aheadBehind);
+  return { hasUpstream: true, remoteBranch: upstream, isAhead, isBehind };
 }
 
 /**

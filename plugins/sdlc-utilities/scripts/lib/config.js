@@ -28,15 +28,15 @@ const LOCAL_SCHEMA_VERSION = 2;
 // `balanced` omits 'version' by design (current pre-v2 default behavior).
 // Legacy A/B/C aliases map to the same step lists as their modern equivalents.
 const PRESET_TO_STEPS = {
-  full:     ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec'],
-  balanced: ['execute', 'commit', 'review',            'pr', 'archive-openspec'],
-  minimal:  ['execute', 'commit',                      'pr'],
-  A:        ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec'],
-  B:        ['execute', 'commit', 'review',            'pr', 'archive-openspec'],
-  C:        ['execute', 'commit',                      'pr'],
+  full:     ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec', 'learnings-commit'],
+  balanced: ['execute', 'commit', 'review',            'pr', 'archive-openspec', 'learnings-commit'],
+  minimal:  ['execute', 'commit',                      'pr',                     'learnings-commit'],
+  A:        ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec', 'learnings-commit'],
+  B:        ['execute', 'commit', 'review',            'pr', 'archive-openspec', 'learnings-commit'],
+  C:        ['execute', 'commit',                      'pr',                     'learnings-commit'],
 };
 
-const ALL_STEPS = ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec'];
+const ALL_STEPS = ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec', 'learnings-commit'];
 
 /**
  * Normalize a preset value: maps legacy A/B/C to full/balanced/minimal.
@@ -557,6 +557,86 @@ function ensureSdlcGitignore(projectRoot) {
 }
 
 // ---------------------------------------------------------------------------
+// ensureRootGitignore
+// ---------------------------------------------------------------------------
+
+// Patterns that the plugin manages in the consumer project root .gitignore.
+// These are transient skill artifacts that scripts emit under `os.tmpdir()`;
+// the gitignore block is defence-in-depth (issue #209) so a stray cwd-write
+// from any future code path or shell redirect never lands in version control.
+//
+// IMPORTANT: keep this list in sync with the prefixes used by `writeOutput`
+// callers across the plugin (commit-context, pr-context, version-context,
+// jira-context, review-manifest, received-review-manifest, sdlc-error-report,
+// plan-prepare, ship-prepare, setup-prepare, etc.). The three glob families
+// below cover all of them.
+const ROOT_GITIGNORE_PATTERNS = [
+  '*-context-*.json',
+  '*-manifest-*.json',
+  '*-prepare-*.json',
+];
+
+const ROOT_GITIGNORE_BEGIN = '# >>> sdlc-utilities managed (do not edit) — transient skill artifacts';
+const ROOT_GITIGNORE_END   = '# <<< sdlc-utilities managed';
+
+/**
+ * Append (or update in place) a managed block to the consumer project root
+ * `.gitignore`. The managed block ignores transient `*-context-*.json`,
+ * `*-manifest-*.json`, and `*-prepare-*.json` artifacts (issue #209).
+ *
+ * Idempotent: detects the existing block by its marker comments and replaces
+ * its contents in place. Never duplicates. Creates `.gitignore` if absent.
+ * Existing user content is preserved (merge-style write, not overwrite).
+ *
+ * @param {string} projectRoot
+ * @returns {'created'|'updated'|'unchanged'}
+ */
+function ensureRootGitignore(projectRoot) {
+  const gitignorePath = path.join(projectRoot, '.gitignore');
+
+  const managedBlock = [
+    ROOT_GITIGNORE_BEGIN,
+    ...ROOT_GITIGNORE_PATTERNS,
+    ROOT_GITIGNORE_END,
+  ].join('\n');
+
+  let existing = '';
+  let fileExisted = false;
+  if (fs.existsSync(gitignorePath)) {
+    existing = fs.readFileSync(gitignorePath, 'utf8');
+    fileExisted = true;
+  }
+
+  // Look for an existing managed block. The regex matches the BEGIN marker,
+  // any content, and the matching END marker on a line of its own.
+  const blockRegex = new RegExp(
+    `${escapeRegExp(ROOT_GITIGNORE_BEGIN)}[\\s\\S]*?${escapeRegExp(ROOT_GITIGNORE_END)}`,
+    'm'
+  );
+
+  let next;
+  if (blockRegex.test(existing)) {
+    // Replace in place.
+    next = existing.replace(blockRegex, managedBlock);
+  } else if (existing.length === 0) {
+    next = managedBlock + '\n';
+  } else {
+    // Append with a separating blank line if the file does not already end with one.
+    const sep = existing.endsWith('\n\n') ? '' : (existing.endsWith('\n') ? '\n' : '\n\n');
+    next = existing + sep + managedBlock + '\n';
+  }
+
+  if (next === existing) return 'unchanged';
+
+  fs.writeFileSync(gitignorePath, next, 'utf8');
+  return fileExisted ? 'updated' : 'created';
+}
+
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -569,6 +649,7 @@ module.exports = {
   writeSection,
   migrateConfig,
   ensureSdlcGitignore,
+  ensureRootGitignore,
   // Preset normalization
   normalizePreset,
   PRESET_NAMES,

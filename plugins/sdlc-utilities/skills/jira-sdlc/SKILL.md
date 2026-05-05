@@ -84,13 +84,11 @@ SCRIPT=$(find ~/.claude/plugins -name "jira.js" -path "*/sdlc*/scripts/skill/jir
 
 JIRA_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --check)
 EXIT_CODE=$?
+# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM.
+trap 'rm -f "$JIRA_CONTEXT_FILE"' EXIT INT TERM
 ```
 
-Read and parse `JIRA_CONTEXT_FILE`. Clean up after skill completes or is cancelled:
-
-```bash
-rm -f "$JIRA_CONTEXT_FILE"
-```
+Read and parse `JIRA_CONTEXT_FILE`. The `trap` above guarantees cleanup on any exit path — do not add scattered `rm -f` calls.
 
 **On non-zero `EXIT_CODE`:**
 
@@ -122,6 +120,10 @@ If `--init-templates` flag is present:
 1. Run the init-templates script:
    ```bash
    INIT_RESULT=$(node "$SCRIPT" --output-file --project "$PROJECT_KEY" --init-templates)
+   # Append cleanup to the existing trap. Note: the JIRA_CONTEXT_FILE trap from
+   # the entry section is still in effect; we extend it here so both files are
+   # removed on EXIT/INT/TERM.
+   trap 'rm -f "$JIRA_CONTEXT_FILE" "$INIT_RESULT"' EXIT INT TERM
    ```
 
 2. Read and parse the output. Report: "N templates initialized (exact match), N skipped (already exist)."
@@ -145,10 +147,7 @@ If `--init-templates` flag is present:
      ```
    - Report final results: "N additional templates created from user selections."
 
-4. Clean up:
-   ```bash
-   rm -f "$INIT_RESULT"
-   ```
+4. Cleanup is automatic — the `trap` declared at step 1 removes `$INIT_RESULT` (and `$JIRA_CONTEXT_FILE`) on shell exit.
 
 5. Stop. Do not proceed with any Jira operation.
 

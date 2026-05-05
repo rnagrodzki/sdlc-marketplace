@@ -25,7 +25,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["execute", "commit", "review", "version", "pr", "archive-openspec"]
+            "enum": ["execute", "commit", "review", "version", "pr", "archive-openspec", "learnings-commit"]
           },
           "uniqueItems": true,
           "description": "Pipeline steps to run. Replaces legacy preset/skip fields."

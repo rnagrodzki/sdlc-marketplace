@@ -289,6 +289,7 @@ Plan guardrails    — [N configured via guardrails sub-flow | skipped]
 | `.claude/review-dimensions/*.yaml` | Review dimensions created during dimensions sub-flow (via `--dimensions`) |
 | `.claude/pr-template.md` | PR template created during PR template sub-flow (via `--pr-template`) |
 | `openspec/config.yaml` | Managed block added/updated by openspec enrichment sub-flow (via `--openspec-enrich`). Only the managed block is modified; user-authored content is preserved. |
+| `.gitignore` (project root) | Managed block listing transient skill artifact patterns (`*-context-*.json`, `*-manifest-*.json`, `*-prepare-*.json`) so any future cwd-write of a context/manifest/prepare file is ignored by git. Idempotent — re-running setup-sdlc replaces the block in place rather than duplicating. Existing user content is preserved. Project-agnostic: ships to every consumer of the plugin (issue #209). |
 
 ---
 

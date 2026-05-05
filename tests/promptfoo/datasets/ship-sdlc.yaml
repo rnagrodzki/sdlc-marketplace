@@ -519,3 +519,49 @@
         The response references the regex `^[a-z][a-z0-9]*$` (or paraphrases it)
         for the valid label format. It does NOT silently coerce the label to
         `patch` or skip the version step.
+
+- description: "ship-sdlc: learnings-commit step appears in default pipeline as final step (issue #208)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --dry-run. The project context is provided above. Load config,
+      parse flags, detect context, build the pipeline plan, and display the dry-run
+      pipeline table. Confirm `learnings-commit` appears as the final step.
+  assert:
+    - type: icontains
+      value: "learnings-commit"
+    - type: icontains
+      value: "pr-sdlc"
+    - type: llm-rubric
+      value: >
+        The pipeline table shows `learnings-commit` as the final step, ordered AFTER
+        `pr-sdlc`. The step is described as an inline shell operation (no Agent
+        dispatched, no sub-skill invoked) that appends Learning Capture entries to
+        `.claude/learnings/log.md` and creates a trailing
+        `chore(ship-sdlc): capture pipeline learnings` commit if the diff is
+        non-empty. The response notes the step is a no-op when no learnings were
+        captured this run. The response makes clear that post-pipeline `git status`
+        is expected to be clean — no untracked or modified files remain.
+
+- description: "ship-sdlc: --steps execute,commit (without learnings-commit) records skipSource cli (issue #208)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --dry-run --steps execute,commit. The user explicitly omitted
+      learnings-commit from the step list. Show the pipeline table and confirm the
+      step is skipped with skipSource=cli.
+  assert:
+    - type: icontains
+      value: "learnings-commit"
+    - type: icontains
+      value: "skipped"
+    - type: llm-rubric
+      value: >
+        The pipeline table shows `learnings-commit` with status `skipped` and
+        skipSource `cli` because the user passed `--steps execute,commit` (a
+        one-shot override that does not include `learnings-commit`). The response
+        explains that the omission is intentional — CLI `--steps` fully replaces
+        the resolved step list. Neither the inline shell append nor the trailing
+        commit fires. No error is reported.

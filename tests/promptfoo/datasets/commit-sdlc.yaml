@@ -166,3 +166,27 @@
         exit the commit must NOT be executed. It does not describe LLM-side validation logic. It does
         not propose retrying, editing URLs without user input, or bypassing the gate. The gate is
         described as script-enforced, not advisory.
+
+- description: "commit-sdlc: trap cleanup fires on pre-commit hook failure (issue #209)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-staged-changes.md"
+    user_request: >
+      Run /commit-sdlc. The pre-commit hook fails (lint error). Walk through what happens
+      to $COMMIT_CONTEXT_FILE in this failure path. Reference the exact bash construct
+      that guarantees cleanup even when the hook causes a non-zero exit before any
+      explicit rm -f could run.
+  assert:
+    - type: icontains
+      value: "trap"
+    - type: icontains
+      value: "EXIT"
+    - type: llm-rubric
+      value: >
+        The response identifies a single canonical `trap 'rm -f "$COMMIT_CONTEXT_FILE"' EXIT INT TERM`
+        declaration immediately after `COMMIT_CONTEXT_FILE` is assigned, and explains that the trap
+        fires unconditionally on shell exit — including the pre-commit hook failure path. It does NOT
+        describe scattered `rm -f` calls in success / cancel / error branches as the cleanup
+        mechanism (those are removed). It explicitly notes that even if a failure path skips the
+        explicit cleanup branches that previously existed, the trap still removes the manifest, so
+        no `commit-context-*.json` file remains in `$TMPDIR` (or anywhere) after exit.
