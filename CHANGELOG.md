@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.38] - 2026-05-05
+
+### Fixed
+- link-validation: added URL validator for all SDLC skills with GitHub identity match, Atlassian host validation, generic URL reachability checks, offline mode support, and skip-list for social platforms (#198)
+- link-validation: added missing exit guards to LINKS_LIB blocks (#198)
+
 ## [0.17.36] - 2026-05-04
 
 ### Added
