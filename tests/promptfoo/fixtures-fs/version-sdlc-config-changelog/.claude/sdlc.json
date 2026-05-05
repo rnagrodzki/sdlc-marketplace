@@ -1,0 +1,9 @@
+{
+  "version": {
+    "mode": "file",
+    "versionFile": "package.json",
+    "fileType": "package.json",
+    "tagPrefix": "v",
+    "changelog": true
+  }
+}

@@ -37,3 +37,4 @@ tests:
   - file://datasets/jira-sdlc-guardrail-exec.yaml
   - file://datasets/context-advisory-exec.yaml
   - file://datasets/links-lib-exec.yaml
+  - file://datasets/version-prepare-exec.yaml

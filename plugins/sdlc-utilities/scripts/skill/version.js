@@ -119,6 +119,10 @@ function parseArgs(argv) {
       auto = true;
     } else if (a === '--file' && args[i + 1]) {
       fileOverride = args[++i];
+    } else if (a === '--output-file') {
+      // Value (when present) is consumed by writeOutput in scripts/lib/output.js.
+      // Skip the next token only if it does not look like another flag.
+      if (args[i + 1] && !args[i + 1].startsWith('-')) i++;
     } else if (a.startsWith('-')) {
       warnings.push(`Unknown flag: ${a}`);
     } else if (PRE_RELEASE_LABEL_RE.test(a)) {
@@ -717,7 +721,7 @@ async function main() {
     requestedBump: args.requestedBump,
     flags: {
       noPush:             args.noPush,
-      changelog:          args.changelog,
+      changelog:          changelogEnabled, // resolved: config.changelog OR --changelog CLI flag
       preLabel:           args.preLabel,
       hotfix:             args.hotfix,
       auto:               args.auto,

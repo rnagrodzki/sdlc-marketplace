@@ -1,0 +1,9 @@
+{
+  "version": {
+    "mode": "file",
+    "versionFile": "plugin.json",
+    "fileType": "plugin.json",
+    "tagPrefix": "v",
+    "changelog": false
+  }
+}

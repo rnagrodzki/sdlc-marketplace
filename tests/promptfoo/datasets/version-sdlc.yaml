@@ -485,6 +485,99 @@
         from the output (script did not compute one). The user has graduated out of
         the rc train.
 
+# ---------------------------------------------------------------------------
+# Version-file integrity (#211) and resolved flags.changelog (#213)
+# ---------------------------------------------------------------------------
+
+- description: "version-sdlc: plugin.json edit uses targeted Edit + post-edit diff hard gate (#211)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user is releasing a Claude Code plugin. Running version-prepare.js with `patch --auto`
+      produces this version-context JSON (excerpt):
+      {"flow": "release", "config": {"mode": "file", "versionFile": "plugin.json",
+      "tagPrefix": "v", "changelog": false},
+      "versionSource": {"currentVersion": "0.1.0"},
+      "requestedBump": "patch", "conventionalSummary": {"suggestedBump": "patch",
+      "hasBreakingChanges": false}, "bumpOptions": {"patch": "0.1.1", "minor": "0.2.0",
+      "major": "1.0.0"}, "tags": {"latest": "v0.1.0"},
+      "commits": [{"type": "fix", "subject": "tighten input validation"}],
+      "flags": {"noPush": false, "auto": true, "hotfix": false, "changelog": false},
+      "conflictsWithNext": {"patch": false}, "currentBranch": "main",
+      "remoteState": {"hasUpstream": true}, "errors": [], "warnings": []}
+      The on-disk plugin.json has a long "description" field, an "author" object, a "keywords"
+      array, a "homepage", and a "repository" object — many fields beyond version that the LLM
+      must NOT touch.
+    user_request: >
+      Run /version-sdlc patch --auto. Walk through Step 8.1 — show how you update plugin.json
+      and what verification you perform after the edit. Show the exact Edit-tool call (old_string
+      and new_string) and the post-edit verification command.
+  assert:
+    # Must use the Edit tool (not Write, not bash sed)
+    - type: icontains
+      value: "Edit"
+    # Must NOT propose Write tool or full file rewrite
+    - type: not-icontains
+      value: "Write tool"
+    # Must verify with git diff
+    - type: regex
+      value: 'git diff (--?[a-z]+ )*plugin\.json'
+    # Must NOT touch description, author, keywords (no mention of changing these in the response)
+    - type: not-regex
+      value: '(?i)(rewrite|regenerate|update).*(description|author|keywords)'
+    - type: llm-rubric
+      value: >
+        The response describes Step 8.1 by performing a single targeted Edit-tool call against
+        plugin.json with old_string="\"version\": \"0.1.0\"" and new_string="\"version\": \"0.1.1\"".
+        It explicitly states that Write tool and full-file rewrites are forbidden. After the edit
+        it runs `git diff plugin.json` (or `git diff -- plugin.json`) and asserts that EXACTLY ONE
+        line changed — the version line. It says that if more than one line differs (e.g. the
+        description was truncated or fields were reordered), the release is aborted and the file
+        is restored with `git checkout -- plugin.json`. It does NOT propose touching the
+        description, author, keywords, homepage, or repository fields.
+
+- description: "version-sdlc: config.changelog=true with no --changelog flag still drafts CHANGELOG (#213)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"
+    project_context: >
+      The user has `version.changelog: true` in .claude/sdlc.json but did NOT pass --changelog
+      on the CLI. Running version-prepare.js with `patch` produces this version-context JSON
+      (excerpt):
+      {"flow": "release", "config": {"mode": "file", "versionFile": "package.json",
+      "tagPrefix": "v", "changelog": true},
+      "versionSource": {"currentVersion": "1.0.0"},
+      "requestedBump": "patch", "conventionalSummary": {"suggestedBump": "patch",
+      "hasBreakingChanges": false}, "bumpOptions": {"patch": "1.0.1", "minor": "1.1.0",
+      "major": "2.0.0"}, "tags": {"latest": "v1.0.0"},
+      "commits": [{"type": "feat", "subject": "add new capability"}],
+      "flags": {"noPush": false, "auto": false, "hotfix": false, "changelog": true},
+      "changelog": {"exists": false, "filePath": "CHANGELOG.md", "currentContent": null},
+      "conflictsWithNext": {"patch": false}, "currentBranch": "main",
+      "remoteState": {"hasUpstream": true}, "errors": [], "warnings": []}
+      Note: the script (after the #213 fix) emits flags.changelog=true as the RESOLVED value
+      (config.changelog OR --changelog). The skill must consume flags.changelog directly.
+    user_request: >
+      Run /version-sdlc patch. Show the release plan including the drafted CHANGELOG entry.
+  assert:
+    # Must show new version
+    - type: regex
+      value: '1\.0\.1'
+    # Must draft a Keep-a-Changelog heading
+    - type: regex
+      value: '## \[1\.0\.1\]'
+    # Must include the feat commit in the Added section
+    - type: icontains
+      value: "Added"
+    - type: icontains
+      value: "new capability"
+    - type: llm-rubric
+      value: >
+        The response reads version-context flags.changelog=true (the resolved value emitted by
+        skill/version.js, sourced from config.changelog=true) and treats it as a single
+        authoritative gate — it does NOT re-check config.changelog. It drafts a Keep-a-Changelog
+        entry under `## [1.0.1] - YYYY-MM-DD` with the feat commit listed under the Added
+        section. The release plan presents the drafted changelog and asks for confirmation.
+
 - description: "version-sdlc: link verification (R17, #198) — invokes script gate at Step 8.3b before git commit"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/version-sdlc/SKILL.md"

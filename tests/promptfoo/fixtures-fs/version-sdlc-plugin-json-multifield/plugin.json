@@ -1,0 +1,22 @@
+{
+  "name": "fixture-multifield-plugin",
+  "version": "0.1.0",
+  "description": "A long description that the LLM must not truncate or paraphrase. It exists specifically to surface the failure mode reported in #211 — when the agent rewrites plugin.json from memory, multi-line description text gets shortened, fields get reordered, or trailing fields disappear entirely. The post-edit git diff hard gate catches this by requiring exactly one changed line.",
+  "author": {
+    "name": "Test Author",
+    "email": "test@example.com",
+    "url": "https://example.com/test-author"
+  },
+  "keywords": [
+    "fixture",
+    "version-sdlc",
+    "regression-test",
+    "plugin-json",
+    "issue-211"
+  ],
+  "homepage": "https://example.com/fixture-multifield-plugin",
+  "repository": {
+    "type": "git",
+    "url": "https://example.com/fixture-multifield-plugin.git"
+  }
+}

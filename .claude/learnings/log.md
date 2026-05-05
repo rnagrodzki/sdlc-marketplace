@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-05 — version-sdlc: plugin.json corruption during release v0.17.41 (#211)
+Root cause: SKILL.md Step 8.1 only mandated targeted Edit for TOML/YAML version files; JSON formats (package.json, plugin.json) were left to LLM discretion. The agent rewrote plugin.json from memory during the release commit, truncating the `description` field. Mitigation: Step 8.1 now mandates a single targeted Edit-tool call for ALL version-file formats (JSON included) plus a post-edit `git diff` HARD GATE — exactly one line must differ; otherwise abort and `git checkout -- <versionFile>`. Spec R8 generalized; gotcha bullet rewritten. Behavioral test added (multi-field plugin.json fixture).
+
 ## 2026-05-05 — version-sdlc: patch release v0.17.41 from fix/205-pr-labels-section-menu
 Branch had no upstream; `--set-upstream` auto-heal fired correctly on first push. Changelog disabled via CLI (no `--changelog` flag despite `config.changelog: true`). Single fix commit: setup-sdlc summarizePrLabels leaf config read.
 
@@ -37,8 +40,8 @@ that capture non-obvious gotchas not yet reflected in code, docs, or skills.
 - version-sdlc auto-set-upstream → #183
 - pr-sdlc post-failure gh-switch → #184
 - plan-sdlc README reminder → #185
-- version-sdlc --output-file unknown flag warning → #212
-- version-sdlc config.changelog not honored → #213
+- version-sdlc --output-file unknown flag warning → #212 (RESOLVED — declared in version.js parser; see fix/version-sdlc-bugs-211-212-213)
+- version-sdlc config.changelog not honored → #213 (RESOLVED — flags.changelog now emits resolved value config OR --changelog; spec R18; see fix/version-sdlc-bugs-211-212-213)
 - pr-sdlc remoteState.pushed stale → #214
 
 ## 2026-04-29 — received-review-sdlc processing of review findings for fix(#183)

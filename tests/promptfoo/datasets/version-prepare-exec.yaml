@@ -1,0 +1,56 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/skill/version.js.
+# Covers: --output-file flag declaration (#212) and resolved flags.changelog (#213).
+# These tests run version.js directly against fixture directories (no LLM).
+
+- description: "version-prepare: --output-file does NOT produce 'Unknown flag' warning (#212)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "--output-file patch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-config-changelog"
+  assert:
+    # stdout is the path to the temp output file (not the JSON payload)
+    - type: regex
+      value: '^/.+/version-context-[0-9a-f]+\.json\s*$'
+    # The "Unknown flag: --output-file" warning must not appear in stdout
+    - type: not-icontains
+      value: "Unknown flag: --output-file"
+
+- description: "version-prepare: config.changelog=true with no --changelog flag emits flags.changelog=true (#213)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "patch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-config-changelog"
+  assert:
+    # The script emits flags.changelog as the resolved value (true here, sourced from config.changelog)
+    - type: icontains
+      value: '"changelog": true'
+    # A non-null changelog block must be present (R18 — skill consumes flags.changelog directly)
+    - type: icontains
+      value: '"changelog":'
+    # No "Unknown flag" warnings should appear regardless
+    - type: not-icontains
+      value: "Unknown flag"
+
+- description: "version-prepare: config.changelog=false with --changelog flag still emits flags.changelog=true (#213)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "patch --changelog"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-plugin-json-multifield"
+  assert:
+    # Even though fixture has config.changelog=false, --changelog CLI flag flips it on
+    - type: icontains
+      value: '"changelog": true'
+
+- description: "version-prepare: neither config.changelog nor --changelog emits flags.changelog=false (#213)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "patch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-plugin-json-multifield"
+  assert:
+    # Fixture has config.changelog=false and no --changelog flag — resolved value must be false
+    - type: icontains
+      value: '"changelog": false'
