@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.17.39] - 2026-05-05
 
+### Added
+- review-sdlc: per-dimension model override — dimension frontmatter can declare a `model` field that overrides the manifest's `subagent_model` for that dimension; orchestrator dispatch uses `dimension.model || manifest.subagent_model` (R15) (#199)
+- review-sdlc: structural validation (D13) for `model` field in dimension frontmatter (#199)
+
 ### Changed
-- Internal: configuration and learning updates
+- sdlc-config: updated version and PR settings (#199)
 
 ## [0.17.38] - 2026-05-05
 
