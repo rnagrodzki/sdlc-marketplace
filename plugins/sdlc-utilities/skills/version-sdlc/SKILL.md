@@ -137,7 +137,7 @@ Decision table:
 
 **Implements R3 (breaking-change gate, reworded):** if `conventionalSummary.hasBreakingChanges` is `true` AND the chosen bump is not `major`, suggest `major` UNLESS the resolved bump is a pre-release from any source. Detect "is a pre-release" by checking that `flags.preLabel` is non-null (covers all three pre-release sources: explicit `--pre`, label-form positional, and `config.preRelease`). Pre-release trains skip this warning to avoid nagging on every RC iteration.
 
-**Draft CHANGELOG entry** (only if `flags.changelog === true` OR `config.changelog === true`):
+**Draft CHANGELOG entry** (only if `flags.changelog === true`) — `flags.changelog` is the resolved value (`config.changelog` OR `--changelog`) emitted by `skill/version.js`:
 
 - Use Keep a Changelog format with today's date: `## [x.y.z] - YYYY-MM-DD`
 - Map commit types to sections:
@@ -247,7 +247,10 @@ The release proceeds regardless of the user's answer. This is informational, not
 
 **Only execute after explicit `yes` from Step 5, or when `flags.auto` is true (implicit approval).**
 
-1. **Update version file** (only if `config.mode === "file"`): Use the Edit tool to replace the old version string with the new version in the version file. For TOML/YAML files, use targeted string replacement rather than a full file rewrite.
+1. **Update version file** (only if `config.mode === "file"`):
+   - **For all version-file formats (JSON, TOML, YAML — package.json, plugin.json, Cargo.toml, pyproject.toml, etc.):** use the Edit tool with a single targeted string replacement. The `old_string` must contain the current version string in its on-disk form (e.g. `"version": "<currentVersion>"` for JSON, `version = "<currentVersion>"` for TOML). The `new_string` substitutes the new version only.
+   - **DO NOT use the Write tool. DO NOT rewrite the file. DO NOT touch any other field.**
+   - **Verify after edit (HARD GATE):** run `git diff <versionFile>`. Exactly one line must differ — the version line. If more than one line differs, abort the release immediately, restore with `git checkout -- <versionFile>`, and surface the diff to the user.
 2. **Update CHANGELOG** (only if changelog is enabled): Use the Edit or Write tool to prepend the new entry after the `## [Unreleased]` section if present, or after the file header if not. Create `CHANGELOG.md` if it does not exist.
 3. **Stage changed files**: `git add <versionFile> CHANGELOG.md` — include only files that were actually changed.
 3b. **Link verification (R17, issue #198) — HARD GATE.** Before `git commit`, validate every URL embedded in the staged CHANGELOG entry (and any release-notes body) via the shared link validator. The script reads the body via `--file` and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON. Skip this sub-step entirely when changelog is disabled and no release-notes body was generated.
@@ -367,7 +370,7 @@ When invoking `error-report-sdlc`, provide:
 
 - **Squash merge orphans tags**: When using GitHub's "squash and merge" strategy, the annotated tag created on the feature branch points to the pre-merge commit, which becomes unreachable from main after merge. The `retag-release.yml` workflow (scaffolded during init) automatically moves the tag to the squash commit on main whenever a push lands on main. Without this workflow, tags are orphaned and `git describe` / `git log --decorate` on main will not show them.
 - `bumpOptions.preRelease` is pre-computed in the JSON only when `--pre` was passed at script time. If the user requests a different pre-label during `edit`, re-run the script — the `preRelease` field reflects the label passed at script invocation, not a label added mid-session.
-- For TOML/YAML version files, use the Edit tool with targeted string replacement (old version string → new version string), not full file rewrites, to avoid corrupting file structure.
+- **Version-file edit hard gate:** for ALL version-file formats (JSON, TOML, YAML — package.json, plugin.json, Cargo.toml, pyproject.toml, etc.) use the Edit tool with a single targeted string replacement and verify with `git diff <versionFile>` that exactly one line changed. If more than one line differs, abort and `git checkout -- <versionFile>`. Never use the Write tool or rewrite the file from memory — LLMs reliably truncate or paraphrase fields like `description` (see #211).
 - `git push && git push --tags` are two separate pushes. `git push --tags` alone does NOT push the release commit — both commands are required.
 - **Auto-`--set-upstream` on first push (R15):** When `remoteState.hasUpstream === false`, Step 8 emits `git push --set-upstream origin <currentBranch>` instead of bare `git push`. This eliminates the `fatal: The current branch has no upstream` error on releases cut from a fresh feature branch. The branch comes from `currentBranch` in the `version-context` JSON — never hardcode it. The subsequent `git push --tags` is unchanged.
 - If the working tree has uncommitted changes at execution time, the release commit will include only the staged version file and changelog changes. Warn the user so they are not surprised by files missing from the commit.

@@ -25,7 +25,7 @@
 - R5: CHANGELOG entry uses Keep a Changelog format with today's date, mapping commit types to sections (feat→Added, fix→Fixed, refactor/perf→Changed)
 - R6: Skip non-user-facing commit types in CHANGELOG (chore, docs, test, ci, build, style) unless clearly user-facing
 - R7: When `config.ticketPrefix` is set, append extracted ticket IDs to changelog entries
-- R8: Version file update uses targeted Edit (not full rewrite) for TOML/YAML files
+- R8: Version file update uses targeted Edit (single-string replacement, NOT full rewrite) for ALL supported formats (package.json, plugin.json, Cargo.toml, pyproject.toml, TOML/YAML, etc.). Skill must verify post-edit that exactly one line of `<versionFile>` differs in `git diff`; if not, abort the release and restore the file with `git checkout -- <versionFile>`.
 - R9: Annotated tag includes hotfix type annotation when `flags.hotfix` is true
 - R10: Release commit message includes `[hotfix]` suffix when `flags.hotfix` is true
 - R11: Push requires both `git push` and `git push --tags` (two separate commands)
@@ -35,6 +35,7 @@
 - R15: When `remoteState.hasUpstream === false`, the push step uses `git push --set-upstream origin <currentBranch>` instead of bare `git push`; the subsequent `git push --tags` is unchanged. This avoids first-push failures on fresh feature branches.
 - R16: Pre-release source precedence (top wins): (1) explicit base bump `major|minor|patch` (with optional `--pre <label>`); (2) explicit label-form `--bump <label>` OR explicit `--pre <label>`; (3) `config.preRelease` from `.claude/sdlc.json`; (4) auto-detection from conventional commits. When `config.preRelease` is set and the user passes neither an explicit base bump nor `--pre` nor a label-form `--bump`, the resolved bump is `patch + --pre <config.preRelease>`. An explicit base bump always graduates the release out of the pre-release train regardless of `config.preRelease`. Label values from any source must match `^[a-z][a-z0-9]*$`.
 - R17: Link verification (issue #198) — every URL embedded in changelog or release-notes body MUST be validated by `plugins/sdlc-utilities/scripts/lib/links.js` (CLI: `node scripts/lib/links.js --json`) before any commit/tag operation that publishes the body. Three URL classes are checked: (1) `github.com/<owner>/<repo>/(issues|pull)/<n>` — owner/repo identity must match the current remote, and the issue/PR number must exist on that repo; (2) `*.atlassian.net/browse/<KEY-N>` — host must match the configured Jira site; (3) any other `http(s)://` URL — generic reachability via HEAD (fall back to GET on 405), 5s timeout. Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) and any `ctx.skipHosts` entries are reported as `skipped`, not violations. `SDLC_LINKS_OFFLINE=1` skips network checks but keeps structural context-aware checks (GitHub identity match, Atlassian host match). Any violation aborts publication with non-zero exit and a structured violation list — no soft-warning mode.
+- R18: `flags.changelog` in `skill/version.js` output reflects the resolved value (`config.changelog === true` OR `--changelog` CLI flag passed). Skill consumes `flags.changelog` directly without re-OR-ing against `config.changelog`.
 
 ## Workflow Phases
 

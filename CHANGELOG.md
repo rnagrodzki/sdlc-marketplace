@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.43] - 2026-05-05
+
+### Fixed
+- version-sdlc: fixed plugin.json corruption during version bump by switching to targeted field replacement with a post-edit diff gate (#211)
+- version-sdlc: fixed `--output-file` flag parser consuming the following positional argument (e.g. `patch`), causing incorrect bump resolution (#212)
+- version-sdlc: `config.changelog` is now respected without requiring an explicit `--changelog` flag; unified changelog gate reads from both flags and config (#213)
+
 ## [0.17.40] - 2026-05-05
 
 ### Fixed
