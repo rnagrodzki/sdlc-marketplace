@@ -14,6 +14,7 @@
  *   node execute-state.js context     --data <json>
  *   node execute-state.js read        [--branch <b>]
  *   node execute-state.js cleanup     [--branch <b>]
+ *   node execute-state.js gc          [--ttl-days <N>] [--dry-run]
  *
  * Exit codes:
  *   0 = success
@@ -24,9 +25,15 @@
 'use strict';
 
 const path = require('node:path');
+const fs   = require('node:fs');
+const { execSync } = require('node:child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { slugifyBranch, readState, writeState, initState, deleteState, resolveBranch } = require(path.join(LIB, 'state'));
+const {
+  slugifyBranch, readState, writeState, initState, deleteState, resolveBranch,
+  gcStateFiles, resolveStateDir, parseStateFilename,
+} = require(path.join(LIB, 'state'));
+const { readSection } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -75,10 +82,40 @@ function parseArgs(argv) {
       result.error = args[++i];
     } else if (a === '--data' && args[i + 1]) {
       result.data = args[++i];
+    } else if (a === '--ttl-days' && args[i + 1]) {
+      const val = parseInt(args[++i], 10);
+      if (isNaN(val)) { process.stderr.write(`Error: --ttl-days requires a number, got "${args[i]}"\n`); process.exit(2); }
+      result.ttlDays = val;
+    } else if (a === '--dry-run') {
+      result.dryRun = true;
     }
   }
 
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers (gc)
+// ---------------------------------------------------------------------------
+
+function listBranches() {
+  try {
+    const out = execSync("git branch --list --format='%(refname:short)'", { encoding: 'utf8' });
+    return out.split('\n').map(s => s.trim()).filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+function readTtlDaysFromConfig() {
+  try {
+    const stateCfg = readSection(process.cwd(), 'state');
+    const v = stateCfg && stateCfg.gc && stateCfg.gc.ttlDays;
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
+  } catch (_) {
+    // fall through to default
+  }
+  return 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -420,6 +457,50 @@ function cmdCleanup(opts) {
   process.exit(0);
 }
 
+/**
+ * `gc` — prune stale execute-state files. Mirrors `state/ship.js gc` but
+ * scoped to the `execute-` prefix only.
+ */
+function cmdGc(opts) {
+  const ttlDays = (typeof opts.ttlDays === 'number') ? opts.ttlDays : readTtlDaysFromConfig();
+  const knownBranches = listBranches();
+
+  if (opts.dryRun) {
+    const stateDir = resolveStateDir();
+    const liveSlugs = new Set(knownBranches.map(slugifyBranch));
+    const now = Date.now();
+    const ttlMs = ttlDays * 86400000;
+    const out = { wouldDelete: [], wouldKeep: [] };
+
+    let entries = [];
+    try { entries = fs.readdirSync(stateDir); } catch (_) { /* empty */ }
+
+    for (const name of entries) {
+      if (!name.endsWith('.json')) continue;
+      const parsed = parseStateFilename(name);
+      if (!parsed || parsed.prefix !== 'execute') continue;
+      let stat;
+      try { stat = fs.statSync(path.join(stateDir, name)); } catch (_) { continue; }
+      const fresh = (now - stat.mtimeMs) < ttlMs;
+      const branchExists = liveSlugs.has(parsed.slug);
+      if (fresh) {
+        out.wouldKeep.push({ file: name, branch: parsed.slug, reason: 'ttl-fresh' });
+      } else if (branchExists) {
+        out.wouldKeep.push({ file: name, branch: parsed.slug, reason: 'branch-exists' });
+      } else {
+        out.wouldDelete.push({ file: name, branch: parsed.slug, reason: 'stale+branch-gone' });
+      }
+    }
+
+    process.stdout.write(JSON.stringify({ dryRun: true, ttlDays, ...out }, null, 2) + '\n');
+    process.exit(0);
+  }
+
+  const result = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
+  process.stdout.write(JSON.stringify({ ttlDays, ...result }, null, 2) + '\n');
+  process.exit(0);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -437,9 +518,10 @@ try {
     case 'context':     cmdContext(opts);    break;
     case 'read':        cmdRead(opts);       break;
     case 'cleanup':     cmdCleanup(opts);    break;
+    case 'gc':          cmdGc(opts);         break;
     default:
       process.stderr.write(`Error: unknown subcommand "${opts.subcommand}"\n`);
-      process.stderr.write('Usage: node execute-state.js <init|wave-start|wave-done|wave-fail|task-done|task-fail|context|read|cleanup> [options]\n');
+      process.stderr.write('Usage: node execute-state.js <init|wave-start|wave-done|wave-fail|task-done|task-fail|context|read|cleanup|gc> [options]\n');
       process.exit(2);
   }
 } catch (e) {

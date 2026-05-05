@@ -5,15 +5,18 @@
  * Delegates all I/O to lib/state.js; zero npm dependencies.
  *
  * Usage:
- *   node ship-state.js init     --branch <b> --flags <json>
- *   node ship-state.js start    --step <name>
- *   node ship-state.js complete --step <name> --result <text>
- *   node ship-state.js skip     --step <name> --reason <text>
- *   node ship-state.js fail     --step <name> --error <text>
- *   node ship-state.js decide   --step <name> --text <text>
- *   node ship-state.js defer    --severity <s> --file <f> [--line <n>] --title <t>
- *   node ship-state.js read     [--branch <b>]
- *   node ship-state.js cleanup  [--branch <b>]
+ *   node ship-state.js init               --branch <b> --flags <json>
+ *   node ship-state.js start              --step <name>
+ *   node ship-state.js complete           --step <name> --result <text>
+ *   node ship-state.js skip               --step <name> --reason <text>
+ *   node ship-state.js fail               --step <name> --error <text>
+ *   node ship-state.js decide             --step <name> --text <text>
+ *   node ship-state.js defer              --severity <s> --file <f> [--line <n>] --title <t>
+ *   node ship-state.js read               [--branch <b>]
+ *   node ship-state.js cleanup            [--branch <b>]                    # legacy alias of cleanup-pipeline (no GC sweep)
+ *   node ship-state.js cleanup-pipeline   [--force] [--ttl-days <N>]        # terminal pipeline cleanup + GC sweep
+ *   node ship-state.js gc                 [--ttl-days <N>] [--dry-run]      # on-demand GC of stale ship- and execute- state
+ *   node ship-state.js migrate            --from <slug> --to <branch>       # rename ship-state file when branch changes
  *
  * Exit codes:
  *   0 = success
@@ -24,9 +27,16 @@
 'use strict';
 
 const path = require('node:path');
+const fs   = require('node:fs');
+const { execSync } = require('node:child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { slugifyBranch, readState, writeState, initState, deleteState, resolveBranch } = require(path.join(LIB, 'state'));
+const {
+  slugifyBranch,
+  readState, writeState, initState, deleteState, resolveBranch,
+  gcStateFiles, migrateBranchSlug,
+} = require(path.join(LIB, 'state'));
+const { readSection } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -60,10 +70,62 @@ function parseArgs(argv) {
       result.line = args[++i];
     } else if (a === '--title' && args[i + 1]) {
       result.title = args[++i];
+    } else if (a === '--ttl-days' && args[i + 1]) {
+      const val = parseInt(args[++i], 10);
+      if (isNaN(val)) { process.stderr.write(`Error: --ttl-days requires a number, got "${args[i]}"\n`); process.exit(2); }
+      result.ttlDays = val;
+    } else if (a === '--dry-run') {
+      result.dryRun = true;
+    } else if (a === '--force') {
+      result.force = true;
+    } else if (a === '--from' && args[i + 1]) {
+      result.from = args[++i];
+    } else if (a === '--to' && args[i + 1]) {
+      result.to = args[++i];
     }
   }
 
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Get the list of currently-existing local branch names via
+ * `git branch --list --format='%(refname:short)'`. Returns an empty array on
+ * failure (so GC errs on the safe side — no branches known means everything
+ * is "branch-gone").
+ *
+ * Note: callers depending on this for safety should be aware that an empty
+ * list will cause stale files to be aggressively pruned. The GC TTL is the
+ * second safety net.
+ *
+ * @returns {string[]}
+ */
+function listBranches() {
+  try {
+    const out = execSync("git branch --list --format='%(refname:short)'", { encoding: 'utf8' });
+    return out.split('\n').map(s => s.trim()).filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+/**
+ * Read `state.gc.ttlDays` from `.claude/sdlc.json`, falling back to 7.
+ * @returns {number}
+ */
+function readTtlDaysFromConfig() {
+  try {
+    const stateCfg = readSection(process.cwd(), 'state');
+    const v = stateCfg && stateCfg.gc && stateCfg.gc.ttlDays;
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
+  } catch (_) {
+    // fall through to default
+  }
+  return 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -301,6 +363,36 @@ function cmdRead(opts) {
   process.exit(0);
 }
 
+/**
+ * Validate pipeline contract for the current run's state file.
+ * Returns { valid, violations } without doing any I/O on the file.
+ *
+ * @param {object} stateData  parsed JSON content of the state file
+ */
+function validatePipelineContract(stateData) {
+  const violations = [];
+  for (const step of (stateData.steps || [])) {
+    if (step.status === 'pending' || step.status === 'in_progress') {
+      violations.push({ step: step.name, status: step.status });
+    }
+  }
+  return {
+    valid: violations.length === 0,
+    violations: violations.map(v => ({
+      step: v.step,
+      actualStatus: v.status,
+      message: `Step "${v.step}" has status "${v.status}" — expected completed, skipped, or failed`,
+    })),
+  };
+}
+
+/**
+ * Legacy `cleanup` subcommand — kept for back-compat with callers from
+ * earlier plugin versions (same plugin, pre-#223). Behavior matches the old
+ * script exactly: validate contract + delete current state file, no GC sweep.
+ * New callers should use `cleanup-pipeline` (which is identical on success
+ * and additionally runs the GC sweep, plus supports --force for failure paths).
+ */
 function cmdCleanup(opts) {
   const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
@@ -310,31 +402,140 @@ function cmdCleanup(opts) {
     process.exit(0);
   }
 
-  // Validate pipeline contract: no step should be pending or in_progress at cleanup
-  const violations = [];
-  for (const step of (found.data.steps || [])) {
-    if (step.status === 'pending' || step.status === 'in_progress') {
-      violations.push({ step: step.name, status: step.status });
-    }
-  }
-
-  if (violations.length > 0) {
-    const result = {
-      valid: false,
-      violations: violations.map(v => ({
-        step: v.step,
-        actualStatus: v.status,
-        message: `Step "${v.step}" has status "${v.status}" — expected completed, skipped, or failed`
-      }))
-    };
-    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    process.stderr.write(`Pipeline contract violation: ${violations.length} step(s) not in terminal state. State file preserved.\n`);
+  const contract = validatePipelineContract(found.data);
+  if (!contract.valid) {
+    process.stdout.write(JSON.stringify({ valid: false, violations: contract.violations }, null, 2) + '\n');
+    process.stderr.write(`Pipeline contract violation: ${contract.violations.length} step(s) not in terminal state. State file preserved.\n`);
     process.exit(1);
   }
 
   deleteState(found.filePath);
   process.stdout.write(JSON.stringify({ valid: true, cleaned: true }, null, 2) + '\n');
   process.exit(0);
+}
+
+/**
+ * `cleanup-pipeline` — terminal pipeline action. On success paths:
+ *   1. validate pipeline contract; on violation, exit 1 (preserve state file)
+ *   2. delete the current run's state file
+ *   3. GC sweep stale ship- and execute- state files older than TTL whose
+ *      branch is no longer in `git branch --list`
+ *   4. emit one combined JSON report and exit 0
+ *
+ * With `--force` (failure paths):
+ *   - skip contract validation
+ *   - preserve the current run's state file (so --resume still works)
+ *   - run only the GC sweep
+ */
+function cmdCleanupPipeline(opts) {
+  const branch = resolveBranchOrExit(opts.branch);
+  const slug = slugifyBranch(branch);
+  const found = readState('ship', slug);
+
+  const ttlDays = (typeof opts.ttlDays === 'number') ? opts.ttlDays : readTtlDaysFromConfig();
+  const knownBranches = listBranches();
+
+  const report = {
+    currentRun: { valid: true, cleaned: false },
+    gc: { ship: { deleted: [], kept: [] }, execute: { deleted: [], kept: [] } },
+    force: !!opts.force,
+    ttlDays,
+  };
+
+  if (opts.force) {
+    // Failure path: preserve current state file, only run GC sweep.
+    report.currentRun = { valid: null, cleaned: false, preservedReason: 'force' };
+  } else if (!found) {
+    // Nothing to delete — already cleaned.
+    report.currentRun = { valid: true, cleaned: false, reason: 'no-state-file' };
+  } else {
+    const contract = validatePipelineContract(found.data);
+    if (!contract.valid) {
+      report.currentRun = { valid: false, cleaned: false, violations: contract.violations };
+      process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+      process.stderr.write(`Pipeline contract violation: ${contract.violations.length} step(s) not in terminal state. State file preserved.\n`);
+      process.exit(1);
+    }
+    deleteState(found.filePath);
+    report.currentRun = { valid: true, cleaned: true };
+  }
+
+  // GC sweep for both prefixes
+  report.gc.ship    = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
+  report.gc.execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
+
+  process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+  process.exit(0);
+}
+
+/**
+ * `gc` — on-demand GC sweep across both ship- and execute- state files.
+ * Honors --dry-run and --ttl-days.
+ */
+function cmdGc(opts) {
+  const ttlDays = (typeof opts.ttlDays === 'number') ? opts.ttlDays : readTtlDaysFromConfig();
+  const knownBranches = listBranches();
+
+  if (opts.dryRun) {
+    // Dry-run: enumerate without deleting. Re-implement with `now`/`fs.statSync`
+    // pre-flight to compute what would happen, by temporarily filtering.
+    const fs2 = fs;
+    const path2 = require('node:path');
+    const { resolveStateDir, parseStateFilename } = require(path.join(LIB, 'state'));
+    const stateDir = resolveStateDir();
+    const liveSlugs = new Set(knownBranches.map(slugifyBranch));
+    const now = Date.now();
+    const ttlMs = ttlDays * 86400000;
+
+    const out = { ship: { wouldDelete: [], wouldKeep: [] }, execute: { wouldDelete: [], wouldKeep: [] } };
+
+    let entries = [];
+    try { entries = fs2.readdirSync(stateDir); } catch (_) { /* empty */ }
+
+    for (const name of entries) {
+      if (!name.endsWith('.json')) continue;
+      const parsed = parseStateFilename(name);
+      if (!parsed) continue;
+      const bucket = out[parsed.prefix];
+      if (!bucket) continue;
+      let stat;
+      try { stat = fs2.statSync(path2.join(stateDir, name)); } catch (_) { continue; }
+      const fresh = (now - stat.mtimeMs) < ttlMs;
+      const branchExists = liveSlugs.has(parsed.slug);
+      if (fresh) {
+        bucket.wouldKeep.push({ file: name, branch: parsed.slug, reason: 'ttl-fresh' });
+      } else if (branchExists) {
+        bucket.wouldKeep.push({ file: name, branch: parsed.slug, reason: 'branch-exists' });
+      } else {
+        bucket.wouldDelete.push({ file: name, branch: parsed.slug, reason: 'stale+branch-gone' });
+      }
+    }
+
+    process.stdout.write(JSON.stringify({ dryRun: true, ttlDays, ...out }, null, 2) + '\n');
+    process.exit(0);
+  }
+
+  const ship    = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
+  const execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
+
+  process.stdout.write(JSON.stringify({ ttlDays, ship, execute }, null, 2) + '\n');
+  process.exit(0);
+}
+
+/**
+ * `migrate` — rename a ship-state file from one branch slug to another and
+ * update `data.branch`. Used by ship-sdlc when execute-plan-sdlc creates a
+ * new branch mid-pipeline.
+ */
+function cmdMigrate(opts) {
+  if (!opts.from || !opts.to) {
+    process.stderr.write('Error: --from <slug> and --to <branch> are required for migrate\n');
+    process.exit(2);
+  }
+
+  const result = migrateBranchSlug({ prefix: 'ship', fromSlug: opts.from, toBranch: opts.to });
+  process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  process.exit(result.migrated ? 0 : 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -353,10 +554,13 @@ try {
     case 'decide':   cmdDecide(opts);   break;
     case 'defer':    cmdDefer(opts);    break;
     case 'read':     cmdRead(opts);     break;
-    case 'cleanup':  cmdCleanup(opts);  break;
+    case 'cleanup':           cmdCleanup(opts);          break;
+    case 'cleanup-pipeline':  cmdCleanupPipeline(opts);  break;
+    case 'gc':                cmdGc(opts);               break;
+    case 'migrate':           cmdMigrate(opts);          break;
     default:
       process.stderr.write(`Error: unknown subcommand "${opts.subcommand}"\n`);
-      process.stderr.write('Usage: node ship-state.js <init|start|complete|skip|fail|decide|defer|read|cleanup> [options]\n');
+      process.stderr.write('Usage: node ship-state.js <init|start|complete|skip|fail|decide|defer|read|cleanup|cleanup-pipeline|gc|migrate> [options]\n');
       process.exit(2);
   }
 } catch (e) {

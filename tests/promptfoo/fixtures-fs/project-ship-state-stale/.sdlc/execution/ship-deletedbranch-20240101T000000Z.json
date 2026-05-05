@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "branch": "deletedbranch",
+  "steps": [
+    {"name": "execute", "status": "completed"}
+  ]
+}

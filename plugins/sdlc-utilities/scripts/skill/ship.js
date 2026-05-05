@@ -42,7 +42,8 @@ const { exec, checkGitState, detectBaseBranch } = require(path.join(LIB, 'git'))
 const { resolveMainWorktree } = require(path.join(LIB, 'state'));
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
-const { VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS } = require(path.join(LIB, 'ship-fields'));
+const { VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS, RESERVED_STEPS } = require(path.join(LIB, 'ship-fields'));
+const { gcStateFiles } = require(path.join(LIB, 'state'));
 const { detectActiveChanges, isArchived } = require(path.join(LIB, 'openspec'));
 const { getAdvisory } = require(path.join(LIB, 'context-advisory'));
 const { PRE_RELEASE_LABEL_RE } = require(path.join(LIB, 'version'));
@@ -73,6 +74,8 @@ function parseArgs(argv) {
   let workspace       = null;
   let rebase          = null;
   let openspecChange  = null;
+  let gc              = false;
+  let ttlDays         = null;
   const errors = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -110,10 +113,19 @@ function parseArgs(argv) {
       rebase = args[++i]; // 'auto' | 'skip' | 'prompt'
     } else if (a === '--openspec-change' && args[i + 1]) {
       openspecChange = args[++i];
+    } else if (a === '--gc') {
+      gc = true;
+    } else if (a === '--ttl-days' && args[i + 1]) {
+      const v = parseInt(args[++i], 10);
+      if (isNaN(v)) {
+        errors.push(`--ttl-days requires an integer, got "${args[i]}".`);
+      } else {
+        ttlDays = v;
+      }
     }
   }
 
-  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, errors };
+  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -443,6 +455,36 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       : `skill: "${step.skill}"`;
   }
 
+  // Append synthetic terminal `cleanup` step (R38, issue #223). NOT user-
+  // configurable — appended unconditionally on every pipeline run. The skill
+  // field is null (dispatched as a direct Bash call, not as an Agent). Two
+  // command variants are emitted; SKILL.md selects `forced` when any prior
+  // step has status: "failed", `normal` otherwise.
+  //
+  // The path resolution is deferred to the skill (find ~/.claude/plugins +
+  // fallback to plugins/sdlc-utilities/scripts/state/ship.js) — same pattern
+  // as every other state-script invocation in SKILL.md. We pass the script
+  // path placeholder `<state-ship>` here for documentation; the skill
+  // substitutes `$SCRIPT` at runtime.
+  steps.push({
+    name: 'cleanup',
+    skill: null,
+    model: 'haiku',
+    status: 'will_run',
+    skipSource: 'none',
+    args: '',
+    reason: 'terminal cleanup — pipeline contract validation, current-run state delete, GC sweep',
+    pause: false,
+    invocation: {
+      method: 'bash',
+      // SKILL.md selects one of these. `normal` runs the contract check and
+      // current-run delete; `forced` skips both and only sweeps stale orphans.
+      normal: `node "$SCRIPT" cleanup-pipeline`,
+      forced: `node "$SCRIPT" cleanup-pipeline --force`,
+    },
+    reserved: true,
+  });
+
   return steps;
 }
 
@@ -504,6 +546,14 @@ function runValidation(flags, flagSources, steps, context) {
   let stepValuesRecognized = true;
   if (Array.isArray(flags.steps)) {
     for (const s of flags.steps) {
+      // Reserved steps (e.g. `cleanup`) are appended unconditionally by
+      // computeSteps. Listing them in --steps or ship.steps[] is a config
+      // bug — always an error regardless of source.
+      if (RESERVED_STEPS.includes(s)) {
+        errors.push(`"${s}" is a reserved terminal step appended automatically by the pipeline. Remove it from --steps and ship.steps[].`);
+        stepValuesRecognized = false;
+        continue;
+      }
       if (!VALID_STEPS.includes(s)) {
         if (flagSources.steps === 'cli') {
           errors.push(`Unrecognized step "${s}" in --steps. Valid values: ${VALID_STEPS.join(', ')}`);
@@ -612,6 +662,49 @@ function main() {
   // Surface argument-parsing errors first (legacy --preset/--skip rejection).
   if (Array.isArray(cli.errors) && cli.errors.length > 0) {
     errors.push(...cli.errors);
+  }
+
+  // --gc short-circuit (R39): on-demand pruning. Skip pipeline composition
+  // entirely. Emit {action: "gc", report, errors, warnings} and exit.
+  if (cli.gc) {
+    if (errors.length > 0) {
+      writeOutput({ action: 'gc', errors, warnings }, 'ship-prepare', 1);
+      return;
+    }
+
+    // TTL resolution: CLI --ttl-days > config state.gc.ttlDays > 7.
+    let ttlDays = (typeof cli.ttlDays === 'number') ? cli.ttlDays : null;
+    if (ttlDays == null) {
+      try {
+        const stateCfg = readSection(projectRoot, 'state');
+        const v = stateCfg && stateCfg.gc && stateCfg.gc.ttlDays;
+        if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
+          ttlDays = v;
+        }
+      } catch (_) { /* fall through */ }
+    }
+    if (ttlDays == null) ttlDays = 7;
+
+    // Build knownBranches from local git
+    let knownBranches = [];
+    const out = exec("git branch --list --format='%(refname:short)'", { cwd: projectRoot, shell: true });
+    if (typeof out === 'string') {
+      knownBranches = out.split('\n').map(s => s.trim()).filter(Boolean);
+    }
+
+    let report;
+    try {
+      const ship    = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
+      const execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
+      report = { ttlDays, ship, execute };
+    } catch (err) {
+      errors.push(`gc failed: ${err.message}`);
+      writeOutput({ action: 'gc', errors, warnings }, 'ship-prepare', 1);
+      return;
+    }
+
+    writeOutput({ action: 'gc', report, errors, warnings }, 'ship-prepare', 0);
+    return;
   }
 
   // Load config
