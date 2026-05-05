@@ -12,6 +12,7 @@ skip-when:
   - "tests/**"
   - ".claude/skills/**"
 severity: high
+model: haiku
 requires-full-diff: true
 ---
 

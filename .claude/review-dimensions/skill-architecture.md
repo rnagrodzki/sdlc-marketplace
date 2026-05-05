@@ -11,6 +11,7 @@ skip-when:
   - "**/node_modules/**"
   - "docs/**"
 severity: high
+model: opus
 ---
 
 # Skill Architecture Review

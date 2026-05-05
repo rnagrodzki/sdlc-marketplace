@@ -7,6 +7,7 @@ triggers:
 skip-when:
   - "**/node_modules/**"
 severity: high
+model: sonnet
 ---
 
 # CI/CD Pipeline Review

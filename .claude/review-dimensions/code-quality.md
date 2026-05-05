@@ -9,6 +9,7 @@ skip-when:
   - "**/build/**"
   - "**/vendor/**"
 severity: medium
+model: sonnet
 ---
 
 # Code Quality Review

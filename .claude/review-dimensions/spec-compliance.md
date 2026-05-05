@@ -9,6 +9,7 @@ skip-when:
   - "**/node_modules/**"
   - "tests/**"
 severity: high
+model: opus
 requires-full-diff: true
 ---
 

@@ -8,6 +8,7 @@ skip-when:
   - "**/node_modules/**"
   - "docs/**"
 severity: high
+model: sonnet
 ---
 
 # Script Resolution Review

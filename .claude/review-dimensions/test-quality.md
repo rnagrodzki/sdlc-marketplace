@@ -11,6 +11,7 @@ skip-when:
   - "tests/promptfoo/.promptfoo-data/**"
   - "tests/promptfoo/.env"
 severity: medium
+model: sonnet
 ---
 
 # Test Quality Review
