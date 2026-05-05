@@ -3,7 +3,7 @@
 > Generate and execute a git commit with a message matching the project's existing style, isolating staged changes via stash lifecycle management.
 
 **User-invocable:** yes
-**Model:** haiku
+**Model:** haiku (pinned on orchestrator agent, not skill frontmatter — see issue #202)
 **Prepare script:** `skill/commit.js`
 
 ## Arguments

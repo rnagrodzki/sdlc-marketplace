@@ -76,6 +76,12 @@ This error may be worth tracking as a GitHub issue. Create one? (yes / no)
 
 ## Section 4: Assemble Issue Content
 
+> **As of issue #202:** Template assembly (reading this template, filling placeholders,
+> building the title) is delegated to the `error-report-orchestrator` agent (SKILL.md
+> Step 4). This section documents the template structure and placeholder sources for
+> reference. The orchestrator receives the manifest from `error-report-prepare.js` and
+> applies the rules below internally.
+
 Read `./templates/ToolingError.md` (locate via Glob: `**/error-report-sdlc/templates/ToolingError.md` under `~/.claude/plugins`, then cwd fallback).
 
 Fill all `{placeholder}` markers using the context provided by the calling skill:

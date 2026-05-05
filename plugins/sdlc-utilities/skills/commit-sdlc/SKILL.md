@@ -3,7 +3,6 @@ name: commit-sdlc
 description: "Use this skill when committing staged changes, creating a git commit, or generating a commit message. Analyzes staged diff and recent commit history to generate a message matching the project's style. Stashes unstaged changes to isolate the commit, commits after user confirmation, and auto-restores the stash. Arguments: [--no-stash] [--scope <scope>] [--type <type>] [--amend] [--auto]. Use --auto to skip interactive approval. Triggers on: commit changes, create commit, write commit message, git commit, smart commit, commit staged, stage and commit."
 user-invocable: true
 argument-hint: "[--no-stash] [--scope <scope>] [--type <type>] [--amend] [--auto]"
-model: haiku
 ---
 
 
@@ -65,74 +64,42 @@ rm -f "$COMMIT_CONTEXT_FILE"
 
 ---
 
-### Step 1 (CONSUME): Read the Context
+### Step 1 (CONSUME): Quick Context Read <!-- implements R1, R2 -->
 
-Extract these fields from `COMMIT_CONTEXT_JSON`:
+Read just enough from `COMMIT_CONTEXT_JSON` for the main-context flow (Step 5 onwards): `currentBranch`, `flags`, `staged.files`, `staged.fileCount`, `staged.diffStat`, `unstaged.hasChanges`, `commitConfig.subjectPattern`, `commitConfig.subjectPatternError`. Heavy fields — `staged.diff`, `recentCommits`, `lastCommitMessage`, full `commitConfig` — are consumed by the orchestrator agent below; do **not** read or quote them in main context.
 
-| Field | Description |
-| ----- | ----------- |
-| `currentBranch` | Active git branch |
-| `flags` | `{ noStash, scope, type, amend, auto }` — parsed CLI flags |
-| `staged.files` | List of staged file paths |
-| `staged.fileCount` | Number of staged files |
-| `staged.diff` | Full unified diff of staged changes |
-| `staged.diffStat` | Diff stat summary line |
-| `staged.diffTruncated` | Boolean: true when diff exceeded context budget and was truncated |
-| `staged.truncatedFiles` | File paths whose full diffs were omitted (diffstat still available) |
-| `unstaged.files` | Modified tracked files not staged |
-| `unstaged.hasChanges` | Whether unstaged changes exist |
-| `recentCommits` | Last 15 commits (oneline format) for style detection |
-| `lastCommitMessage` | Previous commit message (only when `flags.amend` is true) |
-| `commitConfig` | Commit message validation config from .claude/sdlc.json (null when absent) |
+### Step 2 (PLAN): Dispatch the commit-orchestrator Agent <!-- implements R3, R4, R5, R6 -->
 
-### Step 2 (PLAN): Generate Commit Message
+Issue #202: pinning `model:` in skill frontmatter routes the skill into a subagent that inherits the entire conversation transcript and overflows the smaller-window models on long sessions. To keep the main context clean and bound the orchestrator's input to the prepared payload only, dispatch the dedicated `commit-orchestrator` agent. See `docs/skill-best-practices.md` → "Why frontmatter `model:` is the wrong context-isolation knob" for the rationale.
 
-1. Analyze `staged.diff` to understand what changed. Read the full diff — do not rely on file names alone. When `staged.diffTruncated` is true, the diff includes only the largest file changes within the context budget. For files in `staged.truncatedFiles`, use `staged.diffStat` and file names to infer the nature of changes.
-2. Analyze `recentCommits` to detect project commit style:
-   - Conventional commits: `type(scope): description`?
-   - Plain imperative English?
-   - Ticket prefix pattern (e.g. `PROJ-123: ...`)?
-   - Capitalization conventions?
-**2a. Config override (run before steps 3–6 below):** If `commitConfig` is non-null:
-- If `commitConfig.allowedTypes` is set AND `flags.type` is NOT set → choose the type exclusively from `allowedTypes`. Do not infer a type outside this list.
-- If `commitConfig.allowedScopes` is set AND `flags.scope` is NOT set → choose the scope exclusively from `allowedScopes` (or omit if none fits). Do not infer a scope outside this list.
-- Config constraints take precedence over `recentCommits` inference. If `recentCommits` suggests a type not in `allowedTypes`, use the closest allowed type.
-- If `commitConfig.requireBodyFor` is set and the selected type appears in that list → a body is mandatory. Do not omit the body for these commit types.
-- If `commitConfig.requiredTrailers` is set → include all listed trailer keys in the commit body, after a blank line, in `Key: Value` format. Use an empty string as the value placeholder if no value is known; do not invent values.
+Use the `Agent` tool with:
 
-**Common `subjectPattern` examples (for reference when `commitConfig.subjectPattern` is set):**
+- `subagent_type`: `sdlc:commit-orchestrator`
+- `model`: `haiku` (the Agent tool `model:` parameter takes precedence over agent frontmatter; passing `haiku` here keeps this bounded task on a lightweight model regardless of the parent context's model)
+- `prompt` (exactly two lines, no other content):
 
-| Style | Pattern | Example |
-| ----- | ------- | ------- |
-| Conventional commits | `^(feat\|fix\|refactor\|chore\|docs\|test\|ci)(\([a-z-]+\))?: .+$` | `feat(auth): add OAuth2 PKCE flow` |
-| Ticket prefix | `^[A-Z]{2,10}-\d+: .+$` | `PROJ-123: fix login timeout` |
-| Ticket + conventional | `^[A-Z]{2,10}-\d+ (feat\|fix\|chore): .+$` | `PROJ-123 feat: add dark mode` |
-| Plain imperative | `^[A-Z].{10,70}$` | `Add rate limiting to API endpoints` |
+  ```text
+  MANIFEST_FILE: <COMMIT_CONTEXT_FILE>
+  PROJECT_ROOT: <cwd>
+  ```
 
-3. If `flags.type` is set, use it as the commit type. If not, infer from the nature of the change (constrained by `commitConfig.allowedTypes` per step 2a above).
-4. If `flags.scope` is set, use it as the scope. If not, infer from the changed files or omit (constrained by `commitConfig.allowedScopes` per step 2a above).
-4a. **OpenSpec scope hint (optional):** If `flags.scope` is not set, Glob for `openspec/config.yaml`. If found, Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If exactly one active change exists, or one matches the current branch name, use the change directory name as a candidate scope (e.g., change `add-dark-mode` → scope `add-dark-mode`). This is a hint only — the style detected from `recentCommits` in step 2 takes precedence. If recent commits don't use scopes, do not force one.
+  Substitute `<COMMIT_CONTEXT_FILE>` with the absolute temp-file path captured in Step 0. Substitute `<cwd>` with the current working directory.
 
-    **Hook context fast-path:** If the session-start system-reminder contains an `OpenSpec active:` line, use its data (change name, branch match status) to skip the `Glob for openspec/config.yaml` and change directory scanning. If the line is absent or the user switched branches since session start, fall back to the existing Glob-based detection. The hook context is a session-start snapshot — treat it as a hint, not as authoritative.
-4b. **OpenSpec change trailer (optional):** If step 4a identified an active OpenSpec change, add an `OpenSpec-Change: <change-directory-name>` trailer to the commit message body. Trailers go after a blank line at the end of the body, in git standard `Key: Value` format. If the commit has no body (trivial change where the subject line is sufficient), skip the trailer — do not add a body solely for the trailer.
-5. If `flags.amend` and `lastCommitMessage` is non-null, use it as the starting point — revise based on staged diff.
-6. Draft subject line (max 72 chars) and optional body:
-   - Subject: imperative mood, concise, no trailing period
-   - Body: only when the change is non-trivial and benefits from "why" context; blank line between subject and body
+The orchestrator reads the manifest, applies every `commitConfig` constraint (`subjectPattern`, `allowedTypes`, `allowedScopes`, `requireBodyFor`, `requiredTrailers`), detects style from `recentCommits`, runs its own self-critique loop, and returns ONLY the final commit message string. It does not call `git`, does not write files, does not invoke `gh`.
 
-### Step 3 (CRITIQUE): Self-review the Message
+Capture the orchestrator's return value as `MESSAGE`. If `MESSAGE` is empty, the orchestrator detected an `errors[]` array in the manifest — surface those errors and stop.
 
-Review against every quality gate in the table below. Note every failing gate.
+**OpenSpec scope hint (main context, optional):** If `flags.scope` is NOT set, Glob for `openspec/config.yaml`. If found, Glob `openspec/changes/*/proposal.md` (exclude `archive/`). If exactly one active change exists, or one matches the current branch name, append an `OpenSpec-Change: <change-directory-name>` trailer to `MESSAGE` (after a blank line; only if `MESSAGE` already has a body — do not add a body solely for the trailer). If recent commits don't use scopes, the trailer is still optional. The hook context fast-path applies: if the session-start system-reminder has an `OpenSpec active:` line, use it instead of Glob.
 
-### Step 4 (IMPROVE): Revise Based on Critique
+### Step 3 (CRITIQUE) and Step 4 (IMPROVE)
 
-Fix each issue found in Step 3. Max 2 iterations per gate.
+The orchestrator agent owns Steps 3 (CRITIQUE) and 4 (IMPROVE) internally. The main context does not re-run them; the orchestrator's returned `MESSAGE` is already self-critiqued against the gate table below.
 
 ### Step 5 (DO): Present and Execute
 
-Show the full commit plan to the user. **Do not execute any git commands before receiving explicit user approval via AskUserQuestion.**
+Show the full commit plan to the user with the `MESSAGE` returned by the orchestrator and the staged-file summary read in Step 1. **Do not execute any git commands before receiving explicit user approval via AskUserQuestion.**
 
-**Auto mode:** When `flags.auto` is true, skip the AskUserQuestion prompt entirely. Still display the full commit plan for visibility, then proceed directly to execution. Treat the response as an implicit `yes`. All critique gates (Steps 3–4) still run — only the interactive approval prompt is skipped.
+**Auto mode:** When `flags.auto` is true, skip the AskUserQuestion prompt entirely. Still display the full commit plan for visibility, then proceed directly to execution. Treat the response as an implicit `yes`. The orchestrator's internal critique already ran in Step 2 — only the interactive approval prompt is skipped.
 
 ```
 Commit
@@ -209,9 +176,9 @@ Show `Amend:` instead of `Commit:` heading when `flags.amend` is true.
    git stash pop
    ```
 
-**On `edit`:** Ask what to change, revise the message, and present again. Loop until explicit `yes` or `cancel`.
+**On `edit`:** Ask what to change, revise the message, and present again. Loop until explicit `yes` or `cancel`. Re-dispatching the orchestrator is not required for small wording tweaks — apply user-supplied edits to `MESSAGE` directly and re-validate against the subject-pattern gate before re-presenting.
 
-**On `cancel`:** Abort without changes.
+**On `cancel`:** Abort without changes. Run `rm -f "$COMMIT_CONTEXT_FILE"` to remove the manifest.
 
 **Hook failure handling**: If `git commit` fails due to a pre-commit hook, the stash is still in place. Inform the user: "Pre-commit hook failed. Your unstaged changes are stashed (`git stash list` to see). Fix the hook issue, re-stage your changes, and re-run `/commit-sdlc`."
 
@@ -228,6 +195,12 @@ Show the result:
 ```
 
 Omit the `Stash:` line if no stash was used.
+
+After verification, remove the manifest temp file:
+
+```bash
+rm -f "$COMMIT_CONTEXT_FILE"
+```
 
 ---
 
