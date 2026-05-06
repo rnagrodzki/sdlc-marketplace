@@ -23,12 +23,13 @@ YYYY-MM-DD` accepted).
 ## Workflow
 
 1. **Run the helper in `--output-file` mode.** Resolve the helper path:
-   prefer `${CLAUDE_PROJECT_DIR}/.claude/scripts/harvest-learnings.js` if
-   `CLAUDE_PROJECT_DIR` is set, else fall back to
-   `.claude/scripts/harvest-learnings.js` relative to the current working
-   directory. Invoke:
    ```bash
-   node <helper-path> --output-file $ARGUMENTS
+   HELPER_PATH="$(git rev-parse --show-toplevel)/.claude/scripts/harvest-learnings.js"
+   [ -f "$HELPER_PATH" ] || { echo "ERROR: helper not found at $HELPER_PATH"; exit 2; }
+   ```
+   Invoke:
+   ```bash
+   node "$HELPER_PATH" --output-file $ARGUMENTS
    ```
    Capture stdout — it is the absolute path to the drafts JSON in `os.tmpdir()`.
 
@@ -67,7 +68,7 @@ YYYY-MM-DD` accepted).
    resolving the failure.
 
 8. **Commit log mutation.** After all approved issues are created
-   successfully, write a temp file at `$(mktemp -t harvest-approved-XXXXXX).json`
+   successfully, write a temp file at `/tmp/harvest-approved-$$.json`
    with shape:
    ```json
    { "approvedClusterIds": ["<id1>", "<id2>", ...] }
