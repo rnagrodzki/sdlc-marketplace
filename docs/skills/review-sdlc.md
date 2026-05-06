@@ -4,6 +4,8 @@
 
 Loads project review dimensions from `.sdlc/review-dimensions/`, matches them to changed files via glob patterns, dispatches parallel review subagents for each matching dimension, deduplicates findings, and posts a consolidated comment to the PR. By default reviews committed branch changes plus staged changes. Requires at least one dimension file — run `/setup-sdlc --dimensions` first if none exist.
 
+Branch-contribution diffs (the `committed` and `all` scopes) use git's three-dot range form (`<base>...HEAD`) so files that landed on the base branch after the feature branch diverged do not appear as findings (issue #239). Before computing the diff, the prepare script attempts a best-effort `git fetch origin <base>:<base>` to fast-forward the local base ref; failure (offline, no remote, auth denied) is non-fatal and the skill proceeds with whatever the local ref reports. The `worktree` scope is exempt by design — it intentionally compares the full working tree against the bare base.
+
 ---
 
 ## Usage

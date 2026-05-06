@@ -109,6 +109,64 @@ function detectBaseBranch(projectRoot) {
 }
 
 /**
+ * Best-effort fetch of the base branch from origin to fast-forward the local ref.
+ *
+ * Used before computing branch-contribution diffs (review-sdlc, pr-sdlc — issue #239)
+ * so the local copy of `<base>` is not behind `origin/<base>`. The `<base>:<base>`
+ * refspec form fast-forwards the local branch in place — no detached fetch.
+ *
+ * Failure modes (offline, no `origin` remote, auth denied, non-fast-forward) all
+ * silently pass — callers fall back to whatever the local ref already had.
+ *
+ * @param {string} base         Base branch name (e.g. "main")
+ * @param {string} projectRoot
+ * @returns {void}
+ */
+function fetchBaseRef(base, projectRoot) {
+  spawnSync(
+    'git',
+    ['fetch', '--quiet', 'origin', `${base}:${base}`],
+    { cwd: projectRoot, encoding: 'utf8' }
+  );
+}
+
+/**
+ * Build the git diff command for the "branch contribution" scopes that MUST use
+ * three-dot range semantics — issue #239.
+ *
+ * Three-dot (`<base>...HEAD`) compares HEAD against the merge-base of base and HEAD,
+ * so files touched only on `base` after divergence are NOT included. This is the
+ * correct semantics for "what this branch contributed", which is what review-sdlc
+ * and pr-sdlc consumers want.
+ *
+ * Two-dot (`<base>..HEAD`) — the previous behavior — produced false-positive
+ * findings on non-rebased branches by including post-divergence base commits.
+ *
+ * Scopes:
+ *   'committed' — `git diff --name-only <base>...HEAD` (used by getChangedFiles)
+ *   'stat'      — `git diff --stat <base>...HEAD`      (used by getDiffStat)
+ *   'content'   — `git diff <base>...HEAD`             (used by getDiffContent)
+ *
+ * Other scopes (staged, working, worktree, all) intentionally do NOT use 3-dot:
+ *   - 'staged'/'working': do not involve a base ref
+ *   - 'worktree': symmetric (full working tree vs. base) by design
+ *   - 'all'    : `--cached` does not accept a commit range, so stays two-arg
+ *
+ * @param {'committed'|'stat'|'content'} scope
+ * @param {string} base
+ * @returns {string}
+ */
+function buildBranchContribDiffCmd(scope, base) {
+  switch (scope) {
+    case 'committed': return `git diff --name-only ${base}...HEAD`;
+    case 'stat':      return `git diff --stat ${base}...HEAD`;
+    case 'content':   return `git diff ${base}...HEAD`;
+    default:
+      throw new Error(`buildBranchContribDiffCmd: unknown scope "${scope}"`);
+  }
+}
+
+/**
  * List files changed depending on scope.
  * @param {string|null} base  Base branch (required for 'all', 'committed', and 'worktree' scopes)
  * @param {string} projectRoot
@@ -118,11 +176,11 @@ function detectBaseBranch(projectRoot) {
 function getChangedFiles(base, projectRoot, scope = 'all') {
   let cmd;
   switch (scope) {
-    case 'committed': cmd = `git diff --name-only ${base}..HEAD`; break;
-    case 'staged':    cmd = 'git diff --cached --name-only';      break;
-    case 'working':   cmd = 'git diff HEAD --name-only';          break;
-    case 'worktree':  cmd = `git diff --name-only ${base}`;       break;
-    default:          cmd = `git diff --cached --name-only ${base}`; break; // 'all'
+    case 'committed': cmd = buildBranchContribDiffCmd('committed', base);      break;
+    case 'staged':    cmd = 'git diff --cached --name-only';                   break;
+    case 'working':   cmd = 'git diff HEAD --name-only';                       break;
+    case 'worktree':  cmd = `git diff --name-only ${base}`;                    break;
+    default:          cmd = `git diff --cached --name-only ${base}`;           break; // 'all'
   }
   const out = exec(cmd, { cwd: projectRoot });
   return out ? out.split('\n').filter(Boolean) : [];
@@ -558,7 +616,7 @@ function getCommitsStructured(base, projectRoot) {
  * @returns {{ filesChanged: number, insertions: number, deletions: number, summary: string }}
  */
 function getDiffStat(base, projectRoot) {
-  const stat = exec(`git diff --stat ${base}..HEAD`, { cwd: projectRoot }) || '';
+  const stat = exec(buildBranchContribDiffCmd('stat', base), { cwd: projectRoot }) || '';
   const summary = stat.split('\n').filter(Boolean).pop() || '';
 
   // Parse "N files changed, N insertions(+), N deletions(-)"
@@ -584,7 +642,7 @@ function getDiffStat(base, projectRoot) {
  * @returns {string}
  */
 function getDiffContent(base, projectRoot) {
-  return exec(`git diff ${base}..HEAD`, { cwd: projectRoot }) || '';
+  return exec(buildBranchContribDiffCmd('content', base), { cwd: projectRoot }) || '';
 }
 
 /**
@@ -852,6 +910,8 @@ module.exports = {
   // Shared
   checkGitState,
   detectBaseBranch,
+  fetchBaseRef,
+  buildBranchContribDiffCmd,
   getChangedFiles,
   getCommitLog,
   getCommitCount,

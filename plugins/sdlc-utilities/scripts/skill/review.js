@@ -35,6 +35,8 @@ const {
   exec,
   checkGitState,
   detectBaseBranch,
+  fetchBaseRef,
+  buildBranchContribDiffCmd,
   getChangedFiles,
   getCommitLog,
   getCommitCount,
@@ -233,11 +235,15 @@ function getCommitFileMap(base, projectRoot) {
 function fetchAndSplitDiff(base, projectRoot, scope = 'all') {
   let cmd;
   switch (scope) {
-    case 'committed': cmd = `git diff ${base}..HEAD`; break;
-    case 'staged':    cmd = 'git diff --cached';      break;
-    case 'working':   cmd = 'git diff HEAD';          break;
-    case 'worktree':  cmd = `git diff ${base}`;       break;
-    default:          cmd = `git diff --cached ${base}`; break; // 'all'
+    // Three-dot for branch-contribution scope so files only present on the base
+    // branch after divergence don't appear in the per-dimension diff (issue #239).
+    // Routed through lib/git.js::buildBranchContribDiffCmd so review and pr stay
+    // in sync — DRY, no per-call divergence.
+    case 'committed': cmd = buildBranchContribDiffCmd('content', base); break;
+    case 'staged':    cmd = 'git diff --cached';                        break;
+    case 'working':   cmd = 'git diff HEAD';                            break;
+    case 'worktree':  cmd = `git diff ${base}`;                         break;
+    default:          cmd = `git diff --cached ${base}`;                break; // 'all'
   }
   const raw = exec(cmd, { cwd: projectRoot });
   if (!raw) return new Map();
@@ -494,6 +500,14 @@ function main() {
       process.stderr.write(`Error: ${err.message}\n`);
       process.exit(2);
     }
+  }
+
+  // Best-effort refresh of the local base ref so diff semantics are computed
+  // against the current state of origin/<base> rather than a stale local copy
+  // (issue #239). Non-fatal — offline / no-origin / auth-denied all silently
+  // pass and we proceed with whatever the local ref reports.
+  if (base) {
+    fetchBaseRef(base, projectRoot);
   }
 
   const changedFiles = getChangedFiles(base, projectRoot, scope);

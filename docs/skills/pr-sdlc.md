@@ -4,6 +4,8 @@
 
 Analyzes all commits and the diff on the current branch, generates a structured PR description, and opens the PR via the GitHub CLI. Presents the generated description for review before creating. Supports custom per-project templates.
 
+The diff stat and diff content used by the description reflect only the branch's contribution — they use git's three-dot range form (`<base>...HEAD`) so files that landed on the base branch after divergence do not inflate the stats (issue #239). Before computing the diff, the prepare script attempts a best-effort `git fetch origin <base>:<base>` to fast-forward the local base ref; failure (offline, no remote, auth denied) is non-fatal.
+
 ---
 
 ## Usage

@@ -32,6 +32,7 @@ const {
   exec,
   checkGitState,
   detectBaseBranch,
+  fetchBaseRef,
   fetchPrMetadata,
   getRemoteState,
   pushToRemote,
@@ -252,6 +253,10 @@ function main() {
   }
 
   // Step 9: Gather diff
+  // Best-effort refresh of local base ref so getDiffStat/getDiffContent see
+  // the current origin/<base> rather than a stale local copy (issue #239).
+  // Non-fatal — offline / no-origin / auth-denied all silently pass.
+  fetchBaseRef(baseBranch, projectRoot);
   const diffStat    = getDiffStat(baseBranch, projectRoot);
   const diffContent = getDiffContent(baseBranch, projectRoot);
 

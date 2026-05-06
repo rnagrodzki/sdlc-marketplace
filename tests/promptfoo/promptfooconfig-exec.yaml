@@ -39,6 +39,7 @@ tests:
   - file://datasets/context-advisory-exec.yaml
   - file://datasets/state-gc-migrate-exec.yaml
   - file://datasets/links-lib-exec.yaml
+  - file://datasets/git-lib-exec.yaml
   - file://datasets/version-prepare-exec.yaml
   - file://datasets/harvest-learnings-exec.yaml
   - file://datasets/migrate-config-exec.yaml

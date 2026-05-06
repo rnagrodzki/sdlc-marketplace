@@ -98,6 +98,24 @@
     - type: icontains
       value: '"prConfig": null'
 
+# fetchBaseRef non-fatal when origin is unreachable (issue #239).
+# pr.js calls lib/git.js::fetchBaseRef before getDiffStat/getDiffContent. The
+# fetch itself fails (host is RFC 2606 .invalid), but the script must still
+# produce its prepare output without throwing.
+- description: "pr-prepare: fetchBaseRef non-fatal when origin unreachable (issue #239)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/git-lib-unreachable-origin"
+  assert:
+    # pr.js failing to throw produces some structured output (errors array or PR fields).
+    # We do not assert on a specific success field because the no-gh path will populate
+    # warnings/errors — the contract is "did not crash with an unhandled exception".
+    - type: not-contains
+      value: 'Error: spawnSync'
+    - type: not-contains
+      value: 'fatal: unable to access'
+
 # Link verification gate (issue #198) — pr.js --validate-body
 # Reads PR body from --file (or stdin) and validates URLs via lib/links.js.
 # Uses SDLC_LINKS_OFFLINE=1 so generic URLs are skipped; identity checks still run.

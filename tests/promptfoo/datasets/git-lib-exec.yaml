@@ -1,0 +1,77 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/lib/git.js — issue #239.
+# Validates the new fetchBaseRef helper (best-effort, non-fatal) and the
+# buildBranchContribDiffCmd helper (three-dot semantics for branch-contribution scopes).
+# These run real Node.js scripts against fixture directories (no LLM).
+# Uses tests/promptfoo/scripts/git-lib-test.js so script_path resolves to a real file.
+
+- description: "git-lib: fetchBaseRef export is present"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op exports"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: '"hasFetchBaseRef": true'
+
+- description: "git-lib: fetchBaseRef does NOT throw when no origin remote is configured"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op fetchBaseRef --project-root {{project_root}} --base main"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"threw": false'
+    - type: not-contains
+      value: '"threw": true'
+
+- description: "git-lib: fetchBaseRef does NOT throw when origin is configured but unreachable"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op fetchBaseRef --project-root {{project_root}} --base main"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/git-lib-unreachable-origin"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"threw": false'
+
+- description: "git-lib: buildBranchContribDiffCmd 'committed' scope uses three-dot form (issue #239)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op buildDiffCmd --scope committed --base main"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: 'main...HEAD'
+    - type: contains
+      value: '--name-only'
+    - type: not-contains
+      value: 'main..HEAD'
+
+- description: "git-lib: buildBranchContribDiffCmd 'stat' scope uses three-dot form"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op buildDiffCmd --scope stat --base main"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: 'main...HEAD'
+    - type: contains
+      value: '--stat'
+    - type: not-contains
+      value: 'main..HEAD'
+
+- description: "git-lib: buildBranchContribDiffCmd 'content' scope uses three-dot form"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op buildDiffCmd --scope content --base main"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: 'main...HEAD'
+    - type: not-contains
+      value: 'main..HEAD'
