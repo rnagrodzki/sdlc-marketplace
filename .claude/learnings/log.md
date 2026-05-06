@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-07 — version-sdlc: patch bump for jira-sdlc hardening (v0.18.5)
+Patch release from branch `fix/jira-sdlc-hardening-240-241`. Branch had no upstream so `--set-upstream` was used on first push. Commit `906ea6e6` (fix #239) appeared in the commit list but was already captured in `[0.18.4]` — changelog correctly attributed only commit `7eb87856` (#240) as new content. Link validation passed with no violations.
+
 
 ## 2026-05-06 — version-sdlc: patch release with uncommitted deletions in working tree
 Release v0.18.4 proceeded normally with uncommitted deletions (`.claude/review-dimensions/*.md` and `.sdlc.json`) in the working tree — these were not staged and not included in the release commit. The `--set-upstream` auto-heal path fired correctly for a new feature branch with no prior remote tracking.
