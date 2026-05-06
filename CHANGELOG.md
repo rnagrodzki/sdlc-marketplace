@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.5] - 2026-05-07
+
+### Fixed
+- jira-sdlc: hardened cloudId auth-error recovery with automatic namespace retry and cache update; narrowed placeholder detection regex to reduce false positives on ADF payloads (#240)
+- jira-sdlc: fixed tmpdir canonicalization via `fs.realpathSync` to handle macOS symlink chains in artifact-store; added dual-hash diagnostics to write-guard hook for easier debugging (#240)
+- jira-sdlc: issue type template fallback map (Sub-bug → Bug, Sub-task → Task) now consulted before resolving to no template; adds Sub-task.md template (#240)
+
 ## [0.18.4] - 2026-05-06
 
 ### Fixed
