@@ -20,8 +20,15 @@ const crypto = require('crypto');
 
 const TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+// Canonicalize tmpdir once at module load to resolve macOS symlinks
+// (`/var/folders/...` → `/private/var/folders/...`). Both writers (skill)
+// and readers (PreToolUse hook) inherit the same canonical base, so the
+// hook can reliably locate artifacts written by the skill regardless of
+// which symlink form `os.tmpdir()` returned at process start.
+const TMPDIR_REAL = fs.realpathSync(os.tmpdir());
+
 function storeDir() {
-  return path.join(os.tmpdir(), 'jira-sdlc');
+  return path.join(TMPDIR_REAL, 'jira-sdlc');
 }
 
 function ensureDir() {
@@ -71,12 +78,38 @@ function writeApprovalToken(hash) {
 }
 
 /**
+ * Scan storeDir for any approval-<hex>.token files and return up to 3 hash
+ * prefixes (sorted lexicographically). Used by the hook to surface the
+ * artifact-side hash(es) when a hash-mismatch deny is emitted (spec R21).
+ *
+ * @returns {string[]} full 64-hex hashes; truncation happens at the call site.
+ */
+function listArtifactHashes() {
+  const dir = storeDir();
+  let entries;
+  try { entries = fs.readdirSync(dir); } catch { return []; }
+  const hashes = [];
+  for (const name of entries) {
+    const m = /^approval-([0-9a-f]{64})\.token$/.exec(name);
+    if (m) hashes.push(m[1]);
+  }
+  hashes.sort();
+  return hashes.slice(0, 3);
+}
+
+/**
  * Verify both artifacts exist, are readable, well-formed, and not stale.
  *
- * @returns {{ approval: boolean, critique: boolean, ageMs: number, reason: string|null }}
+ * @returns {{ approval: boolean, critique: boolean, ageMs: number, reason: string|null, nearbyArtifactHashes: string[] }}
  */
 function verifyArtifacts(hash) {
-  const out = { approval: false, critique: false, ageMs: Infinity, reason: null };
+  const out = {
+    approval: false,
+    critique: false,
+    ageMs: Infinity,
+    reason: null,
+    nearbyArtifactHashes: [],
+  };
   const aPath = approvalPath(hash);
   const cPath = critiquePath(hash);
 
@@ -86,10 +119,12 @@ function verifyArtifacts(hash) {
 
   if (!aStat) {
     out.reason = 'approval token missing';
+    out.nearbyArtifactHashes = listArtifactHashes();
     return out;
   }
   if (!cStat) {
     out.reason = 'critique artifact missing';
+    out.nearbyArtifactHashes = listArtifactHashes();
     return out;
   }
 
@@ -160,4 +195,5 @@ module.exports = {
   verifyArtifacts,
   consumeArtifacts,
   purgeStale,
+  listArtifactHashes,
 };

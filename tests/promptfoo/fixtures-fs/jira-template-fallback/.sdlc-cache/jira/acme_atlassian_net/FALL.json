@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "lastUpdated": "2026-01-15T10:00:00Z",
+  "maxAgeHours": 0,
+  "cloudId": "fall-cloud",
+  "siteUrl": "https://acme.atlassian.net",
+  "currentUser": { "accountId": "u1", "displayName": "Fall User", "email": "u@acme" },
+  "project": { "key": "FALL", "name": "Fallback Test", "id": "10000" },
+  "issueTypes": {
+    "Bug": { "id": "10001", "subtask": false, "hierarchyLevel": 0 },
+    "Task": { "id": "10002", "subtask": false, "hierarchyLevel": 0 },
+    "Sub-bug": { "id": "10003", "subtask": true, "hierarchyLevel": -1 },
+    "Sub-task": { "id": "10004", "subtask": true, "hierarchyLevel": -1 },
+    "Subtask": { "id": "10005", "subtask": true, "hierarchyLevel": -1 },
+    "Whim": { "id": "10006", "subtask": false, "hierarchyLevel": 0 }
+  },
+  "fieldSchemas": {
+    "Bug": { "summary": { "required": true, "type": "string" } },
+    "Task": { "summary": { "required": true, "type": "string" } },
+    "Sub-bug": { "summary": { "required": true, "type": "string" } },
+    "Sub-task": { "summary": { "required": true, "type": "string" } },
+    "Subtask": { "summary": { "required": true, "type": "string" } },
+    "Whim": { "summary": { "required": true, "type": "string" } }
+  },
+  "workflows": {
+    "Bug": { "transitions": {} },
+    "Task": { "transitions": {} },
+    "Whim": { "transitions": {} }
+  },
+  "linkTypes": [],
+  "userMappings": {}
+}

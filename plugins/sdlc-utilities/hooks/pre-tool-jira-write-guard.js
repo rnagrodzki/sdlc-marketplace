@@ -213,7 +213,16 @@ async function main() {
   }
   const v = verifyArtifacts(hash);
   if (!v.approval || !v.critique) {
-    return emitDeny(`R17/R20/R21: ${v.reason || 'artifact verification failed'} (hash=${hash.slice(0, 12)}…)`);
+    // Spec R21: surface both hashes so the user can self-diagnose whether the
+    // approval/critique was never written (artifact-hash=none) or was written
+    // under a different payload hash (artifact-hash differs from hook-hash).
+    const nearby = Array.isArray(v.nearbyArtifactHashes) ? v.nearbyArtifactHashes : [];
+    const artifactHashStr = nearby.length
+      ? nearby.map(h => `${h.slice(0, 12)}…`).join('|')
+      : 'none';
+    return emitDeny(
+      `R17/R20/R21: ${v.reason || 'artifact verification failed'} (hook-hash=${hash.slice(0, 12)}…, artifact-hash=${artifactHashStr})`
+    );
   }
 
   // Success — consume artifacts so they cannot be re-used for a different tool call.

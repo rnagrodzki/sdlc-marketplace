@@ -12,7 +12,7 @@
  * description / commentBody / body fields are caught.
  */
 
-const PLACEHOLDER_REGEX = /\{[a-zA-Z_][a-zA-Z0-9_-]*\}|\[[^\]\n]{3,}\]/g;
+const PLACEHOLDER_REGEX = /\{[a-zA-Z_][a-zA-Z0-9_-]*\}|\[(?![{"\d])[^\]\n]{3,}\]/g;
 
 /**
  * @param {*} payload

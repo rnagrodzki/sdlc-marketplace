@@ -322,6 +322,15 @@ function readStdin() {
 // Template resolution
 // ---------------------------------------------------------------------------
 
+// Spec R18: when an issue type lacks both a custom and a shipped template,
+// fall back to a parent template before resolving to 'none'. Keys are
+// case-sensitive and match Atlassian issue-type names verbatim.
+const TEMPLATE_FALLBACK_MAP = {
+  'Sub-bug': 'Bug',
+  'Sub-task': 'Task',
+  'Subtask': 'Task',
+};
+
 function resolveTemplateStatus(projectKey, cachePath, templatesDir) {
   let issueTypes = [];
   if (cachePath && fs.existsSync(cachePath)) {
@@ -345,6 +354,8 @@ function resolveTemplateStatus(projectKey, cachePath, templatesDir) {
 
   const customTemplates  = {};
   const resolved         = {};
+  const fallbacks        = []; // [{type, fallbackTo}] — spec R18
+  const noneTypes        = []; // types still resolved as 'none' after fallback lookup
 
   for (const issueType of issueTypes) {
     const customPath = path.join(customDir, `${issueType}.md`);
@@ -356,7 +367,14 @@ function resolveTemplateStatus(projectKey, cachePath, templatesDir) {
     } else if (defaultTemplateNames.includes(issueType)) {
       resolved[issueType] = 'default';
     } else {
-      resolved[issueType] = 'none';
+      const parent = TEMPLATE_FALLBACK_MAP[issueType];
+      if (parent && defaultTemplateNames.includes(parent)) {
+        resolved[issueType] = 'default-fallback';
+        fallbacks.push({ type: issueType, fallbackTo: parent });
+      } else {
+        resolved[issueType] = 'none';
+        noneTypes.push(issueType);
+      }
     }
   }
 
@@ -365,6 +383,8 @@ function resolveTemplateStatus(projectKey, cachePath, templatesDir) {
     customTemplates,
     defaultTemplates: defaultTemplateNames,
     resolved,
+    fallbacks,
+    noneTypes,
   };
 }
 
@@ -578,9 +598,11 @@ function checkCache({ projectKey, cacheDir, site, skipWorkflowDiscovery, templat
   const customTypes    = Object.entries(templateStatus.resolved)
     .filter(([, v]) => v === 'custom')
     .map(([k]) => k);
-  const uncoveredTypes = Object.entries(templateStatus.resolved)
-    .filter(([, v]) => v === 'none')
-    .map(([k]) => k);
+  // `uncoveredTypes` retains its pre-fallback semantics (types resolved as 'none')
+  // so existing consumers and tests still see only truly-uncovered types. The
+  // fallback array is surfaced separately as `fallbacks` for spec R18.
+  const uncoveredTypes = templateStatus.noneTypes;
+  const fallbackTypes  = templateStatus.fallbacks;
 
   const warnings = [...resolved.warnings];
   if (ageHours === null) {
@@ -604,6 +626,7 @@ function checkCache({ projectKey, cacheDir, site, skipWorkflowDiscovery, templat
       defaultCount:   templateStatus.defaultTemplates.length,
       customTypes,
       uncoveredTypes,
+      fallbacks:      fallbackTypes,
     },
     missing,
     flags:    flagsBlock,

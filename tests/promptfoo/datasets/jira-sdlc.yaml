@@ -277,3 +277,49 @@
         consistency per R20), and Final shows the corrected payload. The skill
         does NOT apply critique deltas silently — every change between Initial and
         Final is enumerated in Critique.
+
+- description: "jira-sdlc: cloudId auth error triggers single refresh+retry, never loops"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-cloudid-auth-error.md"
+    user_request: >
+      Run /jira-sdlc. Create a Bug "auth retry test" in PROJ. The cache is
+      loaded but the cloudId is stale and the next write call will return a
+      403 with "isn't explicitly granted". Walk through the recovery sequence
+      defined in Step 3.
+  assert:
+    - type: icontains
+      value: "getAccessibleAtlassianResources"
+    - type: icontains
+      value: "--force-refresh"
+    - type: llm-rubric
+      value: >
+        The response detects the cloudId authorization error, calls
+        getAccessibleAtlassianResources exactly once, compares the returned
+        cloudId against the cached value, runs /jira-sdlc --force-refresh to
+        update the cache, and retries the original operation exactly once. If
+        the retry still fails, the response surfaces the error and stops — it
+        does NOT loop or call getAccessibleAtlassianResources more than once.
+        The response references spec R23.
+
+- description: "jira-sdlc: namespace fallback retries under mcp__claude_ai_Atlassian__ on cloudId auth fail"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-namespace-fallback.md"
+    user_request: >
+      Run /jira-sdlc. Create a Bug "namespace fallback test" in PROJ. Both
+      mcp__atlassian__ and mcp__claude_ai_Atlassian__ are registered. The
+      primary namespace returns a cloudId authorization error. Walk through
+      the namespace-fallback recovery from Step 3 / R23.
+  assert:
+    - type: icontains
+      value: "mcp__claude_ai_Atlassian__"
+    - type: icontains
+      value: "R23"
+    - type: llm-rubric
+      value: >
+        The response retries the operation under the sibling namespace
+        mcp__claude_ai_Atlassian__ once after the primary mcp__atlassian__
+        fails with a cloudId authorization error. The response indicates the
+        working namespace is persisted for the rest of the session — it does
+        NOT re-probe per-call. The response references spec R23.

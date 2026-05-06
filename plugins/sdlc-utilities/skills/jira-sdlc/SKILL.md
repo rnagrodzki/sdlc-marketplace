@@ -334,6 +334,11 @@ For ambiguous requests, use AskUserQuestion to ask one clarifying question befor
 Skip this step for read operations (`search`, `view`). For every write operation (`create`, `edit`, `transition`, `comment`, `link`, `assign`, `worklog`, `bulk`), run a critique pass against the proposed payload **before** showing it to the user. Implements R20.
 
 1. Build the initial payload exactly as you would dispatch it (template-resolved per R18, placeholders resolved per R19, fields validated against cache per G5/G6/G8).
+   - **Template resolution and fallback notices (R18):** Read `resolved`, `fallbacks`, and `noneTypes` from the prepare script output (`resolveTemplateStatus`). For each entry in `fallbacks`, print a one-line notice before building the payload:
+     `Using <fallbackTo> template for <type> — override at .claude/jira-templates/<type>.md`
+     For each entry in `noneTypes`, print a one-line warning and stop the operation:
+     `No template for <type>. Run /jira-sdlc --init-templates or create .claude/jira-templates/<type>.md`
+     Sub-bug, Sub-task, and Subtask types resolve via the FALLBACK_MAP in the prepare script (Sub-bug → Bug, Sub-task → Task, Subtask → Task) — the skill never re-derives this mapping.
 2. Run the critique checklist:
    - **Template completeness** (create / description-touching edit) — every `## ` heading in the payload description belongs to the resolved template; no invented sections.
    - **Field correctness** — issue type / project key / parent / components / labels match cached `allowedValues`.
@@ -390,6 +395,13 @@ On zero exit, proceed to Step 3.
 ## Step 3 — Execute Operation
 
 For write operations: precondition — Step 2.6 returned `approve`, Step 2.7 link verification passed, and both artifacts (`approval-<hash>.token`, `critique-<hash>.json`) are on disk. The PreToolUse hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the hash from `tool_input`, verifies both artifacts, and BLOCKS dispatch otherwise (R21). If dispatch is blocked, surface the hook's `permissionDecisionReason` to the user verbatim — do not retry by guessing what changed.
+
+**On cloudId authorization error** (response text matches `isn't explicitly granted` or auth/403 with cloudId substring) — implements spec R23:
+
+1. Call `getAccessibleAtlassianResources` exactly once.
+2. Compare the returned cloudId(s) against the cached value at `~/.sdlc-cache/jira/<site>/<KEY>.json`.
+3. If different, run `/jira-sdlc --force-refresh` and reload the cache.
+4. Retry the original MCP call exactly once. If it still fails with the same error, surface the error to the user and stop — do not loop.
 
 After Step 2 classifies the operation type, read `./operations-reference.md` and follow the procedure for the matching operation type.
 
@@ -516,6 +528,7 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 - When Phase 5 workflow sampling finds no issues at all for a type, skip workflow discovery for that type entirely and note it in the cache as `"workflows": { "Story": { "unsampled": true } }`
 - `unsampled: true` markers (from `--skip-workflow-discovery` in CI, or from no-sample results above) route transition operations through a live `getTransitionsForJiraIssue` per issue — the skill reuses the existing stale-cache auto-refresh path, so no separate branch is required in Step 3. Treat `unsampled` identically to "transition ID not cached".
 - The `mcp__atlassian__` prefix is the default; if the user's MCP is registered under a different prefix (e.g., `mcp__claude_ai_Atlassian__`), use the active prefix consistently across all calls in the session
+- **Namespace fallback (spec R23):** When the primary namespace (`mcp__atlassian__`) returns a cloudId authorization error and `mcp__claude_ai_Atlassian__` is also registered (visible in the deferred-tools list), retry the operation under the sibling namespace once. Persist the working namespace for the rest of the session — do not re-probe per-call. Combine with the Step 3 cloudId-error ladder: namespace-fallback is the second leg after the cache-refresh retry fails.
 
 ---
 

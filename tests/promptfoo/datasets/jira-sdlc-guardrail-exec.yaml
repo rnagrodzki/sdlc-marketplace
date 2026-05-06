@@ -187,3 +187,51 @@
       value: "RESULT: PASS"
     - type: icontains
       value: "continue"
+
+# ---------- C13 false-positive: JSON-array body inside comment ADF ----------
+
+- description: "jira-write-guardrail #15 (issue #240): comment with JSON-array body → allow (C13 negative lookahead)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-allow --tool mcp__atlassian__addCommentToJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/comment-adf-json-array-body.json --artifacts fresh"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "allow"
+
+- description: "jira-write-guardrail #16 (issue #240): bracketed prose still denied (regression guard)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-deny --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/placeholder-laden-bug.json --artifacts fresh --reason-substring R19/C13"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "deny"
+
+# ---------- Template fallback (issue #241) ----------
+
+- description: "guardrail helper: template-fallback resolves all three FALLBACK_MAP keys (Sub-bug, Sub-task, Subtask)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op helper-template-fallback"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "all-three-fallbacks-resolved"
+
+# ---------- Dual-hash deny reason format (issue #240) ----------
+
+- description: "jira-write-guardrail #17 (issue #240): missing artifacts emit hook-hash + artifact-hash=none"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: '--op hook-deny --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/valid-bug-create.json --artifacts none --reason-substring artifact-hash=none'
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "hook-hash="
+    - type: icontains
+      value: "artifact-hash=none"

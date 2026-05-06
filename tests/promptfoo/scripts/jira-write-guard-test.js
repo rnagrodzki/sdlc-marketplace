@@ -86,9 +86,80 @@ function helperPlaceholder() {
   if (m.length !== 2) return emit(false, `expected 2 markers, got ${m.length}: ${JSON.stringify(m)}`);
   const shortBracket = findPlaceholders({ s: '[ab]' });
   if (shortBracket.length !== 0) return emit(false, `short bracket should be ignored: ${JSON.stringify(shortBracket)}`);
+  // Spec C13 negative lookahead: JSON-array bodies and numeric-led arrays
+  // must not be flagged as placeholders. Issue #240 false-positive guard.
+  const jsonArrayBody = findPlaceholders({
+    commentBody: 'identities contained one entry: [{"id":"auth0|sub","provider":"auth0"}]',
+  });
+  if (jsonArrayBody.length !== 0) {
+    return emit(false, `JSON-array body must not match: ${JSON.stringify(jsonArrayBody)}`);
+  }
+  const numericLedArray = findPlaceholders({ s: '[123, 456, 789]' });
+  if (numericLedArray.length !== 0) {
+    return emit(false, `numeric-led array must not match: ${JSON.stringify(numericLedArray)}`);
+  }
+  // Quoted-string-led array (also JSON-shape)
+  const quotedArray = findPlaceholders({ s: '["a", "b", "c"]' });
+  if (quotedArray.length !== 0) {
+    return emit(false, `quoted-array must not match: ${JSON.stringify(quotedArray)}`);
+  }
+  // True-positive prose placeholder must still match (regression guard)
+  const prose = findPlaceholders({ s: '[Enter description here]' });
+  if (prose.length !== 1) {
+    return emit(false, `prose placeholder regression: ${JSON.stringify(prose)}`);
+  }
   // Sanity: regex global flag works
   if (!PLACEHOLDER_REGEX.global) return emit(false, 'regex missing /g flag');
   emit(true, `markers=${m.length}`);
+}
+
+function helperTemplateFallback() {
+  // Issue #241: FALLBACK_MAP must cover all three keys (Sub-bug, Sub-task, Subtask).
+  // Build a temp templates dir with only Bug.md + Task.md so the fallback arm
+  // fires for every subtask variant (including Sub-task → Task).
+  const { resolveTemplateStatus } = require(path.join(REPO_ROOT, 'plugins/sdlc-utilities/scripts/skill/jira.js')).__testExports || {};
+  // The script does not export __testExports today; replicate the call via spawnSync
+  // against --templates with a controlled templates dir + cache fixture.
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'jira-fallback-'));
+  try {
+    const tplDir = path.join(tmpRoot, 'tpl');
+    fs.mkdirSync(tplDir, { recursive: true });
+    fs.writeFileSync(path.join(tplDir, 'Bug.md'), '## H\n', 'utf8');
+    fs.writeFileSync(path.join(tplDir, 'Task.md'), '## H\n', 'utf8');
+    // Cache fixture
+    const cacheDir = path.join(tmpRoot, '.sdlc-cache/jira/test_atlassian_net');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(path.join(cacheDir, 'FB.json'), JSON.stringify({
+      version: 1, lastUpdated: '2026-01-15T10:00:00Z', maxAgeHours: 0,
+      cloudId: 'c', siteUrl: 'https://test.atlassian.net',
+      currentUser: { accountId: 'u', displayName: 'U', email: 'e' },
+      project: { key: 'FB', name: 'FB', id: '1' },
+      issueTypes: {
+        'Sub-bug':  { id: '1', subtask: true, hierarchyLevel: -1 },
+        'Sub-task': { id: '2', subtask: true, hierarchyLevel: -1 },
+        'Subtask':  { id: '3', subtask: true, hierarchyLevel: -1 },
+      },
+      fieldSchemas: {}, workflows: {}, linkTypes: [], userMappings: {},
+    }), 'utf8');
+    const SCRIPT = path.join(REPO_ROOT, 'plugins/sdlc-utilities/scripts/skill/jira.js');
+    const r = spawnSync('node', [SCRIPT, '--project', 'FB', '--templates', '--templates-dir', tplDir], {
+      cwd: tmpRoot,
+      env: { ...process.env, HOME: tmpRoot },
+      encoding: 'utf8',
+      timeout: 5000,
+    });
+    if (r.status !== 0) return emit(false, `script failed: ${r.stderr || r.stdout}`);
+    const outPath = (r.stdout || '').trim();
+    const out = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+    const fbMap = Object.fromEntries((out.fallbacks || []).map(f => [f.type, f.fallbackTo]));
+    if (fbMap['Sub-bug'] !== 'Bug')  return emit(false, `Sub-bug fallback missing: ${JSON.stringify(out.fallbacks)}`);
+    if (fbMap['Sub-task'] !== 'Task') return emit(false, `Sub-task fallback missing: ${JSON.stringify(out.fallbacks)}`);
+    if (fbMap['Subtask'] !== 'Task') return emit(false, `Subtask fallback missing: ${JSON.stringify(out.fallbacks)}`);
+    if ((out.noneTypes || []).length !== 0) return emit(false, `unexpected noneTypes: ${JSON.stringify(out.noneTypes)}`);
+    emit(true, 'all-three-fallbacks-resolved');
+  } finally {
+    try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch { /* noop */ }
+  }
 }
 
 function helperTemplate() {
@@ -122,6 +193,13 @@ function helperTemplate() {
 }
 
 function helperArtifactStore() {
+  // Issue #240: storeDir() must be under fs.realpathSync(os.tmpdir()) so the
+  // hook (separate process) can locate artifacts written by the skill, even on
+  // macOS where os.tmpdir() returns a /var/folders symlinked path.
+  const expectedBase = path.join(fs.realpathSync(os.tmpdir()), 'jira-sdlc');
+  if (store.storeDir() !== expectedBase) {
+    return emit(false, `storeDir not canonical: got ${store.storeDir()} want ${expectedBase}`);
+  }
   const hash = crypto.randomBytes(16).toString('hex');
   store.writeCritique(hash, { initial: 'I', findings: ['F'], final: 'F' });
   store.writeApprovalToken(hash);
@@ -266,6 +344,7 @@ try {
     case 'helper-payload-hash':   helperPayloadHash(); break;
     case 'helper-placeholder':    helperPlaceholder(); break;
     case 'helper-template':       helperTemplate(); break;
+    case 'helper-template-fallback': helperTemplateFallback(); break;
     case 'helper-artifact-store': helperArtifactStore(); break;
     case 'hook-allow':            hookCommon('allow'); break;
     case 'hook-continue':         hookCommon('continue'); break;

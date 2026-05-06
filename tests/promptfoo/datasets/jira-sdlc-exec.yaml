@@ -203,3 +203,43 @@
       value: '"ok":false'
     - type: contains
       value: 'url-not-found'
+
+# ---------- Template fallback (issue #241) ----------
+
+- description: "jira-prepare: --templates surfaces fallbacks (Sub-bug -> Bug, Subtask -> Task) and noneTypes (Whim)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/jira.js"
+    script_cwd: "{{project_root}}"
+    script_home: "{{project_root}}"
+    project_root: "file://fixtures-fs/jira-template-fallback"
+    script_args: "--project FALL --templates --templates-dir {{project_root}}/../../../plugins/sdlc-utilities/skills/jira-sdlc/templates"
+  assert:
+    - type: icontains
+      value: '"fallbackTo": "Bug"'
+    - type: icontains
+      value: '"type": "Sub-bug"'
+    - type: icontains
+      value: '"fallbackTo": "Task"'
+    - type: icontains
+      value: '"type": "Subtask"'
+    - type: icontains
+      value: '"Whim"'
+    - type: icontains
+      value: '"Sub-task": "default"'
+
+- description: "jira-prepare: --check surfaces templates.fallbacks for unmapped subtask variants"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/jira.js"
+    script_cwd: "{{project_root}}"
+    script_home: "{{project_root}}"
+    project_root: "file://fixtures-fs/jira-template-fallback"
+    script_args: "--project FALL --check --templates-dir {{project_root}}/../../../plugins/sdlc-utilities/skills/jira-sdlc/templates"
+  assert:
+    - type: icontains
+      value: '"fallbacks":'
+    - type: icontains
+      value: '"Sub-bug"'
+    - type: icontains
+      value: '"uncoveredTypes":'
+    - type: icontains
+      value: '"Whim"'
