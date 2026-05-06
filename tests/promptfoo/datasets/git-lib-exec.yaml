@@ -46,11 +46,7 @@
     project_root: "file://fixtures-fs/project-openspec-baseline"
   assert:
     - type: contains
-      value: 'main...HEAD'
-    - type: contains
-      value: '--name-only'
-    - type: not-contains
-      value: 'main..HEAD'
+      value: 'git diff --name-only main...HEAD'
 
 - description: "git-lib: buildBranchContribDiffCmd 'stat' scope uses three-dot form"
   vars:
@@ -59,11 +55,7 @@
     project_root: "file://fixtures-fs/project-openspec-baseline"
   assert:
     - type: contains
-      value: 'main...HEAD'
-    - type: contains
-      value: '--stat'
-    - type: not-contains
-      value: 'main..HEAD'
+      value: 'git diff --stat main...HEAD'
 
 - description: "git-lib: buildBranchContribDiffCmd 'content' scope uses three-dot form"
   vars:
@@ -72,6 +64,4 @@
     project_root: "file://fixtures-fs/project-openspec-baseline"
   assert:
     - type: contains
-      value: 'main...HEAD'
-    - type: not-contains
-      value: 'main..HEAD'
+      value: 'git diff main...HEAD'

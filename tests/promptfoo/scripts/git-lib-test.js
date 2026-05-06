@@ -69,6 +69,7 @@ switch (op) {
     } catch (err) {
       // By contract this MUST NOT throw — surface the failure for the test to assert.
       console.log(JSON.stringify({ ok: false, threw: true, message: String(err && err.message) }, null, 2));
+      process.exit(1);
     }
     break;
   }
