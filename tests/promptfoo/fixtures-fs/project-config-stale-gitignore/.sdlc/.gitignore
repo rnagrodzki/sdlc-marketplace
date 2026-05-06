@@ -3,9 +3,8 @@
 !.gitignore
 
 # >>> sdlc-utilities managed (do not edit) — selective ignores
-*
-!.gitignore
-!config.json
-!review-dimensions/
-!review-dimensions/**
+local.json
+cache/
+*.bak.*
+.migration.lock
 # <<< sdlc-utilities managed

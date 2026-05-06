@@ -525,15 +525,15 @@ function consolidateLegacyFiles(projectRoot) {
 // ensureSdlcGitignore
 // ---------------------------------------------------------------------------
 
-// Issue #231: selective ignore patterns inside `.sdlc/.gitignore`. Files
-// committed to the repo: `config.json`, `review-dimensions/`. Files ignored:
-// `local.json`, `cache/`, `*.bak.*`, `.migration.lock`. The historical
-// blanket `*\n` is replaced.
+// Deny-all + allowlist. Everything inside `.sdlc/` is ignored except:
+// `.gitignore` (the file itself), `config.json`, and `review-dimensions/`.
+// All other files and directories are ignored by default.
 const SDLC_GITIGNORE_PATTERNS = [
-  'local.json',
-  'cache/',
-  '*.bak.*',
-  '.migration.lock',
+  '*',
+  '!.gitignore',
+  '!config.json',
+  '!review-dimensions/',
+  '!review-dimensions/**',
 ];
 const SDLC_GITIGNORE_BEGIN = '# >>> sdlc-utilities managed (do not edit) — selective ignores';
 const SDLC_GITIGNORE_END   = '# <<< sdlc-utilities managed';
@@ -591,6 +591,48 @@ function ensureSdlcGitignore(projectRoot) {
 }
 
 // ---------------------------------------------------------------------------
+// ensureReviewDimensionsRelocated
+// ---------------------------------------------------------------------------
+
+/**
+ * Idempotent one-time copy: if `.claude/review-dimensions/` exists AND
+ * `.sdlc/review-dimensions/` is absent/empty, copy all files from the legacy
+ * location to the new one. The legacy directory is NOT deleted (cleanup is
+ * deferred to 0.21.x). Skip-if-exists semantics: individual files already
+ * in `.sdlc/review-dimensions/` are not overwritten.
+ *
+ * @param {string} projectRoot
+ * @returns {'created'|'noop'}
+ */
+function ensureReviewDimensionsRelocated(projectRoot) {
+  const legacyDir = path.join(projectRoot, '.claude', 'review-dimensions');
+  const newDir    = path.join(projectRoot, '.sdlc',   'review-dimensions');
+
+  if (!fs.existsSync(legacyDir)) return 'noop';
+
+  fs.mkdirSync(newDir, { recursive: true });
+
+  // Copy files from legacy → new with skip-if-exists semantics.
+  let copied = 0;
+  let entries = [];
+  try {
+    entries = fs.readdirSync(legacyDir, { withFileTypes: true });
+  } catch (_) {
+    return 'noop';
+  }
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const src  = path.join(legacyDir, entry.name);
+    const dest = path.join(newDir,    entry.name);
+    if (!fs.existsSync(dest)) {
+      fs.copyFileSync(src, dest);
+      copied++;
+    }
+  }
+  return copied > 0 ? 'created' : 'noop';
+}
+
+// ---------------------------------------------------------------------------
 // ensureRootGitignore
 // ---------------------------------------------------------------------------
 
@@ -599,28 +641,29 @@ function ensureSdlcGitignore(projectRoot) {
 // the gitignore block is defence-in-depth (issue #209) so a stray cwd-write
 // from any future code path or shell redirect never lands in version control.
 //
+// .sdlc/ runtime files (local.json, cache/, .bak.*, .migration.lock) are now
+// covered by .sdlc/.gitignore (deny-all + allowlist) and no longer need to be
+// listed here.
+//
 // IMPORTANT: keep this list in sync with the prefixes used by `writeOutput`
 // callers across the plugin (commit-context, pr-context, version-context,
 // jira-context, review-manifest, received-review-manifest, sdlc-error-report,
 // plan-prepare, ship-prepare, setup-prepare, etc.). The three glob families
 // below cover all of them.
 const ROOT_GITIGNORE_PATTERNS = [
-  // Transient skill artifacts (legacy from issue #209)
+  // Transient skill artifacts — defence-in-depth for prepare output files
   '*-context-*.json',
   '*-manifest-*.json',
   '*-prepare-*.json',
-  // Issue #231 — runtime/transient files inside .sdlc/
-  '.sdlc/local.json',
-  '.sdlc/cache/',
-  '.sdlc/*.bak.*',
-  '.sdlc/.migration.lock',
 ];
 
-// Issue #231: bump the managed-block version marker to v2 so existing v1
-// blocks (which only contain the three transient-artifact patterns) are
-// replaced cleanly when a project upgrades.
-const ROOT_GITIGNORE_BEGIN = '# >>> sdlc-utilities managed v2 (do not edit) — transient skill artifacts and .sdlc/ runtime';
-const ROOT_GITIGNORE_END   = '# <<< sdlc-utilities managed';
+// Bump the managed-block version marker to v3. The .sdlc/ runtime patterns
+// are now handled by .sdlc/.gitignore (deny-all + allowlist), so the root
+// block only needs the three transient-artifact globs.
+const ROOT_GITIGNORE_BEGIN    = '# >>> sdlc-utilities managed v3 (do not edit) — transient skill artifacts';
+const ROOT_GITIGNORE_END      = '# <<< sdlc-utilities managed';
+// Legacy v2 marker (used for in-place replacement of v2 blocks).
+const ROOT_GITIGNORE_BEGIN_V2 = '# >>> sdlc-utilities managed v2 (do not edit) — transient skill artifacts and .sdlc/ runtime';
 // Legacy v1 marker (used for in-place replacement of older blocks).
 const ROOT_GITIGNORE_BEGIN_V1 = '# >>> sdlc-utilities managed (do not edit) — transient skill artifacts';
 
@@ -652,11 +695,14 @@ function ensureRootGitignore(projectRoot) {
     fileExisted = true;
   }
 
-  // Look for an existing managed block. The regex matches the v2 BEGIN
-  // marker first; failing that, falls back to the v1 marker so existing
-  // installations are upgraded in place (issue #231).
-  const blockRegexV2 = new RegExp(
+  // Look for an existing managed block. Cascade: v3 → v2 → v1 so existing
+  // installations are upgraded in place.
+  const blockRegexV3 = new RegExp(
     `${escapeRegExp(ROOT_GITIGNORE_BEGIN)}[\\s\\S]*?${escapeRegExp(ROOT_GITIGNORE_END)}`,
+    'm'
+  );
+  const blockRegexV2 = new RegExp(
+    `${escapeRegExp(ROOT_GITIGNORE_BEGIN_V2)}[\\s\\S]*?${escapeRegExp(ROOT_GITIGNORE_END)}`,
     'm'
   );
   const blockRegexV1 = new RegExp(
@@ -665,11 +711,13 @@ function ensureRootGitignore(projectRoot) {
   );
 
   let next;
-  if (blockRegexV2.test(existing)) {
-    // Replace v2 in place.
+  if (blockRegexV3.test(existing)) {
+    next = existing.replace(blockRegexV3, managedBlock);
+  } else if (blockRegexV2.test(existing)) {
+    // Upgrade v2 → v3 in place.
     next = existing.replace(blockRegexV2, managedBlock);
   } else if (blockRegexV1.test(existing)) {
-    // Upgrade v1 → v2 in place.
+    // Upgrade v1 → v3 in place.
     next = existing.replace(blockRegexV1, managedBlock);
   } else if (existing.length === 0) {
     next = managedBlock + '\n';
@@ -690,6 +738,27 @@ function escapeRegExp(str) {
 }
 
 // ---------------------------------------------------------------------------
+// ensureSdlcInfrastructure
+// ---------------------------------------------------------------------------
+
+/**
+ * Composite helper: runs all idempotent layout reconciliation steps in one
+ * call. Covers `.sdlc/.gitignore` (deny-all template), root `.gitignore`
+ * (transient artifact managed block), and review-dimensions relocation.
+ * Called by prepare scripts and migrate-config regardless of skip flag.
+ *
+ * @param {string} projectRoot
+ * @returns {{ sdlcGitignore: string, rootGitignore: string, reviewDimensions: string }}
+ */
+function ensureSdlcInfrastructure(projectRoot) {
+  return {
+    sdlcGitignore:    ensureSdlcGitignore(projectRoot),
+    rootGitignore:    ensureRootGitignore(projectRoot),
+    reviewDimensions: ensureReviewDimensionsRelocated(projectRoot),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -704,7 +773,9 @@ module.exports = {
   // Backward-compat alias — renamed in issue #231; remove in 0.21.x.
   migrateConfig: consolidateLegacyFiles,
   ensureSdlcGitignore,
+  ensureReviewDimensionsRelocated,
   ensureRootGitignore,
+  ensureSdlcInfrastructure,
   // Preset normalization
   normalizePreset,
   PRESET_NAMES,

@@ -21,6 +21,7 @@
 // ---------------------------------------------------------------------------
 
 const { verifyAndMigrate } = require('./config-version.js');
+const { ensureSdlcInfrastructure } = require('./config.js');
 
 /**
  * Resolve the skip-config-check flag from CLI args + env. CLI > env > default false.
@@ -54,22 +55,35 @@ function ensureConfigVersion(projectRoot, opts = {}) {
     errors: [],
   };
 
-  if (skip) return out;
-
-  const migration = {};
-  for (const role of roles) {
-    try {
-      migration[role] = verifyAndMigrate(projectRoot, role);
-    } catch (err) {
-      out.errors.push({
-        role,
-        step: err.step || null,
-        code: err.code || 'UNKNOWN',
-        message: err.message,
-      });
+  if (!skip) {
+    const migration = {};
+    for (const role of roles) {
+      try {
+        migration[role] = verifyAndMigrate(projectRoot, role);
+      } catch (err) {
+        out.errors.push({
+          role,
+          step: err.step || null,
+          code: err.code || 'UNKNOWN',
+          message: err.message,
+        });
+      }
     }
+    out.migration = migration;
   }
-  out.migration = migration;
+
+  // Infrastructure reconciliation runs regardless of skip flag.
+  try {
+    out.infrastructure = ensureSdlcInfrastructure(projectRoot);
+  } catch (err) {
+    out.errors.push({
+      role: 'infrastructure',
+      step: 'ensureSdlcInfrastructure',
+      code: 'INFRA_FAILED',
+      message: err.message,
+    });
+  }
+
   return out;
 }
 

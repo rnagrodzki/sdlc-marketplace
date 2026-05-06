@@ -27,6 +27,7 @@ const {
   verifyAndMigrate,
   ConfigVersionError,
 } = require(path.resolve(__dirname, '..', 'lib', 'config-version.js'));
+const { ensureSdlcInfrastructure } = require(path.resolve(__dirname, '..', 'lib', 'config.js'));
 
 function parseArgs(argv) {
   const args = { dryRun: false };
@@ -75,6 +76,21 @@ function main() {
       code: err.code || 'UNKNOWN',
       message: err.message,
     });
+  }
+
+  // Layout reconciliation (gitignore, review-dimensions relocation).
+  // Skipped when --dry-run to match verifyAndMigrate dry-run semantics.
+  if (!flags.dryRun) {
+    try {
+      manifest.infrastructure = ensureSdlcInfrastructure(projectRoot);
+    } catch (err) {
+      manifest.errors.push({
+        role: 'infrastructure',
+        step: 'ensureSdlcInfrastructure',
+        code: 'INFRA_FAILED',
+        message: err.message,
+      });
+    }
   }
 
   process.stdout.write(JSON.stringify(manifest, null, 2) + '\n');

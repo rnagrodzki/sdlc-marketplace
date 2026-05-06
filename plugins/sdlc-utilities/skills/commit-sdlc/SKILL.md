@@ -271,7 +271,7 @@ When invoking `error-report-sdlc`, provide:
 
 ## Learning Capture
 
-After completing a commit, if the project's detected commit style was non-conventional or unusual, append to `.sdlc/learnings/log.md`:
+After completing a commit, if the project's detected commit style was non-conventional or unusual, append to `.claude/learnings/log.md`:
 
 ```
 ## YYYY-MM-DD — commit-sdlc: <brief summary>

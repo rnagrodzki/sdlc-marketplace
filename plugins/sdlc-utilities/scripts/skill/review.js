@@ -30,7 +30,7 @@ const path = require('node:path');
 const os   = require('node:os');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { validateAll, extractFrontmatter, extractBody, parseSimpleYaml } = require(path.join(LIB, 'dimensions'));
+const { validateAll, extractFrontmatter, extractBody, parseSimpleYaml, resolveDimensionsDir } = require(path.join(LIB, 'dimensions'));
 const {
   exec,
   checkGitState,
@@ -408,7 +408,7 @@ function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
   for (const result of report.dimensions) {
     if (result.status === 'FAIL') continue;
 
-    const filePath = path.join(projectRoot, '.claude', 'review-dimensions', result.file);
+    const filePath = path.join(resolveDimensionsDir(projectRoot), result.file);
     let content;
     try { content = fs.readFileSync(filePath, 'utf8'); } catch (_) { continue; }
 

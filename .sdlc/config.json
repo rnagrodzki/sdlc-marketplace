@@ -1,0 +1,174 @@
+{
+  "version": {
+    "mode": "file",
+    "versionFile": "plugins/sdlc-utilities/.claude-plugin/plugin.json",
+    "fileType": "plugin.json",
+    "tagPrefix": "v",
+    "changelog": true,
+    "changelogFile": "CHANGELOG.md"
+  },
+  "plan": {
+    "guardrails": [
+      {
+        "id": "test-coverage-required",
+        "description": "Every task that creates or modifies source code must include corresponding promptfoo test cases.",
+        "severity": "error"
+      },
+      {
+        "id": "no-ci-bypass",
+        "description": "Plans must not include steps that skip or disable CI checks.",
+        "severity": "error"
+      },
+      {
+        "id": "no-auto-eval",
+        "description": "Plans must never include steps that run promptfoo eval — evaluation runs are user-initiated only.",
+        "severity": "error"
+      },
+      {
+        "id": "skill-docs-required",
+        "description": "Any task that creates `plugins/*/skills/*/SKILL.md` must include matching entries for all four companion artifacts: `docs/specs/<skill-name>.md` (spec), `docs/skills/<skill-name>.md` (reference doc), `README.md` (skills-table row), and `site/src/data/skills-meta.ts` (SkillCard registry). Skill-name is derived from the SKILL.md path's parent directory.",
+        "severity": "error"
+      },
+      {
+        "id": "no-scope-creep",
+        "description": "Tasks must only address stated requirements; no gold-plating.",
+        "severity": "warning"
+      },
+      {
+        "id": "single-responsibility-tasks",
+        "description": "Each task must have exactly one clear deliverable.",
+        "severity": "warning"
+      },
+      {
+        "id": "scripts-over-llm-logic",
+        "description": "When adding or editing skills, prioritize deterministic behavior driven by prepare scripts over complex LLM instructions. Move logic into scripts whenever feasible.",
+        "severity": "error"
+      },
+      {
+        "id": "yagni",
+        "description": "Do not add functionality until it is actually needed. No speculative abstractions, premature generalization, or unused parameters.",
+        "severity": "warning"
+      },
+      {
+        "id": "cross-skill-consistency",
+        "description": "Check consistency with other skills and expand scope to provide a compatibility layer with other skills execution if necessary.",
+        "severity": "error"
+      },
+      {
+        "id": "pr-link-github-issue",
+        "description": "When a change fixes or addresses a GitHub issue, the plan must include linking the issue in the PR (e.g., Fixes #123 or Closes #123).",
+        "severity": "error"
+      },
+      {
+        "id": "dry",
+        "description": "Do not duplicate logic. If the same behavior exists elsewhere, reuse it or extract a shared function. Copy-pasted code blocks across tasks are a plan failure.",
+        "severity": "warning"
+      },
+      {
+        "id": "kiss",
+        "description": "Prefer the simplest implementation that satisfies the requirements. Avoid unnecessary abstractions, premature generalization, and over-engineered solutions.",
+        "severity": "warning"
+      },
+      {
+        "id": "spec-first",
+        "description": "Any task that modifies a skill's behavior (SKILL.md changes) must first update the corresponding spec in docs/specs/<skill-name>.md. The spec is the source of truth — implementation follows spec, not the other way around. Plans that change SKILL.md without a matching spec update task (ordered before the SKILL.md task) fail this guardrail.",
+        "severity": "error"
+      },
+      {
+        "id": "project-agnostic",
+        "description": "Plugin behaviour must work in any consumer project, not only sdlc-marketplace. Tasks that modify repo-local files (.gitignore, project configs, root scripts) must instead implement the change in plugin code (setup-sdlc helpers, hooks, SKILL.md) so it ships to every consumer. Direct edits to sdlc-marketplace files are allowed only when verifying the plugin's own dogfooding.",
+        "severity": "error"
+      },
+      {
+        "id": "flag-coherence-cross-skill",
+        "description": "When skill A dispatches skill B (e.g., ship-sdlc → version-sdlc) and B's prepare script resolves a flag from CLI + config inputs, every SKILL.md decision site in B that gates on that flag must cite the resolved field from prepare output (e.g., flags.X === true). Sites that inspect raw $ARGUMENTS, the original CLI string, or config.X directly after Step 1 (CONSUME) fail this guardrail. The only exception is sites that genuinely concern persistent project state (e.g., CI scaffolding) — these must cite config.X AND include an inline rationale comment explaining the divergence.",
+        "severity": "error"
+      },
+      {
+        "id": "no-opposite-logical-vectors",
+        "description": "Within a single skill, when two or more SKILL.md sites gate the same behavioral concept (e.g., 'draft changelog' at Step 2 and 'write changelog' at Step 8), the gate condition must be expressed identically (same field reference, same operator, same constant). Plans that introduce or retain divergent gate phrasings for the same concept fail this guardrail.",
+        "severity": "error"
+      },
+      {
+        "id": "flag-resolution-single-source",
+        "description": "Each contractual flag must have exactly one resolution site — typically the prepare script. Downstream consumers (SKILL.md, sub-skills, CI scripts) reference the resolved field by name; they must not re-derive the value via OR-ing, fallback logic, or argument re-parsing.",
+        "severity": "warning"
+      }
+    ]
+  },
+  "commit": {
+    "subjectPattern": "^(feat|fix|refactor|chore|docs|test|ci)\\(#\\d+\\): .+ - .+$",
+    "subjectPatternError": "Commit subject must follow: type(#issue): scope - description",
+    "allowedTypes": [
+      "feat",
+      "fix",
+      "refactor",
+      "chore",
+      "docs",
+      "test",
+      "ci"
+    ]
+  },
+  "pr": {
+    "titlePattern": "^(feat|fix|refactor|chore|docs|test|ci)\\(#\\d+\\): .+ - .+$",
+    "titlePatternError": "PR title must follow: type(#issue): scope - description",
+    "labels": {
+      "mode": "llm"
+    }
+  },
+  "execute": {
+    "guardrails": [
+      {
+        "id": "test-coverage-required",
+        "description": "Code changes must include corresponding test coverage — verify tests exist and pass after each wave.",
+        "severity": "error"
+      },
+      {
+        "id": "no-ci-bypass",
+        "description": "Implemented code must not disable, skip, or weaken CI checks, linters, or pre-commit hooks.",
+        "severity": "error"
+      },
+      {
+        "id": "no-auto-eval",
+        "description": "Never run promptfoo eval automatically — evaluation must always be initiated manually by the user.",
+        "severity": "error"
+      },
+      {
+        "id": "spec-first",
+        "description": "New skills require an accepted spec (docs/specs/<skill-name>.md) before writing SKILL.md.",
+        "severity": "error"
+      },
+      {
+        "id": "skill-docs-required",
+        "description": "Every skill change must produce all three artifacts: spec at docs/specs/, SKILL.md, and docs/skills/ reference doc.",
+        "severity": "error"
+      },
+      {
+        "id": "no-scope-creep",
+        "description": "Implementation must stay within the task stated scope — no additional features, refactoring, or cleanup beyond what was specified.",
+        "severity": "warning"
+      },
+      {
+        "id": "single-responsibility-tasks",
+        "description": "Each implemented change must address exactly one concern — no bundled fixes or unrelated modifications.",
+        "severity": "warning"
+      },
+      {
+        "id": "yagni",
+        "description": "Do not add functionality until it is actually needed. No speculative abstractions, premature generalization, or unused parameters.",
+        "severity": "warning"
+      },
+      {
+        "id": "flag-coherence-cross-skill",
+        "description": "When skill A dispatches skill B (e.g., ship-sdlc → version-sdlc) and B's prepare script resolves a flag from CLI + config inputs, every SKILL.md decision site in B that gates on that flag must cite the resolved field from prepare output (e.g., flags.X === true). Sites that inspect raw $ARGUMENTS, the original CLI string, or config.X directly after Step 1 (CONSUME) fail this guardrail. The only exception is sites that genuinely concern persistent project state (e.g., CI scaffolding) — these must cite config.X AND include an inline rationale comment explaining the divergence.",
+        "severity": "error"
+      },
+      {
+        "id": "no-opposite-logical-vectors",
+        "description": "Within a single skill, when two or more SKILL.md sites gate the same behavioral concept (e.g., 'draft changelog' at Step 2 and 'write changelog' at Step 8), the gate condition must be expressed identically (same field reference, same operator, same constant). Implementations that introduce or retain divergent gate phrasings for the same concept fail this guardrail.",
+        "severity": "error"
+      }
+    ]
+  },
+  "schemaVersion": 3
+}

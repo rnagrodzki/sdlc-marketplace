@@ -88,3 +88,19 @@
       value: '"migrated": false'
     - type: icontains
       value: '"backupPath": null'
+
+# Acceptance does NOT include CI eval — manual `promptfoo eval` only per project policy
+- description: "migrate-config: deny-all .sdlc/.gitignore + review-dimensions relocation"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-stale-gitignore"
+  assert:
+    - type: icontains
+      value: '"sdlcGitignore": "updated"'
+    - type: icontains
+      value: '"reviewDimensions": "created"'
+    - type: icontains
+      value: '"infrastructure"'
+    - type: icontains
+      value: '"errors": []'

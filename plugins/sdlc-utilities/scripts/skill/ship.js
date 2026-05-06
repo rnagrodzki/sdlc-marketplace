@@ -671,7 +671,7 @@ function main() {
   // and short-circuits its own per-skill check.
   const skipConfigCheck = resolveSkipConfigCheck(process.argv);
   const cv = ensureConfigVersion(projectRoot, { skip: skipConfigCheck, roles: ['project', 'local'] });
-  let migrationManifest = cv.migration;
+  let migrationManifest = { ...(cv.migration || {}), infrastructure: cv.infrastructure };
   if (cv.errors.length > 0) {
     for (const e of cv.errors) errors.push(`config-version: ${e.role}: ${e.message}`);
     writeOutput({

@@ -503,7 +503,7 @@ This skill is safe to re-run. Already-configured sections are skipped unless `--
 
 ## Learning Capture
 
-After completing setup or encountering unexpected behavior, append to `.sdlc/learnings/log.md`:
+After completing setup or encountering unexpected behavior, append to `.claude/learnings/log.md`:
 
 ```
 ## YYYY-MM-DD -- setup-sdlc: <brief summary>

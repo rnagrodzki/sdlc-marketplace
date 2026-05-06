@@ -239,7 +239,7 @@ The trap from Step 1 cleans up the manifest on every exit path.
 
 ## Step 7 — Learning Capture
 
-Append a single line to `.sdlc/learnings/log.md` summarizing the hardening
+Append a single line to `.claude/learnings/log.md` summarizing the hardening
 action:
 
 ```

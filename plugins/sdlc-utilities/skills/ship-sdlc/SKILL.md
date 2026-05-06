@@ -472,15 +472,15 @@ Pipeline-level learnings cannot land in the feature commit (issue #208) — revi
 
 If the `learnings-commit` step has `status: "will_run"`, execute it inline (no Agent dispatch — deterministic shell):
 
-1. Run the ship-level Learning Capture (see the `## Learning Capture` section below) — append any new entries to `.sdlc/learnings/log.md`.
+1. Run the ship-level Learning Capture (see the `## Learning Capture` section below) — append any new entries to `.claude/learnings/log.md`.
 2. Check whether anything actually changed:
    ```bash
-   git diff --quiet -- .sdlc/learnings/log.md
+   git diff --quiet -- .claude/learnings/log.md
    ```
    - Exit `0` (no diff) → skip the commit and report `learnings-commit: no-op (no new learnings)`.
 3. If there is a diff:
    ```bash
-   git add .sdlc/learnings/log.md
+   git add .claude/learnings/log.md
    git commit -m "chore(ship-sdlc): capture pipeline learnings"
    git push
    ```
@@ -766,7 +766,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 ## Learning Capture
 
-After completing the pipeline, append to `.sdlc/learnings/log.md`:
+After completing the pipeline, append to `.claude/learnings/log.md`:
 
 - Review verdicts that surprised (threshold too aggressive or too lenient)
 - Sub-skills that failed in unexpected ways during chaining

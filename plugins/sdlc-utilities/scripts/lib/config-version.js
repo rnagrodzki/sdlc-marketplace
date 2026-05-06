@@ -17,10 +17,10 @@
 //
 // Backups: each file is backed up before any in-place migration runs. The
 // one-time legacy relocation step (project v0→v3) writes its backup to
-// `.claude/sdlc.json.bak` (no timestamp suffix — single one-time backup,
-// issue #231 acceptance). All other in-place backups go to
-// `.sdlc/<file>.bak.<filesystem-safe-ISO>` where the timestamp uses `T` and
-// `-` separators (no `:`).
+// `.sdlc/sdlc.json.bak` inside the consumer project's SDLC surface (no timestamp
+// suffix — single one-time backup, issue #231 acceptance). All other in-place
+// backups go to `.sdlc/<file>.bak.<filesystem-safe-ISO>` where the timestamp
+// uses `T` and `-` separators (no `:`).
 //
 // Implements issue #232 (schema versioning) and the migration glue half of
 // issue #231 (legacy relocation).
@@ -399,7 +399,7 @@ function verifyAndMigrate(projectRoot, role, opts = {}) {
 
   try {
     // Backup before any mutation.
-    backupPath = computeBackupPath(role, paths, detected);
+    backupPath = computeBackupPath(projectRoot, role, paths, detected);
     if (backupPath) {
       const sourceForBackup = detected.source === 'legacy' ? paths.legacyPath : paths.newPath;
       writeBackup(sourceForBackup, backupPath);
@@ -454,11 +454,12 @@ function verifyAndMigrate(projectRoot, role, opts = {}) {
  * Compute the backup path for a given role + detected source. Returns null
  * when the source file does not exist (nothing to back up).
  */
-function computeBackupPath(role, paths, detected) {
+function computeBackupPath(projectRoot, role, paths, detected) {
   if (role === 'project' && detected.source === 'legacy') {
-    // Issue #231 acceptance criterion: single one-time backup at
-    // .claude/sdlc.json.bak (no timestamp suffix).
-    return paths.legacyPath + '.bak';
+    // Backup of legacy `.claude/sdlc.json` lands inside `.sdlc/` (consumer
+    // project's SDLC surface), not `.claude/` (Claude Code's surface).
+    // Single one-time backup, no timestamp suffix.
+    return path.join(projectRoot, '.sdlc', path.basename(paths.legacyPath) + '.bak');
   }
   // All other in-place migrations: .sdlc/<file>.bak.<safe-iso>
   const ts = fsSafeIsoTimestamp();

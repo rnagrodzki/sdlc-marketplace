@@ -607,7 +607,7 @@ When invoking `error-report-sdlc`, provide:
 
 ## Learning Capture
 
-When creating pull requests, capture discoveries by appending to `.sdlc/learnings/log.md`.
+When creating pull requests, capture discoveries by appending to `.claude/learnings/log.md`.
 Record entries for: repository PR conventions not covered by this skill, branch naming
 patterns, CI requirements that affect PR descriptions, team-specific template preferences,
 JIRA project key patterns, or review process quirks encountered while generating PR content.

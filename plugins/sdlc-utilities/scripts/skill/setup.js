@@ -89,7 +89,7 @@ function detect(projectRoot) {
   const legacyReviewClaudePath = path.join(projectRoot, LEGACY.reviewClaude);
 
   // --- Content files ---
-  const reviewDimensionsDir = path.join(projectRoot, '.claude', 'review-dimensions');
+  const reviewDimensionsDir = path.join(projectRoot, '.sdlc', 'review-dimensions');
   const prTemplatePath = path.join(projectRoot, '.claude', 'pr-template.md');
   const jiraTemplatesDir = path.join(projectRoot, '.claude', 'jira-templates');
 
@@ -162,7 +162,7 @@ function detect(projectRoot) {
     content: {
       reviewDimensions: {
         count: countFiles(reviewDimensionsDir, '.md'),
-        path: path.join('.claude', 'review-dimensions') + path.sep,
+        path: path.join('.sdlc', 'review-dimensions') + path.sep,
       },
       prTemplate: {
         exists: fs.existsSync(prTemplatePath),

@@ -3,6 +3,12 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-06 — pr-sdlc: --validate-body on older installed plugin version emits full JSON to stdout
+The installed plugin (0.17.x) resolves pr.js via `find ~/.claude/plugins` and may be an older cached version than the local checkout. When piping a large body to `--validate-body`, stdout floods with the full pr context JSON (572KB) because the older version echoes it — only the last line `LINK_EXIT=N` and `OK:` message matter. The validation still works correctly (exit 0 = pass). No action needed; capturing stderr separately and checking exit code is sufficient.
+
+## 2026-05-06 — version-sdlc: patch bump from chore/relocate-sdlc-state-config-schema
+v0.18.1 → v0.18.2. Branch had no upstream — auto-set via `--set-upstream` on push. changelog flag was false (no --changelog arg passed despite config.changelog=true), so no CHANGELOG entry was generated.
+
 ## 2026-05-06 — pr-sdlc: PR #236 created for feat/harden-sdlc-skill → main
 Custom template active (.claude/pr-template.md). Title pattern required type(#issue): scope - description format. Installed pr.js was 0.17.47 (project at 0.18.0) — --validate-body still worked. Branch was already up to date on remote despite remoteState.pushed=false. Labels enhancement+documentation inferred via llm mode from feat/ prefix and docs/* changes.
 
@@ -124,3 +130,19 @@ Plan 220-223-steady-clarke.md (#220 context-stats fix + #223 ship-state lifecycl
 
 ## 2026-05-06 — execute-plan-sdlc: harden-sdlc skill scaffolded across 4 waves
 8 tasks executed sequentially (Agent dispatch unavailable in this environment — adapted to inline execution). Three-layer artifacts (spec/SKILL/reference doc) plus prepare script + orchestrator + caller integrations + promptfoo dataset all landed without retries. The 200-line cap on `harden-prepare.js` initially missed by 8 lines; trimming the docstring resolved it, suggesting the C2 cap should be checked before the final docstring is written, not after. Pre-existing `flag-coherence-cross-skill` validator failure (description >512 chars) confirmed unrelated to this work via git stash.
+
+## 2026-05-06 — ship-sdlc: worktree branch + state migration gap
+execute-plan-sdlc created branch `chore/relocate-sdlc-state-config-schema` from `main`. ship.js state was initialized for `main`; state/ship.js `migrate` subcommand not yet available (v0.17.47). Manual JSON rename needed. Consider initializing state after execute returns, not before.
+
+## 2026-05-06 — ship-sdlc: fixture embedded git repo
+execute-plan-sdlc created `tests/promptfoo/fixtures-fs/project-skill-skip-via-env/` by running `git init` inside the fixture dir. fixture should be empty (no .sdlc/ files) — only `.gitkeep` needed. Spec comment for such fixtures should explicitly note "do not git init".
+
+## 2026-05-06 — execute-plan-sdlc: SDLC layout reconciliation plan (10 tasks, 6 waves)
+
+Wave structure for config.js multi-edit plans: 4 tasks all edited config.js (Tasks 2, 3, 4, 6) which forced 4 sequential waves. A plan-time pre-check grep of all file modifications would have surfaced this earlier and allowed better planning. Wave 1 batched 3 trivials across different files correctly.
+
+Fixture smoke-test side effect: running `migrate-config.js` directly inside a promptfoo fixture directory mutated it. Script-runner copies fixtures to tempdir in real use — always run smoke tests with a temp copy or restore the fixture afterward.
+
+`cd` in Bash tool persists between commands in the session — using relative paths after a `cd` means subsequent tool calls resolve from the new directory. Always use absolute paths or re-cd to repo root at the start of each command.
+
+Out-of-scope finding: `guardrails.js:446` still uses `.claude/review-dimensions` hardcoded path — not listed in plan, left unmodified per no-scope-creep guardrail. Flagged for follow-up.

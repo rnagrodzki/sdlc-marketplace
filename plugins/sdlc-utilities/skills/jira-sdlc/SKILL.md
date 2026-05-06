@@ -521,7 +521,7 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 
 ## Learning Capture
 
-When executing Jira operations, capture discoveries by appending to `.sdlc/learnings/log.md`.
+When executing Jira operations, capture discoveries by appending to `.claude/learnings/log.md`.
 Record entries for: field formats that differ from the defaults documented here, workflow
 quirks discovered in specific projects, issue type names that aren't standard (e.g., custom
 subtask type names), user lookup disambiguation patterns, and transition required fields not

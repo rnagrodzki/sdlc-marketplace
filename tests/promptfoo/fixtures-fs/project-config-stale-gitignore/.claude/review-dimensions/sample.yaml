@@ -1,0 +1,6 @@
+name: code-quality
+description: Code quality checks
+triggers:
+  - "**/*.js"
+instructions: |
+  Review for code quality issues.

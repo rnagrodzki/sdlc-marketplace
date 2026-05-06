@@ -485,7 +485,7 @@ When invoking `error-report-sdlc`, provide:
 
 ## Learning Capture
 
-After processing review feedback, append discoveries to `.sdlc/learnings/log.md`. Record
+After processing review feedback, append discoveries to `.claude/learnings/log.md`. Record
 entries for: reviewer patterns worth knowing (e.g., they always flag X style), pushback
 outcomes (accepted or rejected — to calibrate future responses), unclear feedback patterns
 that revealed communication gaps, YAGNI findings that removed unnecessary work, or codebase

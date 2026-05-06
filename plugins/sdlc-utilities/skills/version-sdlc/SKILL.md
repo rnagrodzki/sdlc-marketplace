@@ -400,7 +400,7 @@ The automated changelog is a **draft, not a source of truth**. Correctness is th
 
 ## Learning Capture
 
-After completing a release or encountering unexpected behavior, append to `.sdlc/learnings/log.md`:
+After completing a release or encountering unexpected behavior, append to `.claude/learnings/log.md`:
 
 ```
 ## YYYY-MM-DD — version-sdlc: <brief summary>

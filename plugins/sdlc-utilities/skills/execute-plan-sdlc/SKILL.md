@@ -477,7 +477,7 @@ The reviewer's focus in this final check is **cross-wave coverage**:
 
 **8-ter. Learning Capture (runs before Step 9 returns control):**
 
-Append to `.sdlc/learnings/log.md`:
+Append to `.claude/learnings/log.md`:
 
 - Tasks classified trivial that needed agent dispatch (or vice versa)
 - Wave structures that caused unexpected file conflicts
@@ -618,7 +618,7 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 
 **Empty guardrails are the happy path for existing projects.** If `activeGuardrails` is empty (no guardrails configured in `.sdlc/config.json` under `execute`), all guardrail steps are skipped. This is backward compatible — no existing behavior changes. Execution guardrails (`execute.guardrails`) and plan guardrails (`plan.guardrails`) are independent — configuring one does not affect the other.
 
-**Learning Capture runs before the final report.** See Step 8-ter. The append to `.sdlc/learnings/log.md` must happen before Step 9 returns control so ship-sdlc's staging window (`git add -A -- ':!.sdlc/'`) picks up the change and the log entry lands inside the feature commit. A standalone `## Learning Capture` section after Step 9 would leave the working tree dirty post-pipeline.
+**Learning Capture runs before the final report.** See Step 8-ter. The append to `.claude/learnings/log.md` must happen before Step 9 returns control so ship-sdlc's staging window (`git add -A -- ':!.sdlc/'`) picks up the change and the log entry lands inside the feature commit. A standalone `## Learning Capture` section after Step 9 would leave the working tree dirty post-pipeline.
 
 ## What's Next
 
