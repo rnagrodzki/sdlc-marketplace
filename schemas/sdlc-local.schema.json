@@ -17,6 +17,23 @@
       },
       "additionalProperties": false
     },
+    "receivedReviewSection": {
+      "type": "object",
+      "description": "User-local defaults for the received-review-sdlc skill.",
+      "properties": {
+        "alwaysFixSeverities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          },
+          "uniqueItems": true,
+          "default": [],
+          "description": "Severities whose 'will fix' findings bypass the per-finding consent gate. Local-only — must NEVER be set in .sdlc/config.json."
+        }
+      },
+      "additionalProperties": false
+    },
     "shipSection": {
       "type": "object",
       "description": "Controls the ship-sdlc skill behaviour.",
@@ -84,6 +101,9 @@
     },
     "ship": {
       "$ref": "#/$defs/shipSection"
+    },
+    "receivedReview": {
+      "$ref": "#/$defs/receivedReviewSection"
     }
   },
   "additionalProperties": false

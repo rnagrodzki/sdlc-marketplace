@@ -24,7 +24,52 @@ Provide review feedback in one of three ways:
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--pr <number>` | PR number to fetch review threads from. Enables thread-aware mode: pre-computes thread resolution state, filters to outstanding comments only on re-run. | Auto-detected from current branch |
-| `--auto` | Skip consent gates at Step 10 and Step 12. Auto-implement all "will fix" items and auto-post in-thread replies (resolving only "agree, will fix" threads). Critique gates still run. "Disagree" and "won't fix" items are displayed but not auto-implemented; their threads are replied to but left open. | Off |
+| `--auto` | Skip consent gates at Step 10 and Step 12. Auto-implement all "will fix" items (subject to `alwaysFixSeverities`, see Configuration below) and auto-post in-thread replies (resolving only "agree, will fix" threads matching the severity allowlist). Critique gates still run. "Disagree" and "won't fix" items are displayed but not auto-implemented; their threads are replied to but left open. | Off |
+
+---
+
+## Configuration
+
+### `receivedReview.alwaysFixSeverities` (issue #233)
+
+Per-user, per-project allowlist of finding severities whose **"agree, will fix"** verdicts bypass
+the per-finding consent gate at Step 10 (PRESENT) and Step 12 (REPLY & RESOLVE) — see spec
+requirements R18 and R19.
+
+| Aspect | Value |
+|---|---|
+| Location | `.sdlc/local.json` under `receivedReview.alwaysFixSeverities` (gitignored, per-user) |
+| Type | `string[]` |
+| Allowed values | `low`, `medium`, `high`, `critical` |
+| Default | `[]` (preserves consent-on-every-finding behavior) |
+| Scope | Applies to in-band review findings AND ultrareview-driven findings uniformly |
+
+**Local-only contract (R19):** This field MUST NEVER be set in `.sdlc/config.json`. The prepare
+script emits a stderr warning and ignores the value if encountered there.
+
+**Bypass rule (R18):** A finding is auto-applied (no consent prompt; one-line `fixed: ...` log)
+when ALL of the following hold:
+
+1. Verdict is `agree, will fix`
+2. Severity was successfully parsed from the comment body (`severity !== null`)
+3. Parsed severity ∈ `alwaysFixSeverities`
+
+**`--auto` interaction:** Under `--auto`, only "will fix" findings satisfying the bypass rule
+are implemented in Step 11; remaining "will fix" findings are collected into a follow-up
+summary appended to the response output. In Step 12, only resolved threads are those matching
+R18 — others are replied to but left open.
+
+**Example (`.sdlc/local.json`):**
+
+```json
+{
+  "receivedReview": {
+    "alwaysFixSeverities": ["critical", "high"]
+  }
+}
+```
+
+To configure interactively, run `/setup-sdlc --only received-review`.
 
 ---
 

@@ -126,7 +126,7 @@ export const skillsMeta: SkillMeta[] = [
     command: '/received-review-sdlc',
     category: 'review',
     userInvocable: true,
-    tagline: 'Responds to code review feedback with a dual self-critique gate that prevents blind implementation of incorrect suggestions.',
+    tagline: 'Responds to code review feedback with a dual self-critique gate and configurable per-severity auto-apply, preventing blind implementation of incorrect suggestions.',
     pipeline: [
       { id: 'load-feedback', label: 'Read review feedback', type: 'script', description: 'Gathers findings from context, paste, or gh API' },
       { id: 'categorize', label: 'Categorize and flag', type: 'llm', description: 'Classifies each item; flags unclear items to resolve' },

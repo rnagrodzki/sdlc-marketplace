@@ -51,3 +51,19 @@
       value: "not valid JSON"
     - type: javascript
       value: "output.includes('\"errors\"') && !output.includes('\"errors\": []')"
+
+- description: "setup-init (#233): writes receivedReview.alwaysFixSeverities to .sdlc/local.json (never to .sdlc/config.json)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-setup-init-receivedreview.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    # Field landed in local.json with the configured value
+    - type: icontains
+      value: '"localHasField":true'
+    - type: icontains
+      value: '"localValue":["high","critical"]'
+    # Field NEVER appears in project config — local-only contract (R19, C15)
+    - type: icontains
+      value: '"projectHasField":false'

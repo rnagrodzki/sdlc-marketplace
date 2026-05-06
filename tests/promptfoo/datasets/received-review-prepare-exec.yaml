@@ -1,0 +1,64 @@
+# Script execution tests for the received-review-sdlc flag-resolution path
+# (issue #233, R18/R19). These run the test harness
+# tests/promptfoo/scripts/run-received-review-flag-resolve.js — which mirrors
+# the resolution logic in plugins/sdlc-utilities/scripts/skill/received-review.js
+# without invoking the gh API — against fixture-fs directories.
+#
+# Plus a structural schema-rejection assertion: the project schema must NOT
+# declare `receivedReview` at top level so that real validators reject it
+# (the local-only contract per R19).
+
+- description: "received-review-prepare (#233): local config alwaysFixSeverities → flags resolves to that list"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-received-review-flag-resolve.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-received-review-local"
+  assert:
+    - type: icontains
+      value: '"alwaysFixSeverities":["high","critical"]'
+
+- description: "received-review-prepare (#233): no local config → flags.alwaysFixSeverities defaults to []"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-received-review-flag-resolve.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-current-v3"
+  assert:
+    - type: icontains
+      value: '"alwaysFixSeverities":[]'
+
+- description: "received-review-prepare (#233): misplaced in project config emits stderr warning AND resolves flags to []"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-received-review-flag-resolve.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-received-review-misplaced"
+  assert:
+    # Warning emitted to stderr (script-runner concatenates stdout + stderr).
+    - type: icontains
+      value: "warning: receivedReview.alwaysFixSeverities found in .sdlc/config.json"
+    # The misplaced value is ignored — flags resolves to [].
+    - type: icontains
+      value: '"alwaysFixSeverities":[]'
+    # Negative: the misplaced value MUST NOT leak through.
+    - type: not-icontains
+      value: '"alwaysFixSeverities":["critical"]'
+
+- description: "received-review-prepare (#233): schema rejection — sdlc-config.schema.json does NOT declare receivedReview at top level"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-schema-rejection-receivedreview.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-current-v3"
+  assert:
+    # Precondition: top-level additionalProperties: false is unchanged.
+    - type: icontains
+      value: '"topLevelAdditionalPropertiesFalse":true'
+    # Negative-assertion case (per plan): receivedReview MUST NOT be added to
+    # the project schema's top-level properties — combined with (1), real
+    # validators reject `{ receivedReview: {...} }` in .sdlc/config.json.
+    - type: icontains
+      value: '"receivedReviewDeclaredInProjectSchema":false'
+    - type: icontains
+      value: '"rejectsReceivedReviewAtProjectLevel":true'

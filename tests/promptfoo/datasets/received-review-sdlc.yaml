@@ -295,3 +295,91 @@
         before Step 12, validates concatenated reply bodies, and explicitly states that on non-zero
         exit no gh api replies are posted and Step 12 is NOT entered. The gate is script-enforced.
         The skill does not propose retrying, editing URLs without user input, or bypassing.
+
+# ---------------------------------------------------------------------------
+# Issue #233 — configurable per-severity auto-apply (R18/R19)
+# ---------------------------------------------------------------------------
+
+- description: "received-review-sdlc (#233): R18 bypass — alwaysFixSeverities=['critical'] auto-applies critical 'will fix' without consent"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/received-review-alwaysfix-critical.md"
+    user_request: >
+      Run /received-review-sdlc --pr 233. The prepare manifest has
+      flags.alwaysFixSeverities = ["critical"] resolved from .sdlc/local.json.
+      Thread T1 has severity "critical" with verdict "agree, will fix"; thread T2 has
+      severity "medium" with verdict "agree, will fix". Walk through Step 10 (PRESENT)
+      and explain exactly which finding bypasses the consent gate per R18 and which
+      one still requires explicit `implement` from the user. Show the `fixed: ...`
+      log line you would emit for the bypassed finding.
+  assert:
+    - type: icontains
+      value: "flags.alwaysFixSeverities"
+    - type: icontains
+      value: "R18"
+    - type: regex
+      value: "fixed:"
+    - type: regex
+      value: "(implement|consent|AskUserQuestion|approval)"
+    - type: llm-rubric
+      value: >
+        The response correctly applies the R18 bypass rule: thread T1 (critical, will fix)
+        bypasses the Step 10 consent gate and is auto-applied with a one-line `fixed: ...`
+        log entry; thread T2 (medium, will fix) does NOT bypass — it remains in the
+        per-finding consent gate and requires explicit `implement` from the user. The
+        decision cites flags.alwaysFixSeverities (the prepare-script-resolved field) and
+        does not re-read the configuration file. The bypass is gated on all three of:
+        verdict === "agree, will fix", severity !== null, and severity in the allowlist.
+
+- description: "received-review-sdlc (#233): medium 'will fix' falls through to consent gate when alwaysFixSeverities=['critical']"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/received-review-alwaysfix-critical.md"
+    user_request: >
+      Run /received-review-sdlc --pr 233 (NO --auto). The prepare manifest has
+      flags.alwaysFixSeverities = ["critical"]. Thread T2 has severity "medium" and
+      verdict "agree, will fix". Show how Step 10 handles T2 specifically — present
+      the analysis row, the drafted response, and the AskUserQuestion consent gate.
+      Do NOT auto-apply T2.
+  assert:
+    - type: regex
+      value: "implement"
+    - type: regex
+      value: "(edit|skip)"
+    - type: not-regex
+      value: "fixed:.*(T2|medium|line 42)"
+    - type: icontains
+      value: "Step 10"
+    - type: llm-rubric
+      value: >
+        The response demonstrates that thread T2 (medium severity, "agree, will fix")
+        goes through the Step 10 consent gate normally — the AskUserQuestion prompt
+        with implement/edit/skip options is presented and no auto-apply occurs for T2.
+        The response does NOT emit a `fixed: ...` log line for T2. The decision cites
+        flags.alwaysFixSeverities and notes that "medium" is NOT in the configured
+        allowlist (which contains only "critical"), so the R18 bypass does not apply.
+
+- description: "received-review-sdlc (#233): unset alwaysFixSeverities preserves R9 consent behavior across all findings"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-feedback.md"
+    user_request: >
+      Run /received-review-sdlc --pr 42. The prepare manifest has
+      flags.alwaysFixSeverities = [] (default — unset in .sdlc/local.json).
+      Walk through Step 10 (PRESENT) and confirm that ALL findings — regardless of
+      severity — go through the per-finding consent gate. No findings are auto-applied.
+  assert:
+    - type: icontains
+      value: "Step 10"
+    - type: regex
+      value: "implement"
+    - type: not-regex
+      value: "fixed:"
+    - type: llm-rubric
+      value: >
+        With flags.alwaysFixSeverities = [] (default), the response shows that the
+        original R9 consent behavior is fully preserved: every finding (regardless of
+        severity) routes through the Step 10 consent gate (AskUserQuestion with
+        implement/edit/skip options). No finding is auto-applied; no `fixed: ...` log
+        lines are emitted. The decision cites flags.alwaysFixSeverities (empty) and
+        does not re-read the configuration file.

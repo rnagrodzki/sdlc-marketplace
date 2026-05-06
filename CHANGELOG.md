@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.3] - 2026-05-06
+
+### Added
+- received-review-sdlc: added configurable `alwaysFixSeverities` — a per-user, per-project allowlist of finding severities whose "agree, will fix" verdicts bypass consent gates (#233)
+
+### Fixed
+- received-review-sdlc: `--auto` mode now falls back to the original behavior (auto-apply all "will fix" findings) when `alwaysFixSeverities` is unconfigured, preserving backward compatibility for existing users (#233)
+
 ## [0.18.0] - 2026-05-06
 
 ### Added
