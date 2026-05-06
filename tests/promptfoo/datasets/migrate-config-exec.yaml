@@ -104,3 +104,43 @@
       value: '"infrastructure"'
     - type: icontains
       value: '"errors": []'
+
+- description: "migrate-config: dedups duplicate !.gitignore entries in .sdlc/.gitignore"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-duplicate-gitignore"
+  assert:
+    - type: icontains
+      value: '"sdlcGitignore": "updated"'
+    - type: icontains
+      value: '"errors": []'
+
+- description: "migrate-config: removes legacy .claude/sdlc.json and .bak and review-dimensions after relocation"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-legacy-cleanup"
+  assert:
+    - type: icontains
+      value: '"migrated": true'
+    - type: icontains
+      value: '.claude/sdlc.json'
+    - type: icontains
+      value: '.claude/sdlc.json.bak'
+    - type: icontains
+      value: '.claude/review-dimensions/'
+    - type: icontains
+      value: '"errors": []'
+
+- description: "migrate-config: --dry-run skips legacy cleanup (infrastructure not invoked)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_args: "--dry-run"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-legacy-cleanup"
+  assert:
+    - type: icontains
+      value: '"dryRun": true'
+    - type: icontains
+      value: '"migrated": false'

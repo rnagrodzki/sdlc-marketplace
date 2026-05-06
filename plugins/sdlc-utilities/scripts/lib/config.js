@@ -142,15 +142,7 @@ function readProjectConfig(projectRoot) {
     return { config: unifiedNew, sources: [PROJECT_CONFIG_PATH] };
   }
 
-  // 2. Legacy unified path (.claude/sdlc.json)
-  const legacyPath = path.join(projectRoot, LEGACY_PROJECT_CONFIG_PATH);
-  const unifiedLegacy = readJsonFile(legacyPath);
-  if (unifiedLegacy) {
-    emitLegacyProjectWarningOnce();
-    return { config: unifiedLegacy, sources: [LEGACY_PROJECT_CONFIG_PATH] };
-  }
-
-  // 3. Legacy fallback — merge individual config files
+  // 2. Legacy fallback — merge individual config files
   const sources = [];
   const config = {};
 
@@ -253,17 +245,6 @@ function readLocalConfig(projectRoot) {
         );
         config.ship = projectDataNew.ship;
         sources.push(PROJECT_CONFIG_PATH);
-      } else {
-        const projectConfigLegacy = path.join(projectRoot, LEGACY_PROJECT_CONFIG_PATH);
-        const projectDataLegacy = readJsonFile(projectConfigLegacy);
-        if (projectDataLegacy?.ship) {
-          emitLegacyProjectWarningOnce();
-          process.stderr.write(
-            `Deprecation: ship section found in ${LEGACY_PROJECT_CONFIG_PATH}. Run /setup-sdlc --migrate to move it to .sdlc/local.json.\n`
-          );
-          config.ship = projectDataLegacy.ship;
-          sources.push(LEGACY_PROJECT_CONFIG_PATH);
-        }
       }
     }
   }
@@ -411,6 +392,7 @@ function consolidateLegacyFiles(projectRoot) {
   // For ship-section consolidation we also need to look at the legacy
   // unified path (.claude/sdlc.json) when the new path is empty — this
   // function may run before verifyAndMigrate has relocated it.
+  // Runs before migration — legacy file may still exist here
   const existingUnified = readJsonFile(unifiedPath)
     || readJsonFile(path.join(projectRoot, LEGACY_PROJECT_CONFIG_PATH));
 
@@ -558,6 +540,7 @@ function ensureSdlcGitignore(projectRoot) {
     SDLC_GITIGNORE_END,
   ].join('\n');
 
+  // Step 1: Read existing file (empty string if absent).
   let existing = '';
   let fileExisted = false;
   if (fs.existsSync(gitignorePath)) {
@@ -565,26 +548,48 @@ function ensureSdlcGitignore(projectRoot) {
     fileExisted = true;
   }
 
-  // Detect a managed block by markers, OR detect the legacy blanket
-  // `*\n` content (which we replace wholesale).
-  const blockRegex = new RegExp(
-    `${escapeRegExp(SDLC_GITIGNORE_BEGIN)}[\\s\\S]*?${escapeRegExp(SDLC_GITIGNORE_END)}`,
-    'm'
-  );
-
-  let next;
-  if (existing.trim() === '*') {
-    // Legacy blanket-ignore — replace with managed block.
-    next = managedBlock + '\n';
-  } else if (blockRegex.test(existing)) {
-    next = existing.replace(blockRegex, managedBlock);
-  } else if (existing.length === 0) {
-    next = managedBlock + '\n';
-  } else {
-    const sep = existing.endsWith('\n\n') ? '' : (existing.endsWith('\n') ? '\n' : '\n\n');
-    next = existing + sep + managedBlock + '\n';
+  // Step 2: Split into lines. Locate any existing managed block via markers;
+  // extract it and remove it from the line list (leaving "other" lines).
+  const lines = existing === '' ? [] : existing.split('\n');
+  // Remove trailing empty string caused by a final newline.
+  if (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop();
   }
 
+  const managedPatternSet = new Set(SDLC_GITIGNORE_PATTERNS);
+  const otherLines = [];
+  let insideBlock = false;
+  for (const line of lines) {
+    if (line === SDLC_GITIGNORE_BEGIN) {
+      insideBlock = true;
+      continue;
+    }
+    if (line === SDLC_GITIGNORE_END) {
+      insideBlock = false;
+      continue;
+    }
+    if (insideBlock) {
+      // Drop lines that are part of the managed block.
+      continue;
+    }
+    // Step 3: Drop any "other" lines whose trimmed value exactly matches a
+    // member of SDLC-managed patterns (legacy raw pattern lines).
+    if (managedPatternSet.has(line.trim())) {
+      continue;
+    }
+    otherLines.push(line);
+  }
+
+  // Step 4: Reconstruct: leading user lines (if any) + blank separator +
+  // managed block + trailing newline.
+  let next;
+  if (otherLines.length > 0) {
+    next = otherLines.join('\n') + '\n\n' + managedBlock + '\n';
+  } else {
+    next = managedBlock + '\n';
+  }
+
+  // Step 5: Compare result to original; return status.
   if (next === existing) return 'unchanged';
   fs.writeFileSync(gitignorePath, next, 'utf8');
   return fileExisted ? 'updated' : 'created';
@@ -597,9 +602,9 @@ function ensureSdlcGitignore(projectRoot) {
 /**
  * Idempotent one-time copy: if `.claude/review-dimensions/` exists AND
  * `.sdlc/review-dimensions/` is absent/empty, copy all files from the legacy
- * location to the new one. The legacy directory is NOT deleted (cleanup is
- * deferred to 0.21.x). Skip-if-exists semantics: individual files already
- * in `.sdlc/review-dimensions/` are not overwritten.
+ * location to the new one. The legacy directory is NOT deleted here (cleanup is
+ * handled by cleanupLegacyClaudeFiles (R-layout-9)). Skip-if-exists semantics:
+ * individual files already in `.sdlc/review-dimensions/` are not overwritten.
  *
  * @param {string} projectRoot
  * @returns {'created'|'noop'}
@@ -630,6 +635,48 @@ function ensureReviewDimensionsRelocated(projectRoot) {
     }
   }
   return copied > 0 ? 'created' : 'noop';
+}
+
+// ---------------------------------------------------------------------------
+// cleanupLegacyClaudeFiles (R-layout-9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove legacy `.claude/` SDLC files that have already been relocated to
+ * `.sdlc/`. Each deletion is gated on the new target being present and
+ * non-empty, so the cleanup is safe to run after relocation steps.
+ *
+ * Removes:
+ *   - `.claude/sdlc.json`         — gated on `.sdlc/config.json` existing and non-empty
+ *   - `.claude/sdlc.json.bak`     — same gate
+ *   - `.claude/review-dimensions/`— gated on `.sdlc/review-dimensions/` being non-empty
+ *
+ * Implements R-layout-9.
+ *
+ * @param {string} projectRoot
+ * @returns {{ removed: string[] }}
+ */
+function cleanupLegacyClaudeFiles(projectRoot) {
+  const removed = [];
+  const claudeJson    = path.join(projectRoot, '.claude', 'sdlc.json');
+  const claudeBak     = path.join(projectRoot, '.claude', 'sdlc.json.bak');
+  const claudeRevDir  = path.join(projectRoot, '.claude', 'review-dimensions');
+  const sdlcJson      = path.join(projectRoot, '.sdlc', 'config.json');
+  const sdlcRevDir    = path.join(projectRoot, '.sdlc', 'review-dimensions');
+
+  // Gate: only delete legacy when new target is present and non-empty.
+  const sdlcJsonOk = fs.existsSync(sdlcJson) && fs.statSync(sdlcJson).size > 0;
+  const sdlcRevOk  = fs.existsSync(sdlcRevDir) && fs.readdirSync(sdlcRevDir).length > 0;
+
+  if (sdlcJsonOk) {
+    if (fs.existsSync(claudeJson)) { fs.unlinkSync(claudeJson); removed.push('.claude/sdlc.json'); }
+    if (fs.existsSync(claudeBak))  { fs.unlinkSync(claudeBak);  removed.push('.claude/sdlc.json.bak'); }
+  }
+  if (sdlcRevOk && fs.existsSync(claudeRevDir)) {
+    fs.rmSync(claudeRevDir, { recursive: true, force: true });
+    removed.push('.claude/review-dimensions/');
+  }
+  return { removed };
 }
 
 // ---------------------------------------------------------------------------
@@ -751,10 +798,13 @@ function escapeRegExp(str) {
  * @returns {{ sdlcGitignore: string, rootGitignore: string, reviewDimensions: string }}
  */
 function ensureSdlcInfrastructure(projectRoot) {
+  const reviewDimensions = ensureReviewDimensionsRelocated(projectRoot);
+  const legacyCleanup    = cleanupLegacyClaudeFiles(projectRoot);
   return {
     sdlcGitignore:    ensureSdlcGitignore(projectRoot),
     rootGitignore:    ensureRootGitignore(projectRoot),
-    reviewDimensions: ensureReviewDimensionsRelocated(projectRoot),
+    reviewDimensions,
+    legacyCleanup,
   };
 }
 
@@ -774,6 +824,7 @@ module.exports = {
   migrateConfig: consolidateLegacyFiles,
   ensureSdlcGitignore,
   ensureReviewDimensionsRelocated,
+  cleanupLegacyClaudeFiles,
   ensureRootGitignore,
   ensureSdlcInfrastructure,
   // Preset normalization

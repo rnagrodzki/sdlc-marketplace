@@ -34,7 +34,7 @@ Pre-check every row in the menu (reconfigure everything) instead of pre-selectin
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--migrate` | Run schema migration via `scripts/skill/migrate-config.js`: relocates legacy `.claude/sdlc.json` to `.sdlc/config.json`, walks the schema-version migration registry (`lib/config-migrations.js`) to bring both project + local configs to `schemaVersion: 3`, and consolidates legacy per-file configs (`.claude/version.json`, `.sdlc/ship-config.json`, etc.) via `lib/config.js::consolidateLegacyFiles`. Idempotent. Backups: legacy relocation writes to `.claude/sdlc.json.bak` (single, no timestamp); other in-place migrations write to `.sdlc/<file>.bak.<safe-iso>`. Setup sweeps to retain 3 newest per role. | — |
+| `--migrate` | Run schema migration via `scripts/skill/migrate-config.js`: relocates legacy `.claude/sdlc.json` to `.sdlc/config.json`, walks the schema-version migration registry (`lib/config-migrations.js`) to bring both project + local configs to `schemaVersion: 3`, and consolidates legacy per-file configs (`.claude/version.json`, `.sdlc/ship-config.json`, etc.) via `lib/config.js::consolidateLegacyFiles`. Idempotent. Backups: legacy relocation writes to `.sdlc/sdlc.json.bak` (single, no timestamp); other in-place migrations write to `.sdlc/<file>.bak.<safe-iso>`. Setup sweeps to retain 3 newest per role. | — |
 | `--skip <section>` | Skip a config section during setup (version, ship, jira, review, commit, pr) | — |
 | `--force` | Pre-check every menu row (reconfigure all sections) | — |
 | `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | — |
@@ -66,6 +66,18 @@ Detects missing config, walks through version/ship/jira/review/commit/pr setup, 
 ```
 
 Reads `.claude/version.json`, `.sdlc/ship-config.json`, `.sdlc/review.json`, and `.sdlc/jira-config.json`, merges them into `.sdlc/config.json` and `.sdlc/local.json`, and optionally deletes the legacy files.
+
+### Migration cleanup
+
+When `migrate-config.js` successfully relocates `.claude/sdlc.json` → `.sdlc/config.json` and copies `.claude/review-dimensions/` → `.sdlc/review-dimensions/`, it removes the following legacy artifacts in the same run:
+
+- `.claude/sdlc.json` — removed after successful relocation
+- `.claude/sdlc.json.bak` — removed (stale backup from pre-0.19 runs)
+- `.claude/review-dimensions/` — removed after successful copy to `.sdlc/`
+
+Cleanup is idempotent (safe to re-run) and is skipped when `--dry-run` is active.
+
+Backup of the original project config is written to `.sdlc/sdlc.json.bak` before migration.
 
 ### Skip specific sections
 
@@ -291,7 +303,7 @@ Plan guardrails    — [N configured via guardrails sub-flow | skipped]
 | `.claude/pr-template.md` | PR template created during PR template sub-flow (via `--pr-template`). |
 | `openspec/config.yaml` | Managed block added/updated by openspec enrichment sub-flow (via `--openspec-enrich`). Only the managed block is modified; user-authored content is preserved. |
 | `.gitignore` (project root) | Managed v2 block (issue #231) listing transient skill artifact patterns (`*-context-*.json`, `*-manifest-*.json`, `*-prepare-*.json`) plus `.sdlc/` runtime patterns (`.sdlc/local.json`, `.sdlc/cache/`, `.sdlc/*.bak.*`, `.sdlc/.migration.lock`). Idempotent — re-running setup-sdlc replaces the block in place; v1 blocks are upgraded to v2. Existing user content is preserved. |
-| `.claude/sdlc.json.bak` | Single one-time backup of the legacy project-config file when migration relocates it to `.sdlc/config.json` (issue #231 acceptance criterion). |
+| `.sdlc/sdlc.json.bak` | Single one-time backup of the legacy project-config file when migration relocates it to `.sdlc/config.json` (issue #231 acceptance criterion). |
 
 ---
 
