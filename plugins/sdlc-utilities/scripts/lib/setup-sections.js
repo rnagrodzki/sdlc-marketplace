@@ -140,6 +140,17 @@ const REVIEW_FIELDS = [
   },
 ];
 
+const RECEIVED_REVIEW_FIELDS = [
+  {
+    name: 'alwaysFixSeverities',
+    label: 'Severities to auto-apply without consent',
+    type: 'multi-enum',
+    options: ['low', 'medium', 'high', 'critical'],
+    default: [],
+    description: 'Severities whose "agree, will fix" findings bypass the per-finding consent gate in /received-review-sdlc (Step 10 / Step 12). Stored in .sdlc/local.json under receivedReview.alwaysFixSeverities — per-developer, never project-wide. Default `[]` preserves the original consent-on-every-finding behavior; e.g. `["critical","high"]` auto-applies high-impact fixes without prompting.',
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Helpers used by summarize() functions
 // ---------------------------------------------------------------------------
@@ -176,6 +187,11 @@ function summarizeJira(cfg) {
 function summarizeReview(cfg) {
   if (!cfg || !cfg.scope) return '';
   return `scope: ${cfg.scope}`;
+}
+
+function summarizeReceivedReview(cfg) {
+  if (!cfg || !Array.isArray(cfg.alwaysFixSeverities) || cfg.alwaysFixSeverities.length === 0) return '';
+  return `auto-apply: ${cfg.alwaysFixSeverities.join(',')}`;
 }
 
 function summarizeCommit(cfg) {
@@ -253,7 +269,7 @@ function summarizeOpenspecBlock(_cfg, detected) {
 }
 
 // ---------------------------------------------------------------------------
-// SETUP_SECTIONS — 11 entries, ordered by typical setup flow
+// SETUP_SECTIONS — 13 entries, ordered by typical setup flow
 // ---------------------------------------------------------------------------
 
 const SETUP_SECTIONS = [
@@ -312,6 +328,20 @@ const SETUP_SECTIONS = [
     confirmDetected: false,
     fields: REVIEW_FIELDS,
     summarize: summarizeReview,
+  },
+  {
+    id: 'received-review',
+    label: 'received-review',
+    purpose: 'Per-user severity allowlist for /received-review-sdlc auto-apply (issue #233). When set, "agree, will fix" findings whose severity is in the list bypass the per-finding consent gate in Step 10/12 and are auto-applied with a one-line `fixed: ...` log. Stored in .sdlc/local.json under receivedReview.alwaysFixSeverities — never in project config. Default `[]` preserves the original consent-on-every-finding behavior.',
+    configFile: '.sdlc/local.json',
+    configPath: 'receivedReview',
+    consumedBy: ['received-review-sdlc'],
+    filesModified: ['.sdlc/local.json'],
+    optional: true,
+    delegatedTo: null,
+    confirmDetected: false,
+    fields: RECEIVED_REVIEW_FIELDS,
+    summarize: summarizeReceivedReview,
   },
   {
     id: 'commit',

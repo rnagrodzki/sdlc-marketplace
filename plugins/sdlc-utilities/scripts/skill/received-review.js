@@ -40,6 +40,62 @@ const {
 } = require(path.join(LIB, 'git'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
+const { readSection, readProjectConfig } = require(path.join(LIB, 'config'));
+
+// ---------------------------------------------------------------------------
+// Severity parsing (issue #233)
+// ---------------------------------------------------------------------------
+
+const VALID_SEVERITIES = new Set(['low', 'medium', 'high', 'critical']);
+
+/**
+ * Parse a severity tag from a PR review comment body.
+ *
+ * Recognized format (emitted by review-sdlc per REFERENCE.md):
+ *   - **Severity**: critical
+ *   - **Severity**: high
+ *
+ * The format is matched case-insensitively. Only the four user-configurable
+ * severities are returned (`low|medium|high|critical`); `info` is mapped to
+ * null because it cannot appear in `alwaysFixSeverities` (R18).
+ *
+ * @param {string} body  Comment body text
+ * @returns {'low'|'medium'|'high'|'critical'|null}
+ */
+function parseSeverity(body) {
+  if (typeof body !== 'string' || body.length === 0) return null;
+  // Match `**Severity**: <value>` or `Severity: <value>`; tolerate surrounding whitespace.
+  const m = body.match(/(?:^|\n)\s*[-*]?\s*\*{0,2}\s*severity\s*\*{0,2}\s*:\s*([a-zA-Z]+)/i);
+  if (!m) return null;
+  const value = m[1].toLowerCase();
+  return VALID_SEVERITIES.has(value) ? value : null;
+}
+
+/**
+ * Resolve `alwaysFixSeverities` from `.sdlc/local.json` only (R19, C15).
+ * If the field appears in `.sdlc/config.json`, emit one stderr warning and ignore it.
+ *
+ * @param {string} projectRoot
+ * @returns {string[]} severity list (empty array when unset)
+ */
+function resolveAlwaysFixSeverities(projectRoot) {
+  // Misplacement check: warn if found in project config.
+  try {
+    const { config: projectConfig } = readProjectConfig(projectRoot);
+    const misplaced = projectConfig?.receivedReview?.alwaysFixSeverities;
+    if (misplaced !== undefined) {
+      process.stderr.write(
+        'warning: receivedReview.alwaysFixSeverities found in .sdlc/config.json — ' +
+        'this field is local-only and will be ignored. Move it to .sdlc/local.json.\n'
+      );
+    }
+  } catch (_) { /* missing or unreadable project config — silent */ }
+
+  const local = readSection(projectRoot, 'receivedReview');
+  const list = local?.alwaysFixSeverities;
+  if (!Array.isArray(list)) return [];
+  return list.filter(s => typeof s === 'string' && VALID_SEVERITIES.has(s));
+}
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -159,11 +215,17 @@ function main() {
   }
   const changedFileSet = new Set(changedFiles);
 
+  // Resolve alwaysFixSeverities (issue #233, R18/R19) — single source: .sdlc/local.json
+  const alwaysFixSeverities = resolveAlwaysFixSeverities(projectRoot);
+
   // Classify threads and build output
   const threads = rawThreads.map(thread => {
     const status = classifyThread(thread, currentUser, changedFileSet);
     const firstComment = thread.comments[0] || null;
     const hasUserReply = thread.comments.some(c => c.authorLogin === currentUser);
+    // Per-thread severity parsed from the first comment body (issue #233, P9).
+    // null when severity cannot be parsed; such threads NEVER bypass consent (R18).
+    const severity = firstComment ? parseSeverity(firstComment.body) : null;
 
     return {
       id: thread.id,
@@ -172,6 +234,7 @@ function main() {
       line: thread.line,
       isResolved: thread.isResolved,
       isOutdated: thread.isOutdated,
+      severity,
       firstComment: firstComment
         ? {
             id: firstComment.id,
@@ -201,7 +264,7 @@ function main() {
     timestamp: new Date().toISOString(),
     pr: { number: prNumber, owner, repo },
     currentUser,
-    flags: { auto },
+    flags: { auto, alwaysFixSeverities },
     threads,
     summary,
   };

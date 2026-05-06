@@ -264,7 +264,7 @@ const PROJECT_SECTIONS = new Set(['version', 'jira', 'commit', 'pr', 'plan', 'ex
  * Read a single config section by name.
  *
  * @param {string} projectRoot
- * @param {string} section — one of 'version', 'commit', 'jira', 'pr', 'ship', 'review'
+ * @param {string} section — one of 'version', 'commit', 'jira', 'pr', 'ship', 'review', 'receivedReview'
  * @returns {object|null}
  */
 function readSection(projectRoot, section) {
@@ -279,6 +279,10 @@ function readSection(projectRoot, section) {
   if (section === 'review') {
     const { config } = readLocalConfig(projectRoot);
     return config?.review ?? null;
+  }
+  if (section === 'receivedReview') {
+    const { config } = readLocalConfig(projectRoot);
+    return config?.receivedReview ?? null;
   }
   return null;
 }
@@ -355,6 +359,8 @@ function writeSection(projectRoot, section, value) {
     writeLocalConfig(projectRoot, { ship: value });
   } else if (section === 'review') {
     writeLocalConfig(projectRoot, { review: value });
+  } else if (section === 'receivedReview') {
+    writeLocalConfig(projectRoot, { receivedReview: value });
   }
 }
 

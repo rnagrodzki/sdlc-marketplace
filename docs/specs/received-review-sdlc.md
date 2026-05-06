@@ -22,16 +22,18 @@
 - R7: Unclear items block all implementation — clarify ALL unclear items at once before proceeding
 - R8: Incremental PR thread processing: prepare script identifies outstanding vs resolved/self-replied/stale threads; only outstanding threads are processed
 - R9: Step 10 consent gate is mandatory unless `--auto` is explicitly passed — pipeline context does not override
-- R10: Auto mode only auto-implements "will fix" items; "disagree", "needs discussion", and "won't fix" are never auto-actioned
+- R10: Auto mode only auto-implements "will fix" items; "disagree", "needs discussion", and "won't fix" are never auto-actioned. Under `--auto`, the auto-apply set is further restricted by R18: only "will fix" findings whose severity ∈ `flags.alwaysFixSeverities` are implemented; remaining "will fix" findings are collected into a follow-up summary written to the response output.
 - R11: PR thread replies use in-thread comment replies (REST API), not top-level PR comments
 - R12: Thread resolution uses GraphQL `resolveReviewThread` mutation — only for "agree, will fix" items; pushback and won't-fix threads are left open
 - R13: Forbidden openers: no performative language ("Great catch!", "You're right!", "Thanks!")
 - R14: YAGNI check for feature requests: grep codebase for actual usage before accepting
 - R15: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (git state, config, flags, metadata) must originate from script output to ensure deterministic behavior
-- R16: Under `--auto`, Step 12 posts in-thread replies for all action-plan items and resolves only "agree, will fix" threads without an AskUserQuestion gate; pushback and "won't fix" threads are replied to but left open for the reviewer
+- R16: Under `--auto`, Step 12 posts in-thread replies for all action-plan items and resolves only "agree, will fix" threads without an AskUserQuestion gate; pushback and "won't fix" threads are replied to but left open for the reviewer. Per R18, when `flags.alwaysFixSeverities` is non-empty, only "agree, will fix" threads whose severity is in the list are resolved; "agree, will fix" threads with severity outside the list are replied to but not resolved (they remain in the follow-up summary).
 - R17: Link verification (issue #198) — every URL embedded in any reply or response body MUST be validated by `plugins/sdlc-utilities/scripts/lib/links.js` (CLI: `node scripts/lib/links.js --json`) before posting. Three URL classes are checked: (1) `github.com/<owner>/<repo>/(issues|pull)/<n>` — owner/repo identity must match the current remote, and the issue/PR number must exist on that repo; (2) `*.atlassian.net/browse/<KEY-N>` — host must match the configured Jira site; (3) any other `http(s)://` URL — generic reachability via HEAD (fall back to GET on 405), 5s timeout. Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) and any `ctx.skipHosts` entries are reported as `skipped`, not violations. `SDLC_LINKS_OFFLINE=1` skips network checks but keeps structural context-aware checks (GitHub identity match, Atlassian host match). Any violation aborts the reply with non-zero exit and a structured violation list — no soft-warning mode; body is never posted.
 - R-config-version (issue #232): The prepare script `skill/received-review.js` MUST call `verifyAndMigrate(projectRoot, 'project')` at start. The call is short-circuited when CLI `--skip-config-check` OR env `SDLC_SKIP_CONFIG_CHECK=1` is present; both gates resolve into a single `flags.skipConfigCheck` boolean in the prepare output (CLI > env > default false). On migration failure the prepare emits non-zero exit and an `errors[]` entry naming the failing step; SKILL.md halts with that text verbatim.
   - Acceptance: prepare output includes `flags.skipConfigCheck` and a `migration` block (or null when skipped); SKILL.md gates further work on `errors.length === 0`.
+- R18 (issue #233): When `flags.alwaysFixSeverities` is non-empty, findings whose verdict is "agree, will fix" AND whose parsed severity is in the list bypass the Step 10 / Step 12 per-finding consent gate. Bypassed findings are auto-applied and emit a one-line `fixed: ...` log entry instead of a consent prompt. Findings with verdict "agree, will fix" but severity NOT in the list, findings with any other verdict, and findings whose severity could not be parsed (`severity: null`) all continue to require explicit user approval per R9. The default value when `alwaysFixSeverities` is unset is `[]`, which preserves the original R9 behavior across all findings. The setting applies uniformly to in-band review findings and ultrareview-driven findings.
+- R19 (issue #233): The `alwaysFixSeverities` field is read EXCLUSIVELY from `.sdlc/local.json` (the per-user, gitignored config). The prepare script MUST NOT consume the field from `.sdlc/config.json`. If the field is encountered in `.sdlc/config.json`, the prepare script emits exactly one warning line to stderr and ignores the value (treating it as if absent). The single resolution site for the field is the prepare script; SKILL.md decision sites cite `flags.alwaysFixSeverities` only and never re-read configuration.
 
 ## Workflow Phases
 
@@ -78,6 +80,8 @@ Critique #2 (responses):
 - P5: `pr.number` (number) — PR number
 - P6: `pr.owner` (string) — repository owner
 - P7: `pr.repo` (string) — repository name
+- P8 (issue #233): `flags.alwaysFixSeverities` (string[]) — severities whose "will fix" findings bypass the per-finding consent gate. Resolved exclusively from `.sdlc/local.json` `receivedReview.alwaysFixSeverities`. Allowed values: `low | medium | high | critical`. Default `[]`. The script MUST emit a stderr warning and ignore the field if it appears in `.sdlc/config.json` (R19).
+- P9 (issue #233): `threads[].severity` (string|null) — per-thread severity parsed from the comment body using the review-sdlc severity tag format. `null` when absent or unparseable; such threads NEVER bypass the consent gate per R18.
 
 ## Error Handling
 
@@ -105,6 +109,8 @@ Critique #2 (responses):
 - C12: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
 - C13: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 - C14: Must not present Step 12 consent gate when `flags.auto` is true — the reply/resolve step auto-executes under the same policy as manual `yes`
+- C15 (issue #233): Must not read `receivedReview.alwaysFixSeverities` from `.sdlc/config.json`. The single source of truth is `.sdlc/local.json`. Misplaced values must produce a stderr warning and be ignored (R19).
+- C16 (issue #233): SKILL.md decision sites that gate on the configurable auto-apply MUST cite `flags.alwaysFixSeverities` (the prepare-script-resolved field). Direct reads of `$ARGUMENTS`, raw CLI strings, or configuration files at decision sites are forbidden (single resolution site).
 
 ## Step-Emitter Contract
 
