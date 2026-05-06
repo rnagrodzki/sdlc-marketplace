@@ -53,7 +53,7 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
 > **VERBATIM** — Run this bash block exactly as written.
 
 ```bash
-SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
+SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
 [ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
 [ -z "$SCRIPT_DIR" ] && { echo "[]"; exit 0; }
 node -e "
@@ -121,7 +121,7 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
 
    - **If `--workspace worktree`:** Create worktree without prompting:
      ```bash
-     SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/util/worktree-create.js" 2>/dev/null | head -1)
+     SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/util/worktree-create.js" 2>/dev/null | sort -V | tail -1)
      [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/worktree-create.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/worktree-create.js"
      result=$(node "$SCRIPT" --name <derived-name>)
      cd $(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
@@ -390,7 +390,7 @@ Proceeding to Wave N+1 (N tasks)
 
 **State persistence:** After each wave completes, update the execution state via `state/execute.js`. Locate the script:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/execute.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/execute.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/execute.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/state/execute.js"
 ```
 

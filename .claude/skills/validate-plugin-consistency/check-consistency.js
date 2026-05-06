@@ -197,6 +197,35 @@ function checkScriptResolutionOrder(skills, findings) {
 }
 
 /**
+ * Rule 1b — script-resolution-version
+ * Plugins-resolution `find ~/.claude/plugins ...` pipelines must end with
+ * `| sort -V | tail -1` to deterministically pick the newest cached plugin
+ * version. A bare `| head -1` returns the first path the directory walk
+ * emits — filesystem-traversal order, not version order — and may resolve a
+ * stale cached version. See #258.
+ */
+function checkScriptResolutionVersionSelector(skills, findings) {
+  for (const skill of skills) {
+    const content = readFile(skill.file);
+    if (!content) continue;
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.includes('find ~/.claude/plugins')) continue;
+      if (!line.includes('| head -1')) continue;
+      if (line.includes('| sort -V | tail -1')) continue;
+      findings.push({
+        rule: 'script-resolution-version',
+        severity: 'error',
+        file: path.relative(process.cwd(), skill.file),
+        line: i + 1,
+        message: "Script resolution uses 'head -1' which picks an arbitrary cached version. Use '| sort -V | tail -1' to select the newest semver. See #258.",
+      });
+    }
+  }
+}
+
+/**
  * Rule 2 — skill-runs-script
  * Skills paired with a prepare script must contain the find+node resolution pattern.
  */
@@ -497,6 +526,7 @@ function main() {
   const findings = [];
 
   checkScriptResolutionOrder(skills, findings);
+  checkScriptResolutionVersionSelector(skills, findings);
   checkSkillRunsScript(skills, scriptNames, findings);
   checkSkillUsesMktemp(skills, scriptNames, findings);
   checkSkillChecksExitCode(skills, scriptNames, findings);

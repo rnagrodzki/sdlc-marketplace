@@ -15,7 +15,7 @@ Sub-flow of `/setup-sdlc --execution-guardrails`. Runs skill/guardrails.js with 
 Run skill/guardrails.js:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "guardrails.js" -path "*/sdlc*/scripts/skill/guardrails.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "guardrails.js" -path "*/sdlc*/scripts/skill/guardrails.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/guardrails.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/guardrails.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/guardrails.js" >&2; exit 2; }
 
@@ -64,7 +64,7 @@ On **custom**: collect id (validate kebab-case pattern `^[a-z][a-z0-9]*(-[a-z0-9
 Write selected guardrails via inline Node.js using config library:
 
 ```bash
-SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
+SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
 [ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
 [ -z "$SCRIPT_DIR" ] && { echo "ERROR: Could not locate lib/config.js" >&2; exit 2; }
 
@@ -81,7 +81,7 @@ Replace `<GUARDRAILS_JSON>` with the JSON array of selected guardrails. In `--ad
 ### Step 4 (VALIDATE) — Run Validation Script
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "validate-guardrails.js" -path "*/sdlc*/scripts/ci/validate-guardrails.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "validate-guardrails.js" -path "*/sdlc*/scripts/ci/validate-guardrails.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-guardrails.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ci/validate-guardrails.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ci/validate-guardrails.js" >&2; exit 2; }
 

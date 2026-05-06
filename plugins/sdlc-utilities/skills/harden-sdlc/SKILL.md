@@ -34,7 +34,7 @@ invocation.
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "harden-prepare.js" -path "*/sdlc*/scripts/skill/harden-prepare.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "harden-prepare.js" -path "*/sdlc*/scripts/skill/harden-prepare.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/harden-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/harden-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/harden-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
@@ -178,7 +178,7 @@ When the user selects **apply**, validate the proposed change BEFORE writing:
   validate via the canonical guardrails validator:
 
   ```bash
-  VALIDATOR=$(find ~/.claude/plugins -name "validate-guardrails.js" -path "*/sdlc*/scripts/ci/validate-guardrails.js" 2>/dev/null | head -1)
+  VALIDATOR=$(find ~/.claude/plugins -name "validate-guardrails.js" -path "*/sdlc*/scripts/ci/validate-guardrails.js" 2>/dev/null | sort -V | tail -1)
   [ -z "$VALIDATOR" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-guardrails.js" ] && VALIDATOR="plugins/sdlc-utilities/scripts/ci/validate-guardrails.js"
   [ -z "$VALIDATOR" ] && { echo "ERROR: Could not locate ci/validate-guardrails.js. Is the sdlc plugin installed?" >&2; exit 2; }
   ```

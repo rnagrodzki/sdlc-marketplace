@@ -20,7 +20,7 @@ cause analysis, and a prioritized fix plan.
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "test-report-prepare.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "test-report-prepare.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f ".claude/skills/test-report/test-report-prepare.js" ] && SCRIPT=".claude/skills/test-report/test-report-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate test-report-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 

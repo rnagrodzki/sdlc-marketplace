@@ -84,7 +84,7 @@ If the system context contains "Plan mode is active":
 When a PR number or URL is provided (via arguments or user input), run the prepare script to pre-compute review thread state:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "received-review.js" -path "*/sdlc*/scripts/skill/received-review.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "received-review.js" -path "*/sdlc*/scripts/skill/received-review.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/received-review.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/received-review.js"
 [ -z "$SCRIPT" ] && { echo "WARNING: Could not locate skill/received-review.js" >&2; }
 
@@ -395,7 +395,7 @@ State the correction factually and move on.
 Before any `gh api` reply is posted, validate every URL embedded in every drafted reply body via the shared link validator. Concatenate all reply bodies (one per line) and feed them to the validator on stdin. The script auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
 
 ```bash
-LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | head -1)
+LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
 [ -z "$LINKS_LIB" ] && { echo "ERROR: Could not locate scripts/lib/links.js. Is the sdlc plugin installed?" >&2; exit 2; }
 printf '%s\n' "$reply_bodies_concatenated" | node "$LINKS_LIB" --json

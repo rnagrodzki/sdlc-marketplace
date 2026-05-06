@@ -173,7 +173,7 @@ conditionally after Step 2 classifies the operation type.
    - After ADF conversion, walk commentBody.body[] and resolve every `low`-confidence marker
 
 4. Build payload — convert markdown to ADF and assemble:
-   SCRIPT=$(find ~/.claude/plugins -name "markdown-to-adf.js" -path "*/sdlc*/scripts/lib/markdown-to-adf.js" 2>/dev/null | head -1)
+   SCRIPT=$(find ~/.claude/plugins -name "markdown-to-adf.js" -path "*/sdlc*/scripts/lib/markdown-to-adf.js" 2>/dev/null | sort -V | tail -1)
    [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
    [ -z "$SCRIPT" ] && { echo "ERROR: markdown-to-adf.js not found"; exit 2; }
    cat <<'COMMENT_MD' | node "$SCRIPT"

@@ -78,7 +78,7 @@ When `--check` is run without `--site` and the home-cache contains entries for t
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "jira.js" -path "*/sdlc*/scripts/skill/jira.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "jira.js" -path "*/sdlc*/scripts/skill/jira.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/jira.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/jira.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/jira.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
@@ -374,7 +374,7 @@ Skip for read operations. Implements R17 + the cooperative half of R21.
 Skip for read operations. After approval (Step 2.6) and before MCP dispatch, validate every URL embedded in the description payload (for `createJiraIssue`/`editJiraIssue`) and the comment body (for `addCommentToJiraIssue`) via `scripts/skill/jira.js --validate-body`. The script reads the body from stdin and resolves the expected Jira site (`siteUrl`) deterministically from the cached `~/.sdlc-cache/jira/<site>/<KEY>.json` — the skill MUST NOT construct ctx JSON.
 
 ```bash
-JIRA_PREPARE=$(find ~/.claude/plugins -name "jira.js" -path "*/sdlc*/scripts/skill/jira.js" 2>/dev/null | head -1)
+JIRA_PREPARE=$(find ~/.claude/plugins -name "jira.js" -path "*/sdlc*/scripts/skill/jira.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$JIRA_PREPARE" ] && [ -f "plugins/sdlc-utilities/scripts/skill/jira.js" ] && JIRA_PREPARE="plugins/sdlc-utilities/scripts/skill/jira.js"
 printf '%s' "$body_or_description" | node "$JIRA_PREPARE" --validate-body --project <KEY> --json
 LINK_EXIT=$?

@@ -31,7 +31,7 @@ If `--init-config` was passed:
 1. Read `./config-format.md` and run the interactive walkthrough to collect the user's answers (steps multi-select, bump type, auto, threshold, workspace isolation).
 2. Locate and call `ship-init.js` via Bash with the collected answers:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" -path "*/sdlc*/scripts/util/ship-init.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" -path "*/sdlc*/scripts/util/ship-init.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/ship-init.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate util/ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
@@ -52,7 +52,7 @@ trap 'rm -f "$INIT_OUTPUT_FILE"' EXIT INT TERM
 If `--gc` (with optional `--ttl-days <N>`) was passed, run `skill/ship.js --gc` and stop — no pipeline composition. The prepare script short-circuits: it scans `<main-worktree>/.sdlc/execution/` for stale ship- and execute- state files (older than TTL AND whose branch is no longer in `git branch --list`), removes them, and emits a JSON report.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
 PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --gc)  # add --ttl-days <N> when provided
 trap 'rm -f "$PREPARE_OUTPUT_FILE"' EXIT INT TERM
@@ -86,7 +86,7 @@ If not found: `No ship config found — using built-in defaults. Run /setup-sdlc
 
 Locate and run `skill/ship.js` with all CLI flags to pre-compute flags, context, and step statuses:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
@@ -545,7 +545,7 @@ Note: in a worktree, all of this is safe — main working tree is untouched.
 
 After each step, update pipeline state via `state/ship.js`. Locate the script:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/state/ship.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/state/ship.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/state/ship.js"
 ```
 

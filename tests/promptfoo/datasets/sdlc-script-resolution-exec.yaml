@@ -83,3 +83,47 @@
       value: ".claude/plugins"
     - type: not-icontains
       value: "plugins/sdlc-utilities/scripts"
+
+# Multi-version regression (#258): when ~/.claude/plugins/cache/ contains two cached
+# plugin versions, the resolution pattern must select the newest semver, not an
+# arbitrary filesystem-traversal-order match.
+- description: "script-resolution: highest semver wins when multiple cached versions exist"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
+    script_args: "--script-name pr.js --script-path skill/pr.js --project-root {{project_root}}"
+    project_root: "file://fixtures-fs/resolution-multi-version"
+  assert:
+    # Source must be "installed"
+    - type: icontains
+      value: '"source":"installed"'
+    # Newest version (0.18.4) must be in the resolved path
+    - type: icontains
+      value: "0.18.4"
+    # Older version (0.17.38) must NOT be in the resolved path
+    - type: not-icontains
+      value: "0.17.38"
+
+# Validator regression (#258): the script-resolution-version rule in
+# .claude/skills/validate-plugin-consistency/check-consistency.js must flag
+# any plugins-resolution `find ... | head -1` lacking `sort -V | tail -1`.
+- description: "script-resolution: validator flags bare 'head -1' in plugins-resolution"
+  vars:
+    script_path: "repo://.claude/skills/validate-plugin-consistency/check-consistency.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/resolution-validator-cases/bad-project"
+  assert:
+    # The new rule must fire on the bad fixture
+    - type: icontains
+      value: '"rule": "script-resolution-version"'
+    - type: icontains
+      value: 'head -1'
+
+- description: "script-resolution: validator passes 'sort -V | tail -1' (good case)"
+  vars:
+    script_path: "repo://.claude/skills/validate-plugin-consistency/check-consistency.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/resolution-validator-cases/good-project"
+  assert:
+    # The good fixture must NOT trigger the new rule
+    - type: not-icontains
+      value: '"rule": "script-resolution-version"'

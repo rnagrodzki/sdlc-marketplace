@@ -236,7 +236,7 @@ two-step pattern:
 
 ```bash
 # Step 1: Search installed plugin (recursive find — scripts are 4 levels deep under cache/)
-SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" 2>/dev/null | sort -V | tail -1)
 
 # Step 2: Fall back to the repository tree (for development / testing)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/pr-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/pr-prepare.js"
