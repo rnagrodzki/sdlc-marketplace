@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-06 — version-sdlc: patch bump on feat/233-configurable-always-fix-severities
+Branch had no upstream; --set-upstream was emitted automatically. suggestedBump was minor (feat commit present) but explicit patch override from pipeline took precedence without issue. All CI scripts were current at v0.18.3 release.
+
 ## 2026-05-06 — pr-sdlc: --validate-body on older installed plugin version emits full JSON to stdout
 The installed plugin (0.17.x) resolves pr.js via `find ~/.claude/plugins` and may be an older cached version than the local checkout. When piping a large body to `--validate-body`, stdout floods with the full pr context JSON (572KB) because the older version echoes it — only the last line `LINK_EXIT=N` and `OK:` message matter. The validation still works correctly (exit 0 = pass). No action needed; capturing stderr separately and checking exit code is sufficient.
 
