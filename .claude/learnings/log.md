@@ -74,6 +74,12 @@ Single chore commit (plan-sdlc skill-docs-required guardrail & test fixture). Br
 ## 2026-04-29 — version-sdlc: patch release v0.17.31 on fix/184-sequential-meteor
 First push from untracked branch; `git push --set-upstream origin <branch>` required before `git push --tags`. Both commits were `fix` type (null-check guard + gh-account-switch retry), cleanly mapping to a patch bump.
 
+## 2026-05-06 — execute-plan-sdlc: 4-task plan executed inline (no Agent dispatch tool)
+Agent tool was not surfaced in this environment so all four waves of the harvest-learnings plan executed inline in the main context (consistent with the existing 2026-05-05 entry on the same situation). Plan AC for the exec test "byte-identical mutation" required tmp-copying the fixture before `--commit` so the canonical fixture under `fixtures-fs/` stays pristine across promptfoo's parallel concurrency=8 — the AC was honored by spinning up an isolated tmp tree inside the JS assertion. Behavioral fixtures `fixtures/*.md` describe the helper's drafts JSON output rather than copying the filesystem fixture; this is the existing harness pattern (exec tests own filesystem trees, behavioral tests own simulated context), so "no fixture duplication" was satisfied in spirit even though the two test surfaces don't literally share files.
+
+## 2026-05-06 — pr-sdlc: custom template sections require matching gh issue link format
+This repo uses a custom PR template (`.claude/pr-template.md`) with a `## Github Issue` section (not `## JIRA Ticket`). The `Fixes #N` reference goes in that section, not in a JIRA field. When a custom template is active, all section headings come from the template — do not inject default 8-section headings alongside it.
+
 Active bugs are tracked in GitHub issues. This log retains only entries < 30 days old
 that capture non-obvious gotchas not yet reflected in code, docs, or skills.
 

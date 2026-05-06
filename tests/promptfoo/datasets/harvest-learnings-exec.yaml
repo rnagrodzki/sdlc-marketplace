@@ -1,0 +1,144 @@
+# Script execution tests for .claude/scripts/harvest-learnings.js
+# Runs the helper directly against fixture trees (no LLM, no real `gh`).
+# Real `gh issue list` is bypassed via the GH_HARVEST_FAKE_LIST env var.
+# Covers: empty log, draft clusters, source-range dedup, --since filter,
+# --dry-run flag, and --commit log mutation.
+
+# AC1 — Empty log → totalEntries 0, no clusters.
+- description: "harvest-learnings: empty log returns totalEntries=0 and clusters=[]"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-empty"
+    script_env: '{"GH_HARVEST_FAKE_LIST":"/dev/null"}'
+  assert:
+    - type: javascript
+      value: |
+        const fs = require('fs');
+        const path = output.trim();
+        const j = JSON.parse(fs.readFileSync(path, 'utf8'));
+        return j.totalEntries === 0 && Array.isArray(j.clusters) && j.clusters.length === 0;
+
+# AC2 — Log with 3 distinct entries → 3 draft clusters.
+- description: "harvest-learnings: 3-entry log produces 3 draft clusters"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-with-entries"
+    script_env: '{"GH_HARVEST_FAKE_LIST":"/dev/null"}'
+  assert:
+    - type: javascript
+      value: |
+        const fs = require('fs');
+        const j = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
+        return j.totalEntries === 3
+          && j.clusters.length === 3
+          && j.clusters.every(c => c.status === 'draft')
+          && j.clusters.every(c => typeof c.id === 'string' && c.id.length === 12);
+
+# AC3 — Source-range overlap → cluster classified as 'tracked'.
+- description: "harvest-learnings: source-range overlap classifies cluster as tracked"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-already-tracked"
+    script_env: '{"GH_HARVEST_FAKE_LIST":"{{project_root}}/fake-gh-issues.json"}'
+  assert:
+    - type: javascript
+      value: |
+        const fs = require('fs');
+        const j = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
+        const tracked = j.clusters.find(c => c.status === 'tracked');
+        const draft = j.clusters.find(c => c.status === 'draft');
+        return j.totalEntries === 2
+          && tracked && tracked.dedupReason === 'source-range-overlap'
+          && tracked.existingIssue && tracked.existingIssue.number === 999
+          && draft && draft.skill === 'skill-beta';
+
+# AC4 — --since filters older clusters out.
+- description: "harvest-learnings: --since YYYY-MM-DD filters older clusters"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file --since 2026-05-01"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-with-entries"
+    script_env: '{"GH_HARVEST_FAKE_LIST":"/dev/null"}'
+  assert:
+    - type: javascript
+      value: |
+        const fs = require('fs');
+        const j = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
+        // totalEntries reflects parse count (3); clusters reflects post-filter (2 of 3).
+        return j.totalEntries === 3
+          && j.clusters.length === 2
+          && j.clusters.every(c => c.dateISO >= '2026-05-01');
+
+# AC5 — --dry-run hint flows into JSON without changing parsing.
+- description: "harvest-learnings: --dry-run sets dryRun=true on output"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file --dry-run"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-with-entries"
+    script_env: '{"GH_HARVEST_FAKE_LIST":"/dev/null"}'
+  assert:
+    - type: javascript
+      value: |
+        const fs = require('fs');
+        const j = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
+        return j.dryRun === true && j.clusters.length === 3;
+
+# AC6 — --commit removes only approved clusters; rest of file preserved.
+# Performed against a tmp-copy of the fixture so the source stays pristine.
+# The first script invocation seeds drafts JSON; the JS assertion then runs
+# a second invocation against an isolated tmp copy and checks the line delta.
+- description: "harvest-learnings: --commit removes only approved cluster line ranges"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-with-entries"
+    script_env: '{"GH_HARVEST_FAKE_LIST":"/dev/null"}'
+  assert:
+    - type: javascript
+      value: |
+        const fs = require('fs');
+        const os = require('os');
+        const path = require('path');
+        const { execFileSync } = require('child_process');
+        const drafts = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
+        // Locate repo root and helper from the fixture path.
+        const fixtureDir = path.dirname(path.dirname(path.dirname(drafts.logPath)));
+        const repoRoot = fixtureDir.replace(/\/tests\/promptfoo\/fixtures-fs\/[^/]+$/, '');
+        const helper = repoRoot + '/.claude/scripts/harvest-learnings.js';
+        // Set up an isolated tmp project tree (copy of fixture log).
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'harvest-commit-'));
+        fs.mkdirSync(path.join(tmp, '.claude', 'learnings'), { recursive: true });
+        const srcLog = drafts.logPath;
+        const dstLog = path.join(tmp, '.claude', 'learnings', 'log.md');
+        fs.copyFileSync(srcLog, dstLog);
+        const beforeLines = fs.readFileSync(dstLog, 'utf8').split('\n').length;
+        // Re-run --output-file inside the tmp tree to mint matching cluster ids.
+        const env = Object.assign({}, process.env, { GH_HARVEST_FAKE_LIST: '/dev/null' });
+        const draftsTmpPath = execFileSync('node', [helper, '--output-file'],
+          { cwd: tmp, env, encoding: 'utf8' }).trim();
+        const draftsTmp = JSON.parse(fs.readFileSync(draftsTmpPath, 'utf8'));
+        // Approve only the middle cluster (skill-beta).
+        const target = draftsTmp.clusters.find(c => c.skill === 'skill-beta');
+        const approvedFile = path.join(tmp, 'approved.json');
+        fs.writeFileSync(approvedFile, JSON.stringify({ approvedClusterIds: [target.id] }));
+        execFileSync('node', [helper, '--commit', approvedFile],
+          { cwd: tmp, env, encoding: 'utf8' });
+        const afterRaw = fs.readFileSync(dstLog, 'utf8');
+        const afterLines = afterRaw.split('\n').length;
+        const removed = beforeLines - afterLines;
+        // skill-beta header occupies 2 lines (header + body) in the fixture.
+        const trailerStillPresent = /^## Tracked in GH Issues/m.test(afterRaw);
+        const alphaStillPresent = /skill-alpha: first lesson/.test(afterRaw);
+        const gammaStillPresent = /skill-gamma: older lesson/.test(afterRaw);
+        const betaGone = !/skill-beta: second lesson/.test(afterRaw);
+        return removed === 2 && trailerStillPresent && alphaStillPresent
+          && gammaStillPresent && betaGone;
