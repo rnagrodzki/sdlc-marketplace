@@ -94,7 +94,15 @@ function resolveAlwaysFixSeverities(projectRoot) {
   const local = readSection(projectRoot, 'receivedReview');
   const list = local?.alwaysFixSeverities;
   if (!Array.isArray(list)) return [];
-  return list.filter(s => typeof s === 'string' && VALID_SEVERITIES.has(s));
+  const valid = list.filter(s => typeof s === 'string' && VALID_SEVERITIES.has(s));
+  const invalid = list.filter(s => !VALID_SEVERITIES.has(s));
+  if (invalid.length > 0) {
+    process.stderr.write(
+      `[received-review] alwaysFixSeverities: unrecognized severity values ignored: ` +
+      `${JSON.stringify(invalid)}. Allowed: low, medium, high, critical.\n`
+    );
+  }
+  return valid;
 }
 
 // ---------------------------------------------------------------------------

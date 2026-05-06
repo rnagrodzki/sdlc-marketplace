@@ -51,11 +51,18 @@ the per-finding consent gate in Step 10 (PRESENT) and Step 12 (REPLY & RESOLVE).
 A finding with `severity: null` (severity could not be parsed from the comment body) **NEVER**
 bypasses the consent gate, regardless of `flags.alwaysFixSeverities`.
 
-**`--auto` interaction (R10/R16):** Under `--auto`, the auto-apply set is restricted by R18:
-only "will fix" findings whose severity is in `flags.alwaysFixSeverities` are implemented in
-Step 11; remaining "will fix" findings (severity not in the list, or `severity: null`) are
-collected into a **follow-up summary** appended to the response output. In Step 12, only
-"agree, will fix" threads matching R18 are resolved; other threads are replied to but left open.
+**`--auto` interaction (R10/R16):** When `flags.alwaysFixSeverities` is non-empty, `--auto`
+is further restricted by R18: only "will fix" findings whose severity is in the list are
+implemented in Step 11; remaining "will fix" findings (severity not in the list, or
+`severity: null`) are collected into a **follow-up summary** appended to the response output.
+In Step 12, only "agree, will fix" threads matching R18 are resolved; other threads are replied
+to but left open.
+
+When `flags.alwaysFixSeverities` is empty (the default — `alwaysFixSeverities` unset in
+`.sdlc/local.json`), `--auto` falls back to the original behavior: **all** "will fix" findings
+are auto-applied in Step 11 and all "agree, will fix" threads are resolved in Step 12, regardless
+of severity (including `severity: null`). This preserves backward compatibility for users who
+have not configured the field.
 
 To configure interactively, run `/setup-sdlc --only received-review`.
 
@@ -320,13 +327,18 @@ Show the full text of each drafted response, labeled by item number.
 log entry and require no user prompt. All other findings (any other verdict, severity not in
 the list, or `severity: null`) follow the modes below.
 
-**Auto mode:** When `flags.auto` is true (from manifest or arguments), apply only "agree, will fix"
-findings whose severity ∈ `flags.alwaysFixSeverities` (per the R18 bypass rule above). Remaining
-"agree, will fix" findings — those with severity NOT in the list, or with `severity: null` — are
-collected into a **follow-up summary** appended to the response output (not auto-applied). Items
-with "disagree", "needs discussion", or "won't fix" verdicts are displayed but NEVER auto-actioned.
-Still display the full analysis table and action plan above for visibility, then proceed directly
-to Step 11.
+**Auto mode:** When `flags.auto` is true (from manifest or arguments):
+- If `flags.alwaysFixSeverities` is **non-empty**: apply only "agree, will fix" findings whose
+  severity ∈ `flags.alwaysFixSeverities` (per the R18 bypass rule above). Remaining "agree, will
+  fix" findings — severity NOT in the list, or `severity: null` — are collected into a
+  **follow-up summary** appended to the response output (not auto-applied).
+- If `flags.alwaysFixSeverities` is **empty** (default): apply **all** "agree, will fix" findings
+  regardless of severity (including `severity: null`). This is the original `--auto` behavior and
+  is the default for users who have not configured `alwaysFixSeverities`.
+
+Items with "disagree", "needs discussion", or "won't fix" verdicts are displayed but NEVER
+auto-actioned in either case. Still display the full analysis table and action plan above for
+visibility, then proceed directly to Step 11.
 
 **Manual mode (default):** When `flags.auto` is false or absent, use AskUserQuestion to ask:
 > No changes have been made yet. How to proceed?
@@ -422,10 +434,16 @@ below.
 **Auto mode:** When `flags.auto` is true (from manifest or arguments), skip the AskUserQuestion
 consent gate. Still display the summary block above for visibility, then proceed directly to
 step 3 below as if the user selected `yes`: post in-thread replies for every action-plan item.
-Thread resolution is restricted by R18 — resolve only "agree, will fix" threads whose severity
-∈ `flags.alwaysFixSeverities`; "agree, will fix" threads with severity NOT in the list (or
-`severity: null`) are replied to but **NOT resolved** (they are appended to the follow-up
-summary). Pushback and "won't fix" threads are replied to but left open for the reviewer.
+
+Thread resolution behavior depends on `flags.alwaysFixSeverities`:
+- **Non-empty list:** Resolve only "agree, will fix" threads whose severity ∈
+  `flags.alwaysFixSeverities` (R18). "agree, will fix" threads with severity NOT in the list (or
+  `severity: null`) are replied to but NOT resolved — they are appended to the follow-up summary.
+- **Empty list (default):** Resolve ALL "agree, will fix" threads regardless of severity
+  (including `severity: null`). This is the original `--auto` behavior for users who have not
+  configured `alwaysFixSeverities`.
+
+Pushback and "won't fix" threads are replied to but left open for the reviewer in both cases.
 Pipeline context does NOT override this behavior — only the explicit `flags.auto` signal skips
 the gate.
 
@@ -450,13 +468,8 @@ Options:
      ```bash
      gh api graphql -f query='mutation($threadId: ID!) { resolveReviewThread(input: {threadId: $threadId}) { thread { isResolved } } }' -F threadId="<thread_id>"
      ```
-   - **R18 restriction (auto mode only):** When `flags.auto` is true AND
-     `flags.alwaysFixSeverities` is non-empty, resolve the thread only when the finding's
-     severity ∈ `flags.alwaysFixSeverities`. "agree, will fix" threads with severity NOT
-     in the list (or `severity: null`) are replied to but the resolve mutation is skipped;
-     the thread is appended to the follow-up summary. This restriction does NOT apply in
-     manual `implement` / `selective` modes — the user has explicitly approved the action
-     plan, so all "agree, will fix" threads are resolved.
+   - In **manual `implement`/`selective` modes**, always resolve all "agree, will fix" threads — the user has explicitly approved the action plan.
+   - In **auto mode**, resolution follows the rule in the Auto mode block above: all "agree, will fix" threads are resolved when `flags.alwaysFixSeverities` is empty; only severity-matching threads are resolved when the list is non-empty.
 
    **For pushback comments (disagree):**
    - Post the drafted pushback response (from Step 7):
