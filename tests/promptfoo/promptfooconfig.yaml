@@ -29,3 +29,4 @@ tests:
   - file://datasets/error-report-sdlc.yaml
   - file://datasets/ship-sdlc.yaml
   - file://datasets/harden-sdlc.yaml
+  - file://datasets/harvest-learnings.yaml

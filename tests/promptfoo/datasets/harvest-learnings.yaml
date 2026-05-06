@@ -1,0 +1,122 @@
+# Behavioral tests for /harvest-learnings command (.claude/commands/harvest-learnings.md).
+# Six cases mapped 1:1 to acceptance criteria from issue #230.
+# The simulated project context describes the drafts JSON the helper returned —
+# the canonical filesystem fixtures live under tests/promptfoo/fixtures-fs/
+# (exercised by datasets/harvest-learnings-exec.yaml).
+
+# AC1 — Empty log → command short-circuits with "nothing to harvest", no `gh` calls.
+- description: "harvest-learnings: empty log short-circuits with 'nothing to harvest'"
+  vars:
+    skill_path: ".claude/commands/harvest-learnings.md"
+    project_context: "file://fixtures/harvest-learnings-empty.md"
+    user_request: >
+      Run /harvest-learnings. The drafts JSON returned by the helper indicates
+      zero clusters. Show what the command does next.
+  assert:
+    - type: icontains
+      value: "nothing to harvest"
+    - type: llm-rubric
+      value: >
+        The response detects that there are no clusters to harvest, prints a
+        short "nothing to harvest" message, and stops. It does NOT call
+        `gh issue create`. It does NOT invoke the helper with `--commit`.
+        It does NOT prompt the user for approval — there is nothing to approve.
+
+# AC2 — All drafts approved → one `gh issue create` per draft, then helper --commit.
+- description: "harvest-learnings: all approved → one gh issue create per draft, then --commit"
+  vars:
+    skill_path: ".claude/commands/harvest-learnings.md"
+    project_context: "file://fixtures/harvest-learnings-three-drafts.md"
+    user_request: >
+      Run /harvest-learnings. The drafts JSON has 3 draft clusters. Assume the
+      user approves every draft via AskUserQuestion. Show what the command
+      does — what `gh issue create` invocations it produces and what helper
+      command it runs to mutate the log.
+  assert:
+    - type: icontains
+      value: "gh issue create"
+    - type: icontains
+      value: "--commit"
+    - type: llm-rubric
+      value: >
+        The response calls `gh issue create --title <T> --body <B>` once per
+        approved draft (3 invocations total), with no `--repo` flag. The body
+        of each issue ends with a `Source: learnings/log.md (lines N–M,
+        harvested YYYY-MM-DD)` footer. After all `gh issue create` calls
+        succeed, the response writes the approved cluster ids to a temp file
+        and runs `node .claude/scripts/harvest-learnings.js --commit <tmpfile>`
+        to atomically remove the harvested entries from log.md.
+
+# AC3 — Tracked clusters silently skipped, count reported in summary.
+- description: "harvest-learnings: tracked cluster silently skipped, counted in summary"
+  vars:
+    skill_path: ".claude/commands/harvest-learnings.md"
+    project_context: "file://fixtures/harvest-learnings-already-tracked.md"
+    user_request: >
+      Run /harvest-learnings. The drafts JSON has 1 cluster with status
+      "tracked" (existing issue #999) and 1 with status "draft". Assume the
+      user approves the draft. Show what the command does.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response silently skips the tracked cluster — it does NOT prompt
+        the user about it and does NOT call `gh issue create` for it. The
+        response only presents the single draft cluster (skill-beta) to the
+        user for approval. After approval, exactly one `gh issue create` is
+        invoked (for skill-beta only), and the final summary reports
+        `skipped 1 tracked` (or equivalent — the count of tracked clusters
+        is acknowledged in the summary output).
+
+# AC4 — Partial approval → only approved clusters removed; skipped entries remain.
+- description: "harvest-learnings: partial approval — only approved clusters committed"
+  vars:
+    skill_path: ".claude/commands/harvest-learnings.md"
+    project_context: "file://fixtures/harvest-learnings-three-drafts.md"
+    user_request: >
+      Run /harvest-learnings. The drafts JSON has 3 draft clusters. Assume the
+      user approves the first cluster (skill-alpha), skips the second
+      (skill-beta), and approves the third (skill-gamma). Show what `gh issue
+      create` invocations are produced and what cluster ids end up in the
+      `--commit` payload.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response makes exactly 2 `gh issue create` invocations (for
+        skill-alpha and skill-gamma). The skipped cluster (skill-beta) gets
+        NO `gh issue create` and is NOT included in the approvedClusterIds
+        passed to `--commit`. The `--commit` payload's approvedClusterIds
+        array contains exactly 2 ids (alpha and gamma) — never the skipped
+        beta. The skipped entry remains in log.md after the commit step.
+
+# AC5 — Full rejection → no `gh issue create`, no log mutation.
+- description: "harvest-learnings: full rejection — no gh create, no log mutation"
+  vars:
+    skill_path: ".claude/commands/harvest-learnings.md"
+    project_context: "file://fixtures/harvest-learnings-three-drafts.md"
+    user_request: >
+      Run /harvest-learnings. The drafts JSON has 3 draft clusters. Assume the
+      user skips every draft (rejects all approvals). Show what the command
+      does.
+  assert:
+    - type: llm-rubric
+      value: >
+        With every draft rejected, the response makes ZERO `gh issue create`
+        invocations and does NOT invoke the helper with `--commit`. log.md is
+        unchanged. The summary indicates that no issues were created and the
+        rejected count is reported.
+
+# AC6 — --dry-run → drafts printed, no `gh issue create`, no log mutation.
+- description: "harvest-learnings: --dry-run prints drafts, no side effects"
+  vars:
+    skill_path: ".claude/commands/harvest-learnings.md"
+    project_context: "file://fixtures/harvest-learnings-dry-run.md"
+    user_request: >
+      Run /harvest-learnings --dry-run. The drafts JSON has dryRun=true and
+      3 draft clusters. Show what the command does.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response prints the draft titles and bodies (or otherwise displays
+        the drafts) and stops. It does NOT call `gh issue create` for any
+        draft. It does NOT invoke the helper with `--commit`. log.md is
+        unchanged. The dry-run nature of the run is explicit in the output.
