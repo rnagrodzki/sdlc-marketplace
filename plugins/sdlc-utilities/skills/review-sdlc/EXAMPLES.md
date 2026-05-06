@@ -1,7 +1,7 @@
 # Review Dimension Examples
 
 Five ready-to-use dimension files. Copy any of these to your project's
-`.claude/review-dimensions/` directory and adjust triggers and instructions
+`.sdlc/review-dimensions/` directory and adjust triggers and instructions
 for your tech stack.
 
 ---

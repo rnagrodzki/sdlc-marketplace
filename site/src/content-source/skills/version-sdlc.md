@@ -18,13 +18,15 @@ Manages the full semantic release workflow: detects the version source, bumps th
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `major` / `minor` / `patch` | Bump type (positional). If omitted, auto-detected from conventional commits. | auto |
+| `major` / `minor` / `patch` / `<label>` | Bump type (positional). If omitted, auto-detected from conventional commits. The `<label>` form (e.g. `version-sdlc rc`) is sugar for `--bump patch --pre <label>` and accepts any pre-release label matching `^[a-z][a-z0-9]*$`. | auto |
 | `--init` | Run the setup wizard and write `.claude/version.json`. Safe to re-run. | — |
-| `--pre <label>` | Create a pre-release version (e.g. `beta`, `rc`). Auto-increments the counter on repeated runs. | — |
+| `--pre <label>` | Create a pre-release version (e.g. `beta`, `rc`). Label must match `^[a-z][a-z0-9]*$`. Auto-increments the counter on repeated runs. | — |
 | `--no-push` | Commit and tag locally, skip `git push`. | — |
-| `--changelog` | With a bump type: generate a CHANGELOG entry as part of the release. Without a bump type: update the changelog for the already-tagged current version (no new tag created). | off |
+| `--changelog` | With a bump type: generate a CHANGELOG entry as part of the release. Without a bump type: update the changelog for the already-tagged current version (no new tag created). Can also be enabled permanently by setting `"changelog": true` in `.claude/version.json` — the CLI flag and config value are OR'd together as `flags.changelog`. | off |
 | `--hotfix` | Mark this release as a hotfix for DORA metrics tracking. Annotates the commit message with `[hotfix]` and the tag message body with `Type: hotfix`. | off |
 | `--auto` | Skip interactive approval prompts. Release plan is still displayed for visibility; critique gates and pre-condition checks still run. | off |
+
+> **Auto-upstream:** When releasing from a branch with no remote upstream configured, the push step automatically uses `git push --set-upstream origin <branch>` instead of bare `git push`. This avoids first-push failures on fresh feature branches. The subsequent `git push --tags` is unaffected.
 
 ---
 
@@ -132,6 +134,44 @@ Proceed? (yes / edit / cancel)
 /version-sdlc minor               # 1.3.0-rc.1 → 1.3.0         (graduate to release)
 ```
 
+### Pre-release shorthand: `--bump <label>`
+
+The positional `<label>` form is sugar for `--bump patch --pre <label>`. Useful for short, repeated RC iteration:
+
+```text
+/version-sdlc rc                  # 1.2.3        → 1.2.4-rc.1   (fresh patch + label)
+/version-sdlc rc                  # 1.2.4-rc.1   → 1.2.4-rc.2   (same-label increment)
+/version-sdlc rc                  # 1.2.4-beta.3 → 1.2.4-rc.1   (label change, counter reset)
+/version-sdlc mycorp              # 1.0.0        → 1.0.1-mycorp.1  (any custom label matching ^[a-z][a-z0-9]*$)
+```
+
+Label-form bumps skip the breaking-change suggestion (R3): pre-release trains do not nag on every iteration.
+
+### Default pre-release label via config
+
+Set `version.preRelease` in `.sdlc/config.json` to apply a default label whenever the user runs `version-sdlc` without an explicit `major|minor|patch` and without `--pre`:
+
+```json
+{
+  "version": {
+    "mode": "file",
+    "versionFile": "package.json",
+    "tagPrefix": "v",
+    "preRelease": "rc"
+  }
+}
+```
+
+With this config:
+
+```text
+/version-sdlc                     # 1.2.3      → 1.2.4-rc.1   (config default applied)
+/version-sdlc                     # 1.2.4-rc.1 → 1.2.4-rc.2   (same as `version-sdlc rc`)
+/version-sdlc major               # 1.2.4-rc.1 → 2.0.0        (explicit base bump graduates)
+```
+
+Configure interactively via `/setup-sdlc` (Step 3a customize path).
+
 ### Example release session
 
 ```text
@@ -229,7 +269,7 @@ git tag -l --format='%(refname:short)%09%(contents:subject)%09%(contents:body)'
 
 | Field | Value |
 |---|---|
-| `argument-hint` | `[major\|minor\|patch] [--pre <label>] [--changelog] [--hotfix]` |
+| `argument-hint` | `[major\|minor\|patch\|<label>] [--pre <label>] [--changelog] [--hotfix]` |
 | Plan mode | Graceful refusal (Step 0) |
 
 ---
@@ -242,6 +282,14 @@ git tag -l --format='%(refname:short)%09%(contents:subject)%09%(contents:body)'
 | `package.json` / version file | Version field bumped in-place |
 | git tag | Annotated tag (e.g. `v1.3.0`) pushed to origin. With `--hotfix`, tag body includes `Type: hotfix`. |
 | `CHANGELOG.md` | New entry prepended (only with `--changelog`) |
+
+---
+
+## Version-File Edit Hard Gate
+
+After bumping the version string in the version file, the skill runs `git diff <versionFile>` and enforces that **exactly one line changed**. If more than one line differs, the release is aborted immediately: the file is restored with `git checkout -- <versionFile>` and the diff is surfaced verbatim to the user.
+
+This gate applies to all supported file formats (JSON, TOML, YAML — `package.json`, `plugin.json`, `Cargo.toml`, `pyproject.toml`, etc.). The Edit tool is used with a single targeted string replacement; the Write tool is never used to rewrite the file, because LLMs can silently truncate or paraphrase fields like `description`.
 
 ---
 
@@ -312,6 +360,10 @@ The automated changelog is a **draft**, not a source of truth. Squash merges, pa
 2. `git checkout main && git pull`
 3. Run `/version-sdlc --changelog` to reconcile the changelog with the actual tag-to-tag commits
 4. The CI `check-changelog.cjs` (scaffolded during `--init` when changelog is enabled) validates that an entry exists on every push to main
+
+## Link Verification (issue #198)
+
+Before the release `git commit` (Step 8), the skill pipes the new CHANGELOG entry through `scripts/lib/links.js` as a hard gate. The validator auto-derives `expectedRepo` from `git remote origin` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill never constructs the validator context. URL classes checked: GitHub issues/PRs (owner/repo identity + existence), Atlassian `*.atlassian.net/browse/<KEY>` (host match), and any other `http(s)://` URL (HEAD reachability, 5s timeout). Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability while keeping context-aware checks. On non-zero exit, neither `git commit` nor `git tag` is executed, and the violation list is surfaced verbatim. No flag toggles this gate — it is hard. (Skipped entirely when changelog is disabled and no release-notes body was generated.)
 
 ## Related Skills
 

@@ -18,7 +18,7 @@ Manages Jira issues via the Atlassian MCP with a project metadata cache that eli
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--project <KEY>` | Jira project key to use (e.g., `PROJ`). Auto-detected from git branch or `.claude/sdlc.json` → `jira.defaultProject`. When `jira.projects` is set (≥2 entries), values outside the list are rejected. | Auto |
+| `--project <KEY>` | Jira project key to use (e.g., `PROJ`). Auto-detected from git branch or `.sdlc/config.json` → `jira.defaultProject`. When `jira.projects` is set (≥2 entries), values outside the list are rejected. | Auto |
 | `--force-refresh` | Rebuild the project cache from scratch (cache is permanent by default; use when project metadata has changed) | — |
 | `--init-templates` | Copy the skill's default issue type templates to `.claude/jira-templates/` for customization | — |
 | `--site <host>` | Sanitized site host (lowercased, `.` → `_`, e.g., `acme_atlassian_net`). Disambiguates `--check`/`--load` when the same project key is cached under multiple site subdirectories. | Unset |
@@ -177,7 +177,7 @@ Earlier versions of this skill stored the cache in-repo at `.sdlc/jira-cache/<KE
 
 ### Multiple Projects
 
-Repos that map to multiple Jira projects can enumerate the allowed keys in `.claude/sdlc.json`:
+Repos that map to multiple Jira projects can enumerate the allowed keys in `.sdlc/config.json`:
 
 ```json
 {

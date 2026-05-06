@@ -101,7 +101,7 @@ When `scope` is `worktree`: `base_branch` is set, `git.commit_count` and `git.co
 
 ## 1. Dimension File Format
 
-Each project defines review dimensions as `.md` files in `<project>/.claude/review-dimensions/`.
+Each project defines review dimensions as `.md` files in `<project>/.sdlc/review-dimensions/`.
 
 ### Schema
 

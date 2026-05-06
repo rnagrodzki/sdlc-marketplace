@@ -152,7 +152,7 @@ Key fields available (including `customTemplate` added for project-level PR temp
 | `changedFiles` | `string[]` — relative file paths changed in this PR |
 | `repoLabels` | `[{ name, description }]` — labels defined in the repository; empty if unavailable |
 | `customTemplate` | Full content of `.claude/pr-template.md` or `null` if not present |
-| `prConfig` | PR title validation config from `.claude/sdlc.json` (null when absent) |
+| `prConfig` | PR title validation config from `.sdlc/config.json` (null when absent) |
 | `isAuto` | Whether `--auto` was passed — skip interactive prompts |
 | `forcedLabels` | `string[]` — labels forced via `--label` flag(s), pre-validated against `repoLabels`. Always included in PR regardless of signal matching |
 
@@ -196,7 +196,7 @@ If `prConfig` is null or absent, use conventional commit style (`feat:`, `fix:`,
 
 #### Common Patterns Reference
 
-Teams can configure their PR title patterns in `.claude/sdlc.json`. Here are four real-world examples to guide configuration:
+Teams can configure their PR title patterns in `.sdlc/config.json`. Here are four real-world examples to guide configuration:
 
 **Pattern 1: Conventional Commits**
 ```json
@@ -607,7 +607,7 @@ When invoking `error-report-sdlc`, provide:
 
 ## Learning Capture
 
-When creating pull requests, capture discoveries by appending to `.claude/learnings/log.md`.
+When creating pull requests, capture discoveries by appending to `.sdlc/learnings/log.md`.
 Record entries for: repository PR conventions not covered by this skill, branch naming
 patterns, CI requirements that affect PR descriptions, team-specific template preferences,
 JIRA project key patterns, or review process quirks encountered while generating PR content.

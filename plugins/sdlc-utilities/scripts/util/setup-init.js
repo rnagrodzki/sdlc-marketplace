@@ -9,7 +9,7 @@
  *   node setup-init.js [options]
  *
  * Options:
- *   --project-config '<json>'  JSON object for .claude/sdlc.json sections
+ *   --project-config '<json>'  JSON object for .sdlc/config.json sections
  *   --local-config '<json>'    JSON object for .sdlc/local.json sections
  *   --output-file              Write JSON to temp file (path on stdout)
  *
@@ -85,6 +85,59 @@ function validate(parsed) {
 }
 
 // ---------------------------------------------------------------------------
+// Backup rotation (issue #231 R-layout-6)
+// ---------------------------------------------------------------------------
+
+const BACKUP_RETAIN = 3;
+
+function sweepBackups(projectRoot, warnings) {
+  const candidates = [];
+  const sdlcDir = path.join(projectRoot, '.sdlc');
+  const claudeDir = path.join(projectRoot, '.claude');
+
+  // .sdlc/*.bak.* — group by base filename so each role retains 3 newest.
+  if (fs.existsSync(sdlcDir)) {
+    for (const entry of fs.readdirSync(sdlcDir)) {
+      const m = /^(.+?)\.bak\..+$/.exec(entry);
+      if (m) {
+        const full = path.join(sdlcDir, entry);
+        const stat = fs.statSync(full);
+        candidates.push({ full, base: m[1], mtimeMs: stat.mtimeMs });
+      }
+    }
+  }
+  // .claude/sdlc.json.bak.<ts> (only the legacy relocation produces .bak.<ts>; the
+  // bare .claude/sdlc.json.bak is preserved as the single legacy backup).
+  if (fs.existsSync(claudeDir)) {
+    for (const entry of fs.readdirSync(claudeDir)) {
+      const m = /^(sdlc\.json)\.bak\..+$/.exec(entry);
+      if (m) {
+        const full = path.join(claudeDir, entry);
+        const stat = fs.statSync(full);
+        candidates.push({ full, base: 'claude:' + m[1], mtimeMs: stat.mtimeMs });
+      }
+    }
+  }
+
+  // Group by base, sort each group by mtime desc, unlink past index BACKUP_RETAIN-1.
+  const byBase = new Map();
+  for (const c of candidates) {
+    if (!byBase.has(c.base)) byBase.set(c.base, []);
+    byBase.get(c.base).push(c);
+  }
+  for (const [base, group] of byBase.entries()) {
+    group.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    for (let i = BACKUP_RETAIN; i < group.length; i++) {
+      try {
+        fs.unlinkSync(group[i].full);
+      } catch (err) {
+        warnings.push(`Failed to remove stale backup ${group[i].full}: ${err.message}`);
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -103,10 +156,19 @@ function main() {
     return;
   }
 
-  // 1. Create .sdlc/ directory and .gitignore
+  // 1. Create .sdlc/ directory and .gitignore (selective ignores per issue #231).
   const gitignoreAction = ensureSdlcGitignore(projectRoot);
-  if (gitignoreAction === 'existed') {
-    warnings.push('.sdlc/.gitignore already exists — skipped');
+  if (gitignoreAction === 'unchanged') {
+    warnings.push('.sdlc/.gitignore already up-to-date — skipped');
+  }
+
+  // 1c. Backup rotation sweep — keep the 3 newest .bak files per role
+  // (issue #231 R-layout-6). Looks at .sdlc/*.bak.* and .claude/sdlc.json.bak.*
+  // (the legacy single backup is also rotated if multiple appear).
+  try {
+    sweepBackups(projectRoot, warnings);
+  } catch (err) {
+    warnings.push(`Backup rotation sweep failed: ${err.message}`);
   }
 
   // 1b. Ensure managed block in project-root .gitignore (issue #209 — defence
@@ -114,7 +176,7 @@ function main() {
   // agnostic: works in any consumer repo, not only sdlc-marketplace.
   const rootGitignoreAction = ensureRootGitignore(projectRoot);
 
-  // 2. Write project config (.claude/sdlc.json) if sections provided
+  // 2. Write project config (.sdlc/config.json) if sections provided
   let projectConfigAction = 'skipped';
   if (cli.projectConfig !== null) {
     const config = JSON.parse(cli.projectConfig);
@@ -143,7 +205,7 @@ function main() {
       directory: '.sdlc/',
       gitignore:     { path: '.sdlc/.gitignore',  action: gitignoreAction },
       rootGitignore: { path: '.gitignore',         action: rootGitignoreAction },
-      projectConfig: { path: '.claude/sdlc.json',  action: projectConfigAction },
+      projectConfig: { path: '.sdlc/config.json',  action: projectConfigAction },
       localConfig:   { path: '.sdlc/local.json',   action: localConfigAction },
     },
   };

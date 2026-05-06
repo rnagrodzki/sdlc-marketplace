@@ -307,12 +307,12 @@ When the agent makes a mistake during real execution, add the correction to the 
 
 "Consider avoiding" is not a prohibition. "Do NOT" is.
 
-**Learning Capture:** Every skill should end by appending discoveries to `.claude/learnings/log.md`. Only capture genuinely new information — project conventions not covered by the skill, edge cases encountered, patterns that required adjustment. Not a summary of what the skill did.
+**Learning Capture:** Every skill should end by appending discoveries to `.sdlc/learnings/log.md`. Only capture genuinely new information — project conventions not covered by the skill, edge cases encountered, patterns that required adjustment. Not a summary of what the skill did.
 
 ```markdown
 ## Learning Capture
 
-After completing [action], append to `.claude/learnings/log.md`:
+After completing [action], append to `.sdlc/learnings/log.md`:
 
 - Project-specific conventions not covered by this skill
 - Edge cases the skill didn't handle that required manual adjustment

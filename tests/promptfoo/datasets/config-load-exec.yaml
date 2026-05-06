@@ -1,0 +1,25 @@
+# Script execution tests for lib/config.js read paths (issue #231 legacy
+# fallback + issue #232 schemaVersion stamping). Uses a tiny inline runner
+# script invoked with different fixture directories.
+
+- description: "config-load: legacy .claude/sdlc.json fallback"
+  vars:
+    script_path: "repo://tests/promptfoo/runners/config-load-runner.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-legacy-claude"
+  assert:
+    - type: icontains
+      value: 'sources":["'
+    - type: icontains
+      value: '.claude/sdlc.json'
+
+- description: "config-load: new .sdlc/config.json preferred when present"
+  vars:
+    script_path: "repo://tests/promptfoo/runners/config-load-runner.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-current-v3"
+  assert:
+    - type: icontains
+      value: '.sdlc/config.json'
+    - type: not-icontains
+      value: '.claude/sdlc.json'

@@ -51,15 +51,30 @@ function execOrThrow(cmd, opts = {}) {
 // ---------------------------------------------------------------------------
 
 /**
- * Read the version section from .claude/sdlc.json, with legacy .claude/version.json fallback.
- * Returns the version config object or null if neither file exists.
+ * Read the version section from .sdlc/config.json, falling back to legacy
+ * .claude/sdlc.json (with stderr deprecation warning), and finally to legacy
+ * .claude/version.json. CI scripts run in read-only context — they never
+ * call verifyAndMigrate (issue #232).
  */
 function readVersionConfig(repoRoot) {
-  // Primary: .claude/sdlc.json → .version
-  const sdlcPath = path.join(repoRoot, '.claude', 'sdlc.json');
-  if (fs.existsSync(sdlcPath)) {
+  // Primary: .sdlc/config.json → .version (issue #231)
+  const newPath = path.join(repoRoot, '.sdlc', 'config.json');
+  if (fs.existsSync(newPath)) {
     try {
-      const config = JSON.parse(fs.readFileSync(sdlcPath, 'utf8'));
+      const config = JSON.parse(fs.readFileSync(newPath, 'utf8'));
+      return config.version || null;
+    } catch (err) {
+      process.stderr.write(`Error parsing .sdlc/config.json: ${err.message}\n`);
+      process.exit(1);
+    }
+  }
+
+  // Fallback: legacy .claude/sdlc.json
+  const legacyUnifiedPath = path.join(repoRoot, '.claude', 'sdlc.json');
+  if (fs.existsSync(legacyUnifiedPath)) {
+    process.stderr.write(`Deprecation: .claude/sdlc.json is the legacy project-config path. Run /setup-sdlc --migrate to relocate.\n`);
+    try {
+      const config = JSON.parse(fs.readFileSync(legacyUnifiedPath, 'utf8'));
       return config.version || null;
     } catch (err) {
       process.stderr.write(`Error parsing .claude/sdlc.json: ${err.message}\n`);

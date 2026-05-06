@@ -1,0 +1,90 @@
+# Script execution tests for migrate-config.js (issue #232 schema versioning,
+# issue #231 legacy relocation). These tests run scripts directly against
+# fixture directories (no LLM). Manual verification only — never run from CI.
+
+- description: "migrate-config: matching version (no-op)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-current-v3"
+  assert:
+    - type: icontains
+      value: '"migrated": false'
+    - type: icontains
+      value: '"errors": []'
+
+- description: "migrate-config: legacy v0 → v3 relocation"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-legacy-claude"
+  assert:
+    - type: icontains
+      value: '"migrated": true'
+    - type: icontains
+      value: 'project: v0→v3'
+    - type: icontains
+      value: '"errors": []'
+
+- description: "migrate-config: local v1 → v3 chain (preset+skip → steps[])"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-needs-relocation"
+  assert:
+    - type: icontains
+      value: 'local: v1→v2'
+    - type: icontains
+      value: 'local: v2→v3'
+
+- description: "migrate-config: future version (v4) refused"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-future-v4"
+  assert:
+    - type: icontains
+      value: 'CONFIG_VERSION_TOO_NEW'
+    - type: icontains
+      value: 'exceeds max supported version'
+
+- description: "migrate-config: corrupt JSON refused"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-corrupt"
+  assert:
+    - type: icontains
+      value: 'Invalid JSON'
+
+- description: "migrate-config: --dry-run reports without writing"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_args: "--dry-run"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-legacy-claude"
+  assert:
+    - type: icontains
+      value: '"dryRun": true'
+    - type: icontains
+      value: '"migrated": false'
+
+- description: "migrate-config: lock contention rejects with ConfigMigrationLocked"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-locked"
+  assert:
+    - type: icontains
+      value: 'CONFIG_MIGRATION_LOCKED'
+
+- description: "migrate-config: idempotent re-run (no second backup)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-current-v3"
+  assert:
+    - type: icontains
+      value: '"migrated": false'
+    - type: icontains
+      value: '"backupPath": null'

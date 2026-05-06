@@ -42,6 +42,7 @@ const { exec, checkGitState, detectBaseBranch } = require(path.join(LIB, 'git'))
 const { resolveMainWorktree } = require(path.join(LIB, 'state'));
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS, RESERVED_STEPS } = require(path.join(LIB, 'ship-fields'));
 const { gcStateFiles } = require(path.join(LIB, 'state'));
 const { detectActiveChanges, isArchived } = require(path.join(LIB, 'openspec'));
@@ -664,6 +665,29 @@ function main() {
     errors.push(...cli.errors);
   }
 
+  // Issue #232: verifyAndMigrate at pipeline entry. On success, export
+  // SDLC_SKIP_CONFIG_CHECK=1 so every subsequent Bash invocation in the
+  // pipeline (including `node scripts/skill/<sub>.js`) inherits the env var
+  // and short-circuits its own per-skill check.
+  const skipConfigCheck = resolveSkipConfigCheck(process.argv);
+  const cv = ensureConfigVersion(projectRoot, { skip: skipConfigCheck, roles: ['project', 'local'] });
+  let migrationManifest = cv.migration;
+  if (cv.errors.length > 0) {
+    for (const e of cv.errors) errors.push(`config-version: ${e.role}: ${e.message}`);
+    writeOutput({
+      errors,
+      warnings,
+      flags: { skipConfigCheck },
+      migration: migrationManifest,
+    }, 'ship-prepare', 1);
+    return;
+  }
+  // Set the env var so child processes inherit it. Avoid clobbering a
+  // pre-existing value (e.g., a parent shipped already set it).
+  if (!skipConfigCheck && process.env.SDLC_SKIP_CONFIG_CHECK !== '1') {
+    process.env.SDLC_SKIP_CONFIG_CHECK = '1';
+  }
+
   // --gc short-circuit (R39): on-demand pruning. Skip pipeline composition
   // entirely. Emit {action: "gc", report, errors, warnings} and exit.
   if (cli.gc) {
@@ -849,8 +873,10 @@ function main() {
       workspace: flags.workspace,
       rebase: flags.rebase,
       openspecChange: flags.openspecChange,
+      skipConfigCheck,
       sources: flagSources,
     },
+    migration: migrationManifest,
     context,
     steps,
     validation: {

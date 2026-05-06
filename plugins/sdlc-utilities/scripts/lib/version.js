@@ -338,7 +338,7 @@ function readConfig(projectRoot) {
 }
 
 /**
- * Write config to the unified `.claude/sdlc.json` under the `version` section.
+ * Write config to the unified `.sdlc/config.json` under the `version` section.
  * @param {string} projectRoot
  * @param {object} config
  * @returns {void}

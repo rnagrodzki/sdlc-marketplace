@@ -39,7 +39,7 @@ scripts/
 
 | Module | Key Exports | Purpose |
 |--------|-------------|---------|
-| `config.js` | `readSection`, `writeSection`, `normalizePreset` | Read/write `.claude/sdlc.json` sections |
+| `config.js` | `readSection`, `writeSection`, `normalizePreset` | Read/write `.sdlc/config.json` sections |
 | `dimensions.js` | `validateAll`, `extractFrontmatter` | Review dimension file validation |
 | `discovery.js` | `validateAll`, `extractScriptRefs` | Plugin discovery and cross-reference checks |
 | `git.js` | `exec`, `checkGitState`, `detectBaseBranch` | Git CLI wrappers |

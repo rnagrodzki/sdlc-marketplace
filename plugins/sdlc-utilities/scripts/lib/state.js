@@ -437,7 +437,7 @@ function listBranches() {
 }
 
 /**
- * Read `state.gc.ttlDays` from `.claude/sdlc.json`, falling back to 7.
+ * Read `state.gc.ttlDays` from `.sdlc/config.json`, falling back to 7.
  * @returns {number}
  */
 function readTtlDaysFromConfig() {

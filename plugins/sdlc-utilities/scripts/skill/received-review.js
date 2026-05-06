@@ -39,6 +39,7 @@ const {
   fetchPrReviewThreads,
 } = require(path.join(LIB, 'git'));
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -99,6 +100,19 @@ function classifyThread(thread, currentUser, changedFileSet) {
 
 function main() {
   const { prNumber, owner: cliOwner, repo: cliRepo, projectRoot, auto } = parseArgs(process.argv);
+
+  // Issue #232: verifyAndMigrate gate (CLI > env > default false).
+  const skipConfigCheck = resolveSkipConfigCheck(process.argv);
+  const cv = ensureConfigVersion(projectRoot, { skip: skipConfigCheck, roles: ['project'] });
+  if (cv.errors.length > 0) {
+    writeOutput({
+      errors: cv.errors.map(e => `config-version: ${e.role}: ${e.message}`),
+      warnings: [],
+      flags: { skipConfigCheck },
+      migration: cv.migration,
+    }, 'received-review-manifest', 1);
+    return;
+  }
 
   // Validate required --pr argument
   if (prNumber == null || isNaN(prNumber)) {

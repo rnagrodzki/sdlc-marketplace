@@ -123,19 +123,93 @@ Run `/setup-sdlc --pr-template` to create or edit the template interactively.
 
 ## Auto-Labeling
 
-When creating or updating a PR, the skill analyzes the PR context — branch name, commit messages, changed file paths, diff content — and suggests repository labels that match.
+Label assignment is **mode-driven** via the `pr.labels` block in `.sdlc/config.json` ([issue #197](https://github.com/rnagrodzki/sdlc-marketplace/issues/197)). Three modes are supported; the default is `off`.
 
-**How it works:**
-1. Available labels are fetched from the repository via `gh label list`
-2. PR signals (branch prefix, commit types, file paths, diff size) are fuzzy-matched against available labels
-3. Suggested labels are displayed in the approval prompt alongside the title and description
-4. Labels are applied only after explicit user approval
+| Mode | What it does |
+|---|---|
+| `off` (default) | No automatic labels. Only forced labels from `--label` apply. |
+| `rules` | Evaluates user-defined `{ label, when }` rules deterministically. Each rule maps one signal (branch prefix, commit type, changed-path glob, JIRA issue type, or diff size) to one repo label. |
+| `llm` | Legacy fuzzy matching by the model — opt-in only. Preserves the pre-#197 behavior for projects that explicitly want it. |
 
-**Update mode:** Existing labels on the PR are preserved. Only new labels are added — the skill never removes labels.
+Configure a project's mode by running:
 
-**Forced labels:** The `--label` flag bypasses signal matching — forced labels are always included in the PR. If a forced label doesn't exist in the repository, it is created automatically before the PR is opened. Forced labels are marked with `(forced)` in the approval prompt to distinguish them from inferred labels. This is used by `/ship-sdlc` to auto-apply `skip-version-check` on worktree PRs.
+```bash
+/setup-sdlc --only pr-labels
+```
 
-**When labeling is skipped:** If the repository has no labels defined or `gh` is unavailable, the labeling step is silently skipped. Forced labels (via `--label`) still work — they are created in the repo if needed.
+The sub-flow scans `gh label list`, prompts for a mode, and (for `rules`) walks you through rule entry. See [setup-sdlc](setup-sdlc.md) for details.
+
+**Provenance tags** appear in the Step 5 Labels line so it is always clear how a label was selected:
+
+- `(forced)` — applied via `--label` or by `/ship-sdlc` (e.g. `skip-version-check`)
+- `(rule)` — matched a deterministic rule under `pr.labels.rules`
+- `(llm)` — fuzzy-matched by the model (mode `llm` only)
+
+### Example: `mode = "off"` (default)
+
+```json
+{
+  "pr": {
+    "labels": { "mode": "off" }
+  }
+}
+```
+
+No labels are suggested. Forced labels still work. `/pr-sdlc --label bug` adds `bug` regardless of mode.
+
+### Example: `mode = "rules"`
+
+```json
+{
+  "pr": {
+    "labels": {
+      "mode": "rules",
+      "rules": [
+        { "label": "bug",           "when": { "branchPrefix": ["fix/", "bugfix/"] } },
+        { "label": "feature",       "when": { "commitType":   ["feat"] } },
+        { "label": "documentation", "when": { "pathGlob":     ["**/*.md"] } },
+        { "label": "small-change",  "when": { "diffSizeUnder": 50 } }
+      ]
+    }
+  }
+}
+```
+
+Each rule names exactly one target label and one signal in `when`:
+
+| Signal | Match condition |
+|---|---|
+| `branchPrefix: string[]` | Current branch starts with any listed prefix |
+| `commitType: string[]` | Any commit subject begins with `<type>:` or `<type>(scope):` |
+| `pathGlob: string[]` | **Every** changed file matches at least one glob (all-changed-files semantics) |
+| `jiraType: string[]` | Detected JIRA ticket type is in the list |
+| `diffSizeUnder: integer` | Total lines changed is strictly less than the threshold |
+
+Multiple rules may target the same label — they OR together. Rules whose `label` is not in `repoLabels` are stripped at validation time with a warning (no fabrication).
+
+### Example: `mode = "llm"` (opt-in only)
+
+```json
+{
+  "pr": {
+    "labels": { "mode": "llm" }
+  }
+}
+```
+
+The legacy fuzzy heuristic runs: branch prefixes, commit types, file paths, and diff size are fuzzy-matched against `repoLabels`. Used only when explicitly chosen during setup.
+
+### Forced labels
+
+The `--label` flag bypasses `pr.labels.mode` entirely. Forced labels apply in all three modes (including `off`). If a forced label doesn't exist in the repository, it is created automatically before the PR is opened. `/ship-sdlc` uses this to auto-apply `skip-version-check` on worktree PRs.
+
+### Update mode
+
+Existing labels on the PR are preserved. Only new labels are added — the skill never removes labels.
+
+### When labeling is skipped
+
+If the repository has no labels defined or `gh` is unavailable, the inferred labeling step is skipped. Forced labels (via `--label`) still work — they are created in the repo if needed.
 
 ---
 
@@ -151,6 +225,26 @@ Detection is two-phase:
 If a switch occurs, the skill notifies you: `GitHub account switched: now using "work-account" (was "personal-account")`. The switch persists for subsequent `gh` commands. If no matching account is found, the skill continues with the currently active account and displays a warning.
 
 To override manually: `gh auth switch --user <login>` before running the skill.
+
+### Account auto-recovery (post-failure retry)
+
+If `gh pr create` still fails with a `does not have the correct permissions to execute CreatePullRequest` error after pre-flight detection (for example, the wrong account was active for a personal repo), the skill auto-recovers once. It parses the repo owner from `git remote`, looks for a local `gh` account whose login matches, switches to it, and retries `gh pr create` exactly once.
+
+You see a single concise recovery line:
+
+```
+Switched gh account to <login> due to repo-permission mismatch — retrying
+Pull request created: <url>
+```
+
+If no local account matches the owner, the skill surfaces the original error plus an actionable hint:
+
+```
+gh: ... does not have the correct permissions to execute `CreatePullRequest` ...
+Run `gh auth login --hostname github.com` to authenticate the account that owns this repo.
+```
+
+This recovery is one-shot per pipeline invocation — a second consecutive permission failure is terminal. Tracked in spec requirement E7 ([issue #184](https://github.com/rnagrodzki/sdlc-marketplace/issues/184)).
 
 ---
 
@@ -170,7 +264,7 @@ To override manually: `gh auth switch --user <login>` before running the skill.
 
 ## Configuration
 
-PR title validation is configured in `.claude/sdlc.json` under the `pr` key. All fields are optional; if absent, the skill uses auto-generated titles and does not enforce pattern validation.
+PR title validation is configured in `.sdlc/config.json` under the `pr` key. All fields are optional; if absent, the skill uses auto-generated titles and does not enforce pattern validation.
 
 ### Full Configuration Example
 
@@ -279,6 +373,20 @@ fix: correct login session expiration
 | File / Artifact | Description |
 |-----------------|-------------|
 | GitHub PR | Opens a new PR or updates the description of an existing one |
+
+## Link Verification (issue #198)
+
+Before any `gh pr create` or `gh pr edit` call, the skill pipes the finalized PR body through the shared validator (`scripts/skill/pr.js --validate-body`, which delegates to `scripts/lib/links.js`). Validation runs deterministically — the skill never constructs the validator context.
+
+URL classes checked:
+
+| Class | Check | Failure code |
+|-------|-------|--------------|
+| GitHub `github.com/<owner>/<repo>/(issues\|pull)/<n>` | Owner/repo identity matches the current `git remote origin`; issue/PR number exists on that repo | `github-context-mismatch`, `github-not-found` |
+| Atlassian `*.atlassian.net/browse/<KEY-N>` | Host matches the configured/cached Jira site | `atlassian-site-mismatch`, `atlassian-site-ambiguous` |
+| Generic `http(s)://...` | HEAD reachable (falls back to GET on 405), 5s timeout | `url-not-found`, `url-server-error`, `url-unreachable` |
+
+Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability checks while keeping context-aware checks (GitHub identity, Atlassian host) — useful in sandboxed CI runs. On non-zero exit, the PR is **not** created/edited; the violation list (URL, line, reason, observed/expected) is surfaced verbatim. No flag toggles this gate — it is hard.
 
 ## OpenSpec Integration
 

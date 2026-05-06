@@ -166,7 +166,7 @@ See [Step-Emitter Architecture](step-emitter-architecture.md) for the full proto
 
 ## Config Schema Versioning
 
-Configuration files (`.sdlc/local.json`, `.claude/sdlc.json`) carry a top-level integer `version` field. The current schema version is **2**.
+Configuration files (`.sdlc/local.json`, `.sdlc/config.json`) carry a top-level integer `version` field. The current schema version is **2**.
 
 When introducing a format-breaking change to a config schema:
 

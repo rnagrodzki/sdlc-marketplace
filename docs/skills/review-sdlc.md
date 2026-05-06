@@ -2,7 +2,7 @@
 
 ## Overview
 
-Loads project review dimensions from `.claude/review-dimensions/`, matches them to changed files via glob patterns, dispatches parallel review subagents for each matching dimension, deduplicates findings, and posts a consolidated comment to the PR. By default reviews committed branch changes plus staged changes. Requires at least one dimension file — run `/setup-sdlc --dimensions` first if none exist.
+Loads project review dimensions from `.sdlc/review-dimensions/`, matches them to changed files via glob patterns, dispatches parallel review subagents for each matching dimension, deduplicates findings, and posts a consolidated comment to the PR. By default reviews committed branch changes plus staged changes. Requires at least one dimension file — run `/setup-sdlc --dimensions` first if none exist.
 
 ---
 
@@ -115,7 +115,7 @@ Valid scope values: `all`, `committed`, `staged`, `working`, `worktree`.
 
 ### Dimension frontmatter fields
 
-Each `.claude/review-dimensions/<name>.md` declares a dimension via YAML frontmatter. The full set of supported fields:
+Each `.sdlc/review-dimensions/<name>.md` declares a dimension via YAML frontmatter. The full set of supported fields:
 
 | Field | Required | Type | Purpose |
 |---|---|---|---|
@@ -276,7 +276,7 @@ Choosing `fix` invokes `/received-review-sdlc`, which picks up the findings from
 
 ## Prerequisites
 
-- **`.claude/review-dimensions/`** — at least one dimension file must exist. Run `/setup-sdlc --dimensions` to create them.
+- **`.sdlc/review-dimensions/`** — at least one dimension file must exist. Run `/setup-sdlc --dimensions` to create them.
 - **`gh` CLI** — recommended for posting the PR comment. Falls back to terminal output if unavailable.
 
 ### Harness Configuration

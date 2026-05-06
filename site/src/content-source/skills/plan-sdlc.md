@@ -186,7 +186,8 @@ The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads i
 |-----------------|-------------|
 | `<plansDirectory>/YYYY-MM-DD-<feature-name>.md` | The written plan document (normal mode). Starts as a skeleton header at Step 0 and grows incrementally: header fields and Requirements section added at Step 1, task blocks at Step 2, critique fixes applied at Steps 4 and 6. Path resolved from: user-specified → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → `~/.claude/plans/` fallback. |
 | Plan mode designated file | When Claude Code plan mode is active, the plan is written to the system-designated file path instead of the above. Same incremental build process applies. The path appears in the plan mode system banner. |
-| `.claude/learnings/log.md` | Planning learnings appended after writing: scope decisions, clarification patterns, decomposition issues. |
+| `.sdlc/learnings/log.md` | Planning learnings appended after writing: scope decisions, clarification patterns, decomposition issues. |
+| Step 7 context-heaviness advisory | When the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget), Step 7 prepends a `/compact` advisory above the handoff menu. Sidecar is written by the `UserPromptSubmit` hook `hooks/context-stats.js`. Implementation: [`scripts/lib/context-advisory.js`](../../plugins/sdlc-utilities/scripts/lib/context-advisory.js) consumed via the wrapper [`scripts/skill/plan-handoff-advisory.js`](../../plugins/sdlc-utilities/scripts/skill/plan-handoff-advisory.js). Pipeline state survives `/compact` (PreCompact + SessionStart hooks). |
 
 ---
 
@@ -214,6 +215,12 @@ When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this 
 - **Functional change routing:** When OpenSpec is detected but neither `--spec` nor `--from-openspec` is passed, the skill classifies the user's request. For functional changes (new features, behavior modifications, API changes), it checks for a matching active OpenSpec change — if found, it auto-loads the spec context. If no match exists, it proposes three options: start the OpenSpec flow with `/opsx:propose`, continue planning directly without specs, or re-invoke with `/plan-sdlc --from-openspec <name>`. Non-functional changes (refactoring, config, docs) receive a passive hint only.
 
 See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
+
+## Link Verification (issue #198)
+
+Before declaring the plan ready (Step 7 handoff), the skill pipes the finalized plan file through `scripts/lib/links.js` as a hard gate. The validator auto-derives `expectedRepo` from `git remote origin` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill never constructs the validator context. URL classes checked: GitHub issues/PRs (owner/repo identity + existence), Atlassian `*.atlassian.net/browse/<KEY>` (host match), and any other `http(s)://` URL (HEAD reachability, 5s timeout). Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability while keeping context-aware checks. On non-zero exit, Step 7 is **not** entered and the violation list is surfaced verbatim. No flag toggles this gate — it is hard.
 
 ---
 

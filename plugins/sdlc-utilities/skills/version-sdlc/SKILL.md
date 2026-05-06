@@ -118,7 +118,7 @@ Pre-release intent can come from four sources, with this precedence (top wins):
 
 1. Explicit base bump (`major|minor|patch`) plus optional `--pre <label>`
 2. Explicit label-form positional (e.g. `version-sdlc rc`, equivalent to `--bump patch --pre rc`) OR explicit `--pre <label>`
-3. `config.preRelease` from `.claude/sdlc.json` (active when no explicit bump and no `--pre`)
+3. `config.preRelease` from `.sdlc/config.json` (active when no explicit bump and no `--pre`)
 4. Auto-detection from conventional commits (no pre-release applied)
 
 The script signals which source fired via `flags.bumpFromLabel`, `flags.preLabelExplicit`, and `flags.preLabelFromConfig`. Use those provenance flags when explaining the choice to the user — do not infer it from raw CLI args.
@@ -334,7 +334,7 @@ If `flags.hotfix === true`, show instead:
 3. For pre-releases: running the full release without `--pre` "graduates" the pre-release to a stable version. An explicit `--bump major|minor|patch` always overrides `config.preRelease` and graduates out of the pre-release train.
 4. Breaking changes require a major bump — suggest it even if the user requested a lower bump type. The suggestion is suppressed when the resolved bump is a pre-release from any source (`--pre`, label-form, or `config.preRelease`).
 5. Changelog entries should be user-facing and outcome-focused, not implementation-focused
-6. Set `version.preRelease` in `.claude/sdlc.json` to default to a pre-release label (e.g. `"rc"`) on every bump until explicit graduation. Configure interactively via `/setup-sdlc`.
+6. Set `version.preRelease` in `.sdlc/config.json` to default to a pre-release label (e.g. `"rc"`) on every bump until explicit graduation. Configure interactively via `/setup-sdlc`.
 
 ## DO NOT
 
@@ -400,7 +400,7 @@ The automated changelog is a **draft, not a source of truth**. Correctness is th
 
 ## Learning Capture
 
-After completing a release or encountering unexpected behavior, append to `.claude/learnings/log.md`:
+After completing a release or encountering unexpected behavior, append to `.sdlc/learnings/log.md`:
 
 ```
 ## YYYY-MM-DD — version-sdlc: <brief summary>

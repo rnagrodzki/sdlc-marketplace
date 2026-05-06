@@ -174,7 +174,7 @@ Options: **apply** | **skip** | **cancel**
 When the user selects **apply**, validate the proposed change BEFORE writing:
 
 - For `surface == "plan-guardrails"` or `"execute-guardrails"`: the target is
-  `.claude/sdlc.json`. Construct the prospective merged JSON in memory, then
+  `.sdlc/config.json`. Construct the prospective merged JSON in memory, then
   validate via the canonical guardrails validator:
 
   ```bash
@@ -239,7 +239,7 @@ The trap from Step 1 cleans up the manifest on every exit path.
 
 ## Step 7 — Learning Capture
 
-Append a single line to `.claude/learnings/log.md` summarizing the hardening
+Append a single line to `.sdlc/learnings/log.md` summarizing the hardening
 action:
 
 ```

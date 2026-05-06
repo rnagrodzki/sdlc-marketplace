@@ -106,12 +106,12 @@ export const skillsMeta: SkillMeta[] = [
     userInvocable: true,
     tagline: 'Dispatches parallel review subagents per dimension, deduplicates findings, and posts a consolidated comment to the PR.',
     pipeline: [
-      { id: 'load-dimensions', label: 'Load review dimensions', type: 'script', description: 'Reads .claude/review-dimensions/ and matches dimensions to changed files via glob patterns' },
+      { id: 'load-dimensions', label: 'Load review dimensions', type: 'script', description: 'Reads .sdlc/review-dimensions/ and matches dimensions to changed files via glob patterns' },
       { id: 'scope-diff', label: 'Resolve diff scope', type: 'script', description: 'Computes the diff based on --committed/--staged/--working/--worktree flags' },
       { id: 'dispatch-reviewers', label: 'Dispatch review agents', type: 'dispatch', description: 'Parallel subagents review each matching dimension independently' },
       { id: 'deduplicate', label: 'Deduplicate findings', type: 'llm', description: 'Merges overlapping findings from multiple dimensions into a unified list' },
       { id: 'persist-comment', label: 'Persist review comment', type: 'llm', description: 'Orchestrator writes consolidated comment body to disk; skill parses summary and handles posting in main context' },
-      { id: 'post-prompt', label: 'Post or save comment', type: 'user', description: 'Prompts yes / save / cancel; posts via gh api -F body=@ or saves to .claude/reviews/' },
+      { id: 'post-prompt', label: 'Post or save comment', type: 'user', description: 'Prompts yes / save / cancel; posts via gh api -F body=@ or saves to .sdlc/reviews/' },
       { id: 'fix-prompt', label: 'Offer self-fix', type: 'user', description: 'Prompts to invoke received-review-sdlc when actionable findings exist' },
     ],
     connections: [
@@ -237,7 +237,7 @@ export const skillsMeta: SkillMeta[] = [
     tagline: 'Unified project setup — configures version, ship, review, and jira settings in one interactive flow.',
     pipeline: [
       { id: 'detect', label: 'Detect current state', type: 'script', description: 'Runs setup-prepare.js to find existing configs and legacy files' },
-      { id: 'migrate', label: 'Migrate legacy configs', type: 'llm', description: 'Consolidates legacy files into unified .claude/sdlc.json' },
+      { id: 'migrate', label: 'Migrate legacy configs', type: 'llm', description: 'Consolidates legacy files into unified .sdlc/config.json' },
       { id: 'configure', label: 'Interactive config builder', type: 'user', description: 'Walks through version, ship, jira, and review settings' },
       { id: 'validate', label: 'Validate written config', type: 'verify', description: 'Re-runs setup-prepare.js to confirm config is readable' },
       { id: 'content-setup', label: 'Content setup', type: 'dispatch', description: 'Runs dimensions, PR template, and guardrails sub-flows' },
@@ -265,7 +265,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'validate', label: 'Schema validation', type: 'verify', description: 'Validates approved sdlc.json edits via ci/validate-guardrails.js before write' },
       { id: 'apply', label: 'Write approved edits', type: 'llm', description: 'Edits surface files only after explicit approval and validation pass' },
       { id: 'route', label: 'Plugin-defect routing', type: 'dispatch', description: 'When classification is plugin-defect, dispatches error-report-sdlc with prepared payload' },
-      { id: 'learn', label: 'Learning capture', type: 'llm', description: 'Appends a one-line summary entry to .claude/learnings/log.md' },
+      { id: 'learn', label: 'Learning capture', type: 'llm', description: 'Appends a one-line summary entry to .sdlc/learnings/log.md' },
     ],
     connections: [
       { to: 'plan-sdlc', label: 'hardens after failure of' },

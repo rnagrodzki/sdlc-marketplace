@@ -18,7 +18,7 @@
  *     id,                  // canonical section id (used by --only flag)
  *     label,               // short human-readable name (menu row)
  *     purpose,             // one-paragraph runtime explanation
- *     configFile,          // '.claude/sdlc.json' | '.sdlc/local.json' | <delegated>
+ *     configFile,          // '.sdlc/config.json' | '.sdlc/local.json' | <delegated>
  *     configPath,          // dot-path within configFile, or null for delegated/content sections
  *     consumedBy: [],      // skill ids that read this section at runtime
  *     filesModified: [],   // workspace artifacts created or touched
@@ -261,10 +261,10 @@ const SETUP_SECTIONS = [
     id: 'version',
     label: 'version',
     purpose: 'Tells /version-sdlc and /ship-sdlc where the canonical version string lives (a file, or only git tags) and how releases are tagged. Without this section, version bumps and release tagging fall back to defaults that may not match your project layout.',
-    configFile: '.claude/sdlc.json',
+    configFile: '.sdlc/config.json',
     configPath: 'version',
     consumedBy: ['version-sdlc', 'ship-sdlc'],
-    filesModified: ['.claude/sdlc.json'],
+    filesModified: ['.sdlc/config.json'],
     optional: false,
     delegatedTo: null,
     confirmDetected: true,
@@ -289,10 +289,10 @@ const SETUP_SECTIONS = [
     id: 'jira',
     label: 'jira',
     purpose: 'Default Jira project key used by /jira-sdlc, /commit-sdlc, and /pr-sdlc when extracting or assigning ticket IDs. Without it, Jira-aware skills require an explicit project on every invocation; with it, branch names like `feat/PROJ-123-foo` resolve automatically.',
-    configFile: '.claude/sdlc.json',
+    configFile: '.sdlc/config.json',
     configPath: 'jira',
     consumedBy: ['jira-sdlc', 'commit-sdlc', 'pr-sdlc'],
-    filesModified: ['.claude/sdlc.json'],
+    filesModified: ['.sdlc/config.json'],
     optional: true,
     delegatedTo: null,
     confirmDetected: false,
@@ -317,10 +317,10 @@ const SETUP_SECTIONS = [
     id: 'commit',
     label: 'commit',
     purpose: 'Commit message validation rules used by /commit-sdlc: subject regex, allowed Conventional-Commits types/scopes, types that require a body, required trailer headers. The skill enforces these patterns when generating and validating commit messages.',
-    configFile: '.claude/sdlc.json',
+    configFile: '.sdlc/config.json',
     configPath: 'commit',
     consumedBy: ['commit-sdlc'],
-    filesModified: ['.claude/sdlc.json'],
+    filesModified: ['.sdlc/config.json'],
     optional: true,
     // Conditional sub-prompts (conventional/ticket-prefix/custom/skip with
     // per-strategy refinement) don't fit a flat field schema. The Step 3
@@ -334,10 +334,10 @@ const SETUP_SECTIONS = [
     id: 'pr',
     label: 'pr',
     purpose: 'PR title validation rules used by /pr-sdlc: title regex, allowed Conventional-Commits types/scopes, required trailers. Mirrors commit patterns; can copy the commit config or use a different style.',
-    configFile: '.claude/sdlc.json',
+    configFile: '.sdlc/config.json',
     configPath: 'pr',
     consumedBy: ['pr-sdlc'],
-    filesModified: ['.claude/sdlc.json'],
+    filesModified: ['.sdlc/config.json'],
     optional: true,
     // Same conditional-sub-prompt model as commit — see id: 'commit' note.
     delegatedTo: 'inline-pr-builder',
@@ -349,10 +349,10 @@ const SETUP_SECTIONS = [
     id: 'pr-labels',
     label: 'pr-labels',
     purpose: 'PR label assignment policy used by /pr-sdlc. Mode "off" (default) adds no labels except those forced via --label. Mode "rules" evaluates user-defined rules — each rule maps one signal (branch prefix, commit type, changed-path glob, JIRA issue type, or diff size) to one repo label. Mode "llm" lets the LLM suggest labels using fuzzy matching against repo labels (legacy behavior, opt-in only).',
-    configFile: '.claude/sdlc.json',
+    configFile: '.sdlc/config.json',
     configPath: 'pr.labels',
     consumedBy: ['pr-sdlc'],
-    filesModified: ['.claude/sdlc.json'],
+    filesModified: ['.sdlc/config.json'],
     optional: true,
     delegatedTo: 'setup-pr-labels',
     confirmDetected: false,
@@ -362,11 +362,11 @@ const SETUP_SECTIONS = [
   {
     id: 'review-dimensions',
     label: 'review-dimensions',
-    purpose: 'Review dimensions installed under .claude/review-dimensions/*.yaml. Each dimension is a focused check set (security, performance, type safety, etc.) that /review-sdlc applies as a pass over the diff. Without dimensions installed, /review-sdlc has nothing to evaluate.',
+    purpose: 'Review dimensions installed under .sdlc/review-dimensions/*.yaml. Each dimension is a focused check set (security, performance, type safety, etc.) that /review-sdlc applies as a pass over the diff. Without dimensions installed, /review-sdlc has nothing to evaluate.',
     configFile: '<delegated>',
     configPath: null,
     consumedBy: ['review-sdlc'],
-    filesModified: ['.claude/review-dimensions/*.yaml'],
+    filesModified: ['.sdlc/review-dimensions/*.yaml'],
     optional: true,
     delegatedTo: 'setup-dimensions',
     confirmDetected: false,
@@ -390,11 +390,11 @@ const SETUP_SECTIONS = [
   {
     id: 'plan-guardrails',
     label: 'plan-guardrails',
-    purpose: 'Custom rules at .claude/sdlc.json#plan.guardrails evaluated by /plan-sdlc during its critique phases. Each guardrail is a natural-language constraint (e.g., "no direct DB access from controllers") that flags drift in plans before execution.',
-    configFile: '.claude/sdlc.json',
+    purpose: 'Custom rules at .sdlc/config.json#plan.guardrails evaluated by /plan-sdlc during its critique phases. Each guardrail is a natural-language constraint (e.g., "no direct DB access from controllers") that flags drift in plans before execution.',
+    configFile: '.sdlc/config.json',
     configPath: 'plan.guardrails',
     consumedBy: ['plan-sdlc'],
-    filesModified: ['.claude/sdlc.json'],
+    filesModified: ['.sdlc/config.json'],
     optional: true,
     delegatedTo: 'setup-guardrails',
     confirmDetected: false,
@@ -404,11 +404,11 @@ const SETUP_SECTIONS = [
   {
     id: 'execution-guardrails',
     label: 'execution-guardrails',
-    purpose: 'Runtime guardrails at .claude/sdlc.json#execute.guardrails evaluated by /execute-plan-sdlc and /ship-sdlc before and after each wave. Error-severity violations halt execution; warning-severity violations are reported but non-blocking.',
-    configFile: '.claude/sdlc.json',
+    purpose: 'Runtime guardrails at .sdlc/config.json#execute.guardrails evaluated by /execute-plan-sdlc and /ship-sdlc before and after each wave. Error-severity violations halt execution; warning-severity violations are reported but non-blocking.',
+    configFile: '.sdlc/config.json',
     configPath: 'execute.guardrails',
     consumedBy: ['execute-plan-sdlc', 'ship-sdlc'],
-    filesModified: ['.claude/sdlc.json'],
+    filesModified: ['.sdlc/config.json'],
     optional: true,
     delegatedTo: 'setup-execution-guardrails',
     confirmDetected: false,

@@ -49,7 +49,7 @@ This skill is for **expert users working on projects with established quality gu
 | `--workspace branch\|worktree\|prompt` | Workspace isolation mode forwarded to execute-plan-sdlc. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. In worktree mode, the version step is auto-skipped (tags are repo-global) and `--label skip-version-check` is added to the PR step to bypass the CI version check. | `prompt` |
 | `--openspec-change <name>` | Explicitly select the OpenSpec change to archive, overriding branch-name matching. Used when the branch name does not match the change directory name. | — |
 | `--gc` | Prune stale ship- and execute- state files from `.sdlc/execution/`, then stop without running the pipeline. A file is pruned only when it is older than the TTL AND its branch is no longer in `git branch --list`. Fixes orphan accumulation from interrupted runs (issue #223). | Off |
-| `--ttl-days <N>` | TTL in days used by `--gc` and the terminal cleanup step. Files newer than this are kept regardless of branch existence (in-flight pipelines on detached HEAD or freshly-deleted branches must not be wiped). Configurable via `state.gc.ttlDays` in `.claude/sdlc.json`; CLI overrides config. | `7` (or `state.gc.ttlDays`) |
+| `--ttl-days <N>` | TTL in days used by `--gc` and the terminal cleanup step. Files newer than this are kept regardless of branch existence (in-flight pipelines on detached HEAD or freshly-deleted branches must not be wiped). Configurable via `state.gc.ttlDays` in `.sdlc/config.json`; CLI overrides config. | `7` (or `state.gc.ttlDays`) |
 
 
 **Removed (#190 hard-remove):** `--preset` and `--skip` are no longer accepted. Passing either produces an error pointing at `--steps <csv>` (for step composition) and `--quality <full|balanced|minimal>` (for the execute-plan-sdlc model tier). Legacy on-disk v1 configs (`ship.preset`/`ship.skip`) are still auto-migrated to v2 by `lib/config.js`.
@@ -543,7 +543,7 @@ Then run `/ship-sdlc` without `--resume` to start a new pipeline.
 
 - **`gh` CLI** — required for PR creation. Must be authenticated (`gh auth login`). The pipeline validates this before execution and stops with a clear error if authentication fails.
 - **git** — must be run inside a git repository on a feature branch (not the default branch).
-- **Review dimensions** — `.claude/review-dimensions/` must contain at least one dimension file for the review step. Run `/setup-sdlc --dimensions` to create them. If review is in the skip set, this is not required.
+- **Review dimensions** — `.sdlc/review-dimensions/` must contain at least one dimension file for the review step. Run `/setup-sdlc --dimensions` to create them. If review is in the skip set, this is not required.
 - **Plan in context** — for the execute step, a plan must be present in the conversation. If no plan is found and execute is not skipped, the step is auto-skipped.
 
 ### Harness Configuration

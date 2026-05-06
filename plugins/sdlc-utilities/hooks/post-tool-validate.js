@@ -8,7 +8,8 @@
  * a known pattern.
  *
  * Patterns:
- *   .claude/review-dimensions/*.ya?ml → validate-dimensions.js
+ *   .sdlc/review-dimensions/*.ya?ml   → validate-dimensions.js (canonical, issue #231)
+ *   .claude/review-dimensions/*.ya?ml → validate-dimensions.js (legacy, deprecated; dropped in 0.21.x)
  *   .claude/pr-template.md            → validate-pr-template.js
  *   plans/*.md                        → validate-plan-format.js
  *
@@ -56,7 +57,9 @@ if (!filePath) {
 // Pattern matching
 // ---------------------------------------------------------------------------
 
-const DIMENSION_RE   = /[/\\]\.claude[/\\]review-dimensions[/\\][^/\\]+\.ya?ml$/;
+// Issue #231: dual-match for two minor versions (0.19.x, 0.20.x). Drop the
+// `.claude/` alternation in 0.21.x.
+const DIMENSION_RE   = /[/\\]\.(?:claude|sdlc)[/\\]review-dimensions[/\\][^/\\]+\.ya?ml$/;
 const PR_TEMPLATE_RE = /[/\\]\.claude[/\\]pr-template\.md$/;
 const PLAN_RE        = /[/\\]plans[/\\][^/\\]+\.md$/;
 

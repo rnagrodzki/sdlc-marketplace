@@ -152,7 +152,7 @@ Use AskUserQuestion with `multiSelect` to dispatch the menu. The question text i
 
 `needsMigration` is true when ANY of these conditions hold:
 - A legacy config file exists (`.claude/version.json`, `.sdlc/ship-config.json`, `.sdlc/jira-config.json`, `.sdlc/review.json`, `.claude/review.json`)
-- `.claude/sdlc.json` contains misplaced sections (e.g. `ship` in the project config)
+- `.sdlc/config.json` contains misplaced sections (e.g. `ship` in the project config)
 - `.sdlc/local.json` is v1 schema — has legacy `ship.preset` or `ship.skip` keys, or lacks the top-level `version: 2` stamp (`localIsV1` from prepare output). Auto-migrated by `lib/config.js::readLocalConfig` on next read; `--migrate` triggers it explicitly with a banner.
 
 If legacy files exist or `projectConfig.misplaced` is non-empty, use AskUserQuestion:
@@ -376,8 +376,8 @@ Before invoking `setup-dimensions` or `setup-pr-template`, run the project signa
 - **CI/CD config:** Use Glob for `.github/workflows/*.yml`, `Jenkinsfile`, `.circleci/config.yml`, `.gitlab-ci.yml`.
 - **Database presence:** Use Glob for `prisma/`, `migrations/`, `alembic.ini`, `db/migrate/`, `**/sequelize*`, `**/typeorm*`, `**/sqlalchemy*`.
 - **Test structure:** Use Glob for `test/`, `tests/`, `spec/`, `__tests__/`, `cypress/`, `**/playwright.config.*`.
-- **Existing review dimensions:** Use Glob for `.claude/review-dimensions/*` (count and names).
-- **Existing guardrails:** Use Read on `.claude/sdlc.json` → `plan.guardrails` array if present.
+- **Existing review dimensions:** Use Glob for `.sdlc/review-dimensions/*` (count and names).
+- **Existing guardrails:** Use Read on `.sdlc/config.json` → `plan.guardrails` array if present.
 - **GitHub hosting detection:** Bash for `git remote -v` and `gh repo view` (safe). Use Glob for `.github/`.
 - **CLAUDE.md / AGENTS.md:** Use Read on `CLAUDE.md`, `AGENTS.md`, `.claude/CLAUDE.md` if present.
 - **PR template:** Use Glob for `.github/PULL_REQUEST_TEMPLATE.md`, `.github/pull_request_template.md`.
@@ -449,7 +449,7 @@ Show what was created or updated:
 Setup complete
 ---------------------------------------------------
 Created/updated:
-  .claude/sdlc.json      -- project config (version, jira)
+  .sdlc/config.json      -- project config (version, jira)
   .sdlc/local.json        -- local config (review, ship)
 
 Content:
@@ -458,7 +458,7 @@ Content:
   Plan guardrails         -- [N configured via guardrails sub-flow | skipped]
 
 Migrated:
-  .claude/version.json    -- merged into .claude/sdlc.json [deleted | kept]
+  .claude/version.json    -- merged into .sdlc/config.json [deleted | kept]
   ...
 ```
 
@@ -491,9 +491,9 @@ This skill is safe to re-run. Already-configured sections are skipped unless `--
 
 **The version section requires `mode` as a required field.** The JSON schema enforces this. When `detected.versionFile` is present, default to `mode: "file"`. When null, default to `mode: "tag"`. Always include `mode` in the written config.
 
-**Ship config is developer-local.** Ship preferences live in `.sdlc/local.json` (gitignored), not in `.claude/sdlc.json`. Each developer has their own ship preferences.
+**Ship config is developer-local.** Ship preferences live in `.sdlc/local.json` (gitignored), not in `.sdlc/config.json`. Each developer has their own ship preferences.
 
-**Migration may find conflicts.** If both unified config (`.claude/sdlc.json`) and legacy files exist for the same section, the unified config wins. The `migrateConfig()` function reports these as `conflicts` -- display them to the user and explain that the legacy values were NOT merged.
+**Migration may find conflicts.** If both unified config (`.sdlc/config.json`) and legacy files exist for the same section, the unified config wins. The `migrateConfig()` function reports these as `conflicts` -- display them to the user and explain that the legacy values were NOT merged.
 
 **`writeProjectConfig` and `writeLocalConfig` do read-merge-write.** They will not clobber sections written by other skills. Each call merges the provided config into the existing file content. This makes it safe to write one section at a time.
 
@@ -503,7 +503,7 @@ This skill is safe to re-run. Already-configured sections are skipped unless `--
 
 ## Learning Capture
 
-After completing setup or encountering unexpected behavior, append to `.claude/learnings/log.md`:
+After completing setup or encountering unexpected behavior, append to `.sdlc/learnings/log.md`:
 
 ```
 ## YYYY-MM-DD -- setup-sdlc: <brief summary>

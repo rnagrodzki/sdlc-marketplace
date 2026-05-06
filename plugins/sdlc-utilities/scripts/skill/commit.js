@@ -31,6 +31,7 @@ const LIB = path.join(__dirname, '..', 'lib');
 const { exec, checkGitState, splitDiffByFile } = require(path.join(LIB, 'git'));
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 
 // ---------------------------------------------------------------------------
 // Diff truncation
@@ -129,7 +130,16 @@ function main() {
   const errors   = [];
   const warnings = [...parseWarnings];
 
-  const flags = { noStash, scope, type, amend, auto };
+  // Issue #232: verifyAndMigrate gate (CLI > env > default false).
+  const skipConfigCheck = resolveSkipConfigCheck(process.argv);
+  const cv = ensureConfigVersion(projectRoot, { skip: skipConfigCheck, roles: ['project'] });
+  if (cv.errors.length > 0) {
+    for (const e of cv.errors) errors.push(`config-version: ${e.role}: ${e.message}`);
+    writeOutput({ errors, warnings, flags: { skipConfigCheck }, migration: cv.migration }, 'commit-context', 1);
+    return;
+  }
+
+  const flags = { noStash, scope, type, amend, auto, skipConfigCheck };
 
   // Step 3: Validate git repo and get current branch
   let gitState;
@@ -216,6 +226,7 @@ function main() {
     warnings,
     currentBranch,
     flags,
+    migration: cv.migration,
     commitConfig,
     staged: {
       files:          stagedFiles,

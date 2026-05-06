@@ -136,7 +136,7 @@ Output a single JSON object and nothing else:
     {
       "surface": "plan-guardrails",
       "action": "add",
-      "targetFile": "/abs/path/.claude/sdlc.json",
+      "targetFile": "/abs/path/.sdlc/config.json",
       "patch": "...",
       "rationale": "..."
     }

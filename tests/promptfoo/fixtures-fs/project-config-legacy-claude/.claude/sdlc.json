@@ -1,0 +1,4 @@
+{
+  "version": { "mode": "tag", "tagPrefix": "v" },
+  "jira": { "site": "example.atlassian.net" }
+}

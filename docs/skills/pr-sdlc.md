@@ -123,7 +123,7 @@ Run `/setup-sdlc --pr-template` to create or edit the template interactively.
 
 ## Auto-Labeling
 
-Label assignment is **mode-driven** via the `pr.labels` block in `.claude/sdlc.json` ([issue #197](https://github.com/rnagrodzki/sdlc-marketplace/issues/197)). Three modes are supported; the default is `off`.
+Label assignment is **mode-driven** via the `pr.labels` block in `.sdlc/config.json` ([issue #197](https://github.com/rnagrodzki/sdlc-marketplace/issues/197)). Three modes are supported; the default is `off`.
 
 | Mode | What it does |
 |---|---|
@@ -264,7 +264,7 @@ This recovery is one-shot per pipeline invocation — a second consecutive permi
 
 ## Configuration
 
-PR title validation is configured in `.claude/sdlc.json` under the `pr` key. All fields are optional; if absent, the skill uses auto-generated titles and does not enforce pattern validation.
+PR title validation is configured in `.sdlc/config.json` under the `pr` key. All fields are optional; if absent, the skill uses auto-generated titles and does not enforce pattern validation.
 
 ### Full Configuration Example
 

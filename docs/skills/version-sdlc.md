@@ -149,7 +149,7 @@ Label-form bumps skip the breaking-change suggestion (R3): pre-release trains do
 
 ### Default pre-release label via config
 
-Set `version.preRelease` in `.claude/sdlc.json` to apply a default label whenever the user runs `version-sdlc` without an explicit `major|minor|patch` and without `--pre`:
+Set `version.preRelease` in `.sdlc/config.json` to apply a default label whenever the user runs `version-sdlc` without an explicit `major|minor|patch` and without `--pre`:
 
 ```json
 {

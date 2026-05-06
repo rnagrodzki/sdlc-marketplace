@@ -408,7 +408,7 @@ Then call ExitPlanMode. Do NOT invoke execute-plan-sdlc or ship-sdlc in this tur
 
 ## Learning Capture
 
-After writing the plan, append to `.claude/learnings/log.md`:
+After writing the plan, append to `.sdlc/learnings/log.md`:
 
 - Requirements that needed significant clarification before decomposition
 - Scope decisions (what was included/excluded and why)

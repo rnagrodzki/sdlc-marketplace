@@ -307,12 +307,12 @@ When the agent makes a mistake during real execution, add the correction to the 
 
 "Consider avoiding" is not a prohibition. "Do NOT" is.
 
-**Learning Capture:** Every skill should end by appending discoveries to `.claude/learnings/log.md`. Only capture genuinely new information — project conventions not covered by the skill, edge cases encountered, patterns that required adjustment. Not a summary of what the skill did.
+**Learning Capture:** Every skill should end by appending discoveries to `.sdlc/learnings/log.md`. Only capture genuinely new information — project conventions not covered by the skill, edge cases encountered, patterns that required adjustment. Not a summary of what the skill did.
 
 ```markdown
 ## Learning Capture
 
-After completing [action], append to `.claude/learnings/log.md`:
+After completing [action], append to `.sdlc/learnings/log.md`:
 
 - Project-specific conventions not covered by this skill
 - Edge cases the skill didn't handle that required manual adjustment
@@ -411,3 +411,15 @@ The harness does not support frontmatter-driven context forking for skills. To a
 This split-phase pattern keeps the main context clean while preserving user interaction where needed.
 
 **Canonical example:** `review-sdlc` dispatches the `review-orchestrator` agent for parallel dimension review, then handles comment posting and self-fix offers in the main context.
+
+### Why frontmatter `model:` is the wrong context-isolation knob
+
+Pinning `model:` (e.g., `model: haiku`) in skill frontmatter does **not** create a fresh context. The harness routes the skill into a subagent that inherits the entire parent conversation transcript. On long sessions this overflows the smaller-window models and the skill aborts with `Context limit reached` (issue #202).
+
+Use the in-body `Agent` dispatch pattern instead: write the skill body to run in the main parent-model context, have it generate a minimal payload (typically via a prepare script using `lib/output.js writeOutput()` and `--output-file`), and dispatch a dedicated orchestrator agent with a two-line prompt — `MANIFEST_FILE: <path>` and `PROJECT_ROOT: <cwd>`. Pin `model: haiku` (or whichever cheaper model fits) on the **orchestrator agent** under `plugins/sdlc-utilities/agents/`, where the input is bounded to the manifest, not on the skill, where the input is the unbounded conversation.
+
+**Canonical pairs:**
+
+- `review-sdlc` → `review-orchestrator`
+- `commit-sdlc` → `commit-orchestrator`
+- `error-report-sdlc` → `error-report-orchestrator`

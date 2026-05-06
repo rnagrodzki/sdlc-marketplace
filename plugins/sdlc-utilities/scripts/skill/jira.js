@@ -32,6 +32,7 @@ const LIB = path.join(__dirname, '..', 'lib');
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
 const { parseRemoteOwner } = require(path.join(LIB, 'git'));
+const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 
 // ---------------------------------------------------------------------------
 // Home-cache path helpers
@@ -86,7 +87,7 @@ function resolveCandidatePaths(projectKey, explicitSite) {
 }
 
 /**
- * Load the `jira` section of project config from `.claude/sdlc.json`, falling
+ * Load the `jira` section of project config from `.sdlc/config.json`, falling
  * back to legacy `.sdlc/jira-config.json` if present. Returns `{}` on any
  * failure — callers treat missing/invalid config as "no multi-project setup".
  */
@@ -880,6 +881,16 @@ async function validateBodySubcommand({ projectKey, cacheDir, site, bodyFile, wa
 function main() {
   const parsed = parseArgs(process.argv);
   const { projectKey, cacheDir, templatesDir: templatesOverride, subcommand, saveFieldName, copyType, copyFrom, site, skipWorkflowDiscovery, bodyFile, wantJson, errors } = parsed;
+
+  // Issue #232: verifyAndMigrate gate (CLI > env > default false).
+  const projectRoot = process.cwd();
+  const skipConfigCheck = resolveSkipConfigCheck(process.argv);
+  const cv = ensureConfigVersion(projectRoot, { skip: skipConfigCheck, roles: ['project'] });
+  if (cv.errors.length > 0) {
+    for (const e of cv.errors) errors.push(`config-version: ${e.role}: ${e.message}`);
+    writeOutput({ errors, flags: { skipConfigCheck }, migration: cv.migration }, 'jira-context', 1);
+    return;
+  }
 
   if (errors.length > 0) {
     writeOutput({ errors }, 'jira-context', 1);

@@ -40,6 +40,7 @@ const {
   readConfig, PRE_RELEASE_LABEL_RE,
 } = require(path.join(LIB, 'version'));
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -178,6 +179,22 @@ function fileTypeFromPath(filePath) {
 async function main() {
   const projectRoot = process.cwd();
   const args        = parseArgs(process.argv);
+
+  // Issue #232: verifyAndMigrate gate (CLI > env > default false).
+  const skipConfigCheck = resolveSkipConfigCheck(process.argv);
+  const cv = ensureConfigVersion(projectRoot, { skip: skipConfigCheck, roles: ['project', 'local'] });
+  if (cv.errors.length > 0) {
+    writeOutput({
+      flow: 'release',
+      errors: cv.errors.map(e => `config-version: ${e.role}: ${e.message}`),
+      warnings: args.warnings,
+      flags: { skipConfigCheck },
+      migration: cv.migration,
+    }, 'version-context', 1);
+    return;
+  }
+  args.skipConfigCheck = skipConfigCheck;
+  args.migration = cv.migration;
 
   // Fail fast on argument-parse errors (invalid --pre label, unrecognized
   // positional token). Skip in --init flow because init never accepts a bump

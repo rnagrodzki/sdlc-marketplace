@@ -1,6 +1,6 @@
 # Guardrails Sub-Flow
 
-Sub-flow of `/setup-sdlc --guardrails`. Runs skill/guardrails.js to scan the project and generate proposals, then lets the user review and select. Writes guardrails to `.claude/sdlc.json` via lib/config.js.
+Sub-flow of `/setup-sdlc --guardrails`. Runs skill/guardrails.js to scan the project and generate proposals, then lets the user review and select. Writes guardrails to `.sdlc/config.json` via lib/config.js.
 
 ## Arguments
 
@@ -72,7 +72,7 @@ node -e "
 const { writeSection } = require('$SCRIPT_DIR/config.js');
 const guardrails = JSON.parse(process.argv[1]);
 writeSection(process.cwd(), 'plan', { guardrails });
-console.log('Wrote ' + guardrails.length + ' guardrails to .claude/sdlc.json');
+console.log('Wrote ' + guardrails.length + ' guardrails to .sdlc/config.json');
 " '<GUARDRAILS_JSON>'
 ```
 

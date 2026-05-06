@@ -18,7 +18,7 @@ const { readSection } = require('./config');
 const { extractFrontmatter, parseSimpleYaml } = require('./dimensions');
 
 // ---------------------------------------------------------------------------
-// Plan / Execute guardrails — sourced from .claude/sdlc.json
+// Plan / Execute guardrails — sourced from .sdlc/config.json (issue #231; legacy .claude/sdlc.json read via lib/config.js fallback)
 // ---------------------------------------------------------------------------
 
 function loadGuardrailsSection(projectRoot, sectionName, errors) {
@@ -47,11 +47,14 @@ function loadExecuteGuardrails(projectRoot, errors) {
 }
 
 // ---------------------------------------------------------------------------
-// Review dimensions — .claude/review-dimensions/*.md frontmatter
+// Review dimensions — .sdlc/review-dimensions/*.md frontmatter (issue #231;
+// legacy .claude/review-dimensions/ supported via dimensions.js fallback).
 // ---------------------------------------------------------------------------
 
 function loadReviewDimensions(projectRoot, errors) {
-  const dir = path.join(projectRoot, '.claude', 'review-dimensions');
+  // Issue #231: prefer .sdlc/review-dimensions/, fall back to legacy via dimensions.js helper.
+  const { resolveDimensionsDir } = require('./dimensions.js');
+  const dir = resolveDimensionsDir(projectRoot);
   if (!fs.existsSync(dir)) return [];
   let files;
   try {

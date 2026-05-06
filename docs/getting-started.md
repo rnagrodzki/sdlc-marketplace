@@ -64,8 +64,8 @@ Configuration sub-flows can also be accessed directly:
 
 | File / Directory | Purpose |
 | --- | --- |
-| `.claude/sdlc.json` | Unified project config — version, jira, commit, pr settings, and plan guardrails (created by `/setup-sdlc`) |
+| `.sdlc/config.json` | Unified project config — version, jira, commit, pr settings, and plan guardrails (created by `/setup-sdlc`) |
 | `.sdlc/local.json` | User-local config — review and ship preferences (created by `/setup-sdlc`) |
-| `.claude/review-dimensions/` | Per-project code review dimension files (created via `/setup-sdlc --dimensions`) |
+| `.sdlc/review-dimensions/` | Per-project code review dimension files (created via `/setup-sdlc --dimensions`) |
 | `.claude/pr-template.md` | Project PR template (created via `/setup-sdlc --pr-template`) |
 

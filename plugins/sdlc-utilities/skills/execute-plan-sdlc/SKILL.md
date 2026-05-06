@@ -71,7 +71,7 @@ Parse the JSON output. If the array is non-empty, store as `activeGuardrails` an
 
 **Context-heaviness advisory (implements R26):** The inline node block above also prints a context-heaviness advisory to stderr when the sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget). The advisory recommends `/compact` and notes that pipeline state is preserved across compaction (PreCompact + SessionStart hooks). When the sidecar is absent or `heavy: false`, no advisory is emitted. Sidecar is written by the `UserPromptSubmit` hook (`hooks/context-stats.js`); helper at `scripts/lib/context-advisory.js`.
 
-Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrails` (planning-time critique). They are independent sets configured separately in `.claude/sdlc.json`.
+Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrails` (planning-time critique). They are independent sets configured separately in `.sdlc/config.json`.
 
 **Resume detection:** Before reading the plan content, resolve the main working tree path: run `git worktree list --porcelain` and extract the path from the first `worktree <path>` line. All state file operations use `<main-worktree>/.sdlc/execution/`. Then check if `--resume` was passed or if a state file exists at `<main-worktree>/.sdlc/execution/execute-<branch>-*.json` (where `<branch>` is the current branch name with `/` replaced by `-`).
 
@@ -477,7 +477,7 @@ The reviewer's focus in this final check is **cross-wave coverage**:
 
 **8-ter. Learning Capture (runs before Step 9 returns control):**
 
-Append to `.claude/learnings/log.md`:
+Append to `.sdlc/learnings/log.md`:
 
 - Tasks classified trivial that needed agent dispatch (or vice versa)
 - Wave structures that caused unexpected file conflicts
@@ -616,9 +616,9 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 
 **Guardrails complement spec compliance review.** Step 5c-bis checks spec compliance; Step 5c-ter checks guardrail compliance. They are complementary: spec review ensures tasks match their descriptions, guardrails ensure tasks match project-wide constraints. Do not merge them — they evaluate different things.
 
-**Empty guardrails are the happy path for existing projects.** If `activeGuardrails` is empty (no guardrails configured in `.claude/sdlc.json` under `execute`), all guardrail steps are skipped. This is backward compatible — no existing behavior changes. Execution guardrails (`execute.guardrails`) and plan guardrails (`plan.guardrails`) are independent — configuring one does not affect the other.
+**Empty guardrails are the happy path for existing projects.** If `activeGuardrails` is empty (no guardrails configured in `.sdlc/config.json` under `execute`), all guardrail steps are skipped. This is backward compatible — no existing behavior changes. Execution guardrails (`execute.guardrails`) and plan guardrails (`plan.guardrails`) are independent — configuring one does not affect the other.
 
-**Learning Capture runs before the final report.** See Step 8-ter. The append to `.claude/learnings/log.md` must happen before Step 9 returns control so ship-sdlc's staging window (`git add -A -- ':!.sdlc/'`) picks up the change and the log entry lands inside the feature commit. A standalone `## Learning Capture` section after Step 9 would leave the working tree dirty post-pipeline.
+**Learning Capture runs before the final report.** See Step 8-ter. The append to `.sdlc/learnings/log.md` must happen before Step 9 returns control so ship-sdlc's staging window (`git add -A -- ':!.sdlc/'`) picks up the change and the log entry lands inside the feature commit. A standalone `## Learning Capture` section after Step 9 would leave the working tree dirty post-pipeline.
 
 ## What's Next
 

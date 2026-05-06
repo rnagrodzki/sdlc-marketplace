@@ -10,7 +10,7 @@ Orchestrates implementation plan execution with adaptive task classification, wa
 
 ```text
 /execute-plan-sdlc
-/execute-plan-sdlc --preset balanced
+/execute-plan-sdlc --quality balanced
 /execute-plan-sdlc --resume
 ```
 
@@ -28,7 +28,8 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 
 | Flag | Description | Default |
 |---|---|---|
-| `--preset <full\|balanced\|minimal>` | Auto-select a model preset, skipping the interactive selection prompt. `full` = Speed, `balanced` = Balanced, `minimal` = Quality. Legacy A/B/C accepted. Invalid values fall back to interactive selection. | Interactive prompt |
+| `--quality <full\|balanced\|minimal>` | Auto-select the model quality tier, skipping the interactive selection prompt. `full` = Speed, `balanced` = Balanced, `minimal` = Quality. Invalid values fall back to interactive selection. (Renamed from `--preset` in #190 to disambiguate from ship-sdlc's `--steps` step-selection flag.) When invoked from ship-sdlc, `--quality` is forwarded only when the user explicitly passed `--quality` to ship. | Interactive prompt |
+| `--auto` | Suppress interactive prompts: auto-resume if state exists, auto-approve high-risk gates, use `--quality` value (required when `--auto` is set). | Off |
 | `--resume` | Resume from the most recent execution state file for the current branch. Completed waves are skipped; in-progress waves are retried. If the plan has changed since execution started, you are prompted to resume or restart. | Off |
 | `--workspace <branch\|worktree\|prompt>` | Workspace isolation mode when on the default branch. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. | `prompt` |
 | `--rebase <auto\|skip\|prompt>` | Rebase onto the default branch before execution. `auto` rebases silently (aborts on conflict), `skip` skips, `prompt` asks. | Skip |
@@ -190,13 +191,13 @@ Select preset (full/balanced/minimal), "custom" to edit individual tasks, or "ca
 
 Claude loads the plan from the specified file, validates it, classifies tasks, and presents the wave structure for confirmation.
 
-### Skip preset selection
+### Skip quality-tier selection
 
 ```text
-/execute-plan-sdlc --preset balanced
+/execute-plan-sdlc --quality balanced
 ```
 
-Claude applies the Balanced preset automatically and proceeds to execution after showing the wave structure — no interactive prompt.
+Claude applies the Balanced quality tier automatically and proceeds to execution after showing the wave structure — no interactive prompt.
 
 ### Resume after interruption
 
@@ -242,6 +243,8 @@ Guardrails:       3/3 passed (1 warning, 0 overridden)
 ────────────────────────────────────────────
 ```
 
+**Learning Capture timing.** The append to `.sdlc/learnings/log.md` runs as part of Step 8-ter, immediately before the summary above is emitted. This ordering is intentional: `ship-sdlc` stages the working tree (`git add -A -- ':!.sdlc/'`) between the `execute` and `commit` pipeline steps, so the learnings entry only lands inside the feature commit if the log file is already modified when execute-plan-sdlc returns control. A pre-Step-9 capture keeps the post-pipeline working tree clean and folds learnings into the same commit as the feature work.
+
 ---
 
 ## Prerequisites
@@ -262,8 +265,9 @@ Guardrails:       3/3 passed (1 warning, 0 overridden)
 | File / Artifact | Description |
 |-----------------|-------------|
 | Source code files | Files created or modified as specified by plan tasks |
-| `.claude/learnings/log.md` | Execution learnings appended after completion (classification accuracy, wave conflicts, recovery outcomes) |
+| `.sdlc/learnings/log.md` | Execution learnings appended after completion (classification accuracy, wave conflicts, recovery outcomes) |
 | `.sdlc/execution/execute-<branch>-<timestamp>.json` | Execution state file written after each wave; enables cross-session resume via --resume. Deleted on success, preserved on failure. |
+| Step 1 context-heaviness advisory | When the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget), Step 1 emits a `/compact` advisory to stderr before guardrail loading. Sidecar is written by the `UserPromptSubmit` hook `hooks/context-stats.js`. Implementation: [`scripts/lib/context-advisory.js`](../../plugins/sdlc-utilities/scripts/lib/context-advisory.js). Distinct from R21 between-wave compaction. Pipeline state survives `/compact` (PreCompact + SessionStart hooks). |
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.
 
@@ -273,12 +277,13 @@ When executing a plan whose `**Source:**` header points to an OpenSpec change pa
 
 - **Spec compliance reviewer** additionally checks implementations against OpenSpec delta spec requirements — not just task acceptance criteria
 - **Inter-wave critique** checks for contradictions between implementations and delta spec requirements not captured in task descriptions
+- **Post-pipeline archive suggestion** — after all waves complete, if the plan was OpenSpec-sourced and `openspec validate <name> --strict` passes, emits a suggestion to archive via `openspec archive <name> --yes` or `/ship-sdlc`. If validation fails, surfaces errors instead. If the CLI is not available, falls back to the existing advisory. The suggestion is never auto-executed.
 
 See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
 
 ## Guardrail Enforcement
 
-When execution guardrails are configured in `.claude/sdlc.json` under `execute.guardrails[]`, this skill enforces them at runtime to prevent drift between plan acceptance and execution. Execution guardrails are separate from plan guardrails (`plan.guardrails[]`) — they use the same item format (`id`, `description`, `severity`) but are configured independently and evaluated at different stages.
+When execution guardrails are configured in `.sdlc/config.json` under `execute.guardrails[]`, this skill enforces them at runtime to prevent drift between plan acceptance and execution. Execution guardrails are separate from plan guardrails (`plan.guardrails[]`) — they use the same item format (`id`, `description`, `severity`) but are configured independently and evaluated at different stages.
 
 **Loading:** Guardrails are loaded in Step 1 using `readSection(root, 'execute')`. If no execution guardrails are configured, all guardrail checks are skipped — backward compatible with existing projects.
 

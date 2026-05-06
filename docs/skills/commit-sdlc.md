@@ -116,7 +116,7 @@ No external tools or configuration files are required beyond `git`.
 
 ## Configuration
 
-Commit message validation is configured in `.claude/sdlc.json` under the `commit` key. All fields are optional; if absent, the skill uses auto-detected style from recent commits and does not enforce pattern or type validation.
+Commit message validation is configured in `.sdlc/config.json` under the `commit` key. All fields are optional; if absent, the skill uses auto-detected style from recent commits and does not enforce pattern or type validation.
 
 ### Full Configuration Example
 

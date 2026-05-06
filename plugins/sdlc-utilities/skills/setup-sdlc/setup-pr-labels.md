@@ -1,7 +1,7 @@
 # PR Labels Sub-Flow
 
 Configure how `/pr-sdlc` chooses labels for a project (issue #197). Writes the
-`pr.labels` block in `.claude/sdlc.json`. Three modes are supported:
+`pr.labels` block in `.sdlc/config.json`. Three modes are supported:
 
 - `off` (default) — no automatic labels; only forced labels via `--label` apply
 - `rules` — deterministic evaluation of user-defined `{ label, when }` rules
@@ -16,7 +16,7 @@ section descriptor (`pr-labels` row in `setup-sections.js`).
 
 This sub-flow loads everything it needs at runtime — no scan input from the
 parent is required. It calls `gh label list` itself and reads the existing
-`pr.labels` block (if any) from `.claude/sdlc.json`.
+`pr.labels` block (if any) from `.sdlc/config.json`.
 
 ---
 
@@ -43,7 +43,7 @@ gh label list --json name,description --limit 100
   > and a GitHub remote. Run `gh auth login` (or `gh auth status` to check) and
   > re-run `setup-sdlc --only pr-labels`. No changes were written.
 
-  Exit cleanly without writing anything to `.claude/sdlc.json`.
+  Exit cleanly without writing anything to `.sdlc/config.json`.
 
 If `repoLabels` is empty (repo has no custom labels yet), warn the user and
 continue — `off` is still a valid choice; `rules` will require creating labels
@@ -51,7 +51,7 @@ in GitHub first; `llm` will produce no suggestions.
 
 ### Step 2 — Idempotency check
 
-Read `.claude/sdlc.json` via `readSection(projectRoot, 'pr')`. If
+Read `.sdlc/config.json` via `readSection(projectRoot, 'pr')`. If
 `pr.labels` already exists, present the current state and ask:
 
 ```
@@ -173,7 +173,7 @@ const root = process.cwd();
 const current = readSection(root, 'pr') || {};
 const next = { ...current, labels: <BLOCK_AS_JSON> };
 writeSection(root, 'pr', next);
-console.log('Wrote pr.labels to .claude/sdlc.json');
+console.log('Wrote pr.labels to .sdlc/config.json');
 "
 ```
 
@@ -184,7 +184,7 @@ Substitute `<BLOCK_AS_JSON>` with the JSON-stringified labels block.
 Print a one-line summary:
 
 ```
-Wrote pr.labels: mode=<mode>[, rules=<N>] to .claude/sdlc.json
+Wrote pr.labels: mode=<mode>[, rules=<N>] to .sdlc/config.json
 This block is consumed by /pr-sdlc Step 2b (Infer Labels).
 ```
 
@@ -220,7 +220,7 @@ When invoking `error-report-sdlc`, provide:
 - **Step**: Step 5 — Write
 - **Operation**: `lib/config.js#writeSection('pr', ...)`
 - **Error**: full stderr/stack
-- **Suggested investigation**: file permissions on `.claude/sdlc.json`; plugin install integrity
+- **Suggested investigation**: file permissions on `.sdlc/config.json`; plugin install integrity
 
 ---
 
@@ -272,7 +272,7 @@ When invoking `error-report-sdlc`, provide:
 
 ## DO NOT
 
-- Do NOT write `.claude/sdlc.json` on any prompt where the user picks `cancel`.
+- Do NOT write `.sdlc/config.json` on any prompt where the user picks `cancel`.
 - Do NOT replace the entire `pr` section — only set/replace the `labels` key.
 - Do NOT accept a free-text label that isn't in `repoLabels` — the rule will be
   stripped by `pr.js` validation later, leaving the user with a silent dead rule.

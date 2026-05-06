@@ -46,6 +46,7 @@ const {
 
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
 
 // ---------------------------------------------------------------------------
@@ -138,6 +139,15 @@ function main() {
 
   const errors   = [];
   const warnings = [];
+
+  // Issue #232: verifyAndMigrate gate (CLI > env > default false).
+  const skipConfigCheck = resolveSkipConfigCheck(process.argv);
+  const cv = ensureConfigVersion(projectRoot, { skip: skipConfigCheck, roles: ['project'] });
+  if (cv.errors.length > 0) {
+    for (const e of cv.errors) errors.push(`config-version: ${e.role}: ${e.message}`);
+    writeOutput({ errors, warnings, flags: { skipConfigCheck }, migration: cv.migration }, 'pr-context', 1);
+    return;
+  }
 
   // Step 1–2: Validate git repo and get current branch
   let gitState;

@@ -457,3 +457,20 @@
         before gh api ... /comments, passes the comment_file via --file, and explicitly states that
         on non-zero exit gh api is NOT executed. The gate is script-enforced. The skill does not
         propose retrying, editing URLs without user input, or bypassing.
+
+# ---------------------------------------------------------------------------
+# Issue #231: review-sdlc reads .sdlc/review-dimensions/ first, legacy fallback
+# ---------------------------------------------------------------------------
+
+- description: "review-sdlc: prefers .sdlc/review-dimensions/ over legacy"
+  vars:
+    skill_content: |
+      The review skill needs to load review-dimension files. Where does it look?
+  assert:
+    - type: llm-rubric
+      value: >
+        The skill describes reading review dimensions from
+        `.sdlc/review-dimensions/` first. It mentions a one-time deprecation
+        fallback to `.claude/review-dimensions/` for compatibility during the
+        deprecation window. The skill does NOT hardcode `.claude/review-dimensions/`
+        as the only path.

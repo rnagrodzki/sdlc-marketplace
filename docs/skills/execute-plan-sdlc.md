@@ -243,7 +243,7 @@ Guardrails:       3/3 passed (1 warning, 0 overridden)
 ────────────────────────────────────────────
 ```
 
-**Learning Capture timing.** The append to `.claude/learnings/log.md` runs as part of Step 8-ter, immediately before the summary above is emitted. This ordering is intentional: `ship-sdlc` stages the working tree (`git add -A -- ':!.sdlc/'`) between the `execute` and `commit` pipeline steps, so the learnings entry only lands inside the feature commit if the log file is already modified when execute-plan-sdlc returns control. A pre-Step-9 capture keeps the post-pipeline working tree clean and folds learnings into the same commit as the feature work.
+**Learning Capture timing.** The append to `.sdlc/learnings/log.md` runs as part of Step 8-ter, immediately before the summary above is emitted. This ordering is intentional: `ship-sdlc` stages the working tree (`git add -A -- ':!.sdlc/'`) between the `execute` and `commit` pipeline steps, so the learnings entry only lands inside the feature commit if the log file is already modified when execute-plan-sdlc returns control. A pre-Step-9 capture keeps the post-pipeline working tree clean and folds learnings into the same commit as the feature work.
 
 ---
 
@@ -265,7 +265,7 @@ Guardrails:       3/3 passed (1 warning, 0 overridden)
 | File / Artifact | Description |
 |-----------------|-------------|
 | Source code files | Files created or modified as specified by plan tasks |
-| `.claude/learnings/log.md` | Execution learnings appended after completion (classification accuracy, wave conflicts, recovery outcomes) |
+| `.sdlc/learnings/log.md` | Execution learnings appended after completion (classification accuracy, wave conflicts, recovery outcomes) |
 | `.sdlc/execution/execute-<branch>-<timestamp>.json` | Execution state file written after each wave; enables cross-session resume via --resume. Deleted on success, preserved on failure. |
 | Step 1 context-heaviness advisory | When the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget), Step 1 emits a `/compact` advisory to stderr before guardrail loading. Sidecar is written by the `UserPromptSubmit` hook `hooks/context-stats.js`. Implementation: [`scripts/lib/context-advisory.js`](../../plugins/sdlc-utilities/scripts/lib/context-advisory.js). Distinct from R21 between-wave compaction. Pipeline state survives `/compact` (PreCompact + SessionStart hooks). |
 
@@ -283,7 +283,7 @@ See [OpenSpec Integration Guide](../openspec-integration.md) for the full workfl
 
 ## Guardrail Enforcement
 
-When execution guardrails are configured in `.claude/sdlc.json` under `execute.guardrails[]`, this skill enforces them at runtime to prevent drift between plan acceptance and execution. Execution guardrails are separate from plan guardrails (`plan.guardrails[]`) — they use the same item format (`id`, `description`, `severity`) but are configured independently and evaluated at different stages.
+When execution guardrails are configured in `.sdlc/config.json` under `execute.guardrails[]`, this skill enforces them at runtime to prevent drift between plan acceptance and execution. Execution guardrails are separate from plan guardrails (`plan.guardrails[]`) — they use the same item format (`id`, `description`, `severity`) but are configured independently and evaluated at different stages.
 
 **Loading:** Guardrails are loaded in Step 1 using `readSection(root, 'execute')`. If no execution guardrails are configured, all guardrail checks are skipped — backward compatible with existing projects.
 

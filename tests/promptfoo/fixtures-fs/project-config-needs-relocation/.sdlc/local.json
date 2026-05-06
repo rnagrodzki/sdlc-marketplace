@@ -1,0 +1,4 @@
+{
+  "ship": { "preset": "balanced", "skip": ["archive-openspec"] },
+  "review": {}
+}

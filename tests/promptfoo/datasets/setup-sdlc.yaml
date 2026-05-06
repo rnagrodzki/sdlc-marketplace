@@ -339,3 +339,18 @@
         The per-section summary is empty (the helper returns `''` for missing config,
         matching sibling summarizers). The literal string `not configured` does NOT
         appear — the legacy regression must not be reintroduced (issue #205).
+
+# ---------------------------------------------------------------------------
+# Issue #231: setup-sdlc detects legacy .claude/sdlc.json and triggers migration
+# ---------------------------------------------------------------------------
+
+- description: "setup-sdlc: legacy .claude/sdlc.json triggers migration suggestion"
+  vars:
+    skill_content: "file://fixtures/project-needs-migration.md"
+  assert:
+    - type: llm-rubric
+      value: >
+        When a legacy `.claude/sdlc.json` is detected, the skill mentions that
+        a migration is needed and that running `/setup-sdlc --migrate` will
+        relocate the file to `.sdlc/config.json` and stamp `schemaVersion: 3`.
+        The skill MUST NOT silently overwrite either file.

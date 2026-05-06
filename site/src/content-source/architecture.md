@@ -27,10 +27,15 @@ sdlc-marketplace/
 │       ├── hooks/
 │       │   └── hooks.json        # Hook configuration
 │       └── scripts/
-│           ├── pr-prepare.js          # Pre-computes git data for PR descriptions
-│           ├── review-prepare.js      # Pre-computes git data for code reviews
-│           ├── validate-dimensions.js # Validates .claude/review-dimensions/ files
-│           └── lib/                   # Shared modules (git, dimensions)
+│           ├── skill/                 # Invoked by skills to pre-compute context
+│           │   ├── commit.js, pr.js, review.js, ...
+│           ├── ci/                    # CI validation and maintenance
+│           │   ├── validate-dimensions.js, validate-discovery.js, ...
+│           ├── state/                 # State persistence CLIs
+│           │   ├── execute.js, ship.js
+│           ├── util/                  # Action utilities
+│           │   ├── ship-init.js, worktree-create.js
+│           └── lib/                   # Shared modules (git, config, state, ...)
 └── docs/                         # Documentation
 ```
 
@@ -148,6 +153,31 @@ To add another plugin to this marketplace:
 
 3. Follow the same structure: `skills/`, `hooks/` (and optionally `scripts/`, `commands/`)
 
+## Step-Emitter Script Architecture
+
+Skills can use the **step-emitter pattern** where prepare scripts become multi-step workflow controllers. Instead of running once and returning flat JSON, a step-emitter script emits one step at a time via a universal envelope protocol. The LLM executes each step using domain knowledge, then calls the script again with the result. The script controls sequencing; the LLM provides judgment.
+
+Key components:
+- **`lib/stepper.js`** — shared utility for envelope creation, state management, and CLI argument parsing
+- **Universal envelope** — every script invocation returns `{ status, step, llm_decision, state_file, progress, ext }`
+- **Two-call protocol** — initial call returns the first step; subsequent calls use `--after <step_id> --result-file <path> --state <state_file>`
+
+See [Step-Emitter Architecture](step-emitter-architecture.md) for the full protocol reference, migration guide, and testing patterns.
+
+## Config Schema Versioning
+
+Configuration files (`.sdlc/local.json`, `.sdlc/config.json`) carry a top-level integer `version` field. The current schema version is **2**.
+
+When introducing a format-breaking change to a config schema:
+
+1. Bump the schema `version` constant in the relevant JSON Schema (e.g. `schemas/sdlc-local.schema.json`).
+2. Add a migration step in `lib/config.js` that runs at read time (`readLocalConfig`/`readProjectConfig`).
+3. Migrations MUST be **idempotent** — reading an already-migrated config is a no-op.
+4. Migrations MUST **persist back to disk** atomically and emit a single deprecation notice on first migration.
+5. Legacy fields are dropped from the in-memory state once migrated; downstream consumers see only the modern shape.
+
+Issue [#180](https://github.com/rnagrodzki/sdlc-marketplace/issues/180) (replacing the decorative `preset` field with explicit `steps[]`) is the motivating example: legacy v1 ship configs auto-migrate to v2 on the next read, with a one-line stderr deprecation notice.
+
 ## Testing
 
 All testing uses [promptfoo](https://promptfoo.dev/) — a framework for evaluating LLM outputs. Two configurations cover different test types:
@@ -182,11 +212,11 @@ tests/promptfoo/
 
 ### Script Execution Tests (`promptfooconfig-exec.yaml`)
 
-Test prepare scripts and utilities directly — no LLM involved. Uses the `script-runner.js` provider to execute Node.js scripts against fixture directories.
+Test scripts directly — no LLM involved. Uses the `script-runner.js` provider to execute Node.js scripts against fixture directories.
 
 ### Adding Tests
 
-When adding or modifying a skill or prepare script:
+When adding or modifying a skill or script:
 1. Add test cases to `tests/promptfoo/datasets/<skill-name>.yaml`
 2. Create fixtures in `tests/promptfoo/fixtures/` if existing ones don't cover the scenario
 3. Do **not** create unit test files — all testing goes through promptfoo datasets

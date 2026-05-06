@@ -17,6 +17,7 @@ const { execSync } = require('node:child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 const { writeOutput } = require(path.join(LIB, 'output'));
 const surfaces = require(path.join(LIB, 'harden-surfaces'));
+const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 
 // ---------------------------------------------------------------------------
 // CLI parsing — mirror error-report-prepare.js posture
@@ -124,6 +125,17 @@ function main() {
   for (const [k, v] of Object.entries(cli)) input[camelKey(k)] = v;
 
   const errors = [];
+
+  // Issue #232: verifyAndMigrate gate (CLI > env > default false).
+  const cwdForVerify = process.cwd();
+  const skipConfigCheck = resolveSkipConfigCheck(process.argv);
+  const cv = ensureConfigVersion(cwdForVerify, { skip: skipConfigCheck, roles: ['project'] });
+  if (cv.errors.length > 0) {
+    for (const e of cv.errors) errors.push(`config-version: ${e.role}: ${e.message}`);
+    writeOutput({ errors, warnings: [], flags: { skipConfigCheck }, migration: cv.migration }, 'sdlc-harden', 1);
+    return;
+  }
+
   const required = ['failureText', 'skill'];
   for (const key of required) {
     if (!input[key] || String(input[key]).trim() === '') {

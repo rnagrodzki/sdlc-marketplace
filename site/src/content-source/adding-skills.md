@@ -28,7 +28,15 @@ Use lowercase and hyphens only. Avoid vague names (`setup`, `utils`) — names s
 > **Name resolution:** User-invocable skills are callable directly by their directory name with
 > no prefix. A skill in `skills/pr-sdlc/` is invoked as `/pr-sdlc`.
 
-### Step 2: Create SKILL.md
+### Step 2: Create the Specification
+
+Create the behavioral specification at `docs/specs/<skill-name>.md` using `docs/spec-template.md` as the starting point.
+
+The spec defines **WHAT** the skill must do — testable requirements, quality gates, error handling, and integration points. SKILL.md (Step 3) defines **HOW** the skill implements these requirements. Each requirement uses a prefix scheme: R (requirement), A (argument), G (quality gate), P (prepare contract), E (error handling), C (constraint), I (integration).
+
+Changes to SKILL.md should reference spec requirement numbers (e.g., "implements R3") to maintain traceability.
+
+### Step 3: Create SKILL.md
 
 ```markdown
 ---
@@ -66,7 +74,7 @@ Brief introduction of what this skill does.
 - [Anti-pattern two]
 ```
 
-### Step 3: Add Supporting Files (Optional)
+### Step 4: Add Supporting Files (Optional)
 
 Place additional `.md` files alongside `SKILL.md` for:
 - **Templates** — Reusable file templates referenced from SKILL.md
@@ -80,6 +88,28 @@ Reference them from SKILL.md with relative paths:
 See `./templates.md` for language-specific templates.
 See `./checklist.md` for the full verification checklist.
 ```
+
+## Prepare Script Patterns
+
+Skills that use a prepare script can follow one of two patterns:
+
+### One-Shot (Current Default)
+
+The script runs once, returns flat JSON, and the LLM follows SKILL.md instructions to execute the full workflow. Suitable for simple skills where the LLM can handle all sequencing.
+
+### Step-Emitter (Recommended for Complex Skills)
+
+The script becomes a multi-step workflow controller using the universal step-emitter protocol. Each invocation returns a single step for the LLM to execute. After the LLM completes the step, it calls the script again with the result. The script controls sequencing, conditional logic, and error recovery deterministically.
+
+Step-emitter scripts use `lib/stepper.js` for:
+- **`parseArgs()`** — parse `--after`, `--result`, `--result-file`, `--state` from CLI
+- **`createEnvelope(status, step, options)`** — build the universal output envelope
+- **`initState(skill)`** — create and persist initial state
+- **`transition(stateFile, afterStepId, result, nextStepId)`** — process step transitions
+
+SKILL.md for a step-emitter skill contains an execution loop and domain-specific sections keyed by `step.id` rather than a linear workflow.
+
+See [Step-Emitter Architecture](step-emitter-architecture.md) for the full protocol reference and migration guide.
 
 ## Error Recovery (Required)
 

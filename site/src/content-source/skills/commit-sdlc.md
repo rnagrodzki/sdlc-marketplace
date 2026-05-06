@@ -116,7 +116,7 @@ No external tools or configuration files are required beyond `git`.
 
 ## Configuration
 
-Commit message validation is configured in `.claude/sdlc.json` under the `commit` key. All fields are optional; if absent, the skill uses auto-detected style from recent commits and does not enforce pattern or type validation.
+Commit message validation is configured in `.sdlc/config.json` under the `commit` key. All fields are optional; if absent, the skill uses auto-detected style from recent commits and does not enforce pattern or type validation.
 
 ### Full Configuration Example
 
@@ -252,6 +252,12 @@ Refactor login logic
 When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/) and no explicit `--scope` flag is provided, this skill uses the active OpenSpec change name as a scope candidate (e.g., `feat(add-dark-mode): ...`). The project's existing commit style from recent commits takes precedence.
 
 See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
+
+---
+
+## Link Verification (issue #198)
+
+Before `git commit`, the skill pipes the commit message body through `scripts/lib/links.js` as a hard gate. The validator auto-derives `expectedRepo` from `git remote origin` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill never constructs the validator context. URL classes checked: GitHub issues/PRs (owner/repo identity + existence), Atlassian `*.atlassian.net/browse/<KEY>` (host match), and any other `http(s)://` URL (HEAD reachability, 5s timeout). Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability while keeping context-aware checks (GitHub identity, Atlassian host) — useful in sandboxed CI runs. On non-zero exit, the commit is **not** executed and the violation list is surfaced verbatim. No flag toggles this gate — it is hard.
 
 ---
 

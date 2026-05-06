@@ -38,7 +38,7 @@ This sub-flow expects the parent skill (setup-sdlc) to have provided the followi
 - **CI/CD config** — .github/workflows, .circleci, Jenkinsfile presence
 - **Database signals** — migrations/ dir, *.sql files, Prisma/Alembic/Flyway presence
 - **Test structure** — *.test.*, *.spec.* files, test runner configs
-- **Existing review dimensions** — what is already installed in .claude/review-dimensions/
+- **Existing review dimensions** — what is already installed in .sdlc/review-dimensions/
 - **GitHub hosting detection** — output of the multi-signal cascade (git remote, gh CLI, .github/ dir)
 
 All structural and dependency evidence has been collected. This sub-flow consumes it and produces dimension proposals and installed files.
@@ -49,7 +49,7 @@ All structural and dependency evidence has been collected. This sub-flow consume
 
 ### Step 2 — Discover Existing Dimensions
 
-Check `.claude/review-dimensions/` for already-installed dimension files.
+Check `.sdlc/review-dimensions/` for already-installed dimension files.
 
 In `--add` (expansion) mode:
 
@@ -135,7 +135,7 @@ Use AskUserQuestion to ask: "Install which dimensions?" Options: **all** / **sel
 
 For each selected dimension:
 
-1. `mkdir -p .claude/review-dimensions`
+1. `mkdir -p .sdlc/review-dimensions`
 2. Write the full dimension file (frontmatter + tailored body). Use the corresponding example from `review-sdlc/EXAMPLES.md` as the starting template, then customize with project-specific evidence.
 3. Confirm each file written with its path.
 

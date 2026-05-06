@@ -431,3 +431,28 @@
         return o.flags.quality === undefined
           && !exec.args.includes('--quality')
           && !exec.args.includes('--preset')
+
+# ---------------------------------------------------------------------------
+# Issue #232: verifyAndMigrate gate at pipeline entry
+# ---------------------------------------------------------------------------
+
+- description: "ship-prepare: SDLC_SKIP_CONFIG_CHECK=1 short-circuits migration"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-skill-skip-via-env"
+    script_env: "SDLC_SKIP_CONFIG_CHECK=1"
+  assert:
+    - type: icontains
+      value: '"skipConfigCheck": true'
+
+- description: "ship-prepare: --skip-config-check CLI gate"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --skip-config-check"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-skill-skip-via-env"
+  assert:
+    - type: icontains
+      value: '"skipConfigCheck": true'

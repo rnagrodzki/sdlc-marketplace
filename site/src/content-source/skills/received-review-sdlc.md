@@ -24,6 +24,7 @@ Provide review feedback in one of three ways:
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--pr <number>` | PR number to fetch review threads from. Enables thread-aware mode: pre-computes thread resolution state, filters to outstanding comments only on re-run. | Auto-detected from current branch |
+| `--auto` | Skip consent gates at Step 10 and Step 12. Auto-implement all "will fix" items and auto-post in-thread replies (resolving only "agree, will fix" threads). Critique gates still run. "Disagree" and "won't fix" items are displayed but not auto-implemented; their threads are replied to but left open. | Off |
 
 ---
 
@@ -86,6 +87,16 @@ How to proceed? (implement / edit / skip)
   skip      — discard, make no changes
 ```
 
+### Auto-implement from ship pipeline
+
+When invoked from `/ship-sdlc` with `--auto`, the consent gate is skipped and "will fix" items are implemented automatically:
+
+```text
+/received-review-sdlc --pr 42 --auto
+```
+
+Claude runs the full analysis pipeline (Steps 2–9), displays the action plan for visibility, then proceeds directly to implement "will fix" items. Items with "disagree" or "won't fix" verdicts are displayed but not auto-actioned. Critique gates still run. Step 12 also runs automatically: Claude posts in-thread replies and resolves "agree, will fix" threads without a second consent prompt.
+
 ### Re-run on a partially addressed PR
 
 ```text
@@ -140,6 +151,10 @@ Selecting "yes" posts in-thread replies and resolves addressed threads automatic
 | GitHub PR thread replies | In-thread responses posted to reviewer comment threads via `gh api` |
 | Source code changes | Edits implementing accepted review feedback, in priority order |
 | Resolved review threads | Threads for addressed comments are resolved via GraphQL mutation |
+
+## Link Verification (issue #198)
+
+Before any `gh api` reply is posted (Step 12), the skill pipes the concatenated reply bodies through `scripts/lib/links.js` as a hard gate (Step 11.5). The validator auto-derives `expectedRepo` from `git remote origin` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill never constructs the validator context. URL classes checked: GitHub issues/PRs (owner/repo identity + existence), Atlassian `*.atlassian.net/browse/<KEY>` (host match), and any other `http(s)://` URL (HEAD reachability, 5s timeout). Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability while keeping context-aware checks. On non-zero exit, no replies are posted and the violation list is surfaced verbatim. No flag toggles this gate — it is hard.
 
 ## Related Skills
 
