@@ -3,6 +3,10 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+
+## 2026-05-06 — version-sdlc: patch release with uncommitted deletions in working tree
+Release v0.18.4 proceeded normally with uncommitted deletions (`.claude/review-dimensions/*.md` and `.sdlc.json`) in the working tree — these were not staged and not included in the release commit. The `--set-upstream` auto-heal path fired correctly for a new feature branch with no prior remote tracking.
+
 ## 2026-05-06 — version-sdlc: patch bump on feat/233-configurable-always-fix-severities
 Branch had no upstream; --set-upstream was emitted automatically. suggestedBump was minor (feat commit present) but explicit patch override from pipeline took precedence without issue. All CI scripts were current at v0.18.3 release.
 
