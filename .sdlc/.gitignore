@@ -1,3 +1,10 @@
 # Ship-sdlc runtime state and personal config — not committed
-*
+
 !.gitignore
+
+# >>> sdlc-utilities managed (do not edit) — selective ignores
+local.json
+cache/
+*.bak.*
+.migration.lock
+# <<< sdlc-utilities managed
