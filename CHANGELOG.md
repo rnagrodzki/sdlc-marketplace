@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.4] - 2026-05-06
+
+### Fixed
+- review-sdlc, pr-sdlc: use three-dot diffs to exclude stale base commits on non-rebased branches; adds `fetchBaseRef()` to refresh local base before diff computation and `buildBranchContribDiffCmd()` to centralize three-dot diff semantics (#239)
+- git-lib: corrected inverted test assertions and enforce contract violations with `process.exit(1)` on `fetchBaseRef` failures (#239)
+
 ## [0.18.3] - 2026-05-06
 
 ### Added
