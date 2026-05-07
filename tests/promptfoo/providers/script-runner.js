@@ -78,6 +78,7 @@ class ScriptRunnerProvider {
     // Auto-read tmp-path JSON when stdout is solely a temp file path.
     const stdoutTrimmed = rawStdout.trim();
     let stdout = rawStdout;
+    let tmpFileRead = false;
     if (
       vars.script_passthrough !== true
       && stdoutTrimmed
@@ -85,7 +86,7 @@ class ScriptRunnerProvider {
       && TMP_PATH_RE.test(stdoutTrimmed)
       && fs.existsSync(stdoutTrimmed)
     ) {
-      try { stdout = fs.readFileSync(stdoutTrimmed, 'utf8'); } catch (_) { /* fall through */ }
+      try { stdout = fs.readFileSync(stdoutTrimmed, 'utf8'); tmpFileRead = true; } catch (_) { /* fall through */ }
     }
 
     // Spawn error (ENOENT, ETIMEDOUT, etc.) — return the error message directly.
@@ -93,11 +94,11 @@ class ScriptRunnerProvider {
       return { output: result.error.message };
     }
 
-    // Include stderr when: (a) exit non-zero, OR (b) script_capture_stderr is explicitly set.
-    // Default: exclude stderr on exit 0 so scripts that emit git noise don't corrupt JSON outputs.
-    const includeStderr = exitCode !== 0 || vars.script_capture_stderr;
+    // Include stderr when: (a) exit non-zero AND no tmp-file was auto-read (to avoid appending
+    // git noise after structured JSON), OR (b) script_capture_stderr is explicitly set.
+    const includeStderr = (tmpFileRead ? false : exitCode !== 0) || vars.script_capture_stderr;
     const output = [stdout.trimEnd(), includeStderr ? stderr : null].filter(Boolean).join('\n');
-    return { output: output || null };
+    return { output: output };
   }
 }
 

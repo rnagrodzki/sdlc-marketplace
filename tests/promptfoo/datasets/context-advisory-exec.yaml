@@ -122,7 +122,7 @@
     project_root: "file://fixtures-fs/project-context-advisory-light"
   assert:
     - type: equals
-      value: "null\n"
+      value: "null"
 
 - description: "context-advisory helper: missing sidecar returns null"
   vars:
@@ -133,4 +133,4 @@
     project_root: "file://fixtures-fs/project-context-advisory-missing"
   assert:
     - type: equals
-      value: "null\n"
+      value: "null"
