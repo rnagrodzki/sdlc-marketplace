@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.9] - 2026-05-07
+
+### Fixed
+- promptfoo exec test provider: auto-read temporary file paths from script stdout — when a script's stdout is a single-line path matching the system temp directory pattern, the provider now reads the file content instead of returning the raw path (#273)
+- config.js: normalize `.sdlc`-gitignore separator from double-newline to single-newline to prevent separator accumulation on repeated writes (#242–#250)
+
 ## [0.18.8] - 2026-05-07
 
 ### Fixed
