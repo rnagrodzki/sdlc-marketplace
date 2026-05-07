@@ -1,8 +1,10 @@
 # Review Dimension Examples
 
-Five ready-to-use dimension files. Copy any of these to your project's
+Ready-to-use dimension files. Copy any of these to your project's
 `.sdlc/review-dimensions/` directory and adjust triggers and instructions
 for your tech stack.
+
+> **Note on `model:`** — every example below carries a `model:` recommendation matched to the dimension's precision/cost trade-off. The values are recommendations only; adopters should override per project budget and quality needs. Omit the field entirely to inherit the manifest default (`subagent_model`).
 
 ---
 
@@ -11,10 +13,12 @@ for your tech stack.
 ```markdown
 ---
 name: security-review
-description: "Reviews changes for authentication, authorization, injection vulnerabilities, and secrets exposure"
+description: "OWASP Top 10 review — tags every finding with the matching A01–A10 category"
 triggers:
   - "**/middleware/**"
   - "**/auth/**"
+  - "**/crypto/**"
+  - "**/session/**"
   - "**/*auth*"
   - "**/*token*"
   - "**/*secret*"
@@ -31,36 +35,41 @@ max-files: 50
 model: sonnet
 ---
 
-# Security Review
+# Security Review (OWASP Top 10)
 
-Review all changes for security vulnerabilities.
+Review changes against the OWASP Top 10 (2025).
+
+## Tagging Instruction (REQUIRED)
+
+For every finding, set `**OWASP:**` to the matching category code (`A01`–`A10`). When a finding spans multiple categories, pick the most specific. Omit the field only when no OWASP category applies (rare).
 
 ## Checklist
 
-- [ ] No hardcoded credentials, API keys, or secrets in code or config files
-- [ ] All user-supplied input is validated before use
-- [ ] Authentication checks are present and correct on protected routes
-- [ ] Authorization (role/permission checks) is enforced, not just authentication
-- [ ] No SQL injection vectors (use parameterized queries / ORM, not string concat)
-- [ ] No command injection (avoid exec/shell with user input)
-- [ ] No XSS vectors (escape output, use safe APIs)
-- [ ] Session tokens are handled securely (HttpOnly, Secure, SameSite)
-- [ ] Cryptographic operations use approved libraries and algorithms
+- [ ] A01 — Broken access control: route/resource checks enforce both authentication AND authorization (role/permission), not just login
+- [ ] A02 — Cryptographic failures: approved algorithms only, no MD5/SHA1/DES/ECB, secrets never logged, TLS verified, keys not hardcoded
+- [ ] A03 — Injection: no SQL/command/template/LDAP injection vectors; user input is parameterised, escaped, or strictly validated
+- [ ] A04 — Insecure design: trust boundaries respected, rate limiting on sensitive endpoints, no missing threat-model controls
+- [ ] A05 — Security misconfiguration: no debug mode in prod, no default credentials, no overly broad CORS / permissive headers
+- [ ] A06 — Vulnerable & outdated components: no deprecated/unmaintained deps, no known-CVE versions added, lockfile reviewed
+- [ ] A07 — Identification & authentication failures: no weak password policy, no missing MFA on sensitive flows, sessions rotated on privilege change
+- [ ] A08 — Software & data integrity failures: no unsigned updates, no untrusted deserialisation, CI/build pipeline integrity preserved
+- [ ] A09 — Security logging & monitoring failures: auth/authz failures logged, no sensitive data in logs, audit trail not silently dropped
+- [ ] A10 — SSRF: outbound requests with user-controlled URLs validated against an allowlist; metadata IPs blocked
 
 ## Severity Guide
 
-| Finding | Severity |
-|---------|----------|
-| Hardcoded secret / credential | critical |
-| Missing authentication on protected route | critical |
-| SQL / command injection vector | critical |
-| Missing authorization check | high |
-| Unvalidated user input reaching sensitive operation | high |
-| Weak cryptography | high |
-| Missing CSRF token | medium |
-| Logging sensitive data | medium |
-| Overly broad CORS policy | medium |
-| Missing rate limiting on auth endpoints | low |
+| Category | Default Severity |
+|----------|------------------|
+| A01 — Broken access control | critical |
+| A02 — Cryptographic failures | critical |
+| A03 — Injection | critical |
+| A04 — Insecure design | high |
+| A05 — Security misconfiguration | high |
+| A06 — Vulnerable & outdated components | high |
+| A07 — Identification & authentication failures | critical |
+| A08 — Software & data integrity failures | high |
+| A09 — Security logging & monitoring failures | medium |
+| A10 — SSRF | high |
 ```
 
 > `model:` — optional. Forces this dimension's subagent onto the named model. Omit to inherit the manifest default.
@@ -90,6 +99,7 @@ skip-when:
   - "**/dist/**"
   - "**/build/**"
 severity: medium
+model: haiku
 ---
 
 # Code Quality Review
@@ -141,6 +151,7 @@ triggers:
   - "**/*cache*"
 severity: medium
 max-files: 30
+model: sonnet
 ---
 
 # Performance Review
@@ -194,6 +205,7 @@ skip-when:
   - "**/*.test.*"
   - "**/*.spec.*"
 severity: high
+model: sonnet
 ---
 
 # API Review
@@ -247,6 +259,7 @@ skip-when:
   - "**/node_modules/**"
   - "**/vendor/**"
 severity: medium
+model: haiku
 ---
 
 # Test Coverage Review
@@ -291,6 +304,7 @@ triggers:
   - "**/Makefile"
 severity: medium
 max-files: 20
+model: haiku
 ---
 
 # CI/CD Pipeline Review
@@ -342,6 +356,7 @@ triggers:
   - "**/db/migrate/**"
 severity: high
 max-files: 30
+model: sonnet
 ---
 
 # Database Migrations Review
@@ -402,6 +417,7 @@ skip-when:
   - "**/node_modules/**"
   - "**/vendor/**"
 severity: medium
+model: haiku
 ---
 
 # Dependency Management Review
@@ -458,6 +474,7 @@ skip-when:
   - "**/vendor/**"
   - "**/dist/**"
 severity: medium
+model: sonnet
 ---
 
 # Error Handling Review
@@ -516,6 +533,7 @@ skip-when:
   - "**/build/**"
 severity: medium
 max-files: 40
+model: sonnet
 ---
 
 # Accessibility Review

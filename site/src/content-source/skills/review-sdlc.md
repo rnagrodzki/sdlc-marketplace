@@ -184,6 +184,23 @@ User-supplied `command` parameter is passed directly to `child_process.exec()` w
 
 ---
 
+## OWASP Top 10 metadata
+
+Findings produced by an OWASP-aware dimension carry an optional `**OWASP:**` field (`A01`–`A10`) that names the matching category. The field is opt-in per dimension — only dimensions whose body explicitly instructs OWASP tagging populate it (the bundled `security-review` example does, see [`EXAMPLES.md`](../../plugins/sdlc-utilities/skills/review-sdlc/EXAMPLES.md#security-reviewmd)). Other dimensions omit the field and their findings render unchanged.
+
+When the field is present, it renders in the consolidated comment as a suffix on the file line:
+
+```markdown
+#### [CRITICAL] SQL injection via string concatenation
+**File:** `src/users/search.ts:34` · OWASP A03
+User-supplied `q` is concatenated into a SQL string before execution.
+**Suggestion:** Use parameterised queries via the existing `db.prepared(...)` helper.
+```
+
+Default severities follow OWASP impact: `critical` for A01/A02/A03/A07, `high` for A04/A05/A06/A08/A10, `medium` for A09. The `security-review` example dimension's checklist enumerates one bullet per category and instructs the subagent to tag each finding with the matching code.
+
+---
+
 ## Dimension Suggestions
 
 When the review finds changed files not covered by any active dimension, it analyzes their patterns and suggests new dimensions in the review plan output:
