@@ -4,7 +4,7 @@ Ready-to-use dimension files. Copy any of these to your project's
 `.sdlc/review-dimensions/` directory and adjust triggers and instructions
 for your tech stack.
 
-> **Note on `model:`** — every example below carries a `model:` recommendation matched to the dimension's precision/cost trade-off. The values are recommendations only; adopters should override per project budget and quality needs. Omit the field entirely to inherit the manifest default (`subagent_model`).
+> **Note on `model:`** — every example below carries a `model:` recommendation matched to the dimension's precision/cost trade-off. The values are recommendations only; adopters should override per project budget and quality needs. Omit the field entirely to inherit the manifest default (`manifest.subagent_model`).
 
 ---
 

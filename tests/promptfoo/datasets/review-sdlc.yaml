@@ -485,6 +485,7 @@
 - description: "review-sdlc: OWASP A01 — finding tagged with category (issue #272)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
     skill_content: |
       You are running the review-sdlc security-review dimension subagent against this diff:
 
@@ -517,6 +518,7 @@
 - description: "review-sdlc: OWASP A02 — finding tagged with category (issue #272)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
     skill_content: |
       You are running the review-sdlc security-review dimension subagent against this diff:
 
@@ -546,6 +548,7 @@
 - description: "review-sdlc: OWASP A03 — finding tagged with category (issue #272)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
     skill_content: |
       You are running the review-sdlc security-review dimension subagent against this diff:
 
@@ -572,6 +575,7 @@
 - description: "review-sdlc: OWASP A04 — finding tagged with category (issue #272)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
     skill_content: |
       You are running the review-sdlc security-review dimension subagent against this diff:
 
@@ -603,6 +607,7 @@
 - description: "review-sdlc: OWASP A05 — finding tagged with category (issue #272)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
     skill_content: |
       You are running the review-sdlc security-review dimension subagent against this diff:
 
@@ -631,6 +636,7 @@
 - description: "review-sdlc: OWASP A06 — finding tagged with category (issue #272)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
     skill_content: |
       You are running the review-sdlc security-review dimension subagent against this diff:
 
@@ -660,6 +666,7 @@
 - description: "review-sdlc: OWASP A07 — finding tagged with category (issue #272)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
     skill_content: |
       You are running the review-sdlc security-review dimension subagent against this diff:
 
@@ -689,6 +696,7 @@
 - description: "review-sdlc: OWASP A08 — finding tagged with category (issue #272)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
     skill_content: |
       You are running the review-sdlc security-review dimension subagent against this diff:
 
@@ -720,6 +728,7 @@
 - description: "review-sdlc: OWASP A09 — finding tagged with category (issue #272)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
     skill_content: |
       You are running the review-sdlc security-review dimension subagent against this diff:
 
@@ -752,6 +761,7 @@
 - description: "review-sdlc: OWASP A10 — finding tagged with category (issue #272)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
     skill_content: |
       You are running the review-sdlc security-review dimension subagent against this diff:
 

@@ -19,6 +19,8 @@
 
 ## Core Requirements
 
+> **Requirement ID convention:** Sequential requirements use `R<N>` (R1, R2, …). Issue-linked requirements added post-launch use name-based IDs (`R-<slug>`) to avoid renumbering. Both forms are normative.
+
 - R1: Run `skill/review.js` to produce a manifest file; do NOT read the manifest into main context
 - R2: Scope flags (`--committed`, `--staged`, `--working`, `--worktree`) are mutually exclusive
 - R3: When `--dry-run` is passed, read the manifest, display the review plan in the specified format, clean up, and stop
