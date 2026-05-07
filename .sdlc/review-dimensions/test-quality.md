@@ -1,6 +1,6 @@
 ---
 name: test-quality
-description: "Reviews promptfoo behavioral test datasets, fixtures, and test scripts for assertion quality, fixture accuracy, and skill coverage"
+description: "Reviews promptfoo behavioral test datasets, fixtures, and test scripts for assertion quality, fixture accuracy, skill coverage, and test staleness (outdated assertions that no longer match current intended behavior)"
 triggers:
   - "tests/promptfoo/datasets/*.yaml"
   - "tests/promptfoo/fixtures/*.md"
@@ -41,7 +41,7 @@ Review promptfoo behavioral test datasets, fixtures, and supporting scripts for 
 | skill_path references a SKILL.md that doesn't exist | high |
 | Test case has no behavioral assertion (llm-rubric) — only structural checks | medium |
 | Fixture appropriateness comment is wrong — fixture doesn't match scenario | medium |
-| Skill behavior changed but no test case updated | medium |
+| Skill behavior changed but no test case updated | high |
 | llm-rubric criteria too vague to distinguish pass/fail | medium |
 | promptfooconfig references deleted dataset | medium |
 | Test description doesn't identify which skill is tested | low |
