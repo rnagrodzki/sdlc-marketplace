@@ -45,7 +45,7 @@ the content from `suggestedConfig` (adjusted if `changelog` was chosen).
 Then scaffold CI scripts and workflows using `scaffold-ci.js`:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "scaffold-ci.js" -path "*/sdlc*/scripts/util/scaffold-ci.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "scaffold-ci.js" -path "*/sdlc*/scripts/util/scaffold-ci.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/scaffold-ci.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/scaffold-ci.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate util/scaffold-ci.js" >&2; exit 2; }
 ```

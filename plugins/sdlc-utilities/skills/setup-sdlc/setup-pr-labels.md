@@ -158,7 +158,7 @@ Build the final block:
 Locate the config helper:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/lib/config.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate lib/config.js. Is the sdlc plugin installed?" >&2; exit 2; }
 ```

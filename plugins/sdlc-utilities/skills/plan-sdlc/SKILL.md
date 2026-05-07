@@ -86,7 +86,7 @@ Wait for explicit response. If "resume", re-read the plan file and skip to Step 
 > **VERBATIM** — Run this bash block exactly as written.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan.js"
 [ -z "$SCRIPT" ] && { echo "{}"; exit 0; }
 
@@ -330,7 +330,7 @@ If this is the 3rd iteration, use AskUserQuestion to surface remaining issues in
 After the reviewer loop converges (or the user resolves remaining issues), validate every URL embedded in the finalized plan file via the shared link validator. The script reads the plan content from stdin and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
 
 ```bash
-LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | head -1)
+LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
 [ -z "$LINKS_LIB" ] && { echo "ERROR: Could not locate scripts/lib/links.js. Is the sdlc plugin installed?" >&2; exit 2; }
 node "$LINKS_LIB" --file "$plan_path" --json
@@ -350,7 +350,7 @@ On zero exit, proceed to Step 7. `SDLC_LINKS_OFFLINE=1` skips network reachabili
 **Context-heaviness advisory (implements R17):** Before printing either branch below, locate and run the advisory wrapper. If it prints text, prepend that text verbatim to the handoff menu (above the `ship` / `execute` / `done` lines). If it prints nothing, skip the prepend.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "plan-handoff-advisory.js" -path "*/sdlc*/scripts/skill/plan-handoff-advisory.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "plan-handoff-advisory.js" -path "*/sdlc*/scripts/skill/plan-handoff-advisory.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan-handoff-advisory.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan-handoff-advisory.js"
 [ -n "$SCRIPT" ] && node "$SCRIPT"
 ```

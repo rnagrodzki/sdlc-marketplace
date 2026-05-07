@@ -38,9 +38,21 @@ The `find` pattern searches CWD (`.`) before `~/.claude/plugins`. Reverse the or
 
 ```bash
 # Correct (plugins-first)
-SCRIPT=$(find ~/.claude/plugins -name "<script>.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "<script>.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/<script>.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/<script>.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate <script>.js. Is the sdlc plugin installed?" >&2; exit 2; }
+```
+
+### `script-resolution-version` (error)
+
+The `find ~/.claude/plugins ... | head -1` pipeline picks an arbitrary cached version
+when multiple plugin versions are present in `~/.claude/plugins/cache/sdlc-marketplace/sdlc/`
+(filesystem-traversal order, not version order). Replace `| head -1` with
+`| sort -V | tail -1` to deterministically select the newest semver. See #258.
+
+```bash
+# Correct
+SCRIPT=$(find ~/.claude/plugins -name "<script>.js" -path "*/sdlc*/scripts/<script>.js" 2>/dev/null | sort -V | tail -1)
 ```
 
 ### `skill-runs-script` (error)
@@ -135,7 +147,7 @@ Every skill that has a matching `*-prepare.js` script must follow this exact pat
 
 ```bash
 # Step 0: Resolve and run the prepare script
-SCRIPT=$(find ~/.claude/plugins -name "<name>-prepare.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "<name>-prepare.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/<name>-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/<name>-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate <name>-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 

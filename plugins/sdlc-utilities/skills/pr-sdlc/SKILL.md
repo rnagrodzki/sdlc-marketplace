@@ -98,7 +98,7 @@ If no tests added, explain why.]
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "pr.js" -path "*/sdlc*/scripts/skill/pr.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "pr.js" -path "*/sdlc*/scripts/skill/pr.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/pr.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/pr.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/pr.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
@@ -439,7 +439,7 @@ On success:
 **Link verification (issue #198, implements spec R15) — HARD GATE:** Before executing `gh pr create` or `gh pr edit`, validate every URL embedded in the final PR body via `scripts/skill/pr.js --validate-body`. The script reads the body from stdin and derives the expected GitHub repo identity (`parseRemoteOwner(projectRoot)`) deterministically — the skill MUST NOT construct ctx JSON.
 
 ```bash
-PR_PREPARE=$(find ~/.claude/plugins -name "pr.js" -path "*/sdlc*/scripts/skill/pr.js" 2>/dev/null | head -1)
+PR_PREPARE=$(find ~/.claude/plugins -name "pr.js" -path "*/sdlc*/scripts/skill/pr.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$PR_PREPARE" ] && [ -f "plugins/sdlc-utilities/scripts/skill/pr.js" ] && PR_PREPARE="plugins/sdlc-utilities/scripts/skill/pr.js"
 printf '%s' "$body" | node "$PR_PREPARE" --validate-body
 LINK_EXIT=$?
@@ -478,7 +478,7 @@ ERR_FILE=$(mktemp)
 gh pr create --title "<title>" --body "<body>" [--draft] [--label ...] 2> "$ERR_FILE"
 GH_EXIT=$?
 if [ "$GH_EXIT" -ne 0 ]; then
-  RECOVER_SCRIPT=$(find ~/.claude/plugins -name "pr-recover-gh-account.js" -path "*/sdlc*/scripts/skill/pr-recover-gh-account.js" 2>/dev/null | head -1)
+  RECOVER_SCRIPT=$(find ~/.claude/plugins -name "pr-recover-gh-account.js" -path "*/sdlc*/scripts/skill/pr-recover-gh-account.js" 2>/dev/null | sort -V | tail -1)
   [ -z "$RECOVER_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js" ] && RECOVER_SCRIPT="plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js"
   if [ -n "$RECOVER_SCRIPT" ]; then
     RECOVER_JSON=$(node "$RECOVER_SCRIPT" --error-file "$ERR_FILE")

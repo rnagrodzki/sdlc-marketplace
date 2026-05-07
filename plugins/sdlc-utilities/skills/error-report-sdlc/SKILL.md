@@ -62,7 +62,7 @@ required before any further work, including running the prepare script.
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "error-report-prepare.js" -path "*/sdlc*/scripts/skill/error-report-prepare.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "error-report-prepare.js" -path "*/sdlc*/scripts/skill/error-report-prepare.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/error-report-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/error-report-prepare.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/error-report-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 

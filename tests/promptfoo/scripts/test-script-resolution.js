@@ -41,7 +41,7 @@ const fakeRepo = path.join(projectRoot, 'fake-repo');
 // Uses fakeHome as HOME and runs with CWD=fakeRepo so the local fallback
 // path ("plugins/sdlc-utilities/scripts/<path>") resolves correctly.
 const bashScript = `
-SCRIPT=$(find "${fakeHome}/.claude/plugins" -name "${scriptName}" -path "*/sdlc*/scripts/${scriptPath}" 2>/dev/null | head -1)
+SCRIPT=$(find "${fakeHome}/.claude/plugins" -name "${scriptName}" -path "*/sdlc*/scripts/${scriptPath}" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/${scriptPath}" ] && SCRIPT="plugins/sdlc-utilities/scripts/${scriptPath}"
 if [ -z "$SCRIPT" ]; then
   printf '{"resolved":null,"source":"error"}\\n'

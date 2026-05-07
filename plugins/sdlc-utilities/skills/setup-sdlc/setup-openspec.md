@@ -22,7 +22,7 @@ at the current plugin version is a no-op.
 Locate and run the enrichment script:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "openspec-enrich.js" -path "*/sdlc*/scripts/util/openspec-enrich.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "openspec-enrich.js" -path "*/sdlc*/scripts/util/openspec-enrich.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/openspec-enrich.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/openspec-enrich.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate util/openspec-enrich.js" >&2; exit 2; }
 

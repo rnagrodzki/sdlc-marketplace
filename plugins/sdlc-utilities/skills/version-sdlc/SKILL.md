@@ -39,7 +39,7 @@ If the system context contains "Plan mode is active":
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "version.js" -path "*/sdlc*/scripts/skill/version.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "version.js" -path "*/sdlc*/scripts/skill/version.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/version.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/version.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/version.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
@@ -220,7 +220,7 @@ This ensures projects that ran `--init` in a prior session get notified about im
 Locate and run the scaffold script in check-only mode:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "scaffold-ci.js" -path "*/sdlc*/scripts/util/scaffold-ci.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "scaffold-ci.js" -path "*/sdlc*/scripts/util/scaffold-ci.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/scaffold-ci.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/scaffold-ci.js"
 [ -z "$SCRIPT" ] && { echo "WARN: Could not locate util/scaffold-ci.js — skipping CI script check" >&2; exit 0; }
 ```
@@ -257,7 +257,7 @@ The release proceeds regardless of the user's answer. This is informational, not
 3b. **Link verification (R17, issue #198) — HARD GATE.** Before `git commit`, validate every URL embedded in the staged CHANGELOG entry (and any release-notes body) via the shared link validator. The script reads the body via `--file` and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON. Skip this sub-step entirely when changelog is disabled and no release-notes body was generated.
 
    ```bash
-   LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | head -1)
+   LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | sort -V | tail -1)
    [ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
    [ -z "$LINKS_LIB" ] && { echo "ERROR: Could not locate scripts/lib/links.js. Is the sdlc plugin installed?" >&2; exit 2; }
    # Validate the new CHANGELOG entry only (not the entire historical file).

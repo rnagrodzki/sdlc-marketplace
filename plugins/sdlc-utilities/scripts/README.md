@@ -55,7 +55,7 @@ Skills locate scripts using a two-step pattern:
 
 ```bash
 # 1. Installed plugin (find in plugin cache)
-SCRIPT=$(find ~/.claude/plugins -name "<name>.js" -path "*/sdlc*/scripts/<subdir>/<name>.js" 2>/dev/null | head -1)
+SCRIPT=$(find ~/.claude/plugins -name "<name>.js" -path "*/sdlc*/scripts/<subdir>/<name>.js" 2>/dev/null | sort -V | tail -1)
 
 # 2. Development fallback (relative to repo root)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/<subdir>/<name>.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/<subdir>/<name>.js"

@@ -53,7 +53,7 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
 > **VERBATIM** — Run this bash block exactly as written.
 
 ```bash
-SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
+SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
 [ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
 [ -z "$SCRIPT_DIR" ] && { echo "[]"; exit 0; }
 node -e "
@@ -78,7 +78,7 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
 - If `--resume` was passed:
   1. Find the most recent state file for the current branch in `<main-worktree>/.sdlc/execution/`. If none found, warn: "No state file found for branch `<branch>`. Starting fresh." and proceed to plan loading below.
   2. Read `./state-format.md` for the schema reference.
-  3. Read the state file using `node "$SCRIPT" read` (locate `state/execute.js` as described in the State persistence section). Load `planPath` and read the plan file. If `planPath` is null (plan was from conversation context), use AskUserQuestion to request the plan file path.
+  3. Read the state file using `node "$STATE_SCRIPT" read` (locate `state/execute.js` as described in the State persistence section). Load `planPath` and read the plan file. If `planPath` is null (plan was from conversation context), use AskUserQuestion to request the plan file path.
   4. Compute the SHA-256 hash of the plan content and compare against `planHash`. If mismatch, use AskUserQuestion:
      > Plan content has changed since execution started. Resume with the existing wave structure, or restart from scratch?
      Options: **resume** | **restart**
@@ -121,7 +121,7 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
 
    - **If `--workspace worktree`:** Create worktree without prompting:
      ```bash
-     SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/util/worktree-create.js" 2>/dev/null | head -1)
+     SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/util/worktree-create.js" 2>/dev/null | sort -V | tail -1)
      [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/worktree-create.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/worktree-create.js"
      result=$(node "$SCRIPT" --name <derived-name>)
      cd $(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
@@ -390,21 +390,21 @@ Proceeding to Wave N+1 (N tasks)
 
 **State persistence:** After each wave completes, update the execution state via `state/execute.js`. Locate the script:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/execute.js" 2>/dev/null | head -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/execute.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/state/execute.js"
+STATE_SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/execute.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$STATE_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/execute.js" ] && STATE_SCRIPT="plugins/sdlc-utilities/scripts/state/execute.js"
 ```
 
 On the very first wave dispatch, initialize the state file:
 ```bash
-node "$SCRIPT" init --branch <branch> --quality <X> --total-tasks <N>
+node "$STATE_SCRIPT" init --branch <branch> --quality <X> --total-tasks <N>
 ```
 
-Before each wave: `node "$SCRIPT" wave-start --wave <N>`
-After each task: `node "$SCRIPT" task-done --wave <N> --task <id> --name "<name>" --complexity <c> --risk <r> --files-changed '<json>'` (or `task-fail` on failure)
-After each wave: `node "$SCRIPT" wave-done --wave <N>` (or `wave-fail`)
-Update context: `node "$SCRIPT" context --data '<json>'`
+Before each wave: `node "$STATE_SCRIPT" wave-start --wave <N>`
+After each task: `node "$STATE_SCRIPT" task-done --wave <N> --task <id> --name "<name>" --complexity <c> --risk <r> --files-changed '<json>'` (or `task-fail` on failure)
+After each wave: `node "$STATE_SCRIPT" wave-done --wave <N>` (or `wave-fail`)
+Update context: `node "$STATE_SCRIPT" context --data '<json>'`
 
-On successful completion: `node "$SCRIPT" cleanup`
+On successful completion: `node "$STATE_SCRIPT" cleanup`
 On failure: preserve the state file for `--resume`.
 
 **5e. Inter-wave critique** — Before next wave:
