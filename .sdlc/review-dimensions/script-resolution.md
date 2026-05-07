@@ -13,7 +13,7 @@ model: sonnet
 
 # Script Resolution Review
 
-Review the runtime script resolution and file reference lookup patterns embedded in command and skill markdown files. This project resolves Node.js helper scripts at runtime using `find ~/.claude/plugins ... | head -1` with a `find .` fallback. These patterns must work both when the plugin is installed via the Claude Code marketplace (`~/.claude/plugins/`) and when running directly from the repository.
+Review the runtime script resolution and file reference lookup patterns embedded in command and skill markdown files. This project resolves Node.js helper scripts at runtime using `find ~/.claude/plugins ... | sort -V | tail -1` with a `find .` fallback. These patterns must work both when the plugin is installed via the Claude Code marketplace (`~/.claude/plugins/`) and when running directly from the repository. With multiple cached plugin versions present (e.g. `0.17.38` and `0.18.4` side-by-side under `~/.claude/plugins/cache/sdlc-marketplace/sdlc/`), filesystem-traversal order is non-deterministic — `sort -V | tail -1` does natural version ordering and always selects the newest semver. See #258.
 
 ## Checklist
 
@@ -26,7 +26,7 @@ Review the runtime script resolution and file reference lookup patterns embedded
 - [ ] Glob patterns for reference file lookups are specific enough to match exactly one file — e.g., `**/review-sdlc/REFERENCE.md` not `**/REFERENCE.md`
 - [ ] No resolution pattern uses hardcoded absolute paths other than the conventional `~/.claude/plugins` prefix
 - [ ] When a skill re-resolves the same script in a later step (e.g., first in Step 2 for validation, then in Step 7 for execution), both resolution blocks use identical find patterns — no divergent logic for the same script
-- [ ] `head -1` is used after `find` to pick one result — verify the script name is specific enough that exactly one match is expected; flag if the name is generic enough to create ambiguity
+- [ ] The `find` pipeline ends with `| sort -V | tail -1` — never bare `| head -1`. With multiple cached plugin versions, `head -1` picks a non-deterministic (possibly stale) version; `sort -V | tail -1` always selects the newest semver
 
 ## Severity Guide
 
@@ -40,4 +40,4 @@ Review the runtime script resolution and file reference lookup patterns embedded
 | Error message in failure guard doesn't name the script or suggest a fix | medium |
 | Divergent resolution patterns for the same script across steps | medium |
 | Hardcoded absolute path other than `~/.claude/plugins` | medium |
-| `head -1` on a find pattern that could produce multiple matches | low |
+| Bare `| head -1` after `find ~/.claude/plugins` (no `sort -V | tail -1`) — picks an arbitrary cached version (#258) | high |
