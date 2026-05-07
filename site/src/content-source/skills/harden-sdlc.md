@@ -37,7 +37,7 @@ The skill is also opt-in dispatched from `plan-sdlc`, `execute-plan-sdlc`, `revi
 
 ```text
 /harden-sdlc \
-  --failure-text "Guardrail no-auto-eval failed: plan task 7 invokes promptfoo eval" \
+  --failure-text "Guardrail no-auto-eval failed: plan task 7 invokes full-suite promptfoo eval" \
   --skill plan-sdlc \
   --step "Step 4 — IMPROVE" \
   --operation "error-severity guardrail block"

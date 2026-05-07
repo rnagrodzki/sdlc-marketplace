@@ -258,7 +258,7 @@ the `.claude/learnings/` directory and `log.md` file if they don't exist.
 - Edit any surface without an `apply` AskUserQuestion answer recorded for that
   specific proposal — the no-silent-write invariant is non-negotiable.
 - Propose relaxing or removing existing rules — v1 is strengthen-only.
-- Run `promptfoo eval` automatically — evaluation runs are user-initiated only.
+- Run full-suite or wide-subset `promptfoo eval` automatically — single targeted test scoped to the change is allowed; tight-loop retries are not.
 - Invoke `error-report-sdlc` for `user-code` classifications — only the
   `plugin-defect` branch routes there.
 - Read the full manifest contents into the main context — Step 2 reads only

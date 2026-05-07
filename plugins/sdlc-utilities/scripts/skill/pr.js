@@ -43,6 +43,8 @@ const {
   fetchRepoLabels,
   getChangedFiles,
   parseRemoteOwner,
+  probeGhAuth,
+  formatAccountMismatch,
 } = require(path.join(LIB, 'git'));
 
 const { readSection } = require(path.join(LIB, 'config'));
@@ -149,6 +151,68 @@ function main() {
     for (const e of cv.errors) errors.push(`config-version: ${e.role}: ${e.message}`);
     writeOutput({ errors, warnings, flags: { skipConfigCheck }, migration: cv.migration }, 'pr-context', 1);
     return;
+  }
+
+  // Issue #234: gh-auth + active-account preflight (shared with ship.js).
+  // Resolve expectedAccount via cascade: prConfig.expectedAccount → origin owner.
+  // Halt on no-auth, expired-token, and mismatch — never on unresolvable expected
+  // account (best-effort cascade).
+  const ghAuthState = probeGhAuth();
+  const ghAuthenticated = ghAuthState.authenticated;
+  const activeAccount = ghAuthState.activeAccount;
+  const tokenExpired = ghAuthState.expired;
+
+  const prConfigForAuth = readSection(projectRoot, 'pr') || {};
+  const remoteForAuth = parseRemoteOwner(projectRoot);
+  const expectedAccount =
+    (typeof prConfigForAuth.expectedAccount === 'string' && prConfigForAuth.expectedAccount.trim()) ||
+    (remoteForAuth && remoteForAuth.owner) ||
+    null;
+
+  if (!ghAuthenticated) {
+    errors.push(ghAuthState.errorMessage);
+    writeOutput(
+      {
+        errors,
+        warnings,
+        ghAuthenticated,
+        activeAccount,
+        expectedAccount,
+        accountMismatch: false,
+        tokenExpired,
+      },
+      'pr-context',
+      1
+    );
+    return;
+  }
+
+  const accountMismatch = Boolean(
+    expectedAccount && activeAccount && activeAccount.toLowerCase() !== expectedAccount.toLowerCase()
+  );
+
+  if (accountMismatch) {
+    errors.push(formatAccountMismatch(expectedAccount, activeAccount));
+    writeOutput(
+      {
+        errors,
+        warnings,
+        ghAuthenticated,
+        activeAccount,
+        expectedAccount,
+        accountMismatch: true,
+        tokenExpired: false,
+      },
+      'pr-context',
+      1
+    );
+    return;
+  }
+
+  if (!expectedAccount) {
+    warnings.push(
+      'Could not resolve expected gh account (no pr.expectedAccount, no email mapping, no origin remote). Skipping active-account check.'
+    );
   }
 
   // Step 1–2: Validate git repo and get current branch
@@ -338,6 +402,13 @@ function main() {
     currentBranch,
     isDraft,
     isAuto,
+    // Issue #234: gh-auth + active-account preflight result. SKILL.md gates on
+    // these field names (per `flag-coherence-cross-skill`).
+    ghAuthenticated,
+    activeAccount,
+    expectedAccount,
+    accountMismatch: false,
+    tokenExpired: false,
     ghAuth: ghAuth.switched
       ? { switched: true, account: ghAuth.account, previousAccount: ghAuth.previousAccount }
       : null,

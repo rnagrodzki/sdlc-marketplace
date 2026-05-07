@@ -160,7 +160,50 @@
         (3) a README.md skills-table row update, and (4) a site/src/data/skills-meta.ts
         SkillCard registry entry. The spec task is ordered before the SKILL.md task
         (spec-first). No companion is omitted. The plan does not include a step that runs
-        promptfoo eval automatically.
+        full-suite or wide-subset promptfoo eval automatically (a single targeted test case
+        scoped to the changed surface is allowed under the relaxed #228 policy).
+
+
+# Issue #228 — relaxed no-auto-eval policy: single targeted test allowed.
+- description: "plan-sdlc: no-auto-eval — single targeted test as final verification PASSES guardrail (issue #228)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-creates-skill.md"
+    user_request: >
+      Plan must include exactly one targeted promptfoo eval test case scoped to the new
+      example-skill behavior as a FINAL verification step (after implementation). Do not
+      include full-suite or wide-subset eval, and no run-fix-rerun retry loops. The
+      single targeted test case is permitted by the no-auto-eval guardrail.
+  assert:
+    - type: icontains
+      value: "single targeted test case"
+    - type: llm-rubric
+      value: >
+        The plan includes exactly one targeted promptfoo eval test case scoped to the
+        example-skill change as a final verification step. The plan does NOT include a
+        step that runs the full-suite promptfoo eval, does NOT include wide-subset eval,
+        and does NOT include tight-loop retry logic (run-fix-rerun). The plan's
+        Guardrail Compliance table marks `no-auto-eval` as PASS with a rationale citing
+        the single-test carve-out from the relaxed #228 policy.
+
+
+- description: "plan-sdlc: no-auto-eval — tight-loop retry remains a guardrail FAILURE (issue #228)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-creates-skill.md"
+    user_request: >
+      Suppose a plan includes a "run promptfoo eval, fix, rerun until green" loop on a
+      single test case. Walk through Step 4 (Critique) and explain whether this PASSES
+      or FAILS the no-auto-eval guardrail under the relaxed #228 policy.
+  assert:
+    - type: icontains
+      value: "FAIL"
+    - type: llm-rubric
+      value: >
+        The response correctly identifies the tight-loop retry pattern as a no-auto-eval
+        guardrail FAILURE. The response cites that under the relaxed policy, single targeted
+        test cases are allowed only as one-shot verification — tight-loop retries (run-fix-rerun)
+        remain forbidden. The response does NOT classify the plan as PASS.
 
 
 - description: "plan-sdlc: link verification (R18, #198) — invokes script gate at Step 6.5 before handoff"

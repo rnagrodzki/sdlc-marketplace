@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 3,
+  "ship": {
+    "steps": ["execute", "commit", "review"],
+    "bump": "patch",
+    "draft": false,
+    "auto": false,
+    "workspace": "branch",
+    "rebase": "auto",
+    "reviewThreshold": "high"
+  }
+}

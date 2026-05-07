@@ -289,6 +289,25 @@ PR title validation is configured in `.sdlc/config.json` under the `pr` key. All
 | `titlePatternError` | string | Human-readable error message displayed when `titlePattern` validation fails. |
 | `allowedTypes` | array of strings | Allowed PR title type prefixes (e.g., `feat`, `fix`, `breaking`). Absence allows any type. Used for title generation hints only; validation uses `titlePattern`. |
 | `allowedScopes` | array of strings | Allowed PR title scopes (the parenthetical in `feat(scope)`). Absence allows any scope. Used for title generation hints only; validation uses `titlePattern`. |
+| `expectedAccount` | string | Expected GitHub login that should be active when `/pr-sdlc` runs (issue #234). When set, the prepare script halts hard if the active `gh` account differs, preventing wrong-account PRs in multi-account setups. Cascades to the `origin` remote owner when unset. |
+
+### Preflight (issue #234)
+
+Before any GitHub API call, `skill/pr.js` runs a gh-auth + active-account preflight:
+
+1. Verifies `gh auth status --hostname github.com` succeeds — halts on no-auth or expired token.
+2. Resolves `expectedAccount` via cascade: `pr.expectedAccount` → `git config user.email` mapping → `origin` remote owner.
+3. Compares the resolved `expectedAccount` against `gh api user --jq .login` and halts on mismatch with the canonical 3-line message:
+
+   ```text
+   Expected gh account: <expected>
+   Active gh account:   <actual>
+   Run: gh auth switch --user <expected>
+   ```
+
+The shared probe `lib/git.js::probeGhAuth` is also consumed by `ship-sdlc`'s pipeline preflight — both gates produce byte-identical halt messages via `formatAccountMismatch`. When `expectedAccount` cannot be resolved at all (no config, no email mapping, no origin), the script emits a warning and proceeds — best-effort cascade.
+
+The post-creation reactive recovery (issue #184, `gh pr create` permission failure → automatic switch + retry) remains as a fallback for cases the preflight cannot anticipate.
 
 ### Note on Type/Scope Flags
 

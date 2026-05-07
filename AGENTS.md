@@ -36,7 +36,7 @@ scripts/                     # Node.js helper scripts (optional; invoked via Bas
 
 ## Constraints
 
-- **Never run `promptfoo eval` automatically.** The LLM must never execute `promptfoo eval` (for all test cases or any subset) on its own. Evaluation runs must always be initiated manually by the user.
+- **`promptfoo eval` invocation policy.** Full-suite or wide-subset `promptfoo eval` runs remain user-initiated only. A single targeted test case scoped to the changed surface MAY be run as the final verification step. Exec-only configs (no LLM provider, e.g. `promptfooconfig-exec.yaml`, `promptfooconfig-exec-hooks.yaml`) are fully relaxed — targeted runs are permitted at any verification gate. Tight-loop retries (run-fix-rerun) are forbidden in all cases.
 
 ---
 

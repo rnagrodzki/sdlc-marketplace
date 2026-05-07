@@ -39,6 +39,21 @@
   - Acceptance: on a non-rebased branch with post-divergence base commits, `skill/pr.js` produces a `diffStat` and `diffContent` containing only the feature branch's own changes.
 - R-base-ref-fetch (issue #239): Before computing the branch-contribution diff stat / content, `skill/pr.js` MUST attempt a best-effort `git fetch origin <base>:<base>` via `lib/git.js::fetchBaseRef(baseBranch, projectRoot)`. The fetch failure is non-fatal — the skill proceeds with whatever the local ref reports.
   - Acceptance: with `origin` unreachable or absent, `skill/pr.js` still exits successfully and produces a complete prepare output.
+- R-gh-auth-preflight (issue #234): The prepare script `skill/pr.js` MUST run a gh-auth preflight before any GitHub API call:
+  1. Verify `gh auth status --hostname github.com` succeeds. On no-auth or expired-token, halt with the no-auth or expired-token message verbatim.
+  2. Resolve `expectedAccount` via the cascade: `prConfig.expectedAccount` → `git config user.email` mapped to a known GitHub login (when a helper exists; else skip this leg) → `origin` remote owner via `parseRemoteOwner(cwd)`.
+  3. Compare the resolved `expectedAccount` against the active account from `gh api user --jq .login`.
+  4. On mismatch, halt with the EXACT 3-line message:
+     ```
+     Expected gh account: <expected>
+     Active gh account:   <actual>
+     Run: gh auth switch --user <expected>
+     ```
+  5. When `expectedAccount` cannot be resolved at all (no config, no email mapping, no origin), emit a warning and proceed — best-effort cascade, never halt on unresolvable expected account.
+
+  Preflight cases covered: matching account (proceeds), mismatched account (halts with exact message), no auth (halts), expired token (halts).
+
+  - Acceptance: prepare output JSON contains `ghAuthenticated`, `activeAccount`, `expectedAccount`, `accountMismatch` keys; mismatch sets exit code 1 and emits the exact halt message; no-auth sets exit code 1 with a clear no-auth message; unresolvable expected account exits 0 with a `warnings[]` entry, not a halt.
 - R-pr-template-path (issues #260, #231, precedent #259): The PR template path follows the same canonical-with-fallback shape used for review dimensions (`R-dimensions-path`). The canonical location is `<project>/.sdlc/pr-template.md`. When the canonical file is absent, the resolver reads the deprecated location `<project>/.claude/pr-template.md` and emits a one-time stderr deprecation warning per process. The deprecation fallback MUST remain for two minor versions following the migration release; removal requires bumping the deprecation window. Resolution lives in a single helper `lib/pr-template.js` exporting `resolvePrTemplatePath(projectRoot)` and `loadPrTemplate(projectRoot)`; every consumer (`skill/pr.js`, `ci/validate-pr-template.js`) routes through it (single-source-of-truth per `flag-resolution-single-source`). The hook `hooks/post-tool-validate.js` is regex-based and matches BOTH `.sdlc/pr-template.md` and `.claude/pr-template.md` paths during the deprecation window.
   - Acceptance: with template at `.sdlc/pr-template.md`, P12 is populated and no warning is emitted; with template only at `.claude/pr-template.md`, P12 is populated AND stderr contains exactly one deprecation warning per process; with both files present, the canonical `.sdlc/` path wins and no warning is emitted; the hook regex matches a Write/Edit to either path and dispatches `validate-pr-template.js`.
 

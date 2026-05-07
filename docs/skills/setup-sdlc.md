@@ -37,6 +37,7 @@ Pre-check every row in the menu (reconfigure everything) instead of pre-selectin
 | `--migrate` | Run schema migration via `scripts/skill/migrate-config.js`: relocates legacy `.claude/sdlc.json` to `.sdlc/config.json`, walks the schema-version migration registry (`lib/config-migrations.js`) to bring both project + local configs to `schemaVersion: 3`, and consolidates legacy per-file configs (`.claude/version.json`, `.sdlc/ship-config.json`, etc.) via `lib/config.js::consolidateLegacyFiles`. Idempotent. Backups: legacy relocation writes to `.sdlc/sdlc.json.bak` (single, no timestamp); other in-place migrations write to `.sdlc/<file>.bak.<safe-iso>`. Setup sweeps to retain 3 newest per role. | — |
 | `--skip <section>` | Skip a config section during setup (version, ship, jira, review, commit, pr) | — |
 | `--force` | Pre-check every menu row (reconfigure all sections) | — |
+| `--unset-only` | Pre-check only sections in `not-set` state. Legacy fast-path before #235 — the default flow now walks every configurable field. | — |
 | `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | — |
 | `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | — |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | — |

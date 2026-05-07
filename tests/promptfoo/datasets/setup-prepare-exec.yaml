@@ -97,3 +97,66 @@
   assert:
     - type: javascript
       value: "JSON.parse(output).content.reviewDimensions.count === 3"
+
+# Issue #235 — setup-sdlc walks every field by default; --unset-only opts in to legacy fast-path.
+- description: "setup-prepare (issue #235): no flag → flags.unsetOnly=false, defaultSelectionMode=all"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/setup-fully-configured"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        return out.flags && out.flags.unsetOnly === false && out.defaultSelectionMode === 'all'
+
+- description: "setup-prepare (issue #235): --unset-only → flags.unsetOnly=true, defaultSelectionMode=unset-only"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    script_args: "--unset-only"
+    project_root: "file://fixtures-fs/setup-fully-configured"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        return out.flags.unsetOnly === true && out.defaultSelectionMode === 'unset-only'
+
+- description: "setup-prepare (issue #235): --force overrides --unset-only → defaultSelectionMode=all"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    script_args: "--unset-only --force"
+    project_root: "file://fixtures-fs/setup-fully-configured"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        return out.flags.unsetOnly === true && out.flags.force === true && out.defaultSelectionMode === 'all'
+
+# Issue #235 — first-run on empty project: every section is 'not-set'; both modes yield identical pre-checks.
+- description: "setup-prepare (issue #235): first-run on empty project — flags.unsetOnly defaults false"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        return out.flags.unsetOnly === false && out.defaultSelectionMode === 'all'
+
+# Issue #234 — pr.expectedAccount surfaces in the standard menu walk.
+- description: "setup-prepare (issue #234): pr section exposes expectedAccount field with origin-owner default"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/setup-fully-configured"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const pr = out.sections.find(s => s.id === 'pr');
+        if (!pr) return false;
+        const ea = pr.fields.find(f => f.name === 'expectedAccount');
+        return Boolean(ea) && ea.type === 'string' && ea.default === 'test-user'

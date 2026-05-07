@@ -120,6 +120,16 @@ Read and parse `PR_CONTEXT_FILE` as `PR_CONTEXT_JSON`. The `trap` above guarante
 
 **If `PR_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
+**Preflight halt rule (issue #234):** When `prepare.errors[]` is non-empty AND any of these conditions hold, surface the prepare error verbatim and stop — do NOT proceed to Step 1:
+
+- `PR_CONTEXT_JSON.accountMismatch === true` (active gh account differs from `expectedAccount`)
+- `PR_CONTEXT_JSON.ghAuthenticated === false` (no auth or expired token)
+- `PR_CONTEXT_JSON.tokenExpired === true`
+
+The prepare script (`skill/pr.js`) is the single source of truth for these fields — SKILL.md must NOT re-derive them from raw `gh` calls (per `flag-coherence-cross-skill`). The `formatAccountMismatch` helper in `lib/git.js` produces the canonical 3-line halt message; the LLM surfaces it verbatim.
+
+The reactive recovery flow later in this skill (post-`gh pr create` permission errors) is a fallback for cases the preflight cannot anticipate (e.g., a permission revocation between preflight and `gh pr create`). Preflight is the FIRST line of defense.
+
 **If `PR_CONTEXT_JSON.warnings` is non-empty**, show the warnings prominently before continuing.
 Do not ask for confirmation — the Step 5 approval gate (AskUserQuestion) is the consent point before PR creation.
 
