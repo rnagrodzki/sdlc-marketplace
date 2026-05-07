@@ -116,44 +116,67 @@ try {
 
 try {
   let recoveryDir;
+  let branchSlug = null;
   try {
-    const { resolveMainWorktree } = require('../scripts/lib/state');
-    recoveryDir = path.join(resolveMainWorktree(), '.sdlc', 'execution');
+    const { resolveStateDir, slugifyBranch } = require('../scripts/lib/state');
+    const { exec } = require('../scripts/lib/git');
+    recoveryDir = resolveStateDir();
+    const branch = exec('git branch --show-current');
+    if (branch) branchSlug = slugifyBranch(branch);
   } catch {
     recoveryDir = path.join(process.cwd(), '.sdlc', 'execution');
   }
 
-  const recoveryPath = path.join(recoveryDir, '.compact-recovery.json');
-  if (fs.existsSync(recoveryPath)) {
-    const raw = fs.readFileSync(recoveryPath, 'utf8');
-    const recovery = JSON.parse(raw);
+  const maxAgeMs = 60 * 60 * 1000; // 1 hour freshness gate (issue #256)
 
-    // Check freshness — ignore if older than 1 hour
-    const ageMs = Date.now() - new Date(recovery.savedAt).getTime();
-    const maxAgeMs = 60 * 60 * 1000; // 1 hour
+  // Per-branch recovery file (issue #256). Read only the file matching the
+  // current branch — never scan-and-filter across branches. branchSlug is null
+  // when not in a git repo or no current branch; in that case skip the read.
+  if (branchSlug) {
+    const recoveryPath = path.join(recoveryDir, `.compact-recovery-${branchSlug}.json`);
+    if (fs.existsSync(recoveryPath)) {
+      const raw = fs.readFileSync(recoveryPath, 'utf8');
+      const recovery = JSON.parse(raw);
 
-    if (ageMs <= maxAgeMs) {
-      resumeLines.push('Pipeline state recovered after compaction:');
+      const ageMs = Date.now() - new Date(recovery.savedAt).getTime();
 
-      if (recovery.pipeline === 'ship-sdlc') {
-        resumeLines.push(`  Pipeline: ship-sdlc on ${recovery.branch}`);
-        if (recovery.currentStep) {
-          resumeLines.push(`  Current step: ${recovery.currentStep}`);
+      if (ageMs <= maxAgeMs) {
+        resumeLines.push('Pipeline state recovered after compaction:');
+
+        if (recovery.pipeline === 'ship-sdlc') {
+          resumeLines.push(`  Pipeline: ship-sdlc on ${recovery.branch}`);
+          if (recovery.currentStep) {
+            resumeLines.push(`  Current step: ${recovery.currentStep}`);
+          }
+          if (recovery.reviewVerdict) {
+            const findings = recovery.deferredFindings
+              ? ` (${recovery.deferredFindings} deferred)`
+              : '';
+            resumeLines.push(`  Review verdict: ${recovery.reviewVerdict}${findings}`);
+          }
+        } else if (recovery.pipeline === 'execute-plan-sdlc') {
+          resumeLines.push(`  Pipeline: execute-plan-sdlc on ${recovery.branch}`);
+          resumeLines.push(`  Progress: wave ${recovery.completedWaves} of ${recovery.totalWaves} complete`);
         }
-        if (recovery.reviewVerdict) {
-          const findings = recovery.deferredFindings
-            ? ` (${recovery.deferredFindings} deferred)`
-            : '';
-          resumeLines.push(`  Review verdict: ${recovery.reviewVerdict}${findings}`);
-        }
-      } else if (recovery.pipeline === 'execute-plan-sdlc') {
-        resumeLines.push(`  Pipeline: execute-plan-sdlc on ${recovery.branch}`);
-        resumeLines.push(`  Progress: wave ${recovery.completedWaves} of ${recovery.totalWaves} complete`);
       }
-    }
 
-    // Delete after reading — single-use
-    fs.unlinkSync(recoveryPath);
+      // Delete after reading — single-use
+      fs.unlinkSync(recoveryPath);
+    }
+  }
+
+  // Legacy `.compact-recovery.json` (no branch suffix, pre-#256 layout).
+  // Unlink ONLY when older than the freshness gate to avoid destroying a
+  // fresh file written by an even-older plugin version on a concurrent
+  // session. Never re-inject — that ship has sailed.
+  const legacyPath = path.join(recoveryDir, '.compact-recovery.json');
+  if (fs.existsSync(legacyPath)) {
+    try {
+      const stat = fs.statSync(legacyPath);
+      if (Date.now() - stat.mtimeMs > maxAgeMs) {
+        fs.unlinkSync(legacyPath);
+      }
+    } catch { /* best-effort */ }
   }
 } catch {
   // Graceful degradation — skip compact recovery on any error

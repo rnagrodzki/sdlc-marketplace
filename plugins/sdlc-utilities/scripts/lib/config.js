@@ -510,6 +510,55 @@ function consolidateLegacyFiles(projectRoot) {
 }
 
 // ---------------------------------------------------------------------------
+// normalizeBlankLines (private — issue #266)
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize blank lines in an array of file lines (no trailing newline element).
+ *
+ * Rules:
+ *   - Strip all leading blank lines (lines that are empty or whitespace-only).
+ *   - Strip all trailing blank lines.
+ *   - Collapse runs of consecutive blank lines to a single blank line.
+ *
+ * Used by both `ensureSdlcGitignore` and `ensureRootGitignore` so that
+ * re-running setup never accumulates stray blank lines in the user-authored
+ * portion of the file (issue #266). The function is kept private (not
+ * exported) — only two callers, KISS.
+ *
+ * @param {string[]} lines
+ * @returns {string[]}
+ */
+function normalizeBlankLines(lines) {
+  if (!Array.isArray(lines) || lines.length === 0) return [];
+  const isBlank = (s) => s === '' || /^\s*$/.test(s);
+
+  // Trim leading blanks
+  let start = 0;
+  while (start < lines.length && isBlank(lines[start])) start++;
+  // Trim trailing blanks
+  let end = lines.length - 1;
+  while (end >= start && isBlank(lines[end])) end--;
+  if (end < start) return [];
+
+  // Collapse consecutive blank runs to one
+  const out = [];
+  let prevBlank = false;
+  for (let i = start; i <= end; i++) {
+    const blank = isBlank(lines[i]);
+    if (blank) {
+      if (prevBlank) continue;
+      out.push('');
+      prevBlank = true;
+    } else {
+      out.push(lines[i]);
+      prevBlank = false;
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // ensureSdlcGitignore
 // ---------------------------------------------------------------------------
 
@@ -563,7 +612,7 @@ function ensureSdlcGitignore(projectRoot) {
   }
 
   const managedPatternSet = new Set(SDLC_GITIGNORE_PATTERNS);
-  const otherLines = [];
+  const otherLinesRaw = [];
   let insideBlock = false;
   for (const line of lines) {
     if (line === SDLC_GITIGNORE_BEGIN) {
@@ -583,8 +632,13 @@ function ensureSdlcGitignore(projectRoot) {
     if (managedPatternSet.has(line.trim())) {
       continue;
     }
-    otherLines.push(line);
+    otherLinesRaw.push(line);
   }
+
+  // Step 3b (issue #266): normalize blank lines in user-authored content so
+  // re-runs are byte-identical. Without this, blank-line accumulation grows
+  // by 2 lines per invocation in the worst case.
+  const otherLines = normalizeBlankLines(otherLinesRaw);
 
   // Step 4: Reconstruct: leading user lines (if any) + blank separator +
   // managed block + trailing newline.
@@ -780,6 +834,11 @@ function ensureRootGitignore(projectRoot) {
     next = existing + sep + managedBlock + '\n';
   }
 
+  // Issue #266: normalize blank lines so re-runs are byte-identical. Split the
+  // result on the managed block, normalize the user-authored portion before
+  // and after, then re-stitch with a single blank-line separator.
+  next = normalizeAroundBlock(next, managedBlock);
+
   if (next === existing) return 'unchanged';
 
   fs.writeFileSync(gitignorePath, next, 'utf8');
@@ -788,6 +847,48 @@ function ensureRootGitignore(projectRoot) {
 
 function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Issue #266: split a file content string on `managedBlock`, normalize blank
+ * lines in the user-authored portions before/after the block, then re-stitch
+ * so the file is byte-identical on a second invocation. Trailing newline
+ * after the managed block is preserved.
+ *
+ * @param {string} content
+ * @param {string} managedBlock
+ * @returns {string}
+ */
+function normalizeAroundBlock(content, managedBlock) {
+  const idx = content.indexOf(managedBlock);
+  if (idx < 0) {
+    // Block not present (unexpected); normalize whole content as user lines.
+    const lines = content.split('\n');
+    if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+    const normalized = normalizeBlankLines(lines);
+    return normalized.length > 0 ? normalized.join('\n') + '\n' : '';
+  }
+  const beforeRaw = content.slice(0, idx);
+  const afterRaw  = content.slice(idx + managedBlock.length);
+
+  // Normalize "before" portion
+  const beforeLines = beforeRaw.split('\n');
+  // Drop trailing empty caused by '\n' immediately before block
+  if (beforeLines.length > 0 && beforeLines[beforeLines.length - 1] === '') beforeLines.pop();
+  const beforeNormalized = normalizeBlankLines(beforeLines);
+
+  // Normalize "after" portion
+  const afterLines = afterRaw.split('\n');
+  // Strip leading empty caused by '\n' immediately after block
+  if (afterLines.length > 0 && afterLines[0] === '') afterLines.shift();
+  if (afterLines.length > 0 && afterLines[afterLines.length - 1] === '') afterLines.pop();
+  const afterNormalized = normalizeBlankLines(afterLines);
+
+  let result = '';
+  if (beforeNormalized.length > 0) result += beforeNormalized.join('\n') + '\n\n';
+  result += managedBlock + '\n';
+  if (afterNormalized.length > 0) result += '\n' + afterNormalized.join('\n') + '\n';
+  return result;
 }
 
 // ---------------------------------------------------------------------------

@@ -406,11 +406,11 @@ const SETUP_SECTIONS = [
   {
     id: 'pr-template',
     label: 'pr-template',
-    purpose: 'PR description template at .claude/pr-template.md, used by /pr-sdlc when drafting PRs. The sub-flow scans existing GitHub PR templates, recent PRs, and Jira evidence to propose a tailored template; without it, /pr-sdlc uses a built-in fallback.',
+    purpose: 'PR description template at .sdlc/pr-template.md, used by /pr-sdlc when drafting PRs. The sub-flow scans existing GitHub PR templates, recent PRs, and Jira evidence to propose a tailored template; without it, /pr-sdlc uses a built-in fallback.',
     configFile: '<delegated>',
     configPath: null,
     consumedBy: ['pr-sdlc'],
-    filesModified: ['.claude/pr-template.md'],
+    filesModified: ['.sdlc/pr-template.md'],
     optional: true,
     delegatedTo: 'setup-pr-template',
     confirmDetected: false,

@@ -150,3 +150,27 @@
       value: '"apiFormat": "rest"'
     - type: icontains
       value: '"express"'
+
+# --- Issue #259: detectReviewDimensions must read .sdlc/review-dimensions/ via resolveDimensionsDir ---
+
+- description: "guardrails-prepare: discovers dimensions at .sdlc/review-dimensions/ (issue #259)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-with-sdlc-dimensions"
+  assert:
+    - type: icontains
+      value: '"security-review"'
+    - type: not-icontains
+      value: '"reviewDimensions": []'
+
+- description: "guardrails-prepare: still discovers dimensions at legacy .claude/review-dimensions/ via deprecation fallback (regression)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-with-dimensions"
+  assert:
+    - type: icontains
+      value: '"security-review"'
+    - type: not-icontains
+      value: '"reviewDimensions": []'

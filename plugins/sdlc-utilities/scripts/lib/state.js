@@ -333,6 +333,49 @@ function gcStateFiles({ prefix = null, ttlDays = 7, knownBranches = [], now } = 
   return result;
 }
 
+/**
+ * Init-time orphan prune for a single (prefix, branchSlug) pair.
+ *
+ * Unconditionally removes all `<prefix>-<branchSlug>-<timestamp>.json` files
+ * in `<mainWorktree>/.sdlc/execution/`. Unlike `gcStateFiles`, this DOES NOT
+ * consult TTL or branch-existence — same-branch state files predating a new
+ * `init` are by definition orphans (one branch hosts one active pipeline).
+ *
+ * Implements R-ship-init-prune (issue #255).
+ *
+ * @param {string} prefix      "ship" | "execute"
+ * @param {string} branchSlug  branch slug as produced by `slugifyBranch`
+ * @returns {string[]} filenames that were removed (basename only, not absolute paths)
+ */
+function pruneStateFiles(prefix, branchSlug) {
+  const stateDir = resolveStateDir();
+  if (!fs.existsSync(stateDir)) return [];
+
+  let entries;
+  try {
+    entries = fs.readdirSync(stateDir);
+  } catch (_) {
+    return [];
+  }
+
+  const removed = [];
+  for (const name of entries) {
+    if (!name.endsWith('.json')) continue;
+    const parsed = parseStateFilename(name);
+    if (!parsed) continue;
+    if (parsed.prefix !== prefix) continue;
+    if (parsed.slug !== branchSlug) continue;
+
+    try {
+      fs.unlinkSync(path.join(stateDir, name));
+      removed.push(name);
+    } catch (_) {
+      // best-effort; another process may have removed it
+    }
+  }
+  return removed;
+}
+
 // ---------------------------------------------------------------------------
 // Branch-slug migration
 // ---------------------------------------------------------------------------
@@ -467,6 +510,7 @@ module.exports = {
   resolveBranch,
   parseStateFilename,
   gcStateFiles,
+  pruneStateFiles,
   migrateBranchSlug,
   listBranches,
   readTtlDaysFromConfig,

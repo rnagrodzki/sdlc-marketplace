@@ -144,3 +144,35 @@
       value: '"dryRun": true'
     - type: icontains
       value: '"migrated": false'
+
+# ---------------------------------------------------------------------------
+# Issue #266: ensureSdlcGitignore idempotency (R-sdlc-gitignore-idempotent)
+# ---------------------------------------------------------------------------
+
+- description: "ensureSdlcGitignore: collapses bug-state stray blanks AND second write is byte-identical (issue #266)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ensure-sdlc-gitignore-idempotent.js"
+    script_args: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-blank-bloat"
+  assert:
+    - type: icontains
+      value: '"firstStatus": "updated"'
+    - type: icontains
+      value: '"secondStatus": "unchanged"'
+    - type: icontains
+      value: '"byteIdentical": true'
+    - type: icontains
+      value: '"noStrayBlanks": true'
+
+- description: "ensureSdlcGitignore: managed-block-only fixture is byte-identical on second write (issue #266)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ensure-sdlc-gitignore-idempotent.js"
+    script_args: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-managed-only"
+  assert:
+    - type: icontains
+      value: '"secondStatus": "unchanged"'
+    - type: icontains
+      value: '"byteIdentical": true'
+    - type: icontains
+      value: '"noStrayBlanks": true'

@@ -20,6 +20,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { resolvePrTemplatePath } = require('../lib/pr-template');
 
 // ---------------------------------------------------------------------------
 // CLI parsing
@@ -96,8 +97,12 @@ function parseSections(content) {
  * @returns {{ passed: boolean, checks: Array<{ id: string, description: string, status: string, detail: string }> }}
  */
 function validatePrTemplate(projectRoot) {
-  const templatePath = path.join(projectRoot, '.claude', 'pr-template.md');
-  const relativePath = '.claude/pr-template.md';
+  // Issue #260: route through single-source resolver so .sdlc/-first lookup works.
+  // When neither location exists, default to the canonical path so the
+  // "missing template" check reports the canonical location.
+  const resolved = resolvePrTemplatePath(projectRoot);
+  const templatePath = resolved || path.join(projectRoot, '.sdlc', 'pr-template.md');
+  const relativePath = path.relative(projectRoot, templatePath);
 
   const checks = [];
   let passed = true;
@@ -210,7 +215,7 @@ function validatePrTemplate(projectRoot) {
           .join('; ')
   );
 
-  return { passed, checks };
+  return { passed, checks, relativePath };
 }
 
 // ---------------------------------------------------------------------------
@@ -233,10 +238,10 @@ function formatJson(result) {
  * @param {{ passed: boolean, checks: object[] }} result
  * @returns {string}
  */
-function formatMarkdown(result) {
+function formatMarkdown(result, relativePath = '.sdlc/pr-template.md') {
   const lines = [];
 
-  lines.push('PR template validation: .claude/pr-template.md');
+  lines.push(`PR template validation: ${relativePath}`);
   lines.push('');
   lines.push('| Check | Description | Status | Detail |');
   lines.push('| ----- | ----------- | ------ | ------ |');
@@ -272,7 +277,7 @@ function main() {
   if (outputFormat === 'json') {
     process.stdout.write(formatJson(result) + '\n');
   } else {
-    process.stdout.write(formatMarkdown(result) + '\n');
+    process.stdout.write(formatMarkdown(result, result.relativePath) + '\n');
   }
 
   process.exit(result.passed ? 0 : 1);

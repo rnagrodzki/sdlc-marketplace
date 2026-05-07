@@ -182,3 +182,36 @@
       value: '^/(tmp|var|private)/.+pr-context-[0-9a-f]+\.json\s*$'
     - type: not-icontains
       value: '"remoteState":'
+
+# ---------------------------------------------------------------------------
+# Issue #260: pr-template path resolution via lib/pr-template.js
+# ---------------------------------------------------------------------------
+
+- description: "pr.js: template at .sdlc/pr-template.md is resolved (canonical, no warning)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-template-sdlc"
+  assert:
+    - type: not-icontains
+      value: 'Deprecation: .claude/pr-template.md'
+
+- description: "pr.js: template at .claude/pr-template.md (legacy only) emits one-time deprecation warning"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-template-claude-legacy"
+  assert:
+    - type: icontains
+      value: 'Deprecation: .claude/pr-template.md'
+    - type: icontains
+      value: '.sdlc/pr-template.md'
+
+- description: "pr.js: with both templates present, .sdlc/ wins (no warning)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-template-both"
+  assert:
+    - type: not-icontains
+      value: 'Deprecation: .claude/pr-template.md'

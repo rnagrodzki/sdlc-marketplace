@@ -81,6 +81,9 @@
 
 > **Implementation surface for R37–R39:** `state/ship.js` exposes `gc`, `migrate`, and `cleanup-pipeline` subcommands; `state/execute.js` exposes `gc`. The shared logic lives in `lib/state.js::gcStateFiles` and `lib/state.js::migrateBranchSlug`.
 
+- R-ship-init-prune (issue #255): At `init` time — before writing the new ship-state file — `state/ship.js cmdInit` MUST remove any pre-existing `ship-<branchSlug>-*.json` files for the same branch in `<mainWorktree>/.sdlc/execution/`. A given branch can only host one active ship pipeline; same-branch state files predating the new init are by definition orphans (e.g., from runs interrupted by context compaction that never reached the terminal `cleanup` step). Pruning is unconditional for same-prefix same-branchSlug files: it does NOT consult the `state.gc.ttlDays` TTL or the branch-existence rule (R39) — those gates apply to cross-branch GC, not to claim-time orphan removal. The prune is implemented via `lib/state.js::pruneStateFiles(prefix, branchSlug)` and runs once per `cmdInit` call before `initState`. The cmdInit JSON output gains a `prunedOrphans: string[]` field (filenames only, not absolute paths) listing every removed file.
+  - Acceptance: with one pre-existing `ship-<currentBranchSlug>-*.json` present, `cmdInit` deletes it and the JSON output's `prunedOrphans` array contains exactly that filename; with no pre-existing same-branch file, `prunedOrphans` is empty; pre-existing state files for OTHER branches (e.g., `ship-otherbranch-*.json`) MUST NOT be removed by `cmdInit` — they remain on disk untouched.
+
 ## Workflow Phases
 
 1. CONSUME — load config, parse flags, run `skill/ship.js` for context detection and step computation

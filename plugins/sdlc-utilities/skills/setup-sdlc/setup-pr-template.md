@@ -2,7 +2,7 @@
 
 Project-aware PR template creator sub-flow: receives scan results from parent, proposes a
 tailored template, guides the user through customization section by section, then writes
-`.claude/pr-template.md`.
+`.sdlc/pr-template.md`.
 
 ---
 
@@ -16,7 +16,7 @@ This sub-flow expects the parent to provide:
 - **Manifest signals**: project type (library, application, service, monorepo) from
   `package.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `pom.xml`
 - **JIRA evidence**: detected JIRA patterns from branch name, recent commits, or manifests
-- **Existing template** (if present): current `.claude/pr-template.md` sections and content
+- **Existing template** (if present): current `.sdlc/pr-template.md` sections and content
 
 ---
 
@@ -30,11 +30,11 @@ None — this sub-flow takes no arguments.
 
 ### Step 2 (PLAN) — Draft Template Proposal
 
-Using the scan signals, draft a proposed `.claude/pr-template.md`.
+Using the scan signals, draft a proposed `.sdlc/pr-template.md`.
 
 **Starting point:**
 
-- If `.claude/pr-template.md` already exists: start from its sections
+- If `.sdlc/pr-template.md` already exists: start from its sections
 - Otherwise: start from the default 8-section template:
   1. Summary
   2. JIRA Ticket
@@ -111,7 +111,7 @@ Use AskUserQuestion to present the template and ask:
 > Accept this PR template?
 
 Options:
-- **accept** — write this template as-is to .claude/pr-template.md
+- **accept** — write this template as-is to .sdlc/pr-template.md
 - **edit** — tell me which sections to add, remove, rename, or modify
 - **section N** — change a specific section (tell me the number)
 
@@ -130,12 +130,12 @@ After the user accepts:
    mkdir -p .claude
    ```
 
-2. Write the accepted template to `.claude/pr-template.md`.
+2. Write the accepted template to `.sdlc/pr-template.md`.
 
 3. Confirm success:
 
    ```text
-   Written to .claude/pr-template.md
+   Written to .sdlc/pr-template.md
 
    This template will be used by /pr-sdlc for all future PRs on this project.
    To update it, run /setup-sdlc --pr-template again.
@@ -168,7 +168,7 @@ Before marking complete, verify:
 - Template has at least one `## Section` heading
 - Every section has a fill instruction of at least 20 characters
 - No duplicate section headings
-- File was written successfully to `.claude/pr-template.md`
+- File was written successfully to `.sdlc/pr-template.md`
 - Validation script passed
 
 ---
@@ -218,7 +218,7 @@ When invoking `error-report-sdlc`, provide:
 
 ## DO NOT
 
-- Do NOT overwrite an existing `.claude/pr-template.md` without first showing the user the current template content and obtaining explicit "yes" consent.
+- Do NOT overwrite an existing `.sdlc/pr-template.md` without first showing the user the current template content and obtaining explicit "yes" consent.
 - Do NOT skip the `validate-pr-template.js` step — an invalid template will break `gh pr create` for the entire project.
 - Do NOT hard-code JIRA project keys or ticket formats based on assumptions — always derive from actual evidence or ask the user.
 - Do NOT present a generic template without the parent's scan results — every template must be tailored to the project's conventions.

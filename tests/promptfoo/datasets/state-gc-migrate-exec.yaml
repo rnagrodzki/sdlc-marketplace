@@ -165,3 +165,33 @@
       value: '"tokenSource": "heuristic-bytes"'
     - type: contains
       value: '"tokensApprox": 0'
+
+# ---------------------------------------------------------------------------
+# state/ship.js init: orphan prune (issue #255, R-ship-init-prune)
+# ---------------------------------------------------------------------------
+
+- description: "state/ship.js init prunes pre-existing same-branch ship-* file (issue #255)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/ship.js"
+    script_args: "init --branch main --flags {}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-state-orphan"
+  assert:
+    # cmdInit emits JSON {filePath, prunedOrphans} to stdout
+    - type: contains
+      value: '"prunedOrphans"'
+    - type: contains
+      value: 'ship-main-20240101T000000Z.json'
+    # The other branch's state file MUST NOT appear in prunedOrphans
+    - type: not-contains
+      value: 'ship-otherbranch-20240101T000000Z.json'
+
+- description: "state/ship.js init with no pre-existing same-branch state file produces empty prunedOrphans (issue #255)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/ship.js"
+    script_args: "init --branch main --flags {}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-state-stale"
+  assert:
+    - type: contains
+      value: '"prunedOrphans":[]'

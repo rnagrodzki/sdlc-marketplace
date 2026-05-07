@@ -90,7 +90,10 @@ function detect(projectRoot) {
 
   // --- Content files ---
   const reviewDimensionsDir = path.join(projectRoot, '.sdlc', 'review-dimensions');
-  const prTemplatePath = path.join(projectRoot, '.claude', 'pr-template.md');
+  // Issue #260: scaffold target is now .sdlc/pr-template.md (canonical).
+  // The deprecated .claude/pr-template.md location remains read-only via
+  // lib/pr-template.js::resolvePrTemplatePath until the deprecation window closes.
+  const prTemplatePath = path.join(projectRoot, '.sdlc', 'pr-template.md');
   const jiraTemplatesDir = path.join(projectRoot, '.claude', 'jira-templates');
 
   // --- OpenSpec config detection ---
@@ -166,7 +169,7 @@ function detect(projectRoot) {
       },
       prTemplate: {
         exists: fs.existsSync(prTemplatePath),
-        path: path.join('.claude', 'pr-template.md'),
+        path: path.join('.sdlc', 'pr-template.md'),
       },
       jiraTemplates: {
         count: countFiles(jiraTemplatesDir, '.md'),

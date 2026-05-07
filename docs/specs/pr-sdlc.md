@@ -39,6 +39,8 @@
   - Acceptance: on a non-rebased branch with post-divergence base commits, `skill/pr.js` produces a `diffStat` and `diffContent` containing only the feature branch's own changes.
 - R-base-ref-fetch (issue #239): Before computing the branch-contribution diff stat / content, `skill/pr.js` MUST attempt a best-effort `git fetch origin <base>:<base>` via `lib/git.js::fetchBaseRef(baseBranch, projectRoot)`. The fetch failure is non-fatal — the skill proceeds with whatever the local ref reports.
   - Acceptance: with `origin` unreachable or absent, `skill/pr.js` still exits successfully and produces a complete prepare output.
+- R-pr-template-path (issues #260, #231, precedent #259): The PR template path follows the same canonical-with-fallback shape used for review dimensions (`R-dimensions-path`). The canonical location is `<project>/.sdlc/pr-template.md`. When the canonical file is absent, the resolver reads the deprecated location `<project>/.claude/pr-template.md` and emits a one-time stderr deprecation warning per process. The deprecation fallback MUST remain for two minor versions following the migration release; removal requires bumping the deprecation window. Resolution lives in a single helper `lib/pr-template.js` exporting `resolvePrTemplatePath(projectRoot)` and `loadPrTemplate(projectRoot)`; every consumer (`skill/pr.js`, `ci/validate-pr-template.js`) routes through it (single-source-of-truth per `flag-resolution-single-source`). The hook `hooks/post-tool-validate.js` is regex-based and matches BOTH `.sdlc/pr-template.md` and `.claude/pr-template.md` paths during the deprecation window.
+  - Acceptance: with template at `.sdlc/pr-template.md`, P12 is populated and no warning is emitted; with template only at `.claude/pr-template.md`, P12 is populated AND stderr contains exactly one deprecation warning per process; with both files present, the canonical `.sdlc/` path wins and no warning is emitted; the hook regex matches a Write/Edit to either path and dispatches `validate-pr-template.js`.
 
 ## Workflow Phases
 
@@ -79,7 +81,7 @@
 - P9: `diffContent` (string) — full unified diff text
 - P10: `changedFiles` (string[]) — relative file paths changed
 - P11: `repoLabels` (array) — `[{ name, description }]` labels defined in the repository
-- P12: `customTemplate` (string | null) — content of `.claude/pr-template.md` or null
+- P12: `customTemplate` (string | null) — content of `.sdlc/pr-template.md` (canonical) or `.claude/pr-template.md` (deprecated fallback) resolved via `lib/pr-template.js::loadPrTemplate`; null when neither file exists. See R-pr-template-path.
 - P13: `prConfig` (object | null) — PR title validation config from `.sdlc/config.json`
 - P14: `isAuto` (boolean) — whether `--auto` was passed
 - P15: `forcedLabels` (string[]) — labels forced via `--label` flag(s)
