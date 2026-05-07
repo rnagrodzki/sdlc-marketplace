@@ -4,7 +4,7 @@
 
 Configures the SDLC plugin for a project. On invocation, `/setup-sdlc` shows a single multi-select menu listing every section it manages — version tracking, ship pipeline preferences, Jira, review scope, commit/PR patterns, review dimensions, PR template, plan and execution guardrails, and openspec enrichment. Each row shows a state badge (`set`, `not set`, or `legacy`), and only the sections you tick get configured. For every selected section, the skill prints a verbose header before any prompt — purpose, files modified, consuming skills, and a per-option description block — so you know exactly what each toggle controls before you answer.
 
-Creates `.sdlc/config.json` (project-level config), `.sdlc/local.json` (user-local preferences), and content artifacts (`.sdlc/review-dimensions/*.yaml`, `.claude/pr-template.md`, `openspec/config.yaml` managed block).
+Creates `.sdlc/config.json` (project-level config), `.sdlc/local.json` (user-local preferences), and content artifacts (`.sdlc/review-dimensions/*.yaml`, `.sdlc/pr-template.md`, `openspec/config.yaml` managed block).
 
 ---
 
@@ -158,7 +158,7 @@ Every section the menu can configure. The label, purpose, files modified, and co
 | `pr` | PR title validation rules used by `/pr-sdlc` (title regex, allowed types/scopes, required trailers). | `.sdlc/config.json` | `/pr-sdlc` |
 | `pr-labels` | PR label assignment policy under `pr.labels`. Mode `off` (default) adds no automatic labels — `--label` overrides still work. Mode `rules` evaluates user-defined deterministic rules (branch prefix, commit type, path glob, JIRA type, diff size). Mode `llm` opts into the legacy fuzzy match. Configured via `--only pr-labels`. | `.sdlc/config.json` | `/pr-sdlc` |
 | `review-dimensions` | Review dimensions installed under `.sdlc/review-dimensions/*.yaml`. Each dimension is a focused check set used by `/review-sdlc`. | `.sdlc/review-dimensions/*.yaml` | `/review-sdlc` |
-| `pr-template` | PR description template at `.claude/pr-template.md`, used by `/pr-sdlc` when drafting PRs. | `.claude/pr-template.md` | `/pr-sdlc` |
+| `pr-template` | PR description template at `.sdlc/pr-template.md`, used by `/pr-sdlc` when drafting PRs. | `.sdlc/pr-template.md` | `/pr-sdlc` |
 | `plan-guardrails` | Custom rules at `.sdlc/config.json#plan.guardrails` evaluated by `/plan-sdlc` during critique phases. | `.sdlc/config.json` | `/plan-sdlc` |
 | `execution-guardrails` | Runtime guardrails at `.sdlc/config.json#execute.guardrails` evaluated by `/execute-plan-sdlc` and `/ship-sdlc` before/after each wave. | `.sdlc/config.json` | `/execute-plan-sdlc`, `/ship-sdlc` |
 | `openspec-block` | Managed block in `openspec/config.yaml` providing sdlc-utilities workflow guidance to OpenSpec-aware skills. Idempotent across plugin versions. | `openspec/config.yaml` | `/plan-sdlc`, `/execute-plan-sdlc`, `/ship-sdlc` |
@@ -259,7 +259,7 @@ Scans your project's tech stack, dependencies, and directory structure to propos
 
 #### PR Template
 
-Analyzes project conventions (existing GitHub PR templates, recent PR patterns, JIRA usage) to propose a tailored PR description template. The result is saved to `.claude/pr-template.md` and used automatically by `/pr-sdlc`.
+Analyzes project conventions (existing GitHub PR templates, recent PR patterns, JIRA usage) to propose a tailored PR description template. The result is saved to `.sdlc/pr-template.md` and used automatically by `/pr-sdlc`.
 
 **Direct entry:** `/setup-sdlc --pr-template`
 
@@ -300,7 +300,7 @@ Plan guardrails    — [N configured via guardrails sub-flow | skipped]
 | `.sdlc/local.json` | User-local config with `review` scope preferences and `ship` settings. Carries top-level `schemaVersion: 3`. Gitignored (selective `.sdlc/.gitignore` block). |
 | `.sdlc/.gitignore` | Selective managed block (issue #231) — committed: `config.json`, `review-dimensions/`. Ignored: `local.json`, `cache/`, `*.bak.*`, `.migration.lock`. Replaces the historical blanket `*\n` content. |
 | `.sdlc/review-dimensions/*.yaml` | Review dimensions created during dimensions sub-flow (via `--dimensions`). Committed to the repo. |
-| `.claude/pr-template.md` | PR template created during PR template sub-flow (via `--pr-template`). |
+| `.sdlc/pr-template.md` | PR template created during PR template sub-flow (via `--pr-template`). Legacy `.claude/pr-template.md` is read as a fallback during the deprecation window — issue #260. |
 | `openspec/config.yaml` | Managed block added/updated by openspec enrichment sub-flow (via `--openspec-enrich`). Only the managed block is modified; user-authored content is preserved. |
 | `.gitignore` (project root) | Managed v2 block (issue #231) listing transient skill artifact patterns (`*-context-*.json`, `*-manifest-*.json`, `*-prepare-*.json`) plus `.sdlc/` runtime patterns (`.sdlc/local.json`, `.sdlc/cache/`, `.sdlc/*.bak.*`, `.sdlc/.migration.lock`). Idempotent — re-running setup-sdlc replaces the block in place; v1 blocks are upgraded to v2. Existing user content is preserved. |
 | `.sdlc/sdlc.json.bak` | Single one-time backup of the legacy project-config file when migration relocates it to `.sdlc/config.json` (issue #231 acceptance criterion). |

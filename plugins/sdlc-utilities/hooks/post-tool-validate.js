@@ -10,7 +10,8 @@
  * Patterns:
  *   .sdlc/review-dimensions/*.ya?ml   → validate-dimensions.js (canonical, issue #231)
  *   .claude/review-dimensions/*.ya?ml → validate-dimensions.js (legacy, deprecated; dropped in 0.21.x)
- *   .claude/pr-template.md            → validate-pr-template.js
+ *   .sdlc/pr-template.md              → validate-pr-template.js (canonical, issue #260)
+ *   .claude/pr-template.md            → validate-pr-template.js (legacy, deprecated)
  *   plans/*.md                        → validate-plan-format.js
  *
  * Exit codes:
@@ -60,7 +61,8 @@ if (!filePath) {
 // Issue #231: dual-match for two minor versions (0.19.x, 0.20.x). Drop the
 // `.claude/` alternation in 0.21.x.
 const DIMENSION_RE   = /[/\\]\.(?:claude|sdlc)[/\\]review-dimensions[/\\][^/\\]+\.ya?ml$/;
-const PR_TEMPLATE_RE = /[/\\]\.claude[/\\]pr-template\.md$/;
+// Issue #260: dual-match canonical .sdlc/ and deprecated .claude/.
+const PR_TEMPLATE_RE = /[/\\]\.(?:claude|sdlc)[/\\]pr-template\.md$/;
 const PLAN_RE        = /[/\\]plans[/\\][^/\\]+\.md$/;
 
 const isDimension  = DIMENSION_RE.test(filePath);

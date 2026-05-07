@@ -49,6 +49,7 @@ const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
+const { loadPrTemplate } = require(path.join(LIB, 'pr-template'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -325,11 +326,10 @@ function main() {
     };
   }
 
-  // Step 11: Read custom PR template
-  const templatePath = path.join(projectRoot, '.claude', 'pr-template.md');
-  const customTemplate = fs.existsSync(templatePath)
-    ? fs.readFileSync(templatePath, 'utf8')
-    : null;
+  // Step 11: Read custom PR template via single-source resolver (issue #260).
+  // Resolves .sdlc/pr-template.md (canonical) with one-time stderr fallback to
+  // .claude/pr-template.md (deprecated) — see lib/pr-template.js.
+  const customTemplate = loadPrTemplate(projectRoot);
 
   // Build output
   const result = {

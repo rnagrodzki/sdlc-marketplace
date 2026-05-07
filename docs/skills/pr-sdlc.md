@@ -101,7 +101,7 @@ Generates the description, runs critique/improve internally, and creates the PR 
 
 ## Custom PR Templates
 
-By default, `/pr-sdlc` uses an 8-section template (Summary, JIRA Ticket, Business Context, Business Benefits, Technical Design, Technical Impact, Changes Overview, Testing). Replace it with a project-specific template by creating `.claude/pr-template.md`.
+By default, `/pr-sdlc` uses an 8-section template (Summary, JIRA Ticket, Business Context, Business Benefits, Technical Design, Technical Impact, Changes Overview, Testing). Replace it with a project-specific template by creating `.sdlc/pr-template.md`. (Legacy `.claude/pr-template.md` is read as a fallback for two minor versions and emits a one-time deprecation warning — issue #260.)
 
 A template is a plain markdown file with `## Section` headings. The text under each heading is a fill instruction for the LLM:
 

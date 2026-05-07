@@ -33,7 +33,7 @@ const LIB = path.join(__dirname, '..', 'lib');
 const {
   slugifyBranch,
   readState, writeState, initState, deleteState, resolveBranch,
-  gcStateFiles, migrateBranchSlug,
+  gcStateFiles, pruneStateFiles, migrateBranchSlug,
   listBranches, readTtlDaysFromConfig,
 } = require(path.join(LIB, 'state'));
 
@@ -137,8 +137,15 @@ function cmdInit(opts) {
   };
 
   try {
+    // R-ship-init-prune (issue #255): remove any pre-existing same-branch ship-state
+    // files before claiming the branch with a new init. These are guaranteed orphans
+    // (one branch hosts one active ship pipeline) — typically left behind by runs
+    // interrupted before the terminal cleanup step (e.g., context compaction).
+    const branchSlug = slugifyBranch(opts.branch);
+    const prunedOrphans = pruneStateFiles('ship', branchSlug);
+
     const filePath = initState('ship', opts.branch, data);
-    process.stdout.write(filePath + '\n');
+    process.stdout.write(JSON.stringify({ filePath, prunedOrphans }) + '\n');
     process.exit(0);
   } catch (e) {
     process.stderr.write(`Error: ${e.message}\n`);

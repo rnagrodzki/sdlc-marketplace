@@ -5,7 +5,8 @@
  * when Claude finishes responding. Safety net for session crashes between
  * compactions.
  *
- * Writes to: <mainWorktree>/.sdlc/execution/.compact-recovery.json
+ * Writes to: <mainWorktree>/.sdlc/execution/.compact-recovery-<branchSlug>.json
+ * (per-branch filename — issue #256; see hooks/README.md)
  *
  * Does NOT read stdin (Stop provides no tool data).
  *
@@ -19,7 +20,7 @@ const fs   = require('node:fs');
 const path = require('node:path');
 
 try {
-  const { findStateFile, readState, slugifyBranch, resolveMainWorktree } = require('../scripts/lib/state');
+  const { findStateFile, readState, slugifyBranch, resolveStateDir } = require('../scripts/lib/state');
   const { exec } = require('../scripts/lib/git');
 
   const branch = exec('git branch --show-current');
@@ -104,12 +105,11 @@ try {
   // No active pipeline — nothing to save
   if (!recovery) process.exit(0);
 
-  // Write recovery file
-  const mainWorktree = resolveMainWorktree();
-  const recoveryDir = path.join(mainWorktree, '.sdlc', 'execution');
+  // Write recovery file (per-branch — issue #256)
+  const recoveryDir = resolveStateDir();
   fs.mkdirSync(recoveryDir, { recursive: true });
 
-  const recoveryPath = path.join(recoveryDir, '.compact-recovery.json');
+  const recoveryPath = path.join(recoveryDir, `.compact-recovery-${branchSlug}.json`);
   fs.writeFileSync(recoveryPath, JSON.stringify(recovery, null, 2), 'utf8');
 } catch {
   // Graceful degradation — exit cleanly on any error

@@ -382,7 +382,7 @@ Before invoking `setup-dimensions` or `setup-pr-template`, run the project signa
 - **CLAUDE.md / AGENTS.md:** Use Read on `CLAUDE.md`, `AGENTS.md`, `.claude/CLAUDE.md` if present.
 - **PR template:** Use Glob for `.github/PULL_REQUEST_TEMPLATE.md`, `.github/pull_request_template.md`.
 - **Recent PRs:** Bash for `gh pr list --limit 5 --json title,body` (safe).
-- **Existing PR template:** Use Glob for `.claude/pr-template.md`.
+- **Existing PR template:** Use Glob for `.sdlc/pr-template.md`.
 - **JIRA evidence:** Bash for `git log --oneline -20` and `git rev-parse --abbrev-ref HEAD` (safe).
 
 Collect all signals into a "Scan Input" object to pass to the sub-flow. Run the scan once per setup invocation; cache the result for any subsequent delegated section in the same selectedIds list.

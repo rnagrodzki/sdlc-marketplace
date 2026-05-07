@@ -28,6 +28,7 @@ const LIB = path.join(__dirname, '..', 'lib');
 
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { resolveDimensionsDir } = require(path.join(LIB, 'dimensions'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -443,7 +444,9 @@ function detectStructure(projectRoot, signals) {
 // ---------------------------------------------------------------------------
 
 function detectReviewDimensions(projectRoot, signals) {
-  const dimDir = path.join(projectRoot, '.claude', 'review-dimensions');
+  // Route through resolveDimensionsDir() so .sdlc/-first lookup works.
+  // Fixes #259 — direct .claude/ read missed every project that had migrated.
+  const dimDir = resolveDimensionsDir(projectRoot);
   if (!fs.existsSync(dimDir)) return;
   try {
     const files = fs.readdirSync(dimDir);

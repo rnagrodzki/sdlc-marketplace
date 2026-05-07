@@ -11,7 +11,7 @@
     "guardrails": [
       {
         "id": "test-coverage-required",
-        "description": "Every task that creates or modifies source code must include corresponding promptfoo test cases.",
+        "description": "Every task that creates or modifies source code must include corresponding promptfoo test cases. When existing behavior changes, existing test cases must be updated to reflect the new behavior — not only new tests added. Stale tests that no longer match current intended behavior must be corrected or removed.",
         "severity": "error"
       },
       {

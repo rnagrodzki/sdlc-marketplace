@@ -1,0 +1,7 @@
+{
+  "savedAt": "REPLACE_AT_RUNTIME",
+  "pipeline": "execute-plan-sdlc",
+  "branch": "main",
+  "completedWaves": 2,
+  "totalWaves": 5
+}

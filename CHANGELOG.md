@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.7] - 2026-05-07
+
+### Fixed
+- config.js: added blank-line normalization to prevent accumulation during repeated `ensureSdlcGitignore()` / `ensureRootGitignore()` runs (#266)
+- hooks: pre-compact-save, stop-state-save, and post-tool-validate now use per-branch `.compact-recovery` filenames to prevent cross-branch interference (#256)
+- ship-sdlc: added pruning of orphaned state files on `--init` (#255)
+- guardrails: route dimension operations through `resolveDimensionsDir()` for consistent directory resolution (#259)
+- pr-template: canonicalized PR template location from `.claude/pr-template.md` to `.sdlc/pr-template.md`; deprecated path migrated automatically (#260)
+- script resolution: all skills now pick the newest installed plugin version using `sort -V | tail -1` instead of `head -1` (#258)
+
 ## [0.18.6] - 2026-05-07
 
 ### Fixed
