@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.6] - 2026-05-07
+
+### Fixed
+- script resolution: all skills now pick the newest installed plugin version using `sort -V | tail -1` instead of `head -1`, preventing arbitrary cache version selection when multiple versions are installed; downstream symptoms (#261–#264) where `/setup-sdlc` reported config sections as [not set] are also resolved (#258)
+- execute-plan-sdlc: renamed internal `SCRIPT` variable to `STATE_SCRIPT` in state-persistence block to eliminate silent variable shadowing
+
 ## [0.18.5] - 2026-05-07
 
 ### Fixed
