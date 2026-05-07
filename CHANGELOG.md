@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.13] - 2026-05-07
+
+### Added
+- setup-sdlc: added five planning-discipline always-on guardrails for plan targets — enforcing root-problem statement, minimum viable scope identification, failure-audience naming, explicit non-goal listing, and hard gate on ambiguous patterns (#270)
+
+### Fixed
+- testbed and harvest-learnings: reliability fixes including assertions extraction, direct JSON parsing, and fixture path migration from `.claude/sdlc.json` to `.sdlc/config.json`; added error handling for invalid JSON and missing cluster guard (#251, #252, #253)
+
 ## [0.18.12] - 2026-05-07
 
 ### Fixed
