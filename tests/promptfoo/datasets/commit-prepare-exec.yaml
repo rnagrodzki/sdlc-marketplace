@@ -170,10 +170,11 @@
     script_args: "--output-file"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
+    script_passthrough: true
   assert:
     # stdout is an absolute path, not the JSON payload
     - type: regex
-      value: '^/.+/sdlc-commit-context-[0-9a-f]+\.json\s*$'
+      value: '^/.+/commit-context-[0-9a-f]+\.json\s*$'
     # The payload should NOT be on stdout when --output-file is set
     - type: not-icontains
       value: '"flags":'
@@ -183,6 +184,7 @@
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
+    script_passthrough: true
   assert:
     # The stdout-JSON branch was removed in #209; writeOutput now always writes
     # to os.tmpdir() and prints only the path. The legacy "JSON inline" branch
@@ -201,6 +203,7 @@
     script_args: "--output-file"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
+    script_passthrough: true
   assert:
     # Path must start with /tmp, /var, or /private — never the project root.
     - type: regex

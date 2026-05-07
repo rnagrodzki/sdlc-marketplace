@@ -702,11 +702,13 @@ function ensureSdlcGitignore(projectRoot) {
   // by 2 lines per invocation in the worst case.
   const otherLines = normalizeBlankLines(otherLinesRaw);
 
-  // Step 4: Reconstruct: leading user lines (if any) + blank separator +
-  // managed block + trailing newline.
+  // Step 4: Reconstruct: leading user lines (if any) + single newline separator +
+  // managed block + trailing newline. (Issue #273: use single '\n' between user
+  // content and managed block so the writer is byte-identical to the committed
+  // canonical shape — no spurious blank line.)
   let next;
   if (otherLines.length > 0) {
-    next = otherLines.join('\n') + '\n\n' + managedBlock + '\n';
+    next = otherLines.join('\n') + '\n' + managedBlock + '\n';
   } else {
     next = managedBlock + '\n';
   }

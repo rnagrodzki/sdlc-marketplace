@@ -14,7 +14,7 @@
     - type: icontains
       value: '"action": "created"'
 
-- description: "setup-init: idempotent re-run reports existed for gitignore"
+- description: "setup-init: re-run on legacy-pattern .sdlc/.gitignore migrates to managed block"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/util/setup-init.js"
     script_args: "--project-config {} --local-config {\"review\":{\"scope\":\"committed\"}}"
@@ -22,9 +22,17 @@
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
     - type: icontains
-      value: '"existed"'
+      value: '"action": "updated"'
+
+- description: "setup-init (#273): canonical .sdlc/.gitignore shape is byte-identical (writer returns unchanged)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/setup-init.js"
+    script_args: "--project-config {} --local-config {\"review\":{\"scope\":\"committed\"}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-canonical"
+  assert:
     - type: icontains
-      value: ".sdlc/.gitignore already exists"
+      value: '"action": "unchanged"'
 
 - description: "setup-init: writes both project and local config"
   vars:

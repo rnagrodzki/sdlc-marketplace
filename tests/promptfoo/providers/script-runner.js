@@ -12,7 +12,25 @@
  *   script_env   — (optional) JSON string or object of extra env vars
  */
 const path = require('path');
+const fs = require('fs');
 const { execFileSync } = require('child_process');
+
+// Matches paths created by lib/output.js#createOutputFile via os.tmpdir() on macOS/Linux:
+//   /tmp/...,  /var/folders/.../...  (macOS),  /private/var/...  (macOS canonicalized)
+const TMP_PATH_RE = /^\/(?:tmp|var|private)\/.+\.json$/;
+
+function maybeReadTmpFile(stdout, scriptPassthrough) {
+  if (scriptPassthrough === true) return stdout;
+  const trimmed = (stdout || '').trim();
+  if (!trimmed.includes('\n') && TMP_PATH_RE.test(trimmed) && fs.existsSync(trimmed)) {
+    try {
+      return fs.readFileSync(trimmed, 'utf8');
+    } catch (_) {
+      return stdout;
+    }
+  }
+  return stdout;
+}
 
 class ScriptRunnerProvider {
   id() {
@@ -52,11 +70,25 @@ class ScriptRunnerProvider {
         cwd,
         env,
       });
-      return { output: stdout };
+      return { output: maybeReadTmpFile(stdout, vars.script_passthrough) };
     } catch (err) {
       // Include stdout + stderr on non-zero exit so assertions can check error messages
-      const stdout = err.stdout ?? '';
+      const rawStdout = err.stdout ?? '';
       const stderr = err.stderr ?? err.message;
+      // Apply tmp-path auto-read to stdout only when it cleanly matches the path shape.
+      // On the common error case (non-path stdout), preserve existing concat behavior so
+      // assertions on error messages keep working.
+      const stdoutTrimmed = (rawStdout || '').trim();
+      let stdout = rawStdout;
+      if (
+        vars.script_passthrough !== true
+        && stdoutTrimmed
+        && !stdoutTrimmed.includes('\n')
+        && TMP_PATH_RE.test(stdoutTrimmed)
+        && fs.existsSync(stdoutTrimmed)
+      ) {
+        try { stdout = fs.readFileSync(stdoutTrimmed, 'utf8'); } catch (_) { /* fall through */ }
+      }
       return {
         output: [stdout, stderr].filter(Boolean).join('\n'),
       };

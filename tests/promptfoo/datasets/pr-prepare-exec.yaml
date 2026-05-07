@@ -166,6 +166,7 @@
     script_args: "--output-file"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-no-config"
+    script_passthrough: true
   assert:
     - type: regex
       value: '^/(tmp|var|private)/.+pr-context-[0-9a-f]+\.json\s*$'
@@ -177,6 +178,7 @@
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-pr-no-config"
+    script_passthrough: true
   assert:
     - type: regex
       value: '^/(tmp|var|private)/.+pr-context-[0-9a-f]+\.json\s*$'

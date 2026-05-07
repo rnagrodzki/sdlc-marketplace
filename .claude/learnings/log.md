@@ -189,3 +189,9 @@ Patch release covering fixes #258 and #261–#264 (script resolution picks newes
 
 ## 2026-05-07 — execute-plan-sdlc: 10-task mechanical sweep, inline execution
 Plan #258/#261/#262/#263/#264 was 7 trivial sweep tasks (T4-T9) plus T2/T3 standard work plus T1 prep and T10 verify. Classification routed 6 sweeps into a single batched-haiku agent dispatch in Wave 2 — but on inspection, the work was 49 line-level edits across 23 files following an exact mechanical rule ("any line with `find ~/.claude/plugins` AND `| head -1` → swap to `| sort -V | tail -1`"). Dispatching a haiku agent for this would have been slower and less reliable than running a 30-line node script in the main context that performed the replacement deterministically. Learning: when "trivial" tasks share an exact textual rule, prefer a one-shot deterministic transform (node/sed) over a batched-LLM dispatch. Reserve agents for "trivial" tasks that still require local judgment (which lines to touch, which to skip).
+
+## 2026-05-07 — execute-plan-sdlc: B1 + #273 plan execution
+
+Plan assumed Task 1 (provider tmp-path auto-read) would fix all listed dataset rows. In practice, ~10 of the originally-listed "failing" rows had pre-existing failures unrelated to the path-vs-JSON shape (stale assertions, fixtures missing required state, code drifted from test expectations). T1 fixed +95 rows; the residual 22 failures were not within T1's scope. Lesson: when verification tasks list specific row counts as success criteria, validate at plan time which rows are truly affected by the proposed fix vs. which carry unrelated breakage. Stash-baseline diff (`git stash; eval; git stash pop; eval; diff`) is the right tool to confirm "no new regressions" and isolate which failures pre-existed.
+
+Also: running plugin scripts in cwd of a fixture directory pollutes the fixture (writes side-effects to working tree). Always use `/tmp/<copy>` for direct invocations.
