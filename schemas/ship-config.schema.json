@@ -42,7 +42,7 @@
     },
     "reviewThreshold": {
       "type": "string",
-      "enum": ["critical", "high", "medium"],
+      "enum": ["critical", "high", "medium", "low"],
       "description": "Minimum severity level that blocks the pipeline."
     },
     "workspace": {

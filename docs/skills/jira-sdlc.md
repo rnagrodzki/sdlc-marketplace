@@ -62,7 +62,7 @@ Returns a table of matching issues.
 Add a comment to PROJ-147 with the root cause analysis
 ```
 
-Converts the markdown to Atlassian Document Format (ADF) via `markdown-to-adf.js` and posts the comment.
+Converts the markdown to Atlassian Document Format (ADF) via `markdown-to-adf.js` and posts the comment. When the tool input declares `contentFormat='adf'`, placeholder detection (C13) walks the parsed ADF tree and applies the regex only to `text` node values — bracket characters in JSON-serialized ADF (e.g., `[null,...]` from a stringified array) never trip the bracket-form regex.
 
 ### Edit issue fields
 
@@ -287,6 +287,12 @@ On `approve`, an approval token is written to `$TMPDIR/jira-sdlc/approval-<hash>
 ### Hook enforcement (R21)
 
 A `PreToolUse` hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the payload hash from the tool input at dispatch time, verifies both artifacts exist and are under 10 minutes old, and **blocks dispatch** if either check fails. If dispatch is blocked, the hook's `permissionDecisionReason` is surfaced verbatim — the skill does not retry by guessing what changed.
+
+Canonicalization strips `null`-valued keys recursively (in addition to `undefined`) so that MCP-harness defaulting (e.g., schema-default `commentVisibility: null` injection between artifact write and hook read) cannot desync the skill-side and hook-side hashes.
+
+### Diagnostics
+
+When `SDLC_DEBUG_DUMP=1` is set, the hook writes the received `tool_input` and the canonical-JSON byte-string to `$TMPDIR/jira-sdlc-debug/<hook-hash-prefix>.json`. Use this to diff against the skill artifact (`$TMPDIR/jira-sdlc/critique-<hash>.json`) byte-for-byte when a hash mismatch denial occurs. The dump is diagnostic only — it does not change the deny decision.
 
 ---
 

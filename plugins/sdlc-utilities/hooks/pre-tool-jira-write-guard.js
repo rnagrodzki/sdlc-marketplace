@@ -23,14 +23,16 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 
 // Dependency resolution: the hook lives in plugins/.../hooks/, the helpers
 // live in plugins/.../skills/jira-sdlc/lib/. We always look up relative to
 // __dirname so test harnesses can copy or symlink the plugin tree elsewhere.
 const LIB_ROOT = path.resolve(__dirname, '..', 'skills', 'jira-sdlc', 'lib');
-const { payloadHash } = require(path.join(LIB_ROOT, 'payload-hash.js'));
-const { findPlaceholders } = require(path.join(LIB_ROOT, 'placeholder-detect.js'));
+const { payloadHash, canonicalize } = require(path.join(LIB_ROOT, 'payload-hash.js'));
+const { findPlaceholdersForToolInput } = require(path.join(LIB_ROOT, 'placeholder-detect.js'));
 const { loadTemplateHeadings } = require(path.join(LIB_ROOT, 'template-fingerprint.js'));
 const {
   verifyArtifacts,
@@ -167,13 +169,21 @@ async function main() {
     return emitContinue();
   }
 
-  // (a) C13 placeholder check
+  // (a) C13 placeholder check (contentFormat-aware: routes ADF commentBody
+  // through the ADF tree walker so JSON-array literals in the stringified
+  // ADF blob never trip the bracket-form regex).
   let markers;
+  let placeholderWarnings = [];
   try {
-    markers = findPlaceholders(toolInput);
+    const placeholderResult = findPlaceholdersForToolInput(toolInput);
+    markers = placeholderResult.results;
+    placeholderWarnings = placeholderResult.warnings || [];
   } catch (e) {
     process.stderr.write(`pre-tool-jira-write-guard: placeholder scan error: ${e.message}\n`);
     return emitContinue();
+  }
+  for (const w of placeholderWarnings) {
+    process.stderr.write(`pre-tool-jira-write-guard: ${w}\n`);
   }
   if (markers.length > 0) {
     const sample = markers.slice(0, 3).map((m) => `${m.path}:${m.marker}`).join(', ');
@@ -204,6 +214,23 @@ async function main() {
   }
 
   // (c)+(d) artifact verification
+  // Env-gated diagnostic: when SDLC_DEBUG_DUMP=1, write the received tool_input
+  // and the canonical-JSON byte-string so the user can diff against the skill's
+  // critique artifact byte-for-byte after a hash mismatch denial. Diagnostic
+  // only — never affects the deny decision.
+  if (process.env.SDLC_DEBUG_DUMP === '1') {
+    try {
+      const dumpDir = path.join(fs.realpathSync(os.tmpdir()), 'jira-sdlc-debug');
+      fs.mkdirSync(dumpDir, { recursive: true });
+      const canonical = JSON.stringify(canonicalize(toolInput));
+      const hashPrefix = crypto.createHash('sha256').update(canonical, 'utf8').digest('hex').slice(0, 12);
+      fs.writeFileSync(
+        path.join(dumpDir, `${hashPrefix}.json`),
+        JSON.stringify({ tool_input: toolInput, canonical_json: canonical }, null, 2)
+      );
+    } catch { /* diagnostic only — never fail the hook on dump errors */ }
+  }
+
   let hash;
   try {
     hash = payloadHash(toolInput);

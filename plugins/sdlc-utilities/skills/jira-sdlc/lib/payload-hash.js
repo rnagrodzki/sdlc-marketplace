@@ -15,8 +15,9 @@ const crypto = require('crypto');
 /**
  * Recursively canonicalize a value into a structure where every plain-object
  * key set is sorted lexicographically. Arrays preserve their order. Primitives
- * pass through. Functions and undefined values are dropped (mirroring
- * JSON.stringify behavior).
+ * pass through. Functions, undefined, and null values are dropped recursively
+ * so that MCP-harness defaulting (e.g., schema-default `commentVisibility: null`
+ * injection) cannot desync skill-side and hook-side hashes.
  *
  * @param {*} value
  * @returns {*}
@@ -30,7 +31,7 @@ function canonicalize(value) {
   const out = {};
   for (const k of sortedKeys) {
     const v = canonicalize(value[k]);
-    if (v === undefined) continue;
+    if (v === undefined || v === null) continue;
     out[k] = v;
   }
   return out;

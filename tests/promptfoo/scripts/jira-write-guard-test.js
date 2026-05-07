@@ -44,7 +44,7 @@ const LIB = path.join(REPO_ROOT, 'plugins/sdlc-utilities/skills/jira-sdlc/lib');
 const HOOK = path.join(REPO_ROOT, 'plugins/sdlc-utilities/hooks/pre-tool-jira-write-guard.js');
 
 const { payloadHash } = require(path.join(LIB, 'payload-hash.js'));
-const { findPlaceholders, PLACEHOLDER_REGEX } = require(path.join(LIB, 'placeholder-detect.js'));
+const { findPlaceholders, findPlaceholdersForToolInput, PLACEHOLDER_REGEX } = require(path.join(LIB, 'placeholder-detect.js'));
 const { extractHeadings, loadTemplateHeadings } = require(path.join(LIB, 'template-fingerprint.js'));
 const store = require(path.join(LIB, 'artifact-store.js'));
 
@@ -71,7 +71,18 @@ function helperPayloadHash() {
   if (h1 !== h2) return emit(false, `key-order: ${h1} != ${h2}`);
   if (h1 !== h3) return emit(false, `determinism: ${h1} != ${h3}`);
   if (!/^[0-9a-f]{64}$/.test(h1)) return emit(false, `format: ${h1}`);
-  emit(true, `hash=${h1.slice(0, 12)}…`);
+  // Issue #276: null-strip — MCP-harness defaulting (e.g., commentVisibility:null
+  // injection) must NOT desync skill/hook hashes. Top-level and nested-key null
+  // values are stripped; empty-object branches that result from a fully-null
+  // descendant are preserved (they were genuine objects in the original payload).
+  const hNoNull       = payloadHash({ a: 1, b: 2 });
+  const hWithTopNull  = payloadHash({ a: 1, b: 2, x: null });
+  if (hNoNull !== hWithTopNull) return emit(false, `null-strip top-level: ${hNoNull} != ${hWithTopNull}`);
+  // Nested null gets stripped from its containing object too.
+  const hNestedA = payloadHash({ a: 1, nested: { y: 2 } });
+  const hNestedB = payloadHash({ a: 1, nested: { y: 2, z: null } });
+  if (hNestedA !== hNestedB) return emit(false, `null-strip nested: ${hNestedA} != ${hNestedB}`);
+  emit(true, `hash=${h1.slice(0, 12)}… null-strip=ok`);
 }
 
 function helperPlaceholder() {
@@ -110,7 +121,54 @@ function helperPlaceholder() {
   }
   // Sanity: regex global flag works
   if (!PLACEHOLDER_REGEX.global) return emit(false, 'regex missing /g flag');
-  emit(true, `markers=${m.length}`);
+
+  // Issue #276: contentFormat-aware dispatch
+  // (1) Stringified ADF blob with `contentFormat='adf'` — bracket regex must NOT
+  //     run against the JSON-serialized ADF (no false-positive on `[{...},...]`).
+  const stringifiedAdf = JSON.stringify({
+    type: 'doc',
+    version: 1,
+    content: [
+      { type: 'paragraph', content: [{ type: 'text', text: 'normal copy without markers' }] },
+    ],
+  });
+  const r1 = findPlaceholdersForToolInput({
+    issueIdOrKey: 'PROJ-1',
+    commentBody: stringifiedAdf,
+    contentFormat: 'adf',
+  });
+  if (r1.results.length !== 0) {
+    return emit(false, `adf-stringified false-positive: ${JSON.stringify(r1.results)}`);
+  }
+  // (2) Parsed ADF object with a `text` node containing a true placeholder must be detected.
+  const r2 = findPlaceholdersForToolInput({
+    issueIdOrKey: 'PROJ-1',
+    commentBody: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'value is {TBD}' }] }] },
+    contentFormat: 'adf',
+  });
+  if (r2.results.length !== 1 || r2.results[0].marker !== '{TBD}') {
+    return emit(false, `adf-text-node placeholder missed: ${JSON.stringify(r2.results)}`);
+  }
+  // (3) Markdown contentFormat path keeps existing behavior — placeholder in body is detected.
+  const r3 = findPlaceholdersForToolInput({
+    issueIdOrKey: 'PROJ-1',
+    commentBody: 'has {placeholder} here',
+    contentFormat: 'markdown',
+  });
+  if (r3.results.length !== 1 || r3.results[0].marker !== '{placeholder}') {
+    return emit(false, `markdown path regression: ${JSON.stringify(r3.results)}`);
+  }
+  // (4) Malformed ADF JSON with contentFormat='adf' — falls back to whole-payload walk + warning.
+  const r4 = findPlaceholdersForToolInput({
+    issueIdOrKey: 'PROJ-1',
+    commentBody: 'not valid json {',
+    contentFormat: 'adf',
+  });
+  if (r4.warnings.length !== 1) {
+    return emit(false, `malformed-adf warning missing: ${JSON.stringify(r4.warnings)}`);
+  }
+
+  emit(true, `markers=${m.length} adf-dispatch=ok`);
 }
 
 function helperTemplateFallback() {

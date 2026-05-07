@@ -456,3 +456,35 @@
   assert:
     - type: icontains
       value: '"skipConfigCheck": true'
+
+# reviewThreshold enum extension: low (#275)
+
+- description: "ship-prepare: config reviewThreshold=low flows through prepare (#275)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-reviewthreshold-low"
+  assert:
+    - type: icontains
+      value: '"reviewThreshold": "low"'
+
+- description: "ship-prepare: config reviewThreshold=medium flows through prepare (#275)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-reviewthreshold-medium"
+  assert:
+    - type: icontains
+      value: '"reviewThreshold": "medium"'
+
+- description: "ship-prepare: source tracks reviewThreshold=low as config (#275)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-reviewthreshold-low"
+  assert:
+    - type: icontains
+      value: '"reviewThreshold": "config"'

@@ -1,0 +1,6 @@
+{
+  "cloudId": "abc-123",
+  "issueIdOrKey": "PROJ-42",
+  "commentBody": "{\"type\":\"doc\",\"version\":1,\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"normal copy without markers\"}]}]}",
+  "contentFormat": "adf"
+}
