@@ -27,7 +27,7 @@
 - R3: Pipeline plan is a binding contract: steps with `status: "will_run"` must execute; LLM cannot override
 - R4: Step statuses computed by `skill/ship.js`: `will_run`, `skipped`, `conditional`
 - R5: Skip set provenance tracked via `skipSource`: `cli`, `config`, `auto`, `condition`, `none`; fabrication guard blocks (error, exit code 1) on `default` source
-- R6: Review verdict conditional logic: CHANGES REQUESTED (critical or ≥3 high) → pause, invoke received-review; APPROVED WITH NOTES (high or ≥5 medium) → invoke received-review if high exists; APPROVED → continue
+- R6: Review verdict conditional logic is gated by `flags.reviewThreshold` resolved by `scripts/skill/ship.js`. Verdict outcomes (`CHANGES REQUESTED`, `APPROVED WITH NOTES`, `APPROVED`) are inputs; the dispatch decision (invoke `received-review-sdlc` vs collect-and-defer) reads `flags.reviewThreshold` exclusively — no hardcoded count thresholds. In `--auto` mode, dispatch is automatic; `received-review-sdlc --auto` is forwarded.
 - R7: `--auto` forwarding audit: only forwarded to commit-sdlc, received-review-sdlc, version-sdlc, pr-sdlc (not execute-plan-sdlc, not review-sdlc)
 - R8: Staging gap between execute and commit: `git add -A -- ':!.sdlc/'` required
 - R9: Rebase onto default branch after all commits, before version step; abort and pause on conflict
@@ -83,6 +83,14 @@
 
 - R-ship-init-prune (issue #255): At `init` time — before writing the new ship-state file — `state/ship.js cmdInit` MUST remove any pre-existing `ship-<branchSlug>-*.json` files for the same branch in `<mainWorktree>/.sdlc/execution/`. A given branch can only host one active ship pipeline; same-branch state files predating the new init are by definition orphans (e.g., from runs interrupted by context compaction that never reached the terminal `cleanup` step). Pruning is unconditional for same-prefix same-branchSlug files: it does NOT consult the `state.gc.ttlDays` TTL or the branch-existence rule (R39) — those gates apply to cross-branch GC, not to claim-time orphan removal. The prune is implemented via `lib/state.js::pruneStateFiles(prefix, branchSlug)` and runs once per `cmdInit` call before `initState`. The cmdInit JSON output gains a `prunedOrphans: string[]` field (filenames only, not absolute paths) listing every removed file.
   - Acceptance: with one pre-existing `ship-<currentBranchSlug>-*.json` present, `cmdInit` deletes it and the JSON output's `prunedOrphans` array contains exactly that filename; with no pre-existing same-branch file, `prunedOrphans` is empty; pre-existing state files for OTHER branches (e.g., `ship-otherbranch-*.json`) MUST NOT be removed by `cmdInit` — they remain on disk untouched.
+
+- R40: `flags.reviewThreshold` enum `{critical, high, medium, low}` controls minimum severity that dispatches `received-review-sdlc`:
+  - `critical` → trigger on any critical finding
+  - `high` → trigger on any critical OR high finding
+  - `medium` → trigger on any critical, high, OR medium finding
+  - `low` → trigger on any finding except `info`
+
+  Default: `high`. Resolution site: `scripts/skill/ship.js` (`flags.reviewThreshold`). All consumers (SKILL.md verdict-routing, downstream skills) MUST cite the resolved field — no re-derivation from config or `$ARGUMENTS`.
 
 ## Workflow Phases
 

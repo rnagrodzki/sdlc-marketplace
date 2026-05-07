@@ -79,7 +79,7 @@ const SHIP_FIELDS = [
     name: 'reviewThreshold',
     label: 'Minimum severity that blocks the pipeline',
     type: 'enum',
-    options: ['critical', 'high', 'medium'],
+    options: ['critical', 'high', 'medium', 'low'],
     default: 'high',
     description: 'Findings at or above this severity halt the pipeline',
   },

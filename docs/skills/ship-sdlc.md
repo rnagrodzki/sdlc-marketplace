@@ -146,7 +146,13 @@ plan-sdlc      (--auto if     (--committed)
 - **Pipeline plan is binding**: Steps marked "will run" in the pipeline table must execute. Step statuses are computed by `ship-prepare.js` — the LLM follows them mechanically and cannot unilaterally skip planned steps.
 - **Agent-based dispatch**: Sub-skills are dispatched as Agents, not invoked via the Skill tool. Each Agent loads its sub-skill's SKILL.md in its own context and returns only a structured result (status, summary, artifacts). This keeps the ship pipeline's context clean — sub-skill definitions stay in the agent, not the orchestrator.
 - **Skip provenance (`skipSource`)**: Each step in the `ship-prepare.js` output includes a `skipSource` field tracking why it was skipped: `"none"` (not skipped), `"cli"` (omitted from CLI `--steps`), `"config"` (omitted from `ship.steps[]` in `.sdlc/local.json`), `"auto"` (workspace rule), `"condition"` (precondition unmet), or `"default"` (excluded by built-in defaults).
-- **Review threshold**: The severity that triggers the fix loop is configurable via `reviewThreshold` in config (default: `high`). At `high`, critical and high findings trigger fixes; medium and below are deferred to the summary.
+- **Review threshold**: The severity that triggers the fix loop is configurable via `reviewThreshold` in config (default: `high`). Allowed values: `critical`, `high`, `medium`, `low`. Mapping:
+  - `critical` → trigger on any critical finding
+  - `high` → trigger on any critical OR high finding
+  - `medium` → trigger on any critical, high, OR medium finding
+  - `low` → trigger on any finding except `info`
+
+  Findings below the threshold are deferred to the pipeline summary.
 
 ---
 
@@ -202,7 +208,7 @@ Step  Skill                 Status       Args           Pause?
 6     version-sdlc          skipped      ---            ---
 7     pr-sdlc               will run     --auto         no
 --------------------------------------------------------------------
-Review threshold: critical or high findings trigger fix loop
+Review threshold: high (any critical OR high finding triggers fix loop)
 Interactive pauses: received-review (if triggered)
 
 Auto mode — proceeding without confirmation.
@@ -401,7 +407,7 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type. |
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |
 | `auto` | `boolean` | `false` | Run in non-interactive mode by default. |
-| `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` | `"high"` | Minimum severity that triggers the fix loop. |
+| `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` \| `"low"` | `"high"` | Minimum severity that triggers the fix loop. `low` triggers on any finding except `info`. |
 | `workspace` | `"branch"` \| `"worktree"` \| `"prompt"` | `"prompt"` | Workspace isolation strategy forwarded to execute-plan-sdlc. |
 | `rebase` | `true` \| `false` \| `"prompt"` | `true` | Rebase strategy before execution and versioning. |
 
@@ -493,6 +499,24 @@ For when you've already implemented and reviewed manually, and just need to comm
     "bump": "patch",
     "draft": true,
     "reviewThreshold": "high"
+  }
+}
+```
+
+**Strict review — surface every finding except `info`:**
+
+For high-stakes branches where any low/medium/high/critical finding should trigger the fix loop.
+
+```json
+{
+  "$schema": "sdlc-local.schema.json",
+  "version": 2,
+  "ship": {
+    "steps": ["execute", "commit", "review", "version", "pr"],
+    "auto": false,
+    "bump": "patch",
+    "draft": false,
+    "reviewThreshold": "low"
   }
 }
 ```

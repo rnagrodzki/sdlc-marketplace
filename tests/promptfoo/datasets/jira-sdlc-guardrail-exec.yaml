@@ -235,3 +235,25 @@
       value: "hook-hash="
     - type: icontains
       value: "artifact-hash=none"
+
+# ---------- Issue #276: ADF dispatch + null-strip canonicalization ----------
+
+- description: "jira-write-guardrail #18: addCommentToJiraIssue stringified ADF body → allow (no false-positive on serialized blob)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-allow --tool mcp__atlassian__addCommentToJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/comment-adf-stringified.json --artifacts fresh"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "allow"
+
+- description: "jira-write-guardrail #19: addCommentToJiraIssue with commentVisibility=null → allow (canonicalize null-strip, #276)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-allow --tool mcp__atlassian__addCommentToJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/comment-visibility-null.json --artifacts fresh"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "allow"

@@ -3,6 +3,12 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-07 — pr-sdlc: dual-issue fix PR (#275, #276) with custom template
+PR body used custom template from `.sdlc/pr-template.md`. Both "Fixes #275" and "Fixes #276" placed in the Github Issue section per plan guardrail. Title used first issue number `fix(#275)` to satisfy the `^(fix)\(#\d+\): .+ - .+$` pattern constraint — secondary issue covered in body. Labels mode=llm inferred `bug` from `fix/` branch prefix. Uncommitted changes warning was surfaced (1 file) but did not block PR creation.
+
+## 2026-05-07 — version-sdlc: patch release v0.18.11 from fresh feature branch
+Branch fix/275-276-ship-jira-fixes had no upstream; R15 auto-set-upstream path triggered correctly. Squash merge brought feat(#272) commit into range but that fix was already documented in v0.18.10 — correctly excluded from this entry. Patch bump used despite suggestedBump=minor due to explicit --patch flag.
+
 ## 2026-05-07 — version-sdlc: patch bump for jira-sdlc hardening (v0.18.5)
 Patch release from branch `fix/jira-sdlc-hardening-240-241`. Branch had no upstream so `--set-upstream` was used on first push. Commit `906ea6e6` (fix #239) appeared in the commit list but was already captured in `[0.18.4]` — changelog correctly attributed only commit `7eb87856` (#240) as new content. Link validation passed with no violations.
 
@@ -198,3 +204,8 @@ Also: running plugin scripts in cwd of a fixture directory pollutes the fixture 
 
 ## 2026-05-07 — version-sdlc: patch bump for OWASP dimension (#272)
 Explicit patch bump requested despite suggestedBump=minor (feat commit present). Caller specified patch via ship config — no conflict, proceeded as requested. The fix(#273) squash commit showed in range but was already released in v0.18.9; only feat(#272) was net-new. remoteState.hasUpstream=false — used --set-upstream on first push from new feature branch.
+
+## 2026-05-07 — execute-plan-sdlc: ship-sdlc + jira-sdlc fixes (#275, #276)
+- Plan flagged 3 ship-prepare exec rows but one was infeasible: `reviewThreshold` is config-only, not a CLI flag, so `--review-threshold unknown` rejection cannot be tested via CLI. Reframed the third row to assert source-tracking (`"reviewThreshold": "config"`) instead. Lesson: when a plan task lists "X exec rows" verify each row is testable against the actual CLI surface before authoring.
+- Plan asked for 5 jira test rows; integrated 2 lib-level assertions (null-strip, ADF dispatch) into the existing helper-payload-hash and helper-placeholder rows rather than spawning new helper rows — extending in-place keeps the helper RESULT line atomic and avoids parallel rows that share state. Lesson: row count in a plan is a coverage proxy, not a strict requirement; merge-into-existing-row is fine when the assertion fits the same op.
+- ship-prepare auto-migrates fixture local.json to schemaVersion 3 on every run, leaving `*.bak.*` and `.gitignore` files in the fixture tree. Pre-existing fixtures absorb this silently because they were already migrated; brand-new fixtures emit backup files that pollute git status. Lesson: when adding new ship-fixture configs, run prepare once locally and clean up backup artifacts before final commit, or write the fixture in already-migrated v3 shape.

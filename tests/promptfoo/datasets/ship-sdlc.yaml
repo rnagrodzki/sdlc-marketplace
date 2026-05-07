@@ -565,3 +565,35 @@
         explains that the omission is intentional — CLI `--steps` fully replaces
         the resolved step list. Neither the inline shell append nor the trailing
         commit fires. No error is reported.
+
+# Verdict routing driven by flags.reviewThreshold (#275)
+
+- description: "ship-sdlc: reviewThreshold=medium with 1 medium finding dispatches received-review-sdlc"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-verdict-medium-finding.md"
+    user_request: >
+      Run /ship-sdlc --auto. The project has reviewThreshold=medium and review
+      returned APPROVED WITH NOTES with 1 medium finding. Per R40, the medium
+      threshold MUST dispatch received-review-sdlc on any medium-or-higher
+      finding. Stop after announcing the dispatch decision (do not actually run
+      sub-skills — describe the decision the SKILL.md would make).
+  assert:
+    # Must cite the flag, not hardcoded counts
+    - type: icontains
+      value: "reviewThreshold"
+    # Must dispatch received-review-sdlc
+    - type: icontains
+      value: "received-review-sdlc"
+    # Must forward --auto since flags.auto is true
+    - type: icontains
+      value: "--auto"
+    - type: llm-rubric
+      value: >
+        The response decides to invoke received-review-sdlc because
+        flags.reviewThreshold === "medium" and the review found a medium-severity
+        finding. The decision cites flags.reviewThreshold (the resolved field
+        from ship.js) — NOT a hardcoded threshold like "any high" or "≥3 high"
+        or "≥5 medium". Because flags.auto is true, --auto is forwarded to
+        received-review-sdlc. The verdict label "APPROVED WITH NOTES" is
+        treated as display-only and does NOT control the dispatch decision.

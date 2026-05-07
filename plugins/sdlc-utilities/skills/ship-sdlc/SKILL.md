@@ -217,30 +217,26 @@ Not all sub-skills support `--auto`. This table is the source of truth:
 
 ### Review verdict conditional logic
 
-After review-sdlc completes, parse the conversation for a `Verdict:` line:
+After review-sdlc completes, parse the conversation for a `Verdict:` line. The verdict label (`CHANGES REQUESTED` / `APPROVED WITH NOTES` / `APPROVED`) is **display-only** — it is included in the run banner but does NOT gate dispatch. Dispatch is gated exclusively by `flags.reviewThreshold` (resolved by `scripts/skill/ship.js`):
 
-**CHANGES REQUESTED** (any critical OR >=3 high):
+| `flags.reviewThreshold` | Dispatch received-review-sdlc when findings include …            |
+|-------------------------|-------------------------------------------------------------------|
+| `critical`              | any critical                                                      |
+| `high`                  | any critical OR high                                              |
+| `medium`                | any critical OR high OR medium                                    |
+| `low`                   | any finding except `info`                                         |
+
+If the threshold is met → invoke received-review-sdlc (forward `"--auto"` when `flags.auto`).
+Otherwise → collect findings and defer to the pipeline summary report.
+
+Example run-banner lines (display-only — do NOT control dispatch):
 ```
 Review verdict: CHANGES REQUESTED (1 critical, 2 high)
-  Decision: PAUSING PIPELINE — critical/high issues require your approval
-  Invoking received-review-sdlc for interactive fix approval
-```
-Invoke received-review-sdlc. If it makes changes, run commit-sdlc (step 5).
-
-**APPROVED WITH NOTES** (any high OR >=5 medium):
-```
 Review verdict: APPROVED WITH NOTES (3 medium, 1 low)
-  Decision: CONTINUING — no critical/high issues found
-  Deferred findings (3 medium, 1 low) will be shown in pipeline summary
-```
-If any high findings exist, invoke received-review-sdlc. If only medium/low/info, collect and defer to the summary report.
-
-**APPROVED**:
-```
 Review verdict: APPROVED
-  Decision: CONTINUING — no issues found
 ```
-Skip received-review-sdlc, continue pipeline.
+
+In `--auto` mode, dispatch is automatic and `received-review-sdlc --auto` is forwarded — no interactive pause.
 
 ---
 

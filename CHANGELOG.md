@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.11] - 2026-05-07
+
+### Fixed
+- ship-sdlc: reviewThreshold config now correctly applied to received-review dispatch threshold gate (#275)
+- jira-sdlc: PreToolUse write-guard hook no longer incorrectly denies addCommentToJiraIssue due to hash mismatch; placeholder detection improved with exact match logic (#275, #276)
+
 ## [0.18.10] - 2026-05-07
 
 ### Added
