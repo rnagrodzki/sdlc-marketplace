@@ -35,6 +35,21 @@
 - R15: Link verification (issue #198) — every URL embedded in the PR body MUST be validated by `plugins/sdlc-utilities/scripts/lib/links.js` before any `gh pr create` / `gh pr edit` invocation. Three URL classes are checked: (1) `github.com/<owner>/<repo>/(issues|pull)/<n>` — owner/repo identity must match the current remote, and the issue/PR number must exist on that repo; (2) `*.atlassian.net/browse/<KEY-N>` — host must match the configured Jira site; (3) any other `http(s)://` URL — generic reachability via HEAD (fall back to GET on 405), 5s timeout. Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) and any `ctx.skipHosts` entries are reported as `skipped`, not violations. `SDLC_LINKS_OFFLINE=1` skips network checks but keeps structural context-aware checks (GitHub identity match, Atlassian host match). Any violation aborts publication with non-zero exit and a structured violation list — no soft-warning mode.
 - R-config-version (issue #232): The prepare script `skill/pr.js` MUST call `verifyAndMigrate(projectRoot, 'project')` at start. The call is short-circuited when CLI `--skip-config-check` OR env `SDLC_SKIP_CONFIG_CHECK=1` is present; both gates resolve into a single `flags.skipConfigCheck` boolean in the prepare output (CLI > env > default false). On migration failure the prepare emits non-zero exit and an `errors[]` entry naming the failing step; SKILL.md halts with that text verbatim.
   - Acceptance: prepare output includes `flags.skipConfigCheck` and a `migration` block (or null when skipped); SKILL.md gates further work on `errors.length === 0`.
+- R-gh-auth-preflight (issue #234): The prepare script `skill/pr.js` MUST run a gh-auth preflight before any GitHub API call:
+  1. Verify `gh auth status --hostname github.com` succeeds. On no-auth or expired-token, halt with the no-auth or expired-token message verbatim.
+  2. Resolve `expectedAccount` via the cascade: `prConfig.expectedAccount` → `git config user.email` mapped to a known GitHub login (when a helper exists; else skip this leg) → `origin` remote owner via `parseRemoteOwner(cwd)`.
+  3. Compare the resolved `expectedAccount` against the active account from `gh api user --jq .login`.
+  4. On mismatch, halt with the EXACT 3-line message:
+     ```
+     Expected gh account: <expected>
+     Active gh account:   <actual>
+     Run: gh auth switch --user <expected>
+     ```
+  5. When `expectedAccount` cannot be resolved at all (no config, no email mapping, no origin), emit a warning and proceed — best-effort cascade, never halt on unresolvable expected account.
+
+  Preflight cases covered: matching account (proceeds), mismatched account (halts with exact message), no auth (halts), expired token (halts).
+
+  - Acceptance: prepare output JSON contains `ghAuthenticated`, `activeAccount`, `expectedAccount`, `accountMismatch` keys; mismatch sets exit code 1 and emits the exact halt message; no-auth sets exit code 1 with a clear no-auth message; unresolvable expected account exits 0 with a `warnings[]` entry, not a halt.
 
 ## Workflow Phases
 

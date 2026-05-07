@@ -52,6 +52,7 @@
  */
 
 const { SHIP_FIELDS } = require('./ship-fields');
+const { parseRemoteOwner } = require('./git');
 
 // ---------------------------------------------------------------------------
 // Section descriptors
@@ -363,16 +364,27 @@ const SETUP_SECTIONS = [
   {
     id: 'pr',
     label: 'pr',
-    purpose: 'PR title validation rules used by /pr-sdlc: title regex, allowed Conventional-Commits types/scopes, required trailers. Mirrors commit patterns; can copy the commit config or use a different style.',
+    purpose: 'PR title validation rules used by /pr-sdlc: title regex, allowed Conventional-Commits types/scopes, required trailers, plus expected GitHub account for active-account preflight. Mirrors commit patterns; can copy the commit config or use a different style.',
     configFile: '.sdlc/config.json',
     configPath: 'pr',
     consumedBy: ['pr-sdlc'],
     filesModified: ['.sdlc/config.json'],
     optional: true,
-    // Same conditional-sub-prompt model as commit — see id: 'commit' note.
+    // Title/labels still use the conditional inline-builder (see id: 'commit' note).
+    // expectedAccount is a flat string field surfaced in the standard menu walk
+    // (issue #234) — the inline-pr-builder consumes it first when present.
     delegatedTo: 'inline-pr-builder',
     confirmDetected: false,
-    fields: [],
+    fields: [
+      {
+        name: 'expectedAccount',
+        label: 'Expected gh account',
+        type: 'string',
+        options: null,
+        default: (parseRemoteOwner(process.cwd()) || {}).owner || '',
+        description: 'GitHub login expected to be active when /pr-sdlc creates a PR. /pr-sdlc halts hard if the active gh account differs from this value, preventing wrong-account PRs in multi-account setups. Default is the origin remote owner; leave blank to skip the active-account check (fall through to email-mapping or origin-owner cascade).',
+      },
+    ],
     summarize: summarizePr,
   },
   {

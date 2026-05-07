@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 3,
+  "version": {
+    "mode": "file",
+    "versionFile": "package.json",
+    "fileType": "package.json",
+    "tagPrefix": "v"
+  },
+  "jira": {
+    "site": "example.atlassian.net",
+    "projectKey": "TEST"
+  },
+  "commit": {
+    "subjectPattern": "^(feat|fix|chore): .+$"
+  },
+  "pr": {
+    "titlePattern": "^(feat|fix|chore): .+$",
+    "expectedAccount": "test-user"
+  }
+}

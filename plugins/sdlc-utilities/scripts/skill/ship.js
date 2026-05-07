@@ -38,7 +38,7 @@ const fs   = require('fs');
 const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { exec, checkGitState, detectBaseBranch } = require(path.join(LIB, 'git'));
+const { exec, checkGitState, detectBaseBranch, parseRemoteOwner, probeGhAuth, formatAccountMismatch } = require(path.join(LIB, 'git'));
 const { resolveMainWorktree } = require(path.join(LIB, 'state'));
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
@@ -530,9 +530,17 @@ function runValidation(flags, flagSources, steps, context) {
   const errors   = [];
   const warnings = [];
 
-  // gh auth must be true
+  // gh auth must be true (issue #234 — preflight via lib/git.js::probeGhAuth).
   if (!context.ghAuthenticated) {
-    errors.push('GitHub CLI is not authenticated. Run "gh auth login" before using ship-sdlc.');
+    errors.push(
+      context.ghAuthErrorMessage ||
+        'GitHub CLI is not authenticated. Run "gh auth login" before using ship-sdlc.'
+    );
+  }
+
+  // Active-account preflight — halt on mismatch with the canonical 3-line message.
+  if (context.accountMismatch && context.accountMismatchMessage) {
+    errors.push(context.accountMismatchMessage);
   }
 
   // Current branch should not equal base branch
@@ -763,23 +771,29 @@ function main() {
     return;
   }
 
-  // Check gh auth
-  let ghAuthenticated = false;
-  let ghUser = null;
-  const ghAuthOutput = exec('gh auth status 2>&1', { shell: true });
-  if (ghAuthOutput !== null && /Logged in to/.test(ghAuthOutput)) {
-    ghAuthenticated = true;
-    const userMatch = ghAuthOutput.match(/Logged in to [^ ]+ account ([^ ]+)/);
-    if (userMatch) {
-      ghUser = userMatch[1];
-    } else {
-      // Try alternate format: "Logged in to github.com as <user>"
-      const altMatch = ghAuthOutput.match(/Logged in to [^ ]+ as ([^\s(]+)/);
-      if (altMatch) {
-        ghUser = altMatch[1];
-      }
-    }
-  }
+  // Check gh auth + active-account preflight (issue #234, shared with pr.js).
+  // Source of truth: lib/git.js::probeGhAuth + formatAccountMismatch.
+  const ghAuthState = probeGhAuth();
+  const ghAuthenticated = ghAuthState.authenticated;
+  const ghUser = ghAuthState.activeAccount;
+  const ghAuthExpired = ghAuthState.expired;
+  const ghAuthErrorMessage = ghAuthState.errorMessage;
+
+  // Resolve expectedAccount: prConfig.expectedAccount → origin owner.
+  const prConfigForAuth = readSection(projectRoot, 'pr') || {};
+  const remoteForAuth = parseRemoteOwner(projectRoot);
+  const expectedAccount =
+    (typeof prConfigForAuth.expectedAccount === 'string' && prConfigForAuth.expectedAccount.trim()) ||
+    (remoteForAuth && remoteForAuth.owner) ||
+    null;
+
+  // Mismatch detection — only when authenticated + we resolved an expected account.
+  const accountMismatch = Boolean(
+    ghAuthenticated && expectedAccount && ghUser && ghUser.toLowerCase() !== expectedAccount.toLowerCase()
+  );
+  const accountMismatchMessage = accountMismatch
+    ? formatAccountMismatch(expectedAccount, ghUser)
+    : null;
 
   // Check OpenSpec (use shared lib for consistent detection)
   const openspecResult = detectActiveChanges(projectRoot);
@@ -813,6 +827,11 @@ function main() {
     dirtyFiles: gitState.dirtyFiles,
     ghAuthenticated,
     ghUser,
+    ghAuthExpired,
+    ghAuthErrorMessage,
+    expectedAccount,
+    accountMismatch,
+    accountMismatchMessage,
     openspecDetected,
     openspecAuthoritative,
     openspecBranchMatch,

@@ -92,7 +92,7 @@ Parse output. If `overall` is "pass", report success with count. If "fail", show
 
 ## Do Not
 
-- Run `promptfoo eval` automatically
+- Run full-suite or wide-subset `promptfoo eval` automatically — single targeted test scoped to the change is allowed; tight-loop retries are not.
 - Write config files using Write or Edit tools directly — always use lib/config.js via inline Node.js
 - Skip AskUserQuestion for user interaction
 - Scan the entire codebase — the prepare script handles scanning

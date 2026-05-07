@@ -313,6 +313,68 @@ function writeProjectConfig(projectRoot, config) {
 }
 
 // ---------------------------------------------------------------------------
+// computeConfigDiff (issue #235 — pre-write diff preview)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute a flat diff between two JSON-serializable objects (deep). Pure: no
+ * I/O, no mutation. Used by setup-sdlc Step 4 to render an end-of-run diff
+ * preview before invoking writeProjectConfig / writeLocalConfig.
+ *
+ * Walks every key from `before ∪ after`, recursing into plain objects and
+ * comparing leaf values via `JSON.stringify` for stable equality across
+ * primitives, arrays, and nested objects.
+ *
+ * Returns:
+ *   - changed: array of `{ path, before, after }` rows in stable insertion order
+ *   - unchanged: count of leaf paths whose value did not change
+ *
+ * Examples:
+ *   computeConfigDiff({a:1}, {a:2, b:3})
+ *     → { changed: [{path:'a', before:1, after:2}, {path:'b', before:undefined, after:3}], unchanged: 0 }
+ *   computeConfigDiff({a:{x:1}}, {a:{x:1, y:2}})
+ *     → { changed: [{path:'a.y', before:undefined, after:2}], unchanged: 1 }
+ *
+ * @param {object} before — config snapshot before changes
+ * @param {object} after — config snapshot after changes
+ * @returns {{ changed: Array<{path: string, before: any, after: any}>, unchanged: number }}
+ */
+function computeConfigDiff(before, after) {
+  const changed = [];
+  let unchanged = 0;
+  const isPlainObject = (v) =>
+    v !== null && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
+
+  function walk(b, a, prefix) {
+    const keys = new Set([
+      ...(b && typeof b === 'object' ? Object.keys(b) : []),
+      ...(a && typeof a === 'object' ? Object.keys(a) : []),
+    ]);
+    for (const key of keys) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      const bv = b == null ? undefined : b[key];
+      const av = a == null ? undefined : a[key];
+
+      if (isPlainObject(bv) && isPlainObject(av)) {
+        walk(bv, av, path);
+        continue;
+      }
+
+      const bs = JSON.stringify(bv);
+      const as = JSON.stringify(av);
+      if (bs === as) {
+        unchanged += 1;
+      } else {
+        changed.push({ path, before: bv, after: av });
+      }
+    }
+  }
+
+  walk(before || {}, after || {}, '');
+  return { changed, unchanged };
+}
+
+// ---------------------------------------------------------------------------
 // writeLocalConfig
 // ---------------------------------------------------------------------------
 
@@ -926,6 +988,7 @@ module.exports = {
   writeProjectConfig,
   writeLocalConfig,
   writeSection,
+  computeConfigDiff,
   consolidateLegacyFiles,
   // Backward-compat alias — renamed in issue #231; remove in 0.21.x.
   migrateConfig: consolidateLegacyFiles,

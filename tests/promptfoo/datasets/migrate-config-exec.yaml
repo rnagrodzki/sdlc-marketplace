@@ -89,7 +89,9 @@
     - type: icontains
       value: '"backupPath": null'
 
-# Acceptance does NOT include CI eval — manual `promptfoo eval` only per project policy
+# Acceptance does NOT include full-suite CI eval — full-suite/wide-subset `promptfoo eval`
+# remains user-initiated per project policy. Single targeted test cases scoped to the
+# changed surface ARE allowed under the relaxed #228 carve-out.
 - description: "migrate-config: deny-all .sdlc/.gitignore + review-dimensions relocation"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"

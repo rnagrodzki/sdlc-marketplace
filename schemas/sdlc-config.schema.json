@@ -235,6 +235,10 @@
         },
         "labels": {
           "$ref": "#/$defs/prLabelsSection"
+        },
+        "expectedAccount": {
+          "type": "string",
+          "description": "Expected gh account login for PR creation. Cascades to git remote origin owner if unset."
         }
       },
       "additionalProperties": false

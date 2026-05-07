@@ -21,7 +21,7 @@
       },
       {
         "id": "no-auto-eval",
-        "description": "Plans must never include steps that run promptfoo eval — evaluation runs are user-initiated only.",
+        "description": "Full-suite or wide-subset `promptfoo eval` runs remain user-initiated only. A single targeted test case scoped to the changed surface MAY be run as the final verification step. Exec-only configs (no LLM provider) are fully relaxed. Tight-loop retries (run-fix-rerun) are forbidden in all cases.",
         "severity": "error"
       },
       {
@@ -130,7 +130,7 @@
       },
       {
         "id": "no-auto-eval",
-        "description": "Never run promptfoo eval automatically — evaluation must always be initiated manually by the user.",
+        "description": "Full-suite or wide-subset `promptfoo eval` runs remain user-initiated only. A single targeted test case scoped to the changed surface MAY be run as the final verification step. Exec-only configs (no LLM provider) are fully relaxed. Tight-loop retries (run-fix-rerun) are forbidden in all cases.",
         "severity": "error"
       },
       {

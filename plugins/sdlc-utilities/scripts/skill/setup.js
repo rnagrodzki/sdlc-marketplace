@@ -345,10 +345,46 @@ function detect(projectRoot) {
 // Main
 // ---------------------------------------------------------------------------
 
+/**
+ * Parse a minimal subset of CLI flags relevant to the prepare contract
+ * (issue #235). Style mirrors `version.js::parseArgs` for cross-script
+ * consistency. Unknown flags are ignored — the wider flag surface (`--migrate`,
+ * `--skip`, `--only`, sub-flow direct-entry flags) is parsed by SKILL.md.
+ *
+ * @param {string[]} argv — process.argv
+ * @returns {{ flags: { unsetOnly: boolean, force: boolean }, defaultSelectionMode: 'all' | 'unset-only' }}
+ */
+function parseArgs(argv) {
+  const args = argv.slice(2);
+  let unsetOnly = false;
+  let force = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--unset-only') {
+      unsetOnly = true;
+    } else if (a === '--force') {
+      force = true;
+    }
+  }
+
+  // --force wins over --unset-only (selection mode is 'all' in both default and --force cases;
+  // the difference is that --force skips the per-field "keep" prompt during the dispatch loop).
+  const defaultSelectionMode = force ? 'all' : (unsetOnly ? 'unset-only' : 'all');
+
+  return {
+    flags: { unsetOnly, force },
+    defaultSelectionMode,
+  };
+}
+
 if (require.main === module) {
   try {
     const projectRoot = process.cwd();
     const result = detect(projectRoot);
+    const parsed = parseArgs(process.argv);
+    result.flags = parsed.flags;
+    result.defaultSelectionMode = parsed.defaultSelectionMode;
     writeOutput(result, 'setup-prepare', 0);
   } catch (err) {
     process.stderr.write(`setup-prepare: unexpected error: ${err.message}\n`);
@@ -356,4 +392,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { detect };
+module.exports = { detect, parseArgs };

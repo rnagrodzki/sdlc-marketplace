@@ -121,14 +121,15 @@ Select sections to configure (space toggle, enter confirm):
 
 Render every row in `prepare.sections[]` exactly once, in array order. Use `section.label` and `section.summary` verbatim for the status block; use the first sentence of `section.purpose` for the menu hint.
 
-**Default selection (which rows are pre-checked):**
+**Default selection (which rows are pre-checked):** issue #235 flips the default — every row is pre-checked unless the user opts in to the legacy unset-only fast-path. The selection mode is resolved by `skill/setup.js` and surfaced as `flags.unsetOnly` in the prepare output; SKILL.md cites that resolved field (per `flag-coherence-cross-skill`).
 
 | Condition | Pre-checked rows |
 |---|---|
 | `section.locked` is `true` | always checked, cannot toggle |
 | `--force` passed | every row |
 | `--only <ids>` passed | only the listed ids; other rows hidden, menu skipped |
-| Otherwise | rows where `section.state === 'not-set'` |
+| `flags.unsetOnly === true` | rows where `section.state === 'not-set'` (legacy fast-path) |
+| Otherwise | every row (default — issue #235) |
 
 **Flag aliases:** See the flag-alias routing table in Step 0. When any direct-entry flag is passed (and `--only` is not), the translation is already applied before Step 1 runs — skip the menu and proceed to Step 3 with the resolved id selected.
 
@@ -401,9 +402,46 @@ The historical step labels map onto the dispatcher above for anyone updating tes
 | 3f | `pr` | 3.pr |
 
 
+#### Diff preview (issue #235)
+
+Before invoking `util/setup-init.js`, render an end-of-run diff preview comparing the in-memory snapshot of the project config as read at preflight (Step 0 prepare output) against the accumulated answers from Steps 3a–3f. Use `lib/config.js::computeConfigDiff(before, after)` — pure helper, no I/O:
+
+```bash
+LIB_CONFIG=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$LIB_CONFIG" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && LIB_CONFIG="plugins/sdlc-utilities/scripts/lib/config.js"
+
+# Write JSON snapshots to temp files to avoid shell quoting hazards with
+# embedded quotes and newlines inside $BEFORE_JSON / $AFTER_JSON.
+BEFORE_TMP=$(mktemp)
+AFTER_TMP=$(mktemp)
+printf '%s' "$BEFORE_JSON" > "$BEFORE_TMP"
+printf '%s' "$AFTER_JSON" > "$AFTER_TMP"
+
+DIFF_JSON=$(LIB_CONFIG="$LIB_CONFIG" BEFORE_TMP="$BEFORE_TMP" AFTER_TMP="$AFTER_TMP" node -e "
+const { computeConfigDiff } = require(process.env.LIB_CONFIG);
+const before = JSON.parse(require('fs').readFileSync(process.env.BEFORE_TMP, 'utf8'));
+const after  = JSON.parse(require('fs').readFileSync(process.env.AFTER_TMP,  'utf8'));
+console.log(JSON.stringify(computeConfigDiff(before, after)));
+")
+rm -f "$BEFORE_TMP" "$AFTER_TMP"
+```
+
+Render `DIFF_JSON.changed[]` as a markdown table:
+
+```text
+| path                      | before        | after         |
+|---------------------------|---------------|---------------|
+| pr.expectedAccount        | (unset)       | rnagrodzki    |
+| version.tagPrefix         | v             | release/      |
+```
+
+When `DIFF_JSON.changed.length === 0`, skip the preview and print `No changes — nothing to write.`; bypass the write step (`util/setup-init.js` invocation) and proceed directly to Step 3b validation (which is now a no-op confirmation).
+
+Otherwise, ask the user to confirm the diff via AskUserQuestion (suppressed when `--auto` is set; auto mode proceeds to write). On rejection, print `Write cancelled — no changes made.` and skip the write step.
+
 #### Writing config files
 
-After collecting all answers, write project config and local config via `util/setup-init.js`:
+After collecting all answers AND confirming the diff preview above, write project config and local config via `util/setup-init.js`:
 
 ```bash
 INIT_SCRIPT=$(find ~/.claude/plugins -name "setup-init.js" -path "*/sdlc*/scripts/util/setup-init.js" 2>/dev/null | sort -V | tail -1)
@@ -474,7 +512,7 @@ This skill is safe to re-run. Already-configured sections are skipped unless `--
 
 ## DO NOT
 
-- Run `promptfoo eval` automatically
+- Run full-suite or wide-subset `promptfoo eval` automatically — single targeted test scoped to the change is allowed; tight-loop retries are not.
 - Delete legacy files without explicit user confirmation via AskUserQuestion
 - Invoke removed skills (`/review-init-sdlc`, `/pr-customize-sdlc`, `/guardrails-init-sdlc`) -- they no longer exist as standalone skills; use the sub-flows (`@setup-dimensions.md`, `@setup-pr-template.md`, `@setup-guardrails.md`) instead
 - Modify Jira templates directly -- delegate to `/jira-sdlc` via the Skill tool

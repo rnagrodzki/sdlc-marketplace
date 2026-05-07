@@ -87,7 +87,11 @@
 - C1: No shell-out beyond read-only `git` (`git rev-parse --abbrev-ref HEAD`, `git diff --shortstat`); no `gh`, no `curl`, no network calls in the prepare script
 - C2: `harden-prepare.js` MUST be ≤ 200 lines; surface-specific loaders MAY be extracted into `lib/harden-surfaces.js` to honor this bound
 - C3: No LLM logic in the loader — all five surfaces are loaded deterministically by the prepare script; SKILL.md MUST NOT glob, parse YAML, or read config directly
-- C4: No `promptfoo eval` invocation anywhere in the skill, its prepare script, or its tests (per `no-auto-eval` guardrail)
+- C4: `promptfoo eval` invocation policy (per `no-auto-eval` guardrail):
+  - **Allowed:** a single targeted test case scoped to the changed surface MAY be run as the final verification step at the end of an implementation.
+  - **Allowed:** exec-only configs (`promptfooconfig-exec.yaml`, `promptfooconfig-exec-hooks.yaml`) — no LLM provider — are fully relaxed; targeted runs are permitted at any verification gate.
+  - **Forbidden:** running the full suite (`promptfooconfig.yaml`) or a wide subset autonomously.
+  - **Forbidden:** tight-loop retries (run-fix-rerun) in any case.
 - C5: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
 - C6: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
 - C7: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data

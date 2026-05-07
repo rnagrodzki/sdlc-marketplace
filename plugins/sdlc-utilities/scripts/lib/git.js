@@ -373,6 +373,87 @@ function ensureGhAccount(projectRoot) {
 }
 
 /**
+ * Format the canonical 3-line account-mismatch halt message used by ship.js
+ * preflight (issue #234) and pr.js preflight. Exporting a single formatter
+ * ensures every gate emits byte-identical text — `no-opposite-logical-vectors`
+ * guardrail compliance.
+ *
+ * @param {string} expected — expected gh login
+ * @param {string} actual — currently active gh login
+ * @returns {string}
+ */
+function formatAccountMismatch(expected, actual) {
+  return [
+    `Expected gh account: ${expected}`,
+    `Active gh account:   ${actual}`,
+    `Run: gh auth switch --user ${expected}`,
+  ].join('\n');
+}
+
+/**
+ * Probe `gh auth status` for a host and return a normalized auth state
+ * (issue #234). One source of truth for the gh-auth + active-account preflight,
+ * consumed by both `skill/ship.js` (pipeline preflight) and `skill/pr.js` (per-PR
+ * preflight).
+ *
+ * Returns:
+ *   - authenticated: true if the host has at least one logged-in account
+ *   - activeAccount: login of the active account (when authenticated)
+ *   - expired: true when the token has expired (gh reports "expired" in stderr)
+ *   - errorMessage: human-readable summary when authenticated === false
+ *
+ * For test injection, pass `opts.execFn` to substitute the gh invocations.
+ *
+ * @param {{ host?: string, execFn?: function }} [opts]
+ * @returns {{ authenticated: boolean, activeAccount: string|null, expired: boolean, errorMessage: string|null }}
+ */
+function probeGhAuth(opts = {}) {
+  const host = opts.host || 'github.com';
+  const run = opts.execFn || ((cmd) => exec(cmd, { shell: true }));
+
+  // gh auth status writes to stderr; we capture both with `2>&1`.
+  const statusRaw = run(`gh auth status --hostname ${host} 2>&1`);
+  if (statusRaw === null) {
+    return {
+      authenticated: false,
+      activeAccount: null,
+      expired: false,
+      errorMessage: `Not logged in to ${host}. Run: gh auth login --hostname ${host}`,
+    };
+  }
+
+  const lower = statusRaw.toLowerCase();
+  const expired = lower.includes('expired');
+  if (expired) {
+    return {
+      authenticated: false,
+      activeAccount: null,
+      expired: true,
+      errorMessage: `gh token for ${host} has expired. Run: gh auth refresh --hostname ${host}`,
+    };
+  }
+
+  const loggedIn = lower.includes('logged in');
+  if (!loggedIn) {
+    return {
+      authenticated: false,
+      activeAccount: null,
+      expired: false,
+      errorMessage: `Not logged in to ${host}. Run: gh auth login --hostname ${host}`,
+    };
+  }
+
+  // Authenticated: query the active login.
+  const activeAccount = run('gh api user --jq .login');
+  return {
+    authenticated: true,
+    activeAccount: activeAccount || null,
+    expired: false,
+    errorMessage: null,
+  };
+}
+
+/**
  * Pure helper — pick a gh account whose login matches the given repo owner (case-insensitive).
  * Used by post-failure recovery (issue #184). Pure / no I/O so it can be unit-tested
  * without mocking gh.
@@ -923,6 +1004,8 @@ module.exports = {
   selectAccountForOwner,
   isGhCreatePrPermissionError,
   recoverGhAccountForRepo,
+  probeGhAuth,
+  formatAccountMismatch,
   // PR-specific
   getRemoteState,
   pushToRemote,

@@ -120,6 +120,8 @@ Read and parse `PR_CONTEXT_FILE` as `PR_CONTEXT_JSON`. The `trap` above guarante
 
 **If `PR_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
+**Note (issue #234):** The prepare script (`skill/pr.js`) populates `errors[]` for auth failures, account mismatches (`accountMismatch`), and expired tokens (`tokenExpired`). The `errors[]` check above already halts on all of these — the reactive recovery flow later in this skill handles edge cases the preflight cannot anticipate (e.g., permission revocation between preflight and `gh pr create`).
+
 **If `PR_CONTEXT_JSON.warnings` is non-empty**, show the warnings prominently before continuing.
 Do not ask for confirmation — the Step 5 approval gate (AskUserQuestion) is the consent point before PR creation.
 
