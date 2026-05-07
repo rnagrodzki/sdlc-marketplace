@@ -6,14 +6,15 @@
  *   script_path  — absolute path to the node script
  *   script_args  — space-separated args (e.g., "--project-root /tmp/fixture-abc --json")
  *   script_cwd   — (optional) working directory for script execution
- *   script_home  — (optional) HOME override; useful for tests that depend on
- *                  `~/.sdlc-cache/...` layouts. Accepts a relative path (resolved
- *                  against `script_cwd`) or an absolute path.
- *   script_env   — (optional) JSON string or object of extra env vars
+ *   script_home            — (optional) HOME override; useful for tests that depend on
+ *                            `~/.sdlc-cache/...` layouts. Accepts a relative path (resolved
+ *                            against `script_cwd`) or an absolute path.
+ *   script_env             — (optional) JSON string or object of extra env vars
+ *   script_capture_stderr  — (optional) when truthy, append stderr to output even on exit 0
  */
 const path = require('path');
 const fs = require('fs');
-const { execFileSync } = require('child_process');
+const { spawnSync } = require('child_process');
 
 // Matches paths created by lib/output.js#createOutputFile via os.tmpdir() on macOS/Linux:
 //   /tmp/...,  /var/folders/.../...  (macOS),  /private/var/...  (macOS canonicalized)
@@ -63,36 +64,41 @@ class ScriptRunnerProvider {
       if (extra && typeof extra === 'object') Object.assign(env, extra);
     }
 
-    try {
-      const stdout = execFileSync('node', [scriptPath, ...scriptArgs], {
-        timeout: 30_000,
-        encoding: 'utf8',
-        cwd,
-        env,
-      });
-      return { output: maybeReadTmpFile(stdout, vars.script_passthrough) };
-    } catch (err) {
-      // Include stdout + stderr on non-zero exit so assertions can check error messages
-      const rawStdout = err.stdout ?? '';
-      const stderr = err.stderr ?? err.message;
-      // Apply tmp-path auto-read to stdout only when it cleanly matches the path shape.
-      // On the common error case (non-path stdout), preserve existing concat behavior so
-      // assertions on error messages keep working.
-      const stdoutTrimmed = (rawStdout || '').trim();
-      let stdout = rawStdout;
-      if (
-        vars.script_passthrough !== true
-        && stdoutTrimmed
-        && !stdoutTrimmed.includes('\n')
-        && TMP_PATH_RE.test(stdoutTrimmed)
-        && fs.existsSync(stdoutTrimmed)
-      ) {
-        try { stdout = fs.readFileSync(stdoutTrimmed, 'utf8'); } catch (_) { /* fall through */ }
-      }
-      return {
-        output: [stdout, stderr].filter(Boolean).join('\n'),
-      };
+    const result = spawnSync('node', [scriptPath, ...scriptArgs], {
+      timeout: 30_000,
+      encoding: 'utf8',
+      cwd,
+      env,
+    });
+
+    const rawStdout = result.stdout ?? '';
+    const stderr = (result.stderr ?? '').trim();
+    const exitCode = result.status ?? (result.error ? 1 : 0);
+
+    // Auto-read tmp-path JSON when stdout is solely a temp file path.
+    const stdoutTrimmed = rawStdout.trim();
+    let stdout = rawStdout;
+    let tmpFileRead = false;
+    if (
+      vars.script_passthrough !== true
+      && stdoutTrimmed
+      && !stdoutTrimmed.includes('\n')
+      && TMP_PATH_RE.test(stdoutTrimmed)
+      && fs.existsSync(stdoutTrimmed)
+    ) {
+      try { stdout = fs.readFileSync(stdoutTrimmed, 'utf8'); tmpFileRead = true; } catch (_) { /* fall through */ }
     }
+
+    // Spawn error (ENOENT, ETIMEDOUT, etc.) — return the error message directly.
+    if (result.error) {
+      return { output: result.error.message };
+    }
+
+    // Include stderr when: (a) exit non-zero AND no tmp-file was auto-read (to avoid appending
+    // git noise after structured JSON), OR (b) script_capture_stderr is explicitly set.
+    const includeStderr = (tmpFileRead ? false : exitCode !== 0) || vars.script_capture_stderr;
+    const output = [stdout.trimEnd(), includeStderr ? stderr : null].filter(Boolean).join('\n');
+    return { output: output };
   }
 }
 

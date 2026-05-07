@@ -185,7 +185,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const expected = ['execute','commit','review','pr','archive-openspec'];
+        const expected = ['execute','commit','review','pr','archive-openspec','learnings-commit'];
         return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
     - type: icontains
       value: '"bump": "patch"'
@@ -312,7 +312,7 @@
       value: |
         const o = JSON.parse(output);
         const steps = o.flags.steps;
-        const expected = ['execute','commit','review','pr','archive-openspec'];
+        const expected = ['execute','commit','review','pr','archive-openspec','learnings-commit'];
         return JSON.stringify(steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: legacy preset:minimal + skip:[pr] migrates to [execute, commit]"
@@ -325,7 +325,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        return JSON.stringify(o.flags.steps) === JSON.stringify(['execute','commit'])
+        return JSON.stringify(o.flags.steps) === JSON.stringify(['execute','commit','learnings-commit'])
 
 - description: "ship-prepare: legacy preset:full migrates to all six canonical steps"
   vars:
@@ -337,7 +337,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const expected = ['execute','commit','review','version','pr','archive-openspec'];
+        const expected = ['execute','commit','review','version','pr','archive-openspec','learnings-commit'];
         return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: legacy A/B/C preset codes resolve to canonical equivalents (B → balanced)"
@@ -350,7 +350,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const expected = ['execute','commit','review','pr','archive-openspec'];
+        const expected = ['execute','commit','review','pr','archive-openspec','learnings-commit'];
         return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: already-migrated v2 config passes through unchanged"
@@ -442,7 +442,7 @@
     script_args: "--has-plan"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-skill-skip-via-env"
-    script_env: "SDLC_SKIP_CONFIG_CHECK=1"
+    script_env: '{"SDLC_SKIP_CONFIG_CHECK":"1"}'
   assert:
     - type: icontains
       value: '"skipConfigCheck": true'

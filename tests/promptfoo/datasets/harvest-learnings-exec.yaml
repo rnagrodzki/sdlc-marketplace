@@ -15,9 +15,7 @@
   assert:
     - type: javascript
       value: |
-        const fs = require('fs');
-        const path = output.trim();
-        const j = JSON.parse(fs.readFileSync(path, 'utf8'));
+        const j = JSON.parse(output);
         return j.totalEntries === 0 && Array.isArray(j.clusters) && j.clusters.length === 0;
 
 # AC2 — Log with 3 distinct entries → 3 draft clusters.
@@ -31,8 +29,7 @@
   assert:
     - type: javascript
       value: |
-        const fs = require('fs');
-        const j = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
+        const j = JSON.parse(output);
         return j.totalEntries === 3
           && j.clusters.length === 3
           && j.clusters.every(c => c.status === 'draft')
@@ -49,8 +46,7 @@
   assert:
     - type: javascript
       value: |
-        const fs = require('fs');
-        const j = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
+        const j = JSON.parse(output);
         const tracked = j.clusters.find(c => c.status === 'tracked');
         const draft = j.clusters.find(c => c.status === 'draft');
         return j.totalEntries === 2
@@ -69,8 +65,7 @@
   assert:
     - type: javascript
       value: |
-        const fs = require('fs');
-        const j = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
+        const j = JSON.parse(output);
         // totalEntries reflects parse count (3); clusters reflects post-filter (2 of 3).
         return j.totalEntries === 3
           && j.clusters.length === 2
@@ -87,8 +82,7 @@
   assert:
     - type: javascript
       value: |
-        const fs = require('fs');
-        const j = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
+        const j = JSON.parse(output);
         return j.dryRun === true && j.clusters.length === 3;
 
 # AC6 — --commit removes only approved clusters; rest of file preserved.
@@ -104,41 +98,4 @@
     script_env: '{"GH_HARVEST_FAKE_LIST":"/dev/null"}'
   assert:
     - type: javascript
-      value: |
-        const fs = require('fs');
-        const os = require('os');
-        const path = require('path');
-        const { execFileSync } = require('child_process');
-        const drafts = JSON.parse(fs.readFileSync(output.trim(), 'utf8'));
-        // Locate repo root and helper from the fixture path.
-        const fixtureDir = path.dirname(path.dirname(path.dirname(drafts.logPath)));
-        const repoRoot = fixtureDir.replace(/\/tests\/promptfoo\/fixtures-fs\/[^/]+$/, '');
-        const helper = repoRoot + '/.claude/scripts/harvest-learnings.js';
-        // Set up an isolated tmp project tree (copy of fixture log).
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'harvest-commit-'));
-        fs.mkdirSync(path.join(tmp, '.claude', 'learnings'), { recursive: true });
-        const srcLog = drafts.logPath;
-        const dstLog = path.join(tmp, '.claude', 'learnings', 'log.md');
-        fs.copyFileSync(srcLog, dstLog);
-        const beforeLines = fs.readFileSync(dstLog, 'utf8').split('\n').length;
-        // Re-run --output-file inside the tmp tree to mint matching cluster ids.
-        const env = Object.assign({}, process.env, { GH_HARVEST_FAKE_LIST: '/dev/null' });
-        const draftsTmpPath = execFileSync('node', [helper, '--output-file'],
-          { cwd: tmp, env, encoding: 'utf8' }).trim();
-        const draftsTmp = JSON.parse(fs.readFileSync(draftsTmpPath, 'utf8'));
-        // Approve only the middle cluster (skill-beta).
-        const target = draftsTmp.clusters.find(c => c.skill === 'skill-beta');
-        const approvedFile = path.join(tmp, 'approved.json');
-        fs.writeFileSync(approvedFile, JSON.stringify({ approvedClusterIds: [target.id] }));
-        execFileSync('node', [helper, '--commit', approvedFile],
-          { cwd: tmp, env, encoding: 'utf8' });
-        const afterRaw = fs.readFileSync(dstLog, 'utf8');
-        const afterLines = afterRaw.split('\n').length;
-        const removed = beforeLines - afterLines;
-        // skill-beta header occupies 2 lines (header + body) in the fixture.
-        const trailerStillPresent = /^## Tracked in GH Issues/m.test(afterRaw);
-        const alphaStillPresent = /skill-alpha: first lesson/.test(afterRaw);
-        const gammaStillPresent = /skill-gamma: older lesson/.test(afterRaw);
-        const betaGone = !/skill-beta: second lesson/.test(afterRaw);
-        return removed === 2 && trailerStillPresent && alphaStillPresent
-          && gammaStillPresent && betaGone;
+      value: file://assertions/harvest-learnings-commit.js
