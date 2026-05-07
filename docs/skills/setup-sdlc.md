@@ -14,7 +14,7 @@ Creates `.sdlc/config.json` (project-level config), `.sdlc/local.json` (user-loc
 /setup-sdlc
 ```
 
-Renders the selective-section menu. Sections in state `not set` are pre-checked; `legacy` (migration-required) sections are locked and auto-checked; `set` sections are unchecked by default. Confirm with no rows selected to exit without changes.
+Renders the selective-section menu. All sections are pre-checked by default; `legacy` (migration-required) sections are locked and auto-checked. Confirm with no rows selected to exit without changes. Use `--unset-only` to restore the legacy behavior of pre-checking only `not-set` sections.
 
 ```text
 /setup-sdlc --only jira,review
@@ -26,7 +26,7 @@ Skip the menu, configure only `jira` and `review`. Useful for scripted runs or f
 /setup-sdlc --force
 ```
 
-Pre-check every row in the menu (reconfigure everything) instead of pre-selecting only `not set` rows.
+Pre-check every row in the menu and skip the per-field `keep` prompt — all configured values are reconfirmed rather than accepted with one keystroke.
 
 ---
 
@@ -36,8 +36,8 @@ Pre-check every row in the menu (reconfigure everything) instead of pre-selectin
 |------|-------------|---------|
 | `--migrate` | Run schema migration via `scripts/skill/migrate-config.js`: relocates legacy `.claude/sdlc.json` to `.sdlc/config.json`, walks the schema-version migration registry (`lib/config-migrations.js`) to bring both project + local configs to `schemaVersion: 3`, and consolidates legacy per-file configs (`.claude/version.json`, `.sdlc/ship-config.json`, etc.) via `lib/config.js::consolidateLegacyFiles`. Idempotent. Backups: legacy relocation writes to `.sdlc/sdlc.json.bak` (single, no timestamp); other in-place migrations write to `.sdlc/<file>.bak.<safe-iso>`. Setup sweeps to retain 3 newest per role. | — |
 | `--skip <section>` | Skip a config section during setup (version, ship, jira, review, commit, pr) | — |
-| `--force` | Pre-check every menu row (reconfigure all sections) | — |
-| `--unset-only` | Pre-check only sections in `not-set` state. Legacy fast-path before #235 — the default flow now walks every configurable field. | — |
+| `--force` | Skip the per-field `keep` prompt for every field — all values are reconfirmed rather than accepted with one keystroke. Does not change which rows are pre-checked (all rows are pre-checked by default). | — |
+| `--unset-only` | Pre-check only sections in `not-set` state. Legacy fast-path before #235 — the default flow now pre-checks all rows. | — |
 | `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | — |
 | `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | — |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | — |
@@ -277,6 +277,21 @@ When `openspec/config.yaml` is detected during setup, offers to add a managed bl
 **Direct entry:** `/setup-sdlc --openspec-enrich` or `/setup-sdlc --openspec-enrich --remove-openspec` (removal)
 
 Each option can be individually skipped or accessed later via the `--dimensions`, `--pr-template`, `--guardrails`, or `--openspec-enrich` flags.
+
+### Diff Preview and Confirmation
+
+Before writing any config files, `/setup-sdlc` renders a diff preview comparing the configuration as it was at startup against the values accumulated during the session:
+
+```
+| path                  | before    | after       |
+|-----------------------|-----------|-------------|
+| pr.expectedAccount    | (unset)   | rnagrodzki  |
+| version.tagPrefix     | v         | release/    |
+```
+
+When no fields changed, the preview is replaced with `No changes — nothing to write.` and the write step is skipped.
+
+Otherwise, you are prompted to confirm before the write proceeds. Reject to discard all accumulated answers without touching the config files. In `--auto` mode the confirmation is suppressed and the write proceeds automatically.
 
 ### Step 5: Summary
 

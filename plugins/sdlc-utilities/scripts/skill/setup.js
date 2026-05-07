@@ -368,7 +368,8 @@ function parseArgs(argv) {
     }
   }
 
-  // --force wins over --unset-only — it pre-checks every row regardless.
+  // --force wins over --unset-only (selection mode is 'all' in both default and --force cases;
+  // the difference is that --force skips the per-field "keep" prompt during the dispatch loop).
   const defaultSelectionMode = force ? 'all' : (unsetOnly ? 'unset-only' : 'all');
 
   return {
