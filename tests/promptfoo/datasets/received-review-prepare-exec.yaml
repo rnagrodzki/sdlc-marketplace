@@ -34,8 +34,9 @@
     script_args: ""
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-received-review-misplaced"
+    script_capture_stderr: true
   assert:
-    # Warning emitted to stderr (script-runner concatenates stdout + stderr).
+    # Warning emitted to stderr (script-runner concatenates stdout + stderr when script_capture_stderr is set).
     - type: icontains
       value: "warning: receivedReview.alwaysFixSeverities found in .sdlc/config.json"
     # The misplaced value is ignored — flags resolves to [].

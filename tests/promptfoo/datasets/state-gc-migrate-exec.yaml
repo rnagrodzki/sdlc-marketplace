@@ -108,14 +108,10 @@
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-ship-state-stale"
   assert:
-    # The skill writes its real output to a temp file; stdout shows the path
-    # and follow-up node call could read it. For an executable test, we only
-    # verify the path is printed (script exited successfully) and the temp
-    # file existed at exit. The script-runner provider returns stdout, which
-    # is the temp-file path. Asserting that path was printed is enough to
-    # confirm the --gc path took effect (errors would surface as exit != 0).
+    # The provider auto-reads the temp file, so output is the JSON content.
+    # Asserting action:"gc" confirms the --gc path ran (errors surface as exit != 0).
     - type: contains
-      value: 'ship-prepare-'
+      value: '"action": "gc"'
 
 # ---------------------------------------------------------------------------
 # skill/ship.js --steps cleanup: reserved-step validation error

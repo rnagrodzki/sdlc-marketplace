@@ -65,9 +65,12 @@ module.exports = async function transformVars(vars) {
     result.script_path = path.join(REPO_ROOT, vars.script_path.replace('repo://', ''));
   }
 
-  // script_args: replace {{project_root}} placeholder after temp dir resolution
-  if (vars.script_args && result.project_root) {
-    result.script_args = vars.script_args.replace(/\{\{project_root\}\}/g, result.project_root);
+  // script_args: replace {{project_root}} and {{repo_root}} placeholders after temp dir resolution
+  if (vars.script_args) {
+    let args = vars.script_args;
+    if (result.project_root) args = args.replace(/\{\{project_root\}\}/g, result.project_root);
+    args = args.replace(/\{\{repo_root\}\}/g, REPO_ROOT);
+    result.script_args = args;
   }
 
   // script_home: replace {{project_root}} placeholder so tests can anchor HOME

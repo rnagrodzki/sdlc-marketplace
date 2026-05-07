@@ -98,4 +98,4 @@
     script_env: '{"GH_HARVEST_FAKE_LIST":"/dev/null"}'
   assert:
     - type: javascript
-      value: file://tests/promptfoo/assertions/harvest-learnings-commit.js
+      value: file://assertions/harvest-learnings-commit.js

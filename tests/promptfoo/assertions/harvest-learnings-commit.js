@@ -14,9 +14,7 @@ module.exports = (output) => {
   } catch (e) {
     return { pass: false, score: 0, reason: `output is not valid JSON: ${e.message}` };
   }
-  const fixtureDir = path.dirname(path.dirname(path.dirname(drafts.logPath)));
-  const repoRoot = fixtureDir.replace(/\/tests\/promptfoo\/fixtures-fs\/[^/]+$/, '');
-  const helper = path.join(repoRoot, '.claude', 'scripts', 'harvest-learnings.js');
+  const helper = path.join(__dirname, '..', '..', '..', '.claude', 'scripts', 'harvest-learnings.js');
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'harvest-commit-'));
   fs.mkdirSync(path.join(tmp, '.claude', 'learnings'), { recursive: true });
