@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-07 — pr-sdlc: dual-issue fix PR (#275, #276) with custom template
+PR body used custom template from `.sdlc/pr-template.md`. Both "Fixes #275" and "Fixes #276" placed in the Github Issue section per plan guardrail. Title used first issue number `fix(#275)` to satisfy the `^(fix)\(#\d+\): .+ - .+$` pattern constraint — secondary issue covered in body. Labels mode=llm inferred `bug` from `fix/` branch prefix. Uncommitted changes warning was surfaced (1 file) but did not block PR creation.
+
 ## 2026-05-07 — version-sdlc: patch release v0.18.11 from fresh feature branch
 Branch fix/275-276-ship-jira-fixes had no upstream; R15 auto-set-upstream path triggered correctly. Squash merge brought feat(#272) commit into range but that fix was already documented in v0.18.10 — correctly excluded from this entry. Patch bump used despite suggestedBump=minor due to explicit --patch flag.
 
