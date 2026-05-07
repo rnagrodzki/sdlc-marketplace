@@ -646,6 +646,49 @@ function buildProposals(signals, target) {
     evidence: 'Universal guardrail — always applicable.',
   });
 
+  // Planning-discipline guardrails — plan target only
+  if (isPlan) {
+    proposals.push({
+      id: 'state-premise',
+      description: 'Plan must state the underlying problem in one sentence — in Goal, Architecture, or Key Decisions. Reject plans that transcribe requirements without naming the root problem.',
+      severity: 'error',
+      category: 'planning-discipline',
+      evidence: 'Universal guardrail — always applicable to non-trivial plans.',
+    });
+
+    proposals.push({
+      id: 'smallest-viable-cut',
+      description: 'Plan must identify the smallest version of the work that still delivers value. If the plan covers more than the minimum, each extra task must be justified in Key Decisions.',
+      severity: 'warning',
+      category: 'planning-discipline',
+      evidence: 'Universal guardrail — always applicable to non-trivial plans.',
+    });
+
+    proposals.push({
+      id: 'failure-audience',
+      description: 'Plan must name who or what fails if this implementation ships incorrectly (user, system, team, downstream service). Surfaces the blast radius before decomposition.',
+      severity: 'warning',
+      category: 'planning-discipline',
+      evidence: 'Universal guardrail — always applicable to non-trivial plans.',
+    });
+
+    proposals.push({
+      id: 'explicit-non-goals',
+      description: 'Plan must list what is intentionally NOT being built. Surface adjacent improvements that were considered and excluded so reviewers and executors do not silently re-expand scope.',
+      severity: 'warning',
+      category: 'planning-discipline',
+      evidence: 'Universal guardrail — always applicable to non-trivial plans.',
+    });
+
+    proposals.push({
+      id: 'ambiguity-stops-and-asks',
+      description: 'When two or more codebase patterns are viable for the same requirement with materially different downstream implications, the plan must EITHER record the choice in Key Decisions with rationale, OR the skill must AskUserQuestion before committing. Silent selection between viable patterns is a critique failure.',
+      severity: 'error',
+      category: 'planning-discipline',
+      evidence: 'Universal guardrail — always applicable to non-trivial plans.',
+    });
+  }
+
   return proposals;
 }
 

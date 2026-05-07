@@ -174,3 +174,66 @@
       value: '"security-review"'
     - type: not-icontains
       value: '"reviewDimensions": []'
+
+# --- planning-discipline catalog (#270 promotion): five plan-only always-on guardrails ---
+
+- description: "guardrails-prepare planning-discipline: --target plan emits all five new IDs"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}} --target plan"
+    project_root: "file://fixtures-fs/project-mongodb-express"
+  assert:
+    - type: icontains
+      value: '"id": "state-premise"'
+    - type: icontains
+      value: '"id": "smallest-viable-cut"'
+    - type: icontains
+      value: '"id": "failure-audience"'
+    - type: icontains
+      value: '"id": "explicit-non-goals"'
+    - type: icontains
+      value: '"id": "ambiguity-stops-and-asks"'
+
+- description: "guardrails-prepare planning-discipline: --target execute omits all five IDs"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}} --target execute"
+    project_root: "file://fixtures-fs/project-mongodb-express"
+  assert:
+    - type: not-icontains
+      value: '"id": "state-premise"'
+    - type: not-icontains
+      value: '"id": "smallest-viable-cut"'
+    - type: not-icontains
+      value: '"id": "failure-audience"'
+    - type: not-icontains
+      value: '"id": "explicit-non-goals"'
+    - type: not-icontains
+      value: '"id": "ambiguity-stops-and-asks"'
+
+- description: "guardrails-prepare planning-discipline: state-premise and ambiguity-stops-and-asks are severity error"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}} --target plan"
+    project_root: "file://fixtures-fs/project-mongodb-express"
+  assert:
+    - type: javascript
+      value: "(() => { const d = JSON.parse(output); const m = Object.fromEntries(d.proposals.map(p => [p.id, p])); return m['state-premise']?.severity === 'error' && m['ambiguity-stops-and-asks']?.severity === 'error'; })()"
+
+- description: "guardrails-prepare planning-discipline: failure-audience, explicit-non-goals, smallest-viable-cut are severity warning"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}} --target plan"
+    project_root: "file://fixtures-fs/project-mongodb-express"
+  assert:
+    - type: javascript
+      value: "(() => { const d = JSON.parse(output); const m = Object.fromEntries(d.proposals.map(p => [p.id, p])); return ['failure-audience','explicit-non-goals','smallest-viable-cut'].every(id => m[id]?.severity === 'warning'); })()"
+
+- description: "guardrails-prepare planning-discipline: all five entries have category planning-discipline"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}} --target plan"
+    project_root: "file://fixtures-fs/project-mongodb-express"
+  assert:
+    - type: javascript
+      value: "(() => { const d = JSON.parse(output); const m = Object.fromEntries(d.proposals.map(p => [p.id, p])); return ['state-premise','smallest-viable-cut','failure-audience','explicit-non-goals','ambiguity-stops-and-asks'].every(id => m[id]?.category === 'planning-discipline'); })()"
