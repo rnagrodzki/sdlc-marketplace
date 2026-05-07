@@ -221,12 +221,13 @@ async function main() {
   if (process.env.SDLC_DEBUG_DUMP === '1') {
     try {
       const dumpDir = path.join(fs.realpathSync(os.tmpdir()), 'jira-sdlc-debug');
-      fs.mkdirSync(dumpDir, { recursive: true });
+      fs.mkdirSync(dumpDir, { recursive: true, mode: 0o700 });
       const canonical = JSON.stringify(canonicalize(toolInput));
       const hashPrefix = crypto.createHash('sha256').update(canonical, 'utf8').digest('hex').slice(0, 12);
       fs.writeFileSync(
         path.join(dumpDir, `${hashPrefix}.json`),
-        JSON.stringify({ tool_input: toolInput, canonical_json: canonical }, null, 2)
+        JSON.stringify({ tool_input: toolInput, canonical_json: canonical }, null, 2),
+        { mode: 0o600 }
       );
     } catch { /* diagnostic only — never fail the hook on dump errors */ }
   }

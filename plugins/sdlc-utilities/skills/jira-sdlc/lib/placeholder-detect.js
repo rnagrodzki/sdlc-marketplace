@@ -18,6 +18,7 @@
  * eliminating C13 false positives on JSON-serialized arrays.
  */
 
+// Global /g flag required for exec() looping. Callers MUST reset .lastIndex = 0 before each use.
 const PLACEHOLDER_REGEX = /\{[a-zA-Z_][a-zA-Z0-9_-]*\}|\[(?![{"\d])[^\]\n]{3,}\]/g;
 
 /**
