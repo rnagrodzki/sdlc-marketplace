@@ -474,3 +474,317 @@
         fallback to `.claude/review-dimensions/` for compatibility during the
         deprecation window. The skill does NOT hardcode `.claude/review-dimensions/`
         as the only path.
+
+# ---------------------------------------------------------------------------
+# OWASP Top 10 — issue #272
+# Each case asserts the security-review subagent tags findings with the
+# matching A0x category code per the optional **OWASP:** finding slot
+# defined in REFERENCE.md §2 / §3 and the EXAMPLES.md security-review body.
+# ---------------------------------------------------------------------------
+
+- description: "review-sdlc: OWASP A01 — finding tagged with category (issue #272)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
+    skill_content: |
+      You are running the review-sdlc security-review dimension subagent against this diff:
+
+      ```
+      --- a/src/admin/users.ts
+      +++ b/src/admin/users.ts
+      @@ -10,6 +10,12 @@
+       router.get('/admin/users/:id', requireAuth, async (req, res) => {
+      -  if (!req.user.isAdmin) return res.status(403).end();
+         const user = await db.users.findById(req.params.id);
+         res.json(user);
+       });
+      ```
+
+      The dimension body instructs OWASP tagging. Produce the finding using the format defined in
+      plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md §2 (Output Format for findings) — the
+      OWASP slot is optional but REQUIRED here because the dimension body asks for it.
+  assert:
+    - type: regex
+      value: '\*\*OWASP\*\*:?\s*A01'
+    - type: regex
+      value: '(?i)\*\*Severity\*\*:?\s*critical'
+    - type: llm-rubric
+      value: >
+        The response surfaces a security-review finding for the removed admin authorization check.
+        The finding includes a **OWASP:** field set to A01 (broken access control) and a
+        **Severity:** of critical, matching the OWASP defaults from EXAMPLES.md security-review.
+        The finding follows the format from REFERENCE.md §2.
+
+- description: "review-sdlc: OWASP A02 — finding tagged with category (issue #272)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
+    skill_content: |
+      You are running the review-sdlc security-review dimension subagent against this diff:
+
+      ```
+      --- a/src/auth/password.ts
+      +++ b/src/auth/password.ts
+      @@ -3,5 +3,7 @@
+      -import { scryptSync, randomBytes } from 'node:crypto';
+      +import { createHash } from 'node:crypto';
+      +export function hashPassword(pw: string) {
+      +  return createHash('md5').update(pw).digest('hex');
+      +}
+      ```
+
+      The dimension body instructs OWASP tagging. Produce the finding per REFERENCE.md §2.
+  assert:
+    - type: regex
+      value: '\*\*OWASP\*\*:?\s*A02'
+    - type: regex
+      value: '(?i)\*\*Severity\*\*:?\s*critical'
+    - type: llm-rubric
+      value: >
+        The response surfaces a security-review finding for the introduction of MD5 password hashing.
+        The finding is tagged **OWASP:** A02 (cryptographic failures) and **Severity:** critical,
+        matching the OWASP defaults from EXAMPLES.md security-review.
+
+- description: "review-sdlc: OWASP A03 — finding tagged with category (issue #272)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
+    skill_content: |
+      You are running the review-sdlc security-review dimension subagent against this diff:
+
+      ```
+      --- a/src/users/search.ts
+      +++ b/src/users/search.ts
+      @@ -8,3 +8,5 @@
+      -const rows = await db.prepared('SELECT * FROM users WHERE email = ?').all(req.query.q);
+      +const rows = await db.exec("SELECT * FROM users WHERE email = '" + req.query.q + "'");
+      ```
+
+      The dimension body instructs OWASP tagging. Produce the finding per REFERENCE.md §2.
+  assert:
+    - type: regex
+      value: '\*\*OWASP\*\*:?\s*A03'
+    - type: regex
+      value: '(?i)\*\*Severity\*\*:?\s*critical'
+    - type: llm-rubric
+      value: >
+        The response surfaces a security-review finding for the SQL string concatenation introducing
+        injection. The finding is tagged **OWASP:** A03 (injection) and **Severity:** critical,
+        matching the OWASP defaults.
+
+- description: "review-sdlc: OWASP A04 — finding tagged with category (issue #272)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
+    skill_content: |
+      You are running the review-sdlc security-review dimension subagent against this diff:
+
+      ```
+      --- a/src/auth/login.ts
+      +++ b/src/auth/login.ts
+      @@ -2,6 +2,8 @@
+       router.post('/login', async (req, res) => {
+      -  await rateLimit(req.ip);
+         const user = await users.findByEmail(req.body.email);
+         if (!await verify(user, req.body.password)) return res.status(401).end();
+         res.json(await issueToken(user));
+       });
+      ```
+
+      The dimension body instructs OWASP tagging. The removal of the rate-limit guard exposes the
+      login endpoint to credential stuffing — an insecure-design omission. Produce the finding.
+  assert:
+    - type: regex
+      value: '\*\*OWASP\*\*:?\s*A04'
+    - type: regex
+      value: '(?i)\*\*Severity\*\*:?\s*high'
+    - type: llm-rubric
+      value: >
+        The response surfaces a security-review finding for the removal of rate limiting on login.
+        The finding is tagged **OWASP:** A04 (insecure design) and **Severity:** high, matching
+        the OWASP defaults from EXAMPLES.md security-review.
+
+- description: "review-sdlc: OWASP A05 — finding tagged with category (issue #272)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
+    skill_content: |
+      You are running the review-sdlc security-review dimension subagent against this diff:
+
+      ```
+      --- a/src/server.ts
+      +++ b/src/server.ts
+      @@ -4,6 +4,7 @@
+       import cors from 'cors';
+      -app.use(cors({ origin: 'https://app.example.com' }));
+      +app.use(cors({ origin: '*', credentials: true }));
+       app.use('/api', apiRouter);
+      ```
+
+      The dimension body instructs OWASP tagging. Produce the finding per REFERENCE.md §2.
+  assert:
+    - type: regex
+      value: '\*\*OWASP\*\*:?\s*A05'
+    - type: regex
+      value: '(?i)\*\*Severity\*\*:?\s*high'
+    - type: llm-rubric
+      value: >
+        The response surfaces a security-review finding for the overly permissive CORS configuration
+        (origin '*' with credentials true). The finding is tagged **OWASP:** A05 (security
+        misconfiguration) and **Severity:** high.
+
+- description: "review-sdlc: OWASP A06 — finding tagged with category (issue #272)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
+    skill_content: |
+      You are running the review-sdlc security-review dimension subagent against this diff:
+
+      ```
+      --- a/package.json
+      +++ b/package.json
+      @@ -10,3 +10,4 @@
+         "dependencies": {
+      +    "lodash": "4.17.4",
+           "express": "^4.19.2"
+         }
+      ```
+
+      lodash@4.17.4 is known-vulnerable (CVE-2019-10744 prototype pollution). The dimension body
+      instructs OWASP tagging. Produce the finding.
+  assert:
+    - type: regex
+      value: '\*\*OWASP\*\*:?\s*A06'
+    - type: regex
+      value: '(?i)\*\*Severity\*\*:?\s*high'
+    - type: llm-rubric
+      value: >
+        The response surfaces a security-review finding for adding a dependency at a version with
+        a known CVE. The finding is tagged **OWASP:** A06 (vulnerable & outdated components) and
+        **Severity:** high.
+
+- description: "review-sdlc: OWASP A07 — finding tagged with category (issue #272)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
+    skill_content: |
+      You are running the review-sdlc security-review dimension subagent against this diff:
+
+      ```
+      --- a/src/routes/billing.ts
+      +++ b/src/routes/billing.ts
+      @@ -2,6 +2,7 @@
+       const router = express.Router();
+      -router.post('/billing/charge', requireAuth, chargeHandler);
+      +router.post('/billing/charge', chargeHandler);
+       export default router;
+      ```
+
+      The dimension body instructs OWASP tagging. The auth middleware was removed from a sensitive
+      route — an authentication failure. Produce the finding.
+  assert:
+    - type: regex
+      value: '\*\*OWASP\*\*:?\s*A07'
+    - type: regex
+      value: '(?i)\*\*Severity\*\*:?\s*critical'
+    - type: llm-rubric
+      value: >
+        The response surfaces a security-review finding for the removal of authentication from a
+        billing endpoint. The finding is tagged **OWASP:** A07 (identification & authentication
+        failures) and **Severity:** critical, matching the OWASP defaults.
+
+- description: "review-sdlc: OWASP A08 — finding tagged with category (issue #272)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
+    skill_content: |
+      You are running the review-sdlc security-review dimension subagent against this diff:
+
+      ```
+      --- a/src/jobs/import.ts
+      +++ b/src/jobs/import.ts
+      @@ -3,4 +3,5 @@
+       import { unserialize } from 'node-serialize';
+       export async function processJob(payload: string) {
+      -  const data = JSON.parse(payload);
+      +  const data = unserialize(payload);
+         await ingest(data);
+       }
+      ```
+
+      The dimension body instructs OWASP tagging. The change introduces untrusted deserialisation —
+      a software/data integrity failure. Produce the finding.
+  assert:
+    - type: regex
+      value: '\*\*OWASP\*\*:?\s*A08'
+    - type: regex
+      value: '(?i)\*\*Severity\*\*:?\s*high'
+    - type: llm-rubric
+      value: >
+        The response surfaces a security-review finding for replacing JSON.parse with the unsafe
+        `unserialize` API on user-supplied data. The finding is tagged **OWASP:** A08 (software &
+        data integrity failures) and **Severity:** high.
+
+- description: "review-sdlc: OWASP A09 — finding tagged with category (issue #272)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
+    skill_content: |
+      You are running the review-sdlc security-review dimension subagent against this diff:
+
+      ```
+      --- a/src/auth/login.ts
+      +++ b/src/auth/login.ts
+      @@ -8,6 +8,5 @@
+       export async function handleLogin(req, res) {
+         const user = await users.findByEmail(req.body.email);
+         if (!await verify(user, req.body.password)) {
+      -    auditLogger.warn('login_failed', { email: req.body.email, ip: req.ip });
+           return res.status(401).end();
+         }
+       }
+      ```
+
+      The dimension body instructs OWASP tagging. Audit logging for failed logins was removed.
+      Produce the finding.
+  assert:
+    - type: regex
+      value: '\*\*OWASP\*\*:?\s*A09'
+    - type: regex
+      value: '(?i)\*\*Severity\*\*:?\s*medium'
+    - type: llm-rubric
+      value: >
+        The response surfaces a security-review finding for the removal of failed-login audit
+        logging. The finding is tagged **OWASP:** A09 (security logging & monitoring failures) and
+        **Severity:** medium, matching the OWASP defaults.
+
+- description: "review-sdlc: OWASP A10 — finding tagged with category (issue #272)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/review-sdlc/REFERENCE.md"
+    user_request: "Produce the security finding for the diff above."
+    skill_content: |
+      You are running the review-sdlc security-review dimension subagent against this diff:
+
+      ```
+      --- a/src/proxy/fetch.ts
+      +++ b/src/proxy/fetch.ts
+      @@ -2,5 +2,5 @@
+       export async function proxy(req, res) {
+      -  if (!isAllowedHost(req.query.url)) return res.status(400).end();
+         const upstream = await fetch(req.query.url);
+         res.send(await upstream.text());
+       }
+      ```
+
+      The dimension body instructs OWASP tagging. The host-allowlist check was removed before a
+      fetch driven by user-controlled input — an SSRF vector. Produce the finding.
+  assert:
+    - type: regex
+      value: '\*\*OWASP\*\*:?\s*A10'
+    - type: regex
+      value: '(?i)\*\*Severity\*\*:?\s*high'
+    - type: llm-rubric
+      value: >
+        The response surfaces a security-review finding for the removal of the URL allowlist check
+        on a server-side fetch driven by user input. The finding is tagged **OWASP:** A10 (SSRF)
+        and **Severity:** high.

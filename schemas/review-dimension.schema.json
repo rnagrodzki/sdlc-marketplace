@@ -39,6 +39,10 @@
     },
     "requires-full-diff": {
       "type": "boolean"
+    },
+    "model": {
+      "type": "string",
+      "enum": ["haiku", "sonnet", "opus"]
     }
   },
   "required": ["name", "description", "triggers"],

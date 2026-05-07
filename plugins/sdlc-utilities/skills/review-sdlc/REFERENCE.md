@@ -190,6 +190,7 @@ Return your findings as a structured list. Each finding MUST follow this exact f
 - **File**: {relative file path}
 - **Line**: {line number or range, e.g., 42 or 42-48}
 - **Severity**: {critical|high|medium|low|info}
+- **OWASP**: {A01–A10, OPTIONAL — populate ONLY when the dimension body instructs OWASP tagging; omit this line entirely for any other dimension}
 - **Title**: {one-line summary, max 80 chars}
 - **Description**: {what is wrong and why it matters, 1-3 sentences}
 - **Suggestion**: {how to fix it, 1-3 sentences — "N/A" if no clear fix}
@@ -237,7 +238,7 @@ After all subagents complete and findings are deduplicated, post this as a singl
 <summary>{critical} critical · {high} high · {medium} medium · {low} low · {info} info</summary>
 
 #### [{SEVERITY}] {title}
-**File:** `{file}:{line}`
+**File:** `{file}:{line}`{if OWASP set: ` · OWASP {OWASP}`}
 {description}
 **Suggestion:** {suggestion}
 
@@ -245,6 +246,8 @@ After all subagents complete and findings are deduplicated, post this as a singl
 
 ---
 ```
+
+**OWASP rendering rule:** When the finding contains an `**OWASP:**` value, append ` · OWASP {code}` to the File line (e.g., ``**File:** `src/auth/login.ts:42` · OWASP A07``). Omit the suffix entirely when the field is absent. The OWASP slot is opt-in per dimension — only dimensions whose body explicitly instructs OWASP tagging will populate it.
 
 **Verdict computation:**
 - `CHANGES REQUESTED` — any `critical` finding, or ≥ 3 `high` findings
