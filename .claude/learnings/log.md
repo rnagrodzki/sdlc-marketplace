@@ -3,6 +3,12 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-07 — version-sdlc: patch bump with feat commit in history
+Explicit `patch` bump requested via pipeline with a `feat:` commit present (suggestedBump was `minor`). Auto mode accepted the override without conflict. Branch had no upstream — `--set-upstream` was auto-applied on push.
+
+## 2026-05-07 — pr-sdlc: planning-discipline guardrails PR (#280)
+PR for five new plan-only guardrails in `guardrails.js`. Title pattern `^(feat|fix|...)\(#\d+\): .+ - .+$` required a ` - ` separator; initial title draft at 82 chars was trimmed to 62 by shortening the scope segment. Custom template active from `.sdlc/pr-template.md`; all 7 sections filled from diff and commit body. Label mode=llm inferred `enhancement` from `feat/` branch prefix. Uncommitted changes warning surfaced but did not block PR creation.
+
 ## 2026-05-07 — pr-sdlc: dual-issue fix PR (#275, #276) with custom template
 PR body used custom template from `.sdlc/pr-template.md`. Both "Fixes #275" and "Fixes #276" placed in the Github Issue section per plan guardrail. Title used first issue number `fix(#275)` to satisfy the `^(fix)\(#\d+\): .+ - .+$` pattern constraint — secondary issue covered in body. Labels mode=llm inferred `bug` from `fix/` branch prefix. Uncommitted changes warning was surfaced (1 file) but did not block PR creation.
 
