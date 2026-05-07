@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.8] - 2026-05-07
+
+### Fixed
+- setup-sdlc: default configuration flow now walks every configurable field with keep/change/unset actions; `--force` re-prompts all values; end-of-run diff preview shown before any config write; zero-change writes skipped (#235)
+- setup-sdlc: clarified `--force` flag description and added `--unset-only` cross-reference in docs (#228)
+- pr-sdlc: added `expectedAccount` field (defaults to origin remote owner) to validate PR target account (#234)
+- pr-sdlc: PR template now scaffolds to `.sdlc/pr-template.md`; deprecated `.claude/pr-template.md` path no longer written (#234)
+- pr-sdlc: removed redundant preflight halt block already covered by `errors[]` check (#228)
+- Shell quoting hardened in diff preview block to prevent injection (#228)
+
 ## [0.18.7] - 2026-05-07
 
 ### Fixed
