@@ -8,7 +8,12 @@ module.exports = (output) => {
   // The provider auto-read returned the JSON content. The script also wrote
   // its tmp file at a known path inside JSON; reuse that path for the dst-log
   // base, then drive a fresh --output-file invocation against an isolated tmp tree.
-  const drafts = JSON.parse(output);
+  let drafts;
+  try {
+    drafts = JSON.parse(output);
+  } catch (e) {
+    return { pass: false, score: 0, reason: `output is not valid JSON: ${e.message}` };
+  }
   const fixtureDir = path.dirname(path.dirname(path.dirname(drafts.logPath)));
   const repoRoot = fixtureDir.replace(/\/tests\/promptfoo\/fixtures-fs\/[^/]+$/, '');
   const helper = path.join(repoRoot, '.claude', 'scripts', 'harvest-learnings.js');
@@ -25,6 +30,9 @@ module.exports = (output) => {
   const tmpStdout = execFileSync('node', [helper, '--output-file'], { cwd: tmp, env, encoding: 'utf8' }).trim();
   const draftsTmp = JSON.parse(fs.readFileSync(tmpStdout, 'utf8'));
   const target = draftsTmp.clusters.find(c => c.skill === 'skill-beta');
+  if (!target) {
+    return { pass: false, score: 0, reason: `cluster 'skill-beta' not found in drafts; available: ${(draftsTmp.clusters || []).map(c => c.skill).join(', ')}` };
+  }
 
   const approvedFile = path.join(tmp, 'approved.json');
   fs.writeFileSync(approvedFile, JSON.stringify({ approvedClusterIds: [target.id] }));
