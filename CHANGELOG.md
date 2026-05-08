@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Migration
 - v3 → v4 LOCAL config migration runs automatically on first read: legacy boolean `ship.verifyPipeline: true` / `ship.awaitReview: true` are rewritten as `verify-pipeline` / `await-remote-review` entries appended to `ship.steps[]`; `awaitReview*` tunable keys are renamed to `awaitRemoteReview*` (values preserved); legacy keys are removed.
 
+## [0.19.1] - 2026-05-08
+
+### Added
+- docs: updated configuration references to use current schema version (v4)
+
+### Fixed
+- ship-sdlc: added error guards for missing script resolution
+- verify-pipeline-sdlc: fixed dynamic script path resolution
+- await-review.js: removed bogus state marker that prematurely signaled completion
+
 ## [0.19.0] - 2026-05-08
 
 ### Added
