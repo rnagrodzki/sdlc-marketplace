@@ -16,9 +16,18 @@
  *     blobs (CHANGELOG content, freeform notes) where no file structure
  *     exists. Returns the prefix and a `truncated` flag.
  *
- * Defaults: `truncateDiff` uses 8000 bytes (commit.js's historical
- * value); `truncateText` uses no default — callers must supply
- * `maxBytes` because the right cap is content-specific.
+ * Defaults: `truncateDiff` uses 8000 (commit.js's historical value);
+ * `truncateText` uses no default — callers must supply `maxBytes`
+ * because the right cap is content-specific.
+ *
+ * NOTE on units: `maxBytes` is a historical name retained for API
+ * stability. The cap is enforced against `String.length`, which counts
+ * UTF-16 code units rather than bytes — a string with non-BMP
+ * characters (e.g. emoji) will use 2 code units per character but
+ * encode to 4 UTF-8 bytes. For ASCII-dominant inputs (the typical
+ * staged diff and CHANGELOG case) the difference is negligible. If a
+ * caller needs a true byte budget, measure with `Buffer.byteLength`
+ * before calling.
  *
  * Issue #284, task 20 — replaces the file-aware copy in commit.js
  * and the two raw `slice(0, 5000)` sites in version.js.
@@ -41,7 +50,7 @@ const DEFAULT_DIFF_MAX_BYTES = 8000;
  * @param {string} fullDiff
  * @param {object} opts
  * @param {Function} opts.splitDiffByFile  Injected splitter (Map<file, chunk>)
- * @param {number}  [opts.maxBytes=8000]
+ * @param {number}  [opts.maxBytes=8000]  Cap measured in UTF-16 code units (`String.length`), not bytes — see module header.
  * @returns {{ diff: string, diffTruncated: boolean, truncatedFiles: string[] }}
  */
 function truncateDiff(fullDiff, { splitDiffByFile, maxBytes = DEFAULT_DIFF_MAX_BYTES } = {}) {
@@ -99,7 +108,7 @@ function truncateDiff(fullDiff, { splitDiffByFile, maxBytes = DEFAULT_DIFF_MAX_B
  *
  * @param {string} text
  * @param {object} opts
- * @param {number} opts.maxBytes  Required.
+ * @param {number} opts.maxBytes  Required. Cap measured in UTF-16 code units (`String.length`), not bytes — see module header.
  * @returns {{ text: string, truncated: boolean }}
  */
 function truncateText(text, { maxBytes } = {}) {

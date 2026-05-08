@@ -60,8 +60,13 @@ function writeOutput(data, prefix, exitCode = 0) {
  * one-shot CLIs (e.g. migrate-config) whose historical output was
  * `JSON.stringify(obj, null, 2)` — passing `indent: 2` preserves that.
  *
+ * Back-compat: the legacy call shape `writeJsonLine(obj, exitCode)` —
+ * with the second argument as a bare integer rather than an options
+ * object — is still accepted and treated as `{ exitCode }`. New
+ * callers should use the options-object form.
+ *
  * @param {object} obj
- * @param {object} [opts]
+ * @param {object|number} [opts]  Options object, or a bare integer exit code (legacy shim).
  * @param {number} [opts.exitCode=0]
  * @param {number|null} [opts.indent=null]  passed to JSON.stringify as 3rd arg
  */
