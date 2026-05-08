@@ -576,8 +576,9 @@ function isGhCreatePrPermissionError(errorText) {
  *
  * For test injection (so promptfoo exec tests can run hermetically), pass
  * `accounts`, `remote`, and optionally `fallbackAccounts` directly instead of
- * letting the function call gh. `fallbackAccounts` is only consulted when
- * `opts.dryRun` is set (mirrors the `accounts` injection pattern).
+ * letting the function call gh. The library accepts `fallbackAccounts` in any
+ * call (regardless of `dryRun`); the `pr-recover-gh-account` CLI enforces the
+ * dry-run-only wiring at the argument-parsing layer.
  *
  * @param {string} projectRoot
  * @param {string} errorText

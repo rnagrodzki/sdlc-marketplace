@@ -109,3 +109,21 @@
       value: '"switched":true'
     - type: not-icontains
       value: '"viaFallback"'
+
+- description: "pr-recover: --fallback-accounts-file is silently ignored when --host github.com"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js"
+    script_args: "--dry-run --accounts-file accounts.json --fallback-accounts-file fallback-accounts.json --owner Cleeng --host github.com --error-file perm-error.txt"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-recover-match"
+  assert:
+    - type: icontains
+      value: '"recovered":true'
+    - type: icontains
+      value: '"switched":true'
+    - type: icontains
+      value: '"account":"Cleeng"'
+    - type: not-icontains
+      value: '"viaFallback"'
+    - type: not-icontains
+      value: 'someone-else'
