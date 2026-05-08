@@ -137,6 +137,12 @@ Hooks are defined in `plugins/<plugin>/hooks/hooks.json`. Available hook points:
 
 See [adding-hooks.md](adding-hooks.md) for the complete list of hook events.
 
+### Cost Tiers
+
+Each skill and orchestrator agent pins a `model:` in its frontmatter to control which Claude tier executes it. Mechanical surfaces (commit messages, version bumps) run on Haiku; reasoning-heavy surfaces (plan decomposition, review-comment triage) run on Opus; the rest run on Sonnet. Per-call overrides at dispatch sites (e.g., `ship.js`, `execute.js`, `review.js`) take precedence over frontmatter at runtime.
+
+See [cost-tiers.md](cost-tiers.md) for the full skill/agent table, resolution precedence, and dispatch-site override list.
+
 ## Adding a New Plugin
 
 To add another plugin to this marketplace:

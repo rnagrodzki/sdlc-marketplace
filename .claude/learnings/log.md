@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-08 — version-sdlc: patch release v0.18.14 from feature branch chore/229-cost-tier-model-assignments
+First push from this branch used --set-upstream; tag pushed separately via git push --tags. Single feat commit (guardrails) landed as patch per explicit pipeline request despite minor being suggested by conventional commits.
+
 ## 2026-05-07 — version-sdlc: patch bump with feat commit in history
 Explicit `patch` bump requested via pipeline with a `feat:` commit present (suggestedBump was `minor`). Auto mode accepted the override without conflict. Branch had no upstream — `--set-upstream` was auto-applied on push.
 
@@ -215,3 +218,8 @@ Explicit patch bump requested despite suggestedBump=minor (feat commit present).
 - Plan flagged 3 ship-prepare exec rows but one was infeasible: `reviewThreshold` is config-only, not a CLI flag, so `--review-threshold unknown` rejection cannot be tested via CLI. Reframed the third row to assert source-tracking (`"reviewThreshold": "config"`) instead. Lesson: when a plan task lists "X exec rows" verify each row is testable against the actual CLI surface before authoring.
 - Plan asked for 5 jira test rows; integrated 2 lib-level assertions (null-strip, ADF dispatch) into the existing helper-payload-hash and helper-placeholder rows rather than spawning new helper rows — extending in-place keeps the helper RESULT line atomic and avoids parallel rows that share state. Lesson: row count in a plan is a coverage proxy, not a strict requirement; merge-into-existing-row is fine when the assertion fits the same op.
 - ship-prepare auto-migrates fixture local.json to schemaVersion 3 on every run, leaving `*.bak.*` and `.gitignore` files in the fixture tree. Pre-existing fixtures absorb this silently because they were already migrated; brand-new fixtures emit backup files that pollute git status. Lesson: when adding new ship-fixture configs, run prepare once locally and clean up backup artifacts before final commit, or write the fixture in already-migrated v3 shape.
+
+## 2026-05-08 — execute-plan-sdlc: cost-tier model assignments (#229)
+- Plan task description put fixtures at `tests/promptfoo/fixtures-fs/cost-tiers-clean/skills/...` (flat layout) but my initial validator hardcoded `<root>/plugins/sdlc-utilities/skills`. Lesson: when a plan specifies fixture paths, read them carefully BEFORE writing the code that scans them — adapt the validator's path resolver (with a real-vs-fixture fallback) rather than reshaping the fixture tree. Adding `resolveSkillsDir`/`resolveAgentsDir` with real → flat fallback was the right move.
+- Local promptfoo install failed with Node ABI mismatch (better-sqlite3 NODE_MODULE_VERSION 141 vs Node 26's 147). Targeted eval was blocked but the dataset YAML structure was verifiable by direct `node validate-cost-tiers.js` runs against fixtures — exit codes and output strings matched the dataset assertions exactly. Lesson: when promptfoo is broken locally, validate dataset assertions by running the script directly with the same args/cwd the provider would use, then check the YAML's `icontains`/`not-icontains` strings against actual output.
+- Tool environment lacked Agent/Task dispatch tool, only SendMessage/TeamCreate. Skill normally builds wave structure for agent dispatch; with no Agent tool available, executed inline. Lesson: when execute-plan-sdlc runs in an environment without the Agent tool, fall back to inline execution rather than blocking — most plans have well-scoped enough tasks that inline succeeds, and the wave structure still informs which edits are independent (parallelizable Edit calls) versus serial.

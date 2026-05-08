@@ -1,0 +1,31 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/ci/validate-cost-tiers.js (#229).
+# Verifies the validator exits 0 against a clean fixture and exits 1 with a DRIFT
+# line against a fixture whose frontmatter disagrees with docs/cost-tiers.md.
+
+- description: "validate-cost-tiers: clean fixture exits 0"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-cost-tiers.js"
+    script_args: "--root {{project_root}}"
+    project_root: "file://fixtures-fs/cost-tiers-clean"
+  assert:
+    # Exit code 0: validator emits no findings on stdout
+    - type: not-icontains
+      value: "DRIFT:"
+    - type: not-icontains
+      value: "MISSING_DOC:"
+    - type: not-icontains
+      value: "STALE_DOC:"
+
+- description: "validate-cost-tiers: drift fixture exits 1 with DRIFT line"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-cost-tiers.js"
+    script_args: "--root {{project_root}}"
+    project_root: "file://fixtures-fs/cost-tiers-drift"
+  assert:
+    # Validator must report the drift on example-skill (frontmatter=opus, doc=sonnet)
+    - type: icontains
+      value: "DRIFT: example-skill"
+    - type: icontains
+      value: "frontmatter=opus"
+    - type: icontains
+      value: "doc=sonnet"

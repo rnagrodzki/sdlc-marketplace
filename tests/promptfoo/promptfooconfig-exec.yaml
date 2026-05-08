@@ -44,3 +44,4 @@ tests:
   - file://datasets/harvest-learnings-exec.yaml
   - file://datasets/migrate-config-exec.yaml
   - file://datasets/config-load-exec.yaml
+  - file://datasets/validate-cost-tiers-exec.yaml
