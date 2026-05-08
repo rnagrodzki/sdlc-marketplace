@@ -154,6 +154,8 @@ plan-sdlc      (--auto if     (--committed)
 
   Findings below the threshold are deferred to the pipeline summary.
 
+  **Correlation with `receivedReview.alwaysFixSeverities`:** These two settings must be aligned. `reviewThreshold` gates whether `received-review-sdlc` is dispatched at all; `alwaysFixSeverities` controls what gets auto-implemented once it is running. Setting `alwaysFixSeverities: ["critical","high","medium","low"]` while keeping `reviewThreshold: "high"` has no effect on medium/low findings — the fix loop never starts. Set `reviewThreshold` to the lowest severity in your `alwaysFixSeverities` list (e.g. `"low"`) so the two values are consistent.
+
 ---
 
 ## What Gets Printed

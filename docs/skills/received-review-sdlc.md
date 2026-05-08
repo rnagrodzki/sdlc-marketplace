@@ -69,6 +69,8 @@ R18 — others are replied to but left open.
 }
 ```
 
+**Correlation with `ship.reviewThreshold`:** `alwaysFixSeverities` only takes effect when `received-review-sdlc` is actually invoked. In the ship pipeline, the dispatch gate is `ship.reviewThreshold` — if a finding's severity is below that threshold, `received-review-sdlc` never runs and `alwaysFixSeverities` is never evaluated. Keep `reviewThreshold` ≤ the lowest severity in `alwaysFixSeverities`. Example: `alwaysFixSeverities: ["critical","high","medium","low"]` requires `reviewThreshold: "low"`.
+
 To configure interactively, run `/setup-sdlc --only received-review`.
 
 ---
