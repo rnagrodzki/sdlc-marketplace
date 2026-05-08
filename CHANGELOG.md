@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Migration
 - v3 → v4 LOCAL config migration runs automatically on first read: legacy boolean `ship.verifyPipeline: true` / `ship.awaitReview: true` are rewritten as `verify-pipeline` / `await-remote-review` entries appended to `ship.steps[]`; `awaitReview*` tunable keys are renamed to `awaitRemoteReview*` (values preserved); legacy keys are removed.
 
+## [0.19.3] - 2026-05-08
+
+### Added
+- plan-sdlc: added stop-plan-integrity hook to verify plan traverses all quality gates when presenting release plan (#285)
+
+### Fixed
+- plan-sdlc: fixed $SCRIPT scope bug in Step 5 marker blocks — each --mark block now re-resolves independently to ensure correct path resolution (#285)
+- plan-integrity: deferred stdin I/O to fallback path only, eliminating synchronous blocking on common execution path (#285)
+
 ## [0.19.2] - 2026-05-08
 
 ### Changed

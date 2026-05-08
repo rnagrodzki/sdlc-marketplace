@@ -62,3 +62,41 @@
     # flag-resolution-single-source is plan-only, NOT execute
     - type: not-icontains
       value: '"id":"flag-resolution-single-source"'
+
+# --- planIntegrity marker writes (R20, issue #285) ---
+
+- description: "plan-prepare: --output-file writes plan state file with skillInvoked and all four markers via --mark (#285)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-plan-integrity-markers.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-integrity"
+  assert:
+    - type: icontains
+      value: '"stateFileCreated": true'
+    - type: icontains
+      value: '"skillInvoked": true'
+    - type: icontains
+      value: '"planFile": true'
+    - type: icontains
+      value: '"guardrailsEvaluated": true'
+    - type: icontains
+      value: '"critiqueRan": true'
+    - type: icontains
+      value: '"planFilePathSet": true'
+    - type: icontains
+      value: '"allPresent": true'
+
+- description: "plan-prepare: --mark with unknown name exits non-zero and lists valid names (#285)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-plan-mark-validation.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-integrity"
+  assert:
+    - type: icontains
+      value: '"exitCode": 1'
+    - type: icontains
+      value: '"stderrContainsValidNames": true'
+    - type: icontains
+      value: '"stderrMentionsPath": true'
+    - type: icontains
+      value: '"stderrMentionsOutputFile": true'

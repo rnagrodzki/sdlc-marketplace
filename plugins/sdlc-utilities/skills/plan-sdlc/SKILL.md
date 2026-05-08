@@ -139,6 +139,19 @@ Naming convention: `YYYY-MM-DD-<feature-name>.md`. Create the directory if neede
 
 **Plan mode:** Write to the designated plan file path. Skip path resolution.
 
+**planFile marker (implements R20, issue #285; consumed by `hooks/stop-plan-integrity.js` per R21):** After path resolution, record the resolved plan path in the plan integrity state. Run in both plan-mode and normal-mode branches. Errors are swallowed — marker writes must not block plan creation.
+
+Each `--mark` block re-resolves `$SCRIPT` independently: SKILL.md bash blocks each run as a separate Bash tool invocation, so shell variables do NOT persist across blocks.
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan.js"
+# writes planIntegrity marker consumed by stop-plan-integrity Stop hook (issue #285)
+[ -n "$SCRIPT" ] && node "$SCRIPT" --mark plan-file --path "<resolved-plan-path>" 2>/dev/null || true
+```
+
+Replace `<resolved-plan-path>` with the actual absolute path: in plan mode it is the designated plan file path extracted at the top of Step 0; in normal mode it is the path resolved above (from `plansDirectory` or the default fallback).
+
 ## Step 1 (CONSUME): Requirements Discovery and Exploration
 
 **`fromOpenspecDirect` enrichment:** When `fromOpenspecDirect` is true (set by `--from-openspec` handling in Step 0):
@@ -265,6 +278,24 @@ Check each quality gate:
 | Guardrail compliance | For each guardrail in `activeGuardrails`: evaluate whether the plan (as written) satisfies its `description`. Report each as PASS or FAIL with a one-line rationale. Guardrails with `severity: "error"` (or no severity, defaulting to error) that FAIL are blocking — they must be fixed in Step 4. Guardrails with `severity: "warning"` that FAIL are advisory — note them but do not block. |
 
 Note every issue. Do NOT write to the plan file in this step.
+
+**guardrailsEvaluated marker (implements R20, issue #285):** After completing the guardrail-compliance gate evaluation above, record the checkpoint. Each `--mark` block re-resolves `$SCRIPT` because SKILL.md bash blocks do not share shell state.
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan.js"
+# writes planIntegrity marker consumed by stop-plan-integrity Stop hook (issue #285)
+[ -n "$SCRIPT" ] && node "$SCRIPT" --mark guardrailsEvaluated 2>/dev/null || true
+```
+
+**critiqueRan marker (implements R20, issue #285):** After all Step 3 checks are complete (this is the final action of Step 3), record the checkpoint.
+
+```bash
+SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan.js"
+# writes planIntegrity marker consumed by stop-plan-integrity Stop hook (issue #285)
+[ -n "$SCRIPT" ] && node "$SCRIPT" --mark critiqueRan 2>/dev/null || true
+```
 
 ## Step 4 (IMPROVE): Revise Plan and Present for Approval
 

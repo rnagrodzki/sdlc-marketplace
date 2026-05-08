@@ -6,10 +6,14 @@
  *
  * Usage:
  *   node plan-prepare.js [--from-openspec <change-name>] [--output-file]
+ *   node plan-prepare.js --mark <name> [--path <abs>]
  *
  * Options:
  *   --from-openspec <name>  Validate a specific OpenSpec change for direct bridging
  *   --output-file           Write JSON to temp file, print path (default: stdout)
+ *   --mark <name>           Update the latest plan state file with a checkpoint marker.
+ *                           Valid names: plan-file, guardrailsEvaluated, critiqueRan
+ *   --path <abs>            Absolute path to the plan file (required when --mark plan-file)
  *
  * Exit codes: 0 = success, 1 = validation error, 2 = unexpected crash
  * Stdout: JSON (or file path with --output-file)
@@ -27,6 +31,22 @@ const { detectActiveChanges, validateChange } = require(path.join(LIB, 'openspec
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
+const { initState, findStateFile, readState, writeState, slugifyBranch } = require(path.join(LIB, 'state'));
+const { exec } = require(path.join(LIB, 'git'));
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const VALID_MARK_NAMES = ['plan-file', 'guardrailsEvaluated', 'critiqueRan'];
+
+/**
+ * Map CLI --mark name to the JSON key in planIntegrity.
+ * 'plan-file' → 'planFile'; others map identity.
+ */
+function markerKey(name) {
+  return name === 'plan-file' ? 'planFile' : name;
+}
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -35,15 +55,74 @@ const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, '
 function parseArgs(argv) {
   const args = argv.slice(2);
   let fromOpenspec = null;
+  let markName = null;
+  let markPath = null;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--from-openspec' && args[i + 1]) {
       fromOpenspec = args[++i];
+    } else if (args[i] === '--mark' && args[i + 1]) {
+      markName = args[++i];
+    } else if (args[i] === '--path' && args[i + 1]) {
+      markPath = args[++i];
     }
     // --output-file is handled by writeOutput
   }
 
-  return { fromOpenspec };
+  return { fromOpenspec, markName, markPath };
+}
+
+// ---------------------------------------------------------------------------
+// --mark mode: update the latest plan state file with a checkpoint marker
+// ---------------------------------------------------------------------------
+
+function runMarkMode(markName, markPath) {
+  if (!VALID_MARK_NAMES.includes(markName)) {
+    process.stderr.write(
+      `[plan-prepare] --mark: unknown marker name "${markName}". ` +
+      `Valid names: ${VALID_MARK_NAMES.join(', ')}\n`
+    );
+    process.exit(1);
+  }
+
+  if (markName === 'plan-file' && !markPath) {
+    process.stderr.write('[plan-prepare] --mark plan-file requires --path <abs>\n');
+    process.exit(1);
+  }
+
+  const branch = exec('git branch --show-current');
+  if (!branch) {
+    process.stderr.write('[plan-prepare] --mark: could not determine current branch\n');
+    process.exit(1);
+  }
+
+  const branchSlug = slugifyBranch(branch);
+  const found = findStateFile('plan', branchSlug);
+  if (!found) {
+    process.stderr.write(
+      `[plan-prepare] --mark: no plan state file found for branch "${branch}". ` +
+      `Run plan-prepare.js --output-file first.\n`
+    );
+    process.exit(1);
+  }
+
+  const existing = readState('plan', branchSlug);
+  const data = (existing && existing.data) ? existing.data : {};
+
+  if (!data.planIntegrity || typeof data.planIntegrity !== 'object') {
+    data.planIntegrity = {};
+  }
+
+  const key = markerKey(markName);
+  data.planIntegrity[key] = new Date().toISOString();
+
+  if (markName === 'plan-file') {
+    data.planFilePath = markPath;
+  }
+
+  writeState(found.fullPath, data);
+  process.stderr.write(`[plan-prepare] marker "${key}" written to ${found.fullPath}\n`);
+  process.exit(0);
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +130,14 @@ function parseArgs(argv) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const { fromOpenspec } = parseArgs(process.argv);
+  const { fromOpenspec, markName, markPath } = parseArgs(process.argv);
+
+  // --mark mode: short-circuit before normal prepare flow
+  if (markName !== null) {
+    runMarkMode(markName, markPath);
+    return; // runMarkMode calls process.exit(); this is a safeguard
+  }
+
   const projectRoot = process.cwd();
   const errors = [];
 
@@ -62,6 +148,19 @@ function main() {
     for (const e of cv.errors) errors.push(`config-version: ${e.role}: ${e.message}`);
     writeOutput({ errors, flags: { skipConfigCheck }, migration: cv.migration }, 'plan-prepare', 1);
     return;
+  }
+
+  // Write skillInvoked marker (R20) — plan-sdlc was invoked (issue #285).
+  // Done early so the marker is present even if later steps fail.
+  try {
+    const branch = exec('git branch --show-current');
+    if (branch) {
+      initState('plan', branch, {
+        planIntegrity: { skillInvoked: new Date().toISOString() },
+      });
+    }
+  } catch (_) {
+    // Non-fatal: marker write failures must not block prepare output.
   }
 
   // 1. OpenSpec detection
