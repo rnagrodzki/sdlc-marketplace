@@ -39,7 +39,7 @@
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     project_context: "file://fixtures/ship-pipeline-ready.md"
     user_request: >
-      Run /ship-sdlc --auto --steps execute,commit,review,pr,archive-openspec. Show
+      Run /ship-sdlc --auto --steps execute,commit,review,archive-openspec,pr. Show
       the pipeline plan and demonstrate that --auto mode skips the interactive
       approval prompt. Stop after displaying the pipeline table (do not actually
       invoke sub-skills — treat this as context setup only, not full execution).
@@ -429,7 +429,7 @@
       value: "archive-openspec"
     - type: llm-rubric
       value: >
-        The pipeline table includes an archive-openspec step between commit-fixes and version.
+        The pipeline table includes an archive-openspec step between version and pr.
         The step is shown as conditional (will run if prior steps succeed). The table shows
         the change name "add-auth" in the step args or description.
 
@@ -602,7 +602,7 @@
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     user_request: >
-      The user invoked `/ship-sdlc --has-plan --steps execute,commit,review,pr,verify-pipeline,await-remote-review,archive-openspec,learnings-commit --dry-run`.
+      The user invoked `/ship-sdlc --has-plan --steps execute,commit,review,archive-openspec,pr,verify-pipeline,await-remote-review,learnings-commit --dry-run`.
       Per R59, both new step rows must appear in the pipeline table immediately after `pr`,
       with status `will_run`. Walk through the dry-run output.
   assert:
@@ -652,7 +652,7 @@
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     user_request: >
-      The user invoked `/ship-sdlc --auto --steps execute,commit,review,pr,verify-pipeline,archive-openspec,learnings-commit`.
+      The user invoked `/ship-sdlc --auto --steps execute,commit,review,archive-openspec,pr,verify-pipeline,learnings-commit`.
       The PR was opened, and `verify-pipeline.js` polled CI and emitted
       `{"status":"failed","prNumber":42,"failedChecks":[{"name":"unit","conclusion":"fail","logsExcerpt":"FAIL src/foo.test.ts"}]}`.
       Walk through what ship-sdlc does next, citing the relevant R-numbers from

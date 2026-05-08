@@ -36,6 +36,7 @@ Read the manifest JSON from `MANIFEST_FILE`. The manifest contains:
 | `surfaces.errorReportSkillPath` | Resolved REFERENCE.md path for `error-report-sdlc` |
 | `pipeline.shipState` / `pipeline.executeState` | Optional paused-pipeline state, or `null` |
 | `repository.root` / `repository.branch` / `repository.recentDiffSummary` | Repo metadata |
+| `pluginRepoUrl` | Constant URL of the plugin's GitHub repository (issue #288) — read directly from `MANIFEST_FILE` by SKILL.md (Steps 5c and 6) to construct the user-facing prompt; NOT included in orchestrator output JSON |
 
 If you need the full body of a specific dimension or copilot instruction file to
 draft a proposal, you MAY Read the file via the `path` field in the manifest. Do
@@ -58,6 +59,18 @@ Decide exactly one of:
 
 Produce a one-sentence rationale tied to a verbatim phrase from `failure.text`
 or to a specific manifest field (an `id`, `name`, `severity`, etc.).
+
+### Ambiguous + plugin evidence (issue #288)
+
+When `classification == "ambiguous"`, `errorReportPayload` MAY be non-null **only
+if** the rationale cites plugin evidence: a script crash inside
+`plugins/sdlc-utilities/`, malformed JSON from a sibling agent, a prepare-script
+exit code 2, or a comparable signal pointing at plugin code while user-side
+hardening could still independently apply. Pure user-code ambiguity (no plugin
+signal in the rationale) MUST emit `errorReportPayload: null`. The skill body
+uses the non-null payload to offer an opt-in upstream-report dispatch alongside
+the user-side proposals — the user, not the orchestrator, decides whether to
+file the issue.
 
 ## Step 2 — Decide Per Surface
 
@@ -162,6 +175,32 @@ When `classification == "plugin-defect"`:
   "proposals": []
 }
 ```
+
+When `classification == "ambiguous"` AND the rationale cites plugin evidence
+(issue #288), `errorReportPayload` is populated and `proposals` MAY also be
+non-empty (user-side hardening still applies). `routeToErrorReport` stays
+`false` — the skill body decides whether to dispatch based on the payload's
+presence and the user's answer:
+
+```json
+{
+  "classification": "ambiguous",
+  "classificationRationale": "Failure text references plugins/sdlc-utilities/scripts/skill/ship.js but a user-side guardrail also matches the rationale.",
+  "routeToErrorReport": false,
+  "errorReportPayload": {
+    "skill": "<failure.skill>",
+    "step": "<failure.step>",
+    "operation": "<failure.operation>",
+    "errorText": "<failure.text>",
+    "exitOrHttpCode": "<failure.exitCode or empty>",
+    "errorType": "ambiguous"
+  },
+  "proposals": [ /* zero or more user-side proposals */ ]
+}
+```
+
+When `classification == "ambiguous"` with no plugin evidence, emit
+`errorReportPayload: null` and rely on the user-side proposals only.
 
 No preamble, no explanation, no surrounding markdown fences around the JSON, no
 chain-of-thought.

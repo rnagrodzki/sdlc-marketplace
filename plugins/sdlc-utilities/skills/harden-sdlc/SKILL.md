@@ -213,14 +213,42 @@ Severity vocabulary MUST be preserved per surface (R10):
 The orchestrator already chose the correct vocabulary in its proposal — never
 substitute one vocabulary for the other.
 
+### 5c. Ambiguous upstream-report offer (R-ambig-offer, issue #288)
+
+When `RESULT.classification === "ambiguous"` AND
+`RESULT.errorReportPayload != null`, the orchestrator concluded the failure
+*may* be a plugin defect even though the evidence was not strong enough to
+classify it as one. After the per-proposal apply/skip flow above completes,
+read `pluginRepoUrl` from `MANIFEST_FILE` (the field is at the top level of
+the manifest JSON), then present an opt-in upstream-report offer:
+
+> This failure may also be a plugin defect. File a GitHub issue at
+> `<pluginRepoUrl>`?
+
+Use AskUserQuestion with options: **dispatch error-report-sdlc** | **skip**.
+
+- On `dispatch error-report-sdlc`: Glob `**/error-report-sdlc/REFERENCE.md`,
+  follow it, and dispatch with the orchestrator-supplied
+  `RESULT.errorReportPayload` fields (same shape and idiom as Step 6 — no
+  duplicate dispatch logic).
+- On `skip`: record the skip in Step 7 Learning Capture and exit cleanly.
+
+The strengthen-only invariant is preserved — no surface is auto-edited; the
+user explicitly approves the dispatch. When `RESULT.errorReportPayload == null`
+on `ambiguous` (pure user-code ambiguity), this sub-step is suppressed entirely
+— do not surface the prompt.
+
 ---
 
 ## Step 6 — PLUGIN-DEFECT ROUTE: Dispatch error-report-sdlc (R9)
 
 When `RESULT.classification == "plugin-defect"`:
 
-1. Display `RESULT.errorReportPayload` to the user as the proposed
-   `error-report-sdlc` dispatch payload.
+1. Read `pluginRepoUrl` from `MANIFEST_FILE` (top-level field). Display
+   `RESULT.errorReportPayload` to the user as the proposed
+   `error-report-sdlc` dispatch payload, naming the target repository as
+   `<pluginRepoUrl>` (sourced from the prepare-script manifest, not
+   hardcoded in this SKILL).
 2. Use AskUserQuestion: **dispatch error-report-sdlc** | **cancel**.
 3. On `dispatch error-report-sdlc`: Glob `**/error-report-sdlc/REFERENCE.md`,
    follow it, and dispatch with `skill=<failure.skill>`,
@@ -245,8 +273,18 @@ action:
 ```
 ## YYYY-MM-DD — harden-sdlc: <classification> for <failure.skill> at <failure.step>
 Applied: <count> proposal(s) across <surface-list> | Skipped: <count> | Routed: <yes|no>
+AmbiguousOffer: <not-applicable|offered-dispatched|offered-skipped>
 Trigger: <first 80 chars of failure.text>
 ```
+
+The `AmbiguousOffer` line records the Step 5c outcome:
+
+- `not-applicable` — classification was not `ambiguous`, OR was `ambiguous` with
+  `errorReportPayload == null` (no plugin evidence; offer suppressed).
+- `offered-dispatched` — Step 5c offered the upstream-report and the user chose
+  `dispatch error-report-sdlc`.
+- `offered-skipped` — Step 5c offered the upstream-report and the user chose
+  `skip`.
 
 Mirror the append pattern used by `commit-sdlc` and `execute-plan-sdlc`. Create
 the `.claude/learnings/` directory and `log.md` file if they don't exist.

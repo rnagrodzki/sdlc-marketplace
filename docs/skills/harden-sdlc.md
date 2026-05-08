@@ -68,7 +68,33 @@ Expected: harden-sdlc resumes the user's interactive flow within the caller skil
   --exit-code 2
 ```
 
-Expected: orchestrator emits `classification: "plugin-defect"`, no surface proposals are presented, and the user is asked to confirm dispatch of `error-report-sdlc` with the supplied payload.
+Expected: orchestrator emits `classification: "plugin-defect"`, no surface proposals are presented, and the user is asked to confirm dispatch of `error-report-sdlc` with the supplied payload. The prompt names the target repository using `MANIFEST.pluginRepoUrl` (sourced from the prepare-script manifest, not hardcoded in the SKILL).
+
+### Ambiguous classification with plugin evidence — Step 5c upstream-report offer (issue #288)
+
+When the orchestrator returns `classification: "ambiguous"` AND
+`errorReportPayload` is non-null (the rationale cites plugin evidence such as a
+script crash inside `plugins/sdlc-utilities/`, malformed JSON from a sibling
+agent, or a prepare-script exit code 2), Step 5c surfaces an opt-in
+upstream-report offer **after** the per-proposal apply/skip flow completes:
+
+> This failure may also be a plugin defect. File a GitHub issue at
+> `<MANIFEST.pluginRepoUrl>`?
+>
+> Options: **dispatch error-report-sdlc** | **skip**
+
+The prompt text sources the plugin repo URL from the prepare-script manifest's
+`pluginRepoUrl` field — Step 6 (the `plugin-defect` routing path) does the
+same, so both prompts stay consistent. On `dispatch error-report-sdlc`, the
+skill follows the same Glob-then-follow pattern as Step 6 to invoke
+[`/error-report-sdlc`](error-report-sdlc.md) with the orchestrator-supplied
+`errorReportPayload`. On `skip`, the skill records the outcome in Step 7
+Learning Capture and exits cleanly. The strengthen-only invariant is preserved
+— no surface is auto-edited; the user explicitly approves the dispatch.
+
+When `classification: "ambiguous"` carries `errorReportPayload: null` (pure
+user-code ambiguity with no plugin signal in the rationale), Step 5c is
+suppressed entirely — the skill proceeds with only the user-side proposals.
 
 ---
 

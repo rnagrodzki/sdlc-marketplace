@@ -419,7 +419,28 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       reason: 'triggered if review fixes applied',
       pause: false,
     },
-    // archive-openspec: conditional step between commit-fixes and version
+    {
+      name: 'version',
+      skill: 'version-sdlc',
+      model: 'sonnet',
+      status: (!isIn('version') || flags.workspace === 'worktree') ? 'skipped' : 'will_run',
+      skipSource: !isIn('version')
+        ? skipSource('version')
+        : flags.workspace === 'worktree'
+          ? 'auto'
+          : 'none',
+      args: [
+        flags.bump || 'patch',
+        flags.auto ? '--auto' : '',
+      ].filter(Boolean).join(' '),
+      reason: !isIn('version')
+        ? 'not in steps[]'
+        : flags.workspace === 'worktree'
+          ? 'auto-skipped — tags are repo-global, not safe from worktrees'
+          : 'in steps[]',
+      pause: true,
+    },
+    // archive-openspec: conditional step between version and pr
     (() => {
       const oc = openspecContext || {};
       const changeName = flags.openspecChange || oc.branchMatch || null;
@@ -462,27 +483,6 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         pause: !flags.auto,
       };
     })(),
-    {
-      name: 'version',
-      skill: 'version-sdlc',
-      model: 'sonnet',
-      status: (!isIn('version') || flags.workspace === 'worktree') ? 'skipped' : 'will_run',
-      skipSource: !isIn('version')
-        ? skipSource('version')
-        : flags.workspace === 'worktree'
-          ? 'auto'
-          : 'none',
-      args: [
-        flags.bump || 'patch',
-        flags.auto ? '--auto' : '',
-      ].filter(Boolean).join(' '),
-      reason: !isIn('version')
-        ? 'not in steps[]'
-        : flags.workspace === 'worktree'
-          ? 'auto-skipped — tags are repo-global, not safe from worktrees'
-          : 'in steps[]',
-      pause: true,
-    },
     {
       name: 'pr',
       skill: 'pr-sdlc',

@@ -19,7 +19,7 @@ const { PRESET_TO_STEPS } = require('./config');
 // `skill/ship.js::computeSteps` (issue #223 / R38) and is NOT user-configurable.
 // It does not appear here. See RESERVED_STEPS below — listing `cleanup` in
 // CLI `--steps` or `ship.steps[]` is a validation error.
-const CANONICAL_STEPS = ['execute', 'commit', 'review', 'version', 'pr', 'verify-pipeline', 'await-remote-review', 'archive-openspec', 'learnings-commit'];
+const CANONICAL_STEPS = ['execute', 'commit', 'review', 'version', 'archive-openspec', 'pr', 'verify-pipeline', 'await-remote-review', 'learnings-commit'];
 
 // Steps that the prepare script appends unconditionally and that users MUST
 // NOT pass via CLI `--steps` or set in `ship.steps[]`. The validator in

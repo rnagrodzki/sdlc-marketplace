@@ -36,7 +36,7 @@ SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" -path "*/sdlc*/scripts/util
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/ship-init.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate util/ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-INIT_OUTPUT_FILE=$(node "$SCRIPT" --output-file --steps execute,commit,review,pr,archive-openspec --bump patch --auto --threshold high --workspace prompt)
+INIT_OUTPUT_FILE=$(node "$SCRIPT" --output-file --steps execute,commit,review,archive-openspec,pr --bump patch --auto --threshold high --workspace prompt)
 EXIT_CODE=$?
 echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -76,7 +76,7 @@ Then stop. Do not proceed to step 1b. The pipeline does not run.
 Check for ship config via skill/ship.js output (reads from `.sdlc/local.json` → `ship` section, with legacy `.sdlc/ship-config.json` fallback). If found, read and merge. Print loaded config verbosely:
 ```
 Ship config loaded from .sdlc/local.json (schema v2)
-  steps: [execute, commit, review, pr, archive-openspec], draft: false, bump: patch
+  steps: [execute, commit, review, archive-openspec, pr], draft: false, bump: patch
   reviewThreshold: high
 ```
 If not found: `No ship config found — using built-in defaults. Run /setup-sdlc to configure.`
@@ -125,7 +125,7 @@ Print the `flags` object from the `skill/ship.js` output, including the `sources
 ```
 Flag resolution (from skill/ship.js):
   auto:    true  (source: cli)
-  steps:   [execute, commit, review, pr, archive-openspec]  (source: config)
+  steps:   [execute, commit, review, archive-openspec, pr]  (source: config)
   preset:  balanced  (source: cli, legacy sugar; expanded to steps)
   bump:    patch (source: default)
   draft:   false (source: default)
@@ -168,6 +168,7 @@ Auto-skip decisions (from skill/ship.js):
   received-review: conditional — depends on review verdict
   commit (fixes): conditional — depends on received-review changes
   version: skipped (auto) — auto-skipped — tags are repo-global
+  archive-openspec: conditional — openspec change ready for archive
   pr:      will_run — not in skip set
 ```
 
@@ -259,7 +260,7 @@ Pipeline validation:
 Validation checks:
 - `gh auth status` succeeds
 - Current branch is not the default branch (warn if it is — do not block)
-- All `--steps` values are recognized step names: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`, `learnings-commit`
+- All `--steps` values are recognized step names: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `learnings-commit`
 - At least one step will run
 - Flag combinations are coherent (`--bump` without version step → warn). `--bump` accepts `major|minor|patch` or any pre-release label matching `^[a-z][a-z0-9]*$` (e.g. `--bump rc` ships an RC release; the label is forwarded verbatim to version-sdlc).
 
@@ -433,7 +434,7 @@ Review fixes applied: 3 files modified
 ```
 Then invoke commit-sdlc (step 5) for the fix commit.
 
-### Between commit-fixes and version — archive-openspec (conditional)
+### Between version and pr — archive-openspec (conditional)
 
 If the `archive-openspec` step has `status: "conditional"` in the pipeline plan, execute it inline (no Agent dispatch — this is a deterministic shell operation):
 
@@ -688,7 +689,7 @@ Step  Skill                 Result
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Decisions log:
-  - Steps resolved: [execute, commit, review, pr, archive-openspec] (from config default; --quality not forwarded to execute-plan-sdlc — user did not pass --quality)
+  - Steps resolved: [execute, commit, review, archive-openspec, pr] (from config default; --quality not forwarded to execute-plan-sdlc — user did not pass --quality)
   - Version step skipped (from config default, bump type: patch)
   - Review found 2 medium issues — below threshold, deferred
   - PR created as draft (from --draft flag)

@@ -273,3 +273,11 @@ Trigger: Agent dispatch failed: opus model requires 1M context (extra usage not 
 - promptfoo fixture dirs must not have embedded .git repos; hook tests that need branch detection require an env-var override (SDLC_BRANCH_OVERRIDE) instead
 - SKILL.md bash blocks do NOT share shell state — each block is a separate Bash tool invocation; $SCRIPT resolved in Step 0 is not available in Step 3 blocks; always re-resolve per block
 - execute-plan-sdlc creates feature branch when workspace=branch; ship state file needs post-execute branch migration (state/ship.js migrate) before subsequent state operations
+
+## 2026-05-08 — execute-plan-sdlc: 10-task fix for #287/#288 — inline execution path
+Plan called for wave-based agent dispatch but the runtime had no `Agent`/`Task` tool available, so all 9 implementation tasks ran inline in the orchestrator context. Wave structure was preserved for ordering and state persistence. Promptfoo CLI is broken in this environment (better-sqlite3 NODE_MODULE_VERSION mismatch), so per-wave promptfoo verification was substituted with direct node-based smoke tests of the affected modules (PRESET_TO_STEPS, CANONICAL_STEPS, computeSteps pipeline order, harden-prepare manifest pluginRepoUrl). Side-effect to watch for: running ship.js against a fixture mutates the fixture's `.sdlc/.gitignore` (auto-managed selective-ignore block) — reverted manually.
+
+## 2026-05-08 — ship-sdlc: #287/#288 archive-openspec order + harden ambiguous offer
+- archive-openspec was placed before version in runtime (ship.js), before pr in config lists — both wrong. Fixed: runtime IIFE relocated to version→archive-openspec→pr; CANONICAL_STEPS, PRESET_TO_STEPS, schema enum, specs, docs, tests all aligned.
+- harden-sdlc SKILL.md Step 5c referenced MANIFEST.pluginRepoUrl but MANIFEST as parsed-JSON was never defined — only MANIFEST_FILE (path). Review caught it; fix: add explicit read instruction per step.
+- reviewThreshold=low fires received-review-sdlc on any finding; both medium and low findings were real and fixable — threshold appropriate for this project.
