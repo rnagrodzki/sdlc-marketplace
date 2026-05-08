@@ -275,6 +275,23 @@ export const skillsMeta: SkillMeta[] = [
       { to: 'setup-sdlc', label: 'strengthens what is configured by' },
     ],
   },
+  {
+    slug: 'verify-pipeline-sdlc',
+    command: '/verify-pipeline-sdlc',
+    category: 'workflows',
+    userInvocable: true,
+    tagline: 'Analyzes a failed CI run on a PR, classifies the root cause via a deterministic helper, and either applies a minimal fix or emits a proposal as a JSON verdict.',
+    pipeline: [
+      { id: 'consume', label: 'Parse args, load logs', type: 'script', description: 'Reads --pr / --logs; falls back to fetchFailedCheckLogs for the latest failed run' },
+      { id: 'classify', label: 'Classify failure category', type: 'script', description: 'Runs verify-pipeline-sdlc-classify.js to bucket logs into lint/test/type/build/dep/infra/unknown' },
+      { id: 'route', label: 'Apply or propose', type: 'llm', description: 'Actionable categories under --auto trigger an inline Edit; otherwise emits a proposal' },
+      { id: 'verdict', label: 'Emit JSON verdict', type: 'verify', description: 'Single JSON line on stdout: fix-applied | proposal | abort' },
+    ],
+    connections: [
+      { to: 'ship-sdlc', label: 'invoked by verify-pipeline step of' },
+      { to: 'commit-sdlc', label: 'commit after fix-applied verdict' },
+    ],
+  },
 ];
 
 export function getSkillMeta(slug: string): SkillMeta | undefined {

@@ -77,6 +77,8 @@ function parseArgs(argv) {
   let openspecChange  = null;
   let gc              = false;
   let ttlDays         = null;
+  let verifyPipeline  = null; // R58 — null means not passed; CLI-true wins over config
+  let awaitReview     = null; // R58
   const errors = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -123,10 +125,16 @@ function parseArgs(argv) {
       } else {
         ttlDays = v;
       }
+    } else if (a === '--verify-pipeline') {
+      // R58 — boolean flag enabling the post-PR CI verification step
+      verifyPipeline = true;
+    } else if (a === '--await-review') {
+      // R58 — boolean flag enabling the post-PR await-automated-review step
+      awaitReview = true;
     }
   }
 
-  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, errors };
+  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, verifyPipeline, awaitReview, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -251,6 +259,90 @@ function mergeFlags(cli, config) {
     // Default is true → 'auto'
     merged.rebase  = 'auto';
     sources.rebase = 'default';
+  }
+
+  // -- verify-pipeline / await-review (R57, R58) --
+  //
+  // Boolean gating flags + their tunables. CLI true overrides config; otherwise
+  // config; otherwise the spec default. CLI was set to `null` (not `false`)
+  // when not passed so we can distinguish "explicitly off" from "not passed".
+
+  // verifyPipeline (boolean, default false)
+  if (cli.verifyPipeline === true) {
+    merged.verifyPipeline  = true;
+    sources.verifyPipeline = 'cli';
+  } else if (cfg.verifyPipeline !== undefined) {
+    merged.verifyPipeline  = cfg.verifyPipeline === true;
+    sources.verifyPipeline = 'config';
+  } else {
+    merged.verifyPipeline  = false;
+    sources.verifyPipeline = 'default';
+  }
+
+  // verifyPipelineTimeout (integer ≥30, default 1200)
+  if (cfg.verifyPipelineTimeout !== undefined) {
+    merged.verifyPipelineTimeout  = cfg.verifyPipelineTimeout;
+    sources.verifyPipelineTimeout = 'config';
+  } else {
+    merged.verifyPipelineTimeout  = 1200;
+    sources.verifyPipelineTimeout = 'default';
+  }
+
+  // verifyPipelineInterval (integer ≥10, default 60)
+  if (cfg.verifyPipelineInterval !== undefined) {
+    merged.verifyPipelineInterval  = cfg.verifyPipelineInterval;
+    sources.verifyPipelineInterval = 'config';
+  } else {
+    merged.verifyPipelineInterval  = 60;
+    sources.verifyPipelineInterval = 'default';
+  }
+
+  // verifyPipelineMaxIterations (integer 1-10, default 3)
+  if (cfg.verifyPipelineMaxIterations !== undefined) {
+    merged.verifyPipelineMaxIterations  = cfg.verifyPipelineMaxIterations;
+    sources.verifyPipelineMaxIterations = 'config';
+  } else {
+    merged.verifyPipelineMaxIterations  = 3;
+    sources.verifyPipelineMaxIterations = 'default';
+  }
+
+  // awaitReview (boolean, default false)
+  if (cli.awaitReview === true) {
+    merged.awaitReview  = true;
+    sources.awaitReview = 'cli';
+  } else if (cfg.awaitReview !== undefined) {
+    merged.awaitReview  = cfg.awaitReview === true;
+    sources.awaitReview = 'config';
+  } else {
+    merged.awaitReview  = false;
+    sources.awaitReview = 'default';
+  }
+
+  // awaitReviewTimeout (integer ≥30, default 600)
+  if (cfg.awaitReviewTimeout !== undefined) {
+    merged.awaitReviewTimeout  = cfg.awaitReviewTimeout;
+    sources.awaitReviewTimeout = 'config';
+  } else {
+    merged.awaitReviewTimeout  = 600;
+    sources.awaitReviewTimeout = 'default';
+  }
+
+  // awaitReviewInterval (integer ≥10, default 60)
+  if (cfg.awaitReviewInterval !== undefined) {
+    merged.awaitReviewInterval  = cfg.awaitReviewInterval;
+    sources.awaitReviewInterval = 'config';
+  } else {
+    merged.awaitReviewInterval  = 60;
+    sources.awaitReviewInterval = 'default';
+  }
+
+  // awaitReviewers (array of strings, minItems 1, default ["copilot"])
+  if (Array.isArray(cfg.awaitReviewers) && cfg.awaitReviewers.length > 0) {
+    merged.awaitReviewers  = cfg.awaitReviewers.slice();
+    sources.awaitReviewers = 'config';
+  } else {
+    merged.awaitReviewers  = ['copilot'];
+    sources.awaitReviewers = 'default';
   }
 
   // Pass-through flags that don't come from config.
@@ -433,6 +525,86 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           : 'in steps[]',
       pause: false,
     },
+    // R41-R49: verify-pipeline — opt-in inline-execution step (skill: null,
+    // dispatched by ship-sdlc/SKILL.md which parses the JSON verdict). Gated
+    // by flags.verifyPipeline; auto-skipped when 'pr' is excluded from
+    // flags.steps (cannot poll a PR that does not exist).
+    (() => {
+      const prInSteps = isIn('pr');
+      if (!flags.verifyPipeline) {
+        return {
+          name: 'verify-pipeline',
+          skill: null,
+          model: null,
+          status: 'skipped',
+          skipSource: 'condition',
+          args: '',
+          reason: 'verifyPipeline not enabled',
+          pause: false,
+        };
+      }
+      if (!prInSteps) {
+        return {
+          name: 'verify-pipeline',
+          skill: null,
+          model: null,
+          status: 'skipped',
+          skipSource: 'condition',
+          args: '',
+          reason: 'pr step excluded — cannot verify CI for a non-existent PR',
+          pause: false,
+        };
+      }
+      return {
+        name: 'verify-pipeline',
+        skill: null,
+        model: null,
+        status: 'will_run',
+        skipSource: 'none',
+        args: `--timeout ${flags.verifyPipelineTimeout} --interval ${flags.verifyPipelineInterval}`,
+        reason: 'verify CI checks before await-review',
+        pause: true,
+      };
+    })(),
+    // R50-R56: await-review — opt-in inline-execution step. Gated by
+    // flags.awaitReview; auto-skipped when 'pr' is excluded from flags.steps.
+    (() => {
+      const prInSteps = isIn('pr');
+      if (!flags.awaitReview) {
+        return {
+          name: 'await-review',
+          skill: null,
+          model: null,
+          status: 'skipped',
+          skipSource: 'condition',
+          args: '',
+          reason: 'awaitReview not enabled',
+          pause: false,
+        };
+      }
+      if (!prInSteps) {
+        return {
+          name: 'await-review',
+          skill: null,
+          model: null,
+          status: 'skipped',
+          skipSource: 'condition',
+          args: '',
+          reason: 'pr step excluded — cannot await review on a non-existent PR',
+          pause: false,
+        };
+      }
+      return {
+        name: 'await-review',
+        skill: null,
+        model: null,
+        status: 'will_run',
+        skipSource: 'none',
+        args: `--timeout ${flags.awaitReviewTimeout} --interval ${flags.awaitReviewInterval} --reviewers ${flags.awaitReviewers.join(',')}`,
+        reason: 'await automated reviewer (e.g., Copilot)',
+        pause: false,
+      };
+    })(),
     {
       name: 'learnings-commit',
       // No dispatched skill — this is a deterministic shell step the
@@ -892,6 +1064,15 @@ function main() {
       workspace: flags.workspace,
       rebase: flags.rebase,
       openspecChange: flags.openspecChange,
+      // R57, R58: post-PR CI verification + await-review flags
+      verifyPipeline: flags.verifyPipeline,
+      verifyPipelineTimeout: flags.verifyPipelineTimeout,
+      verifyPipelineInterval: flags.verifyPipelineInterval,
+      verifyPipelineMaxIterations: flags.verifyPipelineMaxIterations,
+      awaitReview: flags.awaitReview,
+      awaitReviewTimeout: flags.awaitReviewTimeout,
+      awaitReviewInterval: flags.awaitReviewInterval,
+      awaitReviewers: flags.awaitReviewers,
       skipConfigCheck,
       sources: flagSources,
     },

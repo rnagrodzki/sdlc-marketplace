@@ -30,3 +30,4 @@ tests:
   - file://datasets/ship-sdlc.yaml
   - file://datasets/harden-sdlc.yaml
   - file://datasets/harvest-learnings.yaml
+  - file://datasets/verify-pipeline-sdlc.yaml

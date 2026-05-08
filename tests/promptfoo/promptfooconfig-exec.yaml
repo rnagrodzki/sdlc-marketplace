@@ -45,3 +45,5 @@ tests:
   - file://datasets/migrate-config-exec.yaml
   - file://datasets/config-load-exec.yaml
   - file://datasets/validate-cost-tiers-exec.yaml
+  - file://datasets/verify-pipeline-exec.yaml
+  - file://datasets/await-review-exec.yaml

@@ -1,0 +1,87 @@
+# verify-pipeline-sdlc behavioural dataset.
+# Spec: docs/specs/verify-pipeline-sdlc.md (R1-R10, G1-G3, C1-C4)
+
+- description: "verify-pipeline-sdlc: lint failure under --auto applies in-place fix"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/verify-pipeline-sdlc/SKILL.md"
+    user_request: >
+      The user invoked /verify-pipeline-sdlc --pr 142 --auto with --logs containing
+      "eslint found 3 errors: missing semicolon at src/foo.ts:42, no-unused-vars at
+      src/bar.ts:18, prefer-const at src/baz.ts:7". Walk through what the skill does.
+  assert:
+    - type: regex
+      value: "(classifyLogs|classify|category)"
+    - type: regex
+      value: "(lint)"
+    - type: regex
+      value: "(Edit tool|apply.*fix|in-place)"
+    - type: regex
+      value: '"status":"fix-applied"|fix-applied'
+    - type: not-regex
+      value: "(git commit|git push)"
+
+- description: "verify-pipeline-sdlc: build-error always emits proposal (never auto-applies)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/verify-pipeline-sdlc/SKILL.md"
+    user_request: >
+      The user invoked /verify-pipeline-sdlc --pr 142 --auto with --logs containing
+      "Cannot find module 'react-router-dom' from src/App.tsx". Walk through what
+      the skill does.
+  assert:
+    - type: regex
+      value: "(build-error|build error)"
+    - type: regex
+      value: '"status":"proposal"|proposal'
+    - type: not-regex
+      value: "(apply.*fix.*automatically|auto.*apply.*Edit)"
+
+- description: "verify-pipeline-sdlc: interactive (no --auto) emits proposal regardless of category"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/verify-pipeline-sdlc/SKILL.md"
+    user_request: >
+      The user invoked /verify-pipeline-sdlc --pr 142 (no --auto) with logs showing
+      a single eslint missing-semicolon error. The skill should NOT auto-apply.
+      Walk through what happens.
+  assert:
+    - type: regex
+      value: '"status":"proposal"|proposal'
+    - type: not-regex
+      value: "(auto.apply|fix-applied)"
+
+- description: "verify-pipeline-sdlc: missing both --pr and --logs aborts (E1)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/verify-pipeline-sdlc/SKILL.md"
+    user_request: >
+      The user invoked /verify-pipeline-sdlc with no arguments. Per spec E1, the
+      skill must abort. Walk through.
+  assert:
+    - type: regex
+      value: '"status":"abort"|abort'
+    - type: regex
+      value: "(--pr|--logs|required)"
+
+- description: "verify-pipeline-sdlc: emits exactly one JSON line on stdout (G1)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/verify-pipeline-sdlc/SKILL.md"
+    user_request: >
+      Describe Step 4 VERDICT — what is emitted on stdout, what goes to stderr,
+      and why the contract requires a single JSON line.
+  assert:
+    - type: regex
+      value: "(single JSON line|one JSON|stdout)"
+    - type: regex
+      value: "(fix-applied|proposal|abort)"
+    - type: regex
+      value: "(stderr)"
+
+- description: "verify-pipeline-sdlc: must NOT commit or push (R7, C1)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/verify-pipeline-sdlc/SKILL.md"
+    user_request: >
+      What does the skill do AFTER applying a fix? Specifically — does it commit?
+      push? Reference the relevant constraint.
+  assert:
+    - type: regex
+      value: "(MUST NOT commit|never commit|do.*not.*commit|C1|R7)"
+    - type: regex
+      value: "(commit-sdlc|parent|ship-sdlc.*dispatch)"

@@ -81,6 +81,56 @@
               "const": "prompt"
             }
           ]
+        },
+        "verifyPipeline": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable post-PR CI verification step. When true, ship-sdlc polls `gh pr checks` after PR creation and reports CI verdict. (R57)"
+        },
+        "verifyPipelineTimeout": {
+          "type": "integer",
+          "minimum": 30,
+          "default": 1200,
+          "description": "Maximum seconds verify-pipeline polls before giving up with a warning. (R57)"
+        },
+        "verifyPipelineInterval": {
+          "type": "integer",
+          "minimum": 10,
+          "default": 60,
+          "description": "Seconds between verify-pipeline poll attempts. (R57)"
+        },
+        "verifyPipelineMaxIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum analyze-fix-recheck iterations before verify-pipeline emits a warning and proceeds. (R47, R57)"
+        },
+        "awaitReview": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable post-PR await-review step. When true, ship-sdlc polls for an automated reviewer's verdict (default: Copilot) and dispatches received-review-sdlc when actionable. (R57)"
+        },
+        "awaitReviewTimeout": {
+          "type": "integer",
+          "minimum": 30,
+          "default": 600,
+          "description": "Maximum seconds await-review polls before giving up with a warning. (R57)"
+        },
+        "awaitReviewInterval": {
+          "type": "integer",
+          "minimum": 10,
+          "default": 60,
+          "description": "Seconds between await-review poll attempts. (R57)"
+        },
+        "awaitReviewers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "default": ["copilot"],
+          "description": "Logins (case-insensitive) whose reviews satisfy await-review. When the login is `copilot`, the reviewer must also be a Bot. (R56, R57)"
         }
       },
       "additionalProperties": false

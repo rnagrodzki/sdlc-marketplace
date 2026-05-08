@@ -2,7 +2,7 @@
 name: ship-sdlc
 description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Chains execute-plan-sdlc, commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, and pr-sdlc with conditional review-fix loop. Arguments: [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config]. The `<label>` form for --bump (e.g. `--bump rc`) is forwarded to version-sdlc, where it is interpreted as `--bump patch --pre <label>`; labels must match `^[a-z][a-z0-9]*$`. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
-argument-hint: "[--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
+argument-hint: "[--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>] [--verify-pipeline] [--await-review]"
 model: sonnet
 ---
 
@@ -201,6 +201,8 @@ The pipeline table is generated from the `steps` array in the `skill/ship.js` ou
 | 5 | commit-sdlc (fixes) | conditional | `--auto` | no |
 | 6 | version-sdlc | skipped | — | — |
 | 7 | pr-sdlc | will_run | `--auto --draft` | no |
+| 7a | verify-pipeline (inline, opt-in) | conditional on `flags.verifyPipeline` | `--timeout <N> --interval <N>` | YES on failure (interactive) |
+| 7b | await-review (inline, opt-in) | conditional on `flags.awaitReview` | `--timeout <N> --interval <N> --reviewers <csv>` | no |
 | 8 | learnings-commit | will_run | (none — inline shell, see "After pr — learnings-commit" below) | no |
 
 ### --auto Mode Audit
@@ -462,6 +464,70 @@ If the `archive-openspec` step has `status: "conditional"` in the pipeline plan,
 7. If `isArchived(projectRoot, name)` already returns true (idempotence), skip with reason "already archived".
 
 If the step has `status: "skipped"`, print the skip reason from `step.reason`.
+
+### After pr — verify-pipeline (conditional, opt-in)
+
+If the `verify-pipeline` step has `status: "will_run"` (gated by `flags.verifyPipeline === true` from prepare output — cite `flags.verifyPipeline`, not `$ARGUMENTS`; per `flag-coherence-cross-skill`), execute it inline (no Agent dispatch — this is a deterministic polling script). Implements R41–R49.
+
+1. Resolve the script path:
+   ```bash
+   VP_SCRIPT=$(find ~/.claude/plugins -name "verify-pipeline.js" -path "*/sdlc*/scripts/skill/verify-pipeline.js" 2>/dev/null | sort -V | tail -1)
+   [ -z "$VP_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/verify-pipeline.js" ] && VP_SCRIPT="plugins/sdlc-utilities/scripts/skill/verify-pipeline.js"
+   ```
+2. Run the script with the args from `step.args` plus `--state-file <ship-state-path>`:
+   ```bash
+   node "$VP_SCRIPT" $STEP_ARGS --state-file "$SHIP_STATE_PATH"
+   ```
+3. Parse the single JSON line on stdout. Branch on `status`:
+
+   **`status === "green"`** — log `verify-pipeline: CI green for PR #N` and proceed to `await-review`. Cites R43.
+
+   **`status === "failed"`** AND `flags.auto === false` — interactive (R45). Use `AskUserQuestion`:
+   > Wave verify-pipeline failed for PR #N. <X> failed checks: <names>.
+   >
+   > Options: **analyze** (Recommended) | **skip** | **abort**
+   - **analyze**: dispatch `verify-pipeline-sdlc` subagent (Agent tool, model sonnet) with `--pr <N>` and `--logs <inline-log-excerpt-from-failedChecks>`. On verdict `fix-applied`, dispatch `commit-sdlc` (Agent tool, model haiku, `--auto`) directly to commit and push. Then re-run verify-pipeline (loop). Iteration cap = `flags.verifyPipelineMaxIterations` (default 3, R47); after cap, log warning and proceed to `await-review`. The pre-existing `commit-fixes` step entry (already visited before `pr`) is NOT involved — this dispatch is direct via the Agent tool.
+   - **skip**: log warning, proceed to `await-review`.
+   - **abort**: write `verifyPipelineExhausted: true` to the ship state file, exit pipeline 1.
+
+   **`status === "failed"`** AND `flags.auto === true` — non-interactive (R46). Directly dispatch `verify-pipeline-sdlc` subagent (Agent tool, model sonnet) with `--pr <N> --logs <excerpt> --auto`. On `fix-applied`, dispatch `commit-sdlc --auto` directly. Loop with the same iteration cap (`flags.verifyPipelineMaxIterations`, R47). On cap exhaustion, log warning and proceed.
+
+   **`status === "timeout"`** — log warning `verify-pipeline: timeout after Ns`. The script has already written `verifyPipelineExhausted: true` to the state file. Proceed to `await-review`. Cites R48, R49.
+
+   **`status === "skipped"`** (resume short-circuit) — log info `verify-pipeline: skipped (resumed from prior exhaustion)`. Proceed. Cites R49.
+
+   **`status === "error"`** — log warning `verify-pipeline: error — <reason>`. Proceed.
+
+Do NOT replicate polling, log fetching, or fix-application logic in this prose — those live in `verify-pipeline.js` and the `verify-pipeline-sdlc` skill (per `scripts-over-llm-logic`).
+
+If the step has `status: "skipped"`, print the skip reason from `step.reason` and do nothing.
+
+### After verify-pipeline — await-review (conditional, opt-in)
+
+If the `await-review` step has `status: "will_run"` (gated by `flags.awaitReview === true` from prepare output — cite `flags.awaitReview`, not `$ARGUMENTS`), execute it inline. Implements R50–R56.
+
+1. Resolve the script path:
+   ```bash
+   AR_SCRIPT=$(find ~/.claude/plugins -name "await-review.js" -path "*/sdlc*/scripts/skill/await-review.js" 2>/dev/null | sort -V | tail -1)
+   [ -z "$AR_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/await-review.js" ] && AR_SCRIPT="plugins/sdlc-utilities/scripts/skill/await-review.js"
+   ```
+2. Run the script with the args from `step.args` plus `--state-file <ship-state-path>`:
+   ```bash
+   node "$AR_SCRIPT" $STEP_ARGS --state-file "$SHIP_STATE_PATH"
+   ```
+3. Parse the single JSON line on stdout. Branch on `status`:
+
+   **`status === "actionable"`** — directly dispatch `received-review-sdlc` (Agent tool, model sonnet) with `--pr <verdict.prNumber>` (and `--auto` when `flags.auto === true`). After the subagent completes, run `git status --porcelain` in the main context; if there are working-tree changes, directly dispatch `commit-sdlc` (Agent tool, model haiku, `--auto`) to commit and push. The pre-existing `received-review` and `commit-fixes` step entries (already visited before `pr`) are NOT involved — these dispatches are direct via the Agent tool. Cites R52.
+
+   **`status === "approved-clean"`** — log `await-review: APPROVED by <reviewer>` and proceed. Do NOT dispatch received-review-sdlc. Cites R53.
+
+   **`status === "timeout"`** — log warning `await-review: timeout after Ns waiting for <reviewers>`. The script has already written `awaitReviewExhausted: true` to the state file. Proceed. Cites R54, R55.
+
+   **`status === "skipped"`** (resume short-circuit) — log info and proceed. Cites R55.
+
+   **`status === "error"`** — log warning and proceed.
+
+If the step has `status: "skipped"`, print the skip reason from `step.reason` and do nothing.
 
 ### After pr — learnings-commit (final step)
 

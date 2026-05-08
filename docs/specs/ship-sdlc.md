@@ -92,6 +92,26 @@
 
   Default: `high`. Resolution site: `scripts/skill/ship.js` (`flags.reviewThreshold`). All consumers (SKILL.md verdict-routing, downstream skills) MUST cite the resolved field — no re-derivation from config or `$ARGUMENTS`.
 
+- R41 (issue #130): Pipeline MUST support opt-in `verify-pipeline` step inserted after `pr`, gated by `flags.verifyPipeline` (CLI `--verify-pipeline` or config `ship.verifyPipeline: true`).
+- R42: When `flags.verifyPipeline` is true, the pipeline MUST poll `gh pr checks <N> --json name,state,bucket,workflow,event,startedAt,completedAt,link` at a configurable interval (default 60s) until all required checks have non-pending conclusions, or a configurable timeout (default 1200s) elapses.
+- R43: On all-green CI, `verify-pipeline` MUST emit verdict `green` (single JSON line on stdout) and the pipeline MUST proceed to `await-review`.
+- R44: On any failed check, `verify-pipeline` MUST fetch a log summary (`gh run view --log-failed`) and emit verdict `failed` with `{failedChecks: [{name, conclusion, logsExcerpt}]}`.
+- R45: On verdict `failed` AND NOT `flags.auto`, ship-sdlc MUST prompt the user via `AskUserQuestion` with three options: `analyze` (dispatch `verify-pipeline-sdlc` subagent), `skip` (continue to `await-review`), `abort` (exit 1).
+- R46: On verdict `failed` AND `flags.auto`, ship-sdlc MUST dispatch `verify-pipeline-sdlc` subagent with the failed-check log excerpts; the subagent's verdict drives subsequent flow.
+- R47: When `verify-pipeline-sdlc` returns `fix-applied`, ship-sdlc MUST directly dispatch `commit-sdlc` (Agent tool) to commit and push the fix, then `verify-pipeline` MUST re-poll. Iteration cap = `flags.verifyPipelineMaxIterations` (default 3); on cap exhaustion, emit a warning and proceed. The pre-existing `commit-fixes` step (`ship.js:344–353`) is NOT involved — it sits before `pr` in `computeSteps` and has already been visited.
+- R48: `verify-pipeline` timeout MUST produce a warning log; pipeline MUST exit 0 (warning, not error) and continue to `await-review`.
+- R49: `--resume` after `verify-pipeline` exhaustion (timeout, abort, or cap) MUST NOT re-poll; tracked via state-file marker `verifyPipelineExhausted: true`.
+- R50: Pipeline MUST support opt-in `await-review` step inserted after `verify-pipeline`, gated by `flags.awaitReview` (CLI `--await-review` or config `ship.awaitReview: true`).
+- R51: When `flags.awaitReview` is true, the pipeline MUST poll `gh api repos/{owner}/{repo}/pulls/{pr}/reviews` (REST) at a configurable interval (default 60s) until a non-PENDING review from a configured reviewer arrives or a configurable timeout (default 600s) elapses.
+- R52: On detection of `CHANGES_REQUESTED` or `COMMENTED` review with at least one comment, ship-sdlc MUST directly dispatch `received-review-sdlc` (Agent tool, model sonnet) with `--pr <N>` (+ `--auto` if `flags.auto`); on subagent completion, if working-tree changes are present, directly dispatch `commit-sdlc` to commit and push. Pre-existing `received-review` and `commit-fixes` step entries are NOT involved.
+- R53: On detection of `APPROVED` review with no actionable comments, the pipeline MUST log success and skip `received-review`.
+- R54: `await-review` timeout MUST produce a warning log; pipeline MUST exit 0 (warning, not error).
+- R55: `--resume` after `await-review` exhaustion MUST NOT re-poll; tracked via state-file marker `awaitReviewExhausted: true`.
+- R56: Reviewer matching MUST filter by login (case-insensitive); when login is `copilot` (or recognised Copilot bot login), `user.type === "Bot"` MUST also be required.
+- R57: Config fields in `.sdlc/local.json` `ship` section: `verifyPipeline` (boolean, default false), `verifyPipelineTimeout` (integer ≥30, default 1200), `verifyPipelineInterval` (integer ≥10, default 60), `verifyPipelineMaxIterations` (integer 1–10, default 3), `awaitReview` (boolean, default false), `awaitReviewTimeout` (integer ≥30, default 600), `awaitReviewInterval` (integer ≥10, default 60), `awaitReviewers` (array of strings, minItems 1, default `["copilot"]`).
+- R58: CLI flags `--verify-pipeline` and `--await-review` MUST enable the respective steps without config edits; CLI overrides config when set.
+- R59: `--dry-run` MUST list `verify-pipeline` and `await-review` rows in the pipeline table; rows MUST render as skipped when their gating flag is false.
+
 ## Workflow Phases
 
 1. CONSUME — load config, parse flags, run `skill/ship.js` for context detection and step computation
