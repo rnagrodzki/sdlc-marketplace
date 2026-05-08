@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.19.5] - 2026-05-08
+
+### Fixed
+- setup-sdlc: added explicit min/max constraint properties to numeric SHIP_FIELDS (#292)
+- ship-sdlc: corrected step ordering (archive-openspec moves from 5a to 5c post-publish) (#287)
+- harden-sdlc: clarified pluginRepoUrl sourcing from manifest (#288)
+
 ## [0.19.4] - 2026-05-08
 
 ### Added
