@@ -267,3 +267,9 @@ Verdict was APPROVED but 2 low findings triggered received-review-sdlc dispatch 
 ## 2026-05-08 — harden-sdlc: ambiguous for execute-plan-sdlc at Step 1 — Agent dispatch
 Applied: 0 proposal(s) | Skipped: 0 | Routed: no
 Trigger: Agent dispatch failed: opus model requires 1M context (extra usage not enabled)
+
+## 2026-05-08 — ship-sdlc: plan-integrity hook (issue #285)
+- state.js resolveStateDir() is git-dependent (resolveMainWorktree via worktree list) — test fixtures with embedded state files need SDLC_STATE_DIR_OVERRIDE env var to bypass; adding this to state.js is the clean approach
+- promptfoo fixture dirs must not have embedded .git repos; hook tests that need branch detection require an env-var override (SDLC_BRANCH_OVERRIDE) instead
+- SKILL.md bash blocks do NOT share shell state — each block is a separate Bash tool invocation; $SCRIPT resolved in Step 0 is not available in Step 3 blocks; always re-resolve per block
+- execute-plan-sdlc creates feature branch when workspace=branch; ship state file needs post-execute branch migration (state/ship.js migrate) before subsequent state operations
