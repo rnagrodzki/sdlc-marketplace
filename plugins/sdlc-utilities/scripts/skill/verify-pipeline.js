@@ -30,6 +30,7 @@ const path = require('node:path');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { fetchPrMetadata, fetchPrChecks, fetchFailedCheckLogs } = require(path.join(LIB, 'git'));
+const { writeJsonLine } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // Pure helper (exported for tests) — implements R42/R43 verdict mapping
@@ -130,8 +131,11 @@ function extractRunId(link) {
 // Single-line stdout emitter
 // ---------------------------------------------------------------------------
 
+// emit() is a thin alias over `lib/output.js::writeJsonLine` (issue #284,
+// task 3). Each call site emits ONE verdict and returns from main();
+// writeJsonLine exits with code 0, matching the previous post-return exit.
 function emit(verdict) {
-  process.stdout.write(JSON.stringify(verdict) + '\n');
+  writeJsonLine(verdict);
 }
 
 // ---------------------------------------------------------------------------

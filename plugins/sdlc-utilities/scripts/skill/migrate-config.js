@@ -28,6 +28,7 @@ const {
   ConfigVersionError,
 } = require(path.resolve(__dirname, '..', 'lib', 'config-version.js'));
 const { ensureSdlcInfrastructure } = require(path.resolve(__dirname, '..', 'lib', 'config.js'));
+const { writeJsonLine } = require(path.resolve(__dirname, '..', 'lib', 'output.js'));
 
 function parseArgs(argv) {
   const args = { dryRun: false };
@@ -93,8 +94,9 @@ function main() {
     }
   }
 
-  process.stdout.write(JSON.stringify(manifest, null, 2) + '\n');
-  process.exit(manifest.errors.length === 0 ? 0 : 1);
+  // 2-space indent preserves the historical pretty-printed output format
+  // expected by setup-sdlc's migration consumer.
+  writeJsonLine(manifest, { indent: 2, exitCode: manifest.errors.length === 0 ? 0 : 1 });
 }
 
 main();

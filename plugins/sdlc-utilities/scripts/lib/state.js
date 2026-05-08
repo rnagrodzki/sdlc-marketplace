@@ -131,6 +131,81 @@ function findStateFile(prefix, branchSlug) {
 }
 
 // ---------------------------------------------------------------------------
+// Resume-state detection (canonical: slugify branch + newest mtime)
+// ---------------------------------------------------------------------------
+
+/**
+ * Locate the most recent `<prefix>-*.json` state file in the canonical
+ * execution directory.
+ *
+ * Selection rule (canonical for the project):
+ *   1. If `branch` is supplied, slugify it via `slugifyBranch` and filter
+ *      filenames to those starting with `<prefix>-<slug>-`.
+ *   2. If `branch` is omitted, accept any file with the given prefix.
+ *   3. Among the survivors, pick the one with the highest mtimeMs.
+ *
+ * Adopted from `skill/ship.js::detectResumeState` so that both ship.js
+ * (branch-scoped resume) and harden-prepare.js (latest-of-any-branch
+ * read-only probe) share one implementation. Issue #284 — task 19.
+ *
+ * Output shape mirrors ship.js's existing `{stateFile, found}` so that
+ * its caller is unchanged. `stateFile` is a path RELATIVE to the project
+ * root (e.g. `.sdlc/execution/ship-foo-20260101T000000Z.json`); `fullPath`
+ * is the absolute path for callers that want to read the file.
+ *
+ * @param {object} opts
+ * @param {string}  opts.prefix      "ship" | "execute"
+ * @param {string} [opts.branch]     If provided, restricts to this branch's slug.
+ * @returns {{stateFile: string|null, fullPath: string|null, found: boolean}}
+ */
+function detectResumeState({ prefix, branch } = {}) {
+  if (!prefix) return { stateFile: null, fullPath: null, found: false };
+
+  const stateDir = resolveStateDir();
+  if (!fs.existsSync(stateDir)) {
+    return { stateFile: null, fullPath: null, found: false };
+  }
+
+  let entries;
+  try {
+    entries = fs.readdirSync(stateDir);
+  } catch (_) {
+    return { stateFile: null, fullPath: null, found: false };
+  }
+
+  const branchSlug = branch ? slugifyBranch(branch) : null;
+  const namePrefix = branchSlug ? `${prefix}-${branchSlug}-` : `${prefix}-`;
+
+  const matching = entries
+    .filter(f => f.startsWith(namePrefix) && f.endsWith('.json'))
+    .map(f => {
+      const fullPath = path.join(stateDir, f);
+      try {
+        const stat = fs.statSync(fullPath);
+        return {
+          file: path.join('.sdlc', 'execution', f),
+          fullPath,
+          mtime: stat.mtimeMs,
+        };
+      } catch (_) {
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.mtime - a.mtime);
+
+  if (matching.length === 0) {
+    return { stateFile: null, fullPath: null, found: false };
+  }
+
+  return {
+    stateFile: matching[0].file,
+    fullPath: matching[0].fullPath,
+    found: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Read / write / init / delete
 // ---------------------------------------------------------------------------
 
@@ -508,6 +583,7 @@ module.exports = {
   initState,
   deleteState,
   resolveBranch,
+  detectResumeState,
   parseStateFilename,
   gcStateFiles,
   pruneStateFiles,

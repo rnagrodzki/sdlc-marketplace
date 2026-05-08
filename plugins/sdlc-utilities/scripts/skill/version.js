@@ -41,6 +41,7 @@ const {
 } = require(path.join(LIB, 'version'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
+const { truncateText } = require(path.join(LIB, 'diff-truncate'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -400,7 +401,7 @@ async function main() {
 
     if (changelogExists) {
       const raw = fs.readFileSync(changelogPath, 'utf8');
-      changelogContent = raw.length > 5000 ? raw.slice(0, 5000) : raw;
+      changelogContent = truncateText(raw, { maxBytes: 5000 }).text;
     }
 
     // 7. Output
@@ -707,7 +708,7 @@ async function main() {
 
     if (exists) {
       const raw      = fs.readFileSync(changelogPath, 'utf8');
-      currentContent = raw.length > 5000 ? raw.slice(0, 5000) : raw;
+      currentContent = truncateText(raw, { maxBytes: 5000 }).text;
     }
 
     changelogOutput = { exists, filePath: changelogFile, currentContent };

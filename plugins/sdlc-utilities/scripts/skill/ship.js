@@ -39,7 +39,7 @@ const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { exec, checkGitState, detectBaseBranch, parseRemoteOwner, probeGhAuth, formatAccountMismatch } = require(path.join(LIB, 'git'));
-const { resolveMainWorktree } = require(path.join(LIB, 'state'));
+const { resolveMainWorktree, detectResumeState: detectResumeStateLib } = require(path.join(LIB, 'state'));
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
@@ -763,45 +763,26 @@ function runValidation(flags, flagSources, steps, context) {
 
 /**
  * Look for the most recent ship state file matching the current branch.
- * @param {string} projectRoot
+ *
+ * Thin wrapper over `lib/state.js::detectResumeState` — see issue #284,
+ * task 19. The selection rule (slugify branch, pick newest mtime) is
+ * canonical there; this wrapper preserves the historical
+ * `(projectRoot, currentBranch)` call signature and the
+ * `{stateFile, found}` return shape that ship.js's caller depends on.
+ *
+ * @param {string} _projectRoot  Unused; kept for call-site compatibility.
+ *                                State directory is resolved via
+ *                                `resolveStateDir()` (main worktree) inside
+ *                                the canonical helper.
  * @param {string} currentBranch
  * @returns {{ stateFile: string|null, found: boolean }}
  */
-function detectResumeState(projectRoot, currentBranch) {
-  const execDir = path.join(projectRoot, '.sdlc', 'execution');
-  if (!fs.existsSync(execDir)) {
-    return { stateFile: null, found: false };
-  }
-
-  let entries;
-  try {
-    entries = fs.readdirSync(execDir);
-  } catch (_) {
-    return { stateFile: null, found: false };
-  }
-
-  // Slugify the branch name the same way a filename would be created
-  const branchSlug = currentBranch.replace(/[^a-zA-Z0-9-]/g, '-');
-
-  const matching = entries
-    .filter(f => f.startsWith('ship-') && f.endsWith('.json') && f.includes(branchSlug))
-    .map(f => {
-      const fullPath = path.join(execDir, f);
-      try {
-        const stat = fs.statSync(fullPath);
-        return { file: path.join('.sdlc', 'execution', f), mtime: stat.mtimeMs };
-      } catch (_) {
-        return null;
-      }
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.mtime - a.mtime);
-
-  if (matching.length === 0) {
-    return { stateFile: null, found: false };
-  }
-
-  return { stateFile: matching[0].file, found: true };
+function detectResumeState(_projectRoot, currentBranch) {
+  const { stateFile, found } = detectResumeStateLib({
+    prefix: 'ship',
+    branch: currentBranch,
+  });
+  return { stateFile, found };
 }
 
 // ---------------------------------------------------------------------------

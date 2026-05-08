@@ -52,6 +52,7 @@ const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
 const { loadPrTemplate } = require(path.join(LIB, 'pr-template'));
+const { jiraKeyRegex } = require(path.join(LIB, 'jira-keys'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -86,8 +87,12 @@ function parseArgs(argv) {
 // ---------------------------------------------------------------------------
 // JIRA ticket detection
 // ---------------------------------------------------------------------------
-
-const JIRA_PATTERN = /\b([A-Z]{2,10}-\d+)\b/;
+// Issue #284, task 21: regex sourced from `lib/jira-keys.js` so pr.js and
+// `lib/version.js` agree on the canonical pattern. We keep the existing
+// `detectJiraTicket(branch, commits)` shape (FIRST match only — branch
+// wins, then iterate commit subjects) because the wider helper
+// `extractFromBranchAndCommits` returns ALL keys; the two semantics
+// differ.
 
 /**
  * Scan branch name and commit subjects for the first JIRA-style ticket reference.
@@ -96,11 +101,12 @@ const JIRA_PATTERN = /\b([A-Z]{2,10}-\d+)\b/;
  * @returns {string|null}
  */
 function detectJiraTicket(branchName, commits) {
-  const branchMatch = branchName.match(JIRA_PATTERN);
+  const re = jiraKeyRegex();
+  const branchMatch = branchName.match(re);
   if (branchMatch) return branchMatch[1];
 
   for (const commit of commits) {
-    const m = commit.subject.match(JIRA_PATTERN);
+    const m = commit.subject.match(jiraKeyRegex());
     if (m) return m[1];
   }
 

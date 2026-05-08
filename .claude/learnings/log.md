@@ -236,3 +236,17 @@ Plan said `PROJECT_MIGRATIONS is not extended` because the renamed fields are lo
 
 ## 2026-05-08 — execute-plan-sdlc: Astro site devops category + system map update
 Multi-file additive changes across a TypeScript Astro site. Wave structure was forced by skills-meta.ts being touched by 3 tasks (T1, T3, T5) — all needed separate waves. WorkflowGraph.astro used dynamic maxCol computation so no layout fix was needed for the new col-4 node. Agent correctly identified and added the parallel colorHex map entry alongside colorMap — slight plan spec gap (spec only mentioned colorMap), agent self-corrected. Trivial batch (2 tasks, 2 separate files) executed cleanly in parallel with the standard task in Wave 2.
+
+## 2026-05-08 — execute-plan-sdlc: Agent dispatch tool absent in session
+
+**What happened:** Session had no `Agent` tool surfaced (only TeamCreate). Plan called for parallel wave dispatch of 6 MVP tasks (1, 2, 3, 19, 20, 21).
+
+**What was learned:** When the dispatch tool is missing, sequential inline execution in the main context is the right fallback for ≤6 mechanical tasks. TeamCreate would have been over-engineering. Adopted file-conflict-safe order (2 → 1 → 19 → 20 → 3 → 21) so dependencies (Task 3 needs Task 2, Tasks 20+21 both touch lib/version.js) resolved naturally without parallelism.
+
+**Implementation gotchas surfaced:**
+- `migrate-config.js` outputs pretty-printed JSON (`null, 2`) — required extending `writeJsonLine` with an `indent` option to keep byte-identical output.
+- `version.js`'s "diff truncation" sites are actually CHANGELOG file truncation, not diff truncation. Required adding a separate `truncateText(text, {maxBytes})` helper alongside the file-aware `truncateDiff` in `lib/diff-truncate.js`.
+- `harden-prepare.js::readPipelineState` doesn't filter by branch — it picks any state file. Adapted by passing `detectResumeState({prefix})` with no `branch` arg, returning the newest of any branch.
+- Original ship.js `detectResumeState` resolved state dir from `process.cwd()` (worktree-local); canonical `lib/state.js::resolveStateDir` resolves from main worktree. This is the documented correct path; any worktree-local-only consumer would have been a bug.
+
+**Stash hazard:** A `git checkout HEAD -- file` was needed when a stash pop conflicted on an unrelated file (`.sdlc/config.json` modified at session start). Lesson: avoid stashing during long execution; modify only files within the task surface.

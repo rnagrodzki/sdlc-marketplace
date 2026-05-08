@@ -20,8 +20,9 @@
 
 try {
   const { getAdvisory } = require('../lib/context-advisory');
+  const { emitText } = require('../lib/output');
   const text = getAdvisory({ skill: 'plan-sdlc' });
-  if (text) process.stdout.write(text + '\n');
+  if (text) emitText(text); // exits 0 from the helper
 } catch (_) {
   // Graceful degradation — silent failure, never break handoff.
 }
