@@ -60,6 +60,7 @@ Open `/plugin`, go to **Marketplaces**, and toggle auto-update for `sdlc-marketp
 | --- | --- |
 | [Getting Started](docs/getting-started.md) | Installation, first use, what gets created |
 | [Architecture](docs/architecture.md) | Repository structure, plugin system, name resolution |
+| [Cost Tiers](docs/cost-tiers.md) | Per-skill/agent model assignments, resolution precedence, and dispatch-site overrides |
 | [Plugin Installation](docs/plugin-installation.md) | How plugins are installed, discovered, and resolved at runtime |
 | [Adding Skills](docs/adding-skills.md) | Create custom skills for your project |
 | [Skill Best Practices](docs/skill-best-practices.md) | Design patterns for reliable, maintainable skills |
