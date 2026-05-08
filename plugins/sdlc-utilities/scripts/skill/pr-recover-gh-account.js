@@ -38,6 +38,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { recoverGhAccountForRepo } = require('../lib/git');
+const { writeJsonLine } = require('../lib/output');
 
 function parseArgs(argv) {
   const args = {
@@ -147,8 +148,7 @@ function main() {
   }
 
   const result = recoverGhAccountForRepo(args.projectRoot, errorText, opts);
-  process.stdout.write(JSON.stringify(result) + '\n');
-  process.exit(0);
+  writeJsonLine(result);
 }
 
 main();

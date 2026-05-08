@@ -32,6 +32,7 @@ const { exec, checkGitState, splitDiffByFile } = require(path.join(LIB, 'git'));
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
+const { truncateDiff } = require(path.join(LIB, 'diff-truncate'));
 
 // ---------------------------------------------------------------------------
 // Diff truncation
@@ -40,52 +41,17 @@ const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, '
 const MAX_DIFF_CHARS = 8000;
 
 /**
- * Truncates a staged diff to MAX_DIFF_CHARS by keeping the largest file diffs
- * (most semantic signal) within the budget and omitting the smallest.
+ * Truncates a staged diff to MAX_DIFF_CHARS using `lib/diff-truncate.js`,
+ * which is the single canonical source of large-input cap policy in the
+ * corpus (issue #284, task 20). Behaviour preserved 1:1 from the previous
+ * inline implementation; the helper takes `splitDiffByFile` as an injected
+ * dependency to avoid a circular `lib/git.js` import.
  *
  * @param {string} fullDiff
  * @returns {{ diff: string, diffTruncated: boolean, truncatedFiles: string[] }}
  */
 function truncateStagedDiff(fullDiff) {
-  if (fullDiff.length <= MAX_DIFF_CHARS) {
-    return { diff: fullDiff, diffTruncated: false, truncatedFiles: [] };
-  }
-
-  const fileChunks = splitDiffByFile(fullDiff); // Map<filePath, diffChunk>
-
-  // Guard: if diff doesn't parse into files, return original unchanged
-  if (fileChunks.size === 0) {
-    return { diff: fullDiff, diffTruncated: false, truncatedFiles: [] };
-  }
-
-  // Sort descending by chunk size (largest first — most signal)
-  const sorted = [...fileChunks.entries()].sort((a, b) => b[1].length - a[1].length);
-
-  const included = [];
-  const truncatedFiles = [];
-  let totalChars = 0;
-
-  for (const [filePath, chunk] of sorted) {
-    if (included.length === 0) {
-      // Always include at least one file
-      included.push(chunk);
-      totalChars += chunk.length;
-    } else if (totalChars + chunk.length <= MAX_DIFF_CHARS) {
-      included.push(chunk);
-      totalChars += chunk.length;
-    } else {
-      truncatedFiles.push(filePath);
-    }
-  }
-
-  const footer = [
-    `# --- Truncated ---`,
-    `# The following ${truncatedFiles.length} file(s) were omitted (see diffStat for summary):`,
-    ...truncatedFiles.map(f => `# - ${f}`),
-  ].join('\n');
-
-  const diff = included.join('') + '\n' + footer;
-  return { diff, diffTruncated: true, truncatedFiles };
+  return truncateDiff(fullDiff, { splitDiffByFile, maxBytes: MAX_DIFF_CHARS });
 }
 
 // ---------------------------------------------------------------------------

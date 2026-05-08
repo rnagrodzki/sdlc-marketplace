@@ -30,6 +30,7 @@ const path = require('node:path');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { fetchPrMetadata, fetchPrReviews } = require(path.join(LIB, 'git'));
+const { writeJsonLine } = require(path.join(LIB, 'output'));
 
 // ---------------------------------------------------------------------------
 // Pure helper (exported for tests) — implements R51, R52, R53, R56
@@ -146,8 +147,12 @@ function sleepMs(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
+// emit() is a thin alias over `lib/output.js::writeJsonLine` (issue #284,
+// task 3). Each consumer call site emits ONE verdict and returns from
+// `main()` — `writeJsonLine` exits the process which matches the
+// previous behaviour where main returned and the script exited with code 0.
 function emit(verdict) {
-  process.stdout.write(JSON.stringify(verdict) + '\n');
+  writeJsonLine(verdict);
 }
 
 // ---------------------------------------------------------------------------

@@ -31,6 +31,7 @@
 
 const fs   = require('node:fs');
 const path = require('node:path');
+const { extractFrontmatter, parseSimpleYaml } = require('./yaml.js');
 
 // ---------------------------------------------------------------------------
 // File system helpers
@@ -50,50 +51,6 @@ function isDir(p) {
 
 function listDir(dirPath) {
   try { return fs.readdirSync(dirPath); } catch { return []; }
-}
-
-// ---------------------------------------------------------------------------
-// Frontmatter parser (matches lib/dimensions.js approach)
-// ---------------------------------------------------------------------------
-
-function extractFrontmatter(content) {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  return match ? match[1] : null;
-}
-
-function parseSimpleYaml(yamlStr) {
-  const result = {};
-  const lines = yamlStr.split('\n');
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (!line.trim()) { i++; continue; }
-    const kvMatch = line.match(/^(\S[^:]*?)\s*:\s*(.*)$/);
-    if (!kvMatch) { i++; continue; }
-    const key = kvMatch[1].trim();
-    const rest = kvMatch[2].trim();
-    if (rest === '') {
-      const arr = [];
-      i++;
-      while (i < lines.length && lines[i].match(/^\s+-\s+/)) {
-        arr.push(lines[i].replace(/^\s+-\s+/, '').trim().replace(/^["']|["']$/g, ''));
-        i++;
-      }
-      result[key] = arr;
-      continue;
-    }
-    if (rest.startsWith('[') && rest.endsWith(']')) {
-      const inner = rest.slice(1, -1);
-      result[key] = inner.split(',').map(v => v.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
-      i++; continue;
-    }
-    if (rest === 'true') { result[key] = true; i++; continue; }
-    if (rest === 'false') { result[key] = false; i++; continue; }
-    if (/^\d+$/.test(rest)) { result[key] = parseInt(rest, 10); i++; continue; }
-    result[key] = rest.replace(/^["']|["']$/g, '');
-    i++;
-  }
-  return result;
 }
 
 // ---------------------------------------------------------------------------

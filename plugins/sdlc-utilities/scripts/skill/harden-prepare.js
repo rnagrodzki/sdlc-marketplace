@@ -18,6 +18,7 @@ const LIB = path.join(__dirname, '..', 'lib');
 const { writeOutput } = require(path.join(LIB, 'output'));
 const surfaces = require(path.join(LIB, 'harden-surfaces'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
+const { detectResumeState } = require(path.join(LIB, 'state'));
 
 // ---------------------------------------------------------------------------
 // CLI parsing — mirror error-report-prepare.js posture
@@ -76,39 +77,44 @@ function safeExec(cmd) {
 // ---------------------------------------------------------------------------
 // Pipeline state probes — optional context (R11)
 // ---------------------------------------------------------------------------
+// Issue #284, task 19: selection rule (newest mtime) is now canonical via
+// `lib/state.js::detectResumeState`. Previously this scanned the local
+// `.sdlc/execution/` and picked the first match; that diverged from
+// ship.js's slugify+newest-mtime rule when multiple state files existed.
+// We pass no `branch` so we accept the most recent file of each prefix
+// regardless of which branch produced it — harden is a project-wide probe.
 
-function readPipelineState(projectRoot) {
-  const dir = path.join(projectRoot, '.sdlc', 'execution');
+function readPipelineState() {
   let shipState = null;
   let executeState = null;
-  if (!fs.existsSync(dir)) return { shipState, executeState };
 
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-  for (const f of files) {
-    if (!shipState && f.startsWith('ship-')) {
-      try {
-        const data = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-        shipState = {
-          paused: !!data.paused,
-          currentStep: data.currentStep || null,
-          lastFailedStep: data.lastFailedStep || null,
-        };
-      } catch (err) {
-        process.stderr.write(`harden-prepare: skipping ship state file ${f} — ${err.message}\n`);
-      }
-    }
-    if (!executeState && f.startsWith('execute-')) {
-      try {
-        const data = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-        executeState = {
-          failedTask: data.failedTask || null,
-          failedWave: data.failedWave || null,
-        };
-      } catch (err) {
-        process.stderr.write(`harden-prepare: skipping execute state file ${f} — ${err.message}\n`);
-      }
+  const ship = detectResumeState({ prefix: 'ship' });
+  if (ship.found) {
+    try {
+      const data = JSON.parse(fs.readFileSync(ship.fullPath, 'utf8'));
+      shipState = {
+        paused: !!data.paused,
+        currentStep: data.currentStep || null,
+        lastFailedStep: data.lastFailedStep || null,
+      };
+    } catch (err) {
+      process.stderr.write(`harden-prepare: skipping ship state file ${path.basename(ship.fullPath)} — ${err.message}\n`);
     }
   }
+
+  const execute = detectResumeState({ prefix: 'execute' });
+  if (execute.found) {
+    try {
+      const data = JSON.parse(fs.readFileSync(execute.fullPath, 'utf8'));
+      executeState = {
+        failedTask: data.failedTask || null,
+        failedWave: data.failedWave || null,
+      };
+    } catch (err) {
+      process.stderr.write(`harden-prepare: skipping execute state file ${path.basename(execute.fullPath)} — ${err.message}\n`);
+    }
+  }
+
   return { shipState, executeState };
 }
 
@@ -159,7 +165,7 @@ function main() {
   const copilotInstructions = surfaces.loadCopilotInstructions(projectRoot, surfaceLoadErrors);
   const errorReportSkillPath = surfaces.resolveErrorReportSkill(projectRoot, surfaceLoadErrors);
 
-  const { shipState, executeState } = readPipelineState(projectRoot);
+  const { shipState, executeState } = readPipelineState();
 
   const manifest = {
     failure: {

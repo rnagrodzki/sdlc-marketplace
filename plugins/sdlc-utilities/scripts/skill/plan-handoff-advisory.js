@@ -20,8 +20,12 @@
 
 try {
   const { getAdvisory } = require('../lib/context-advisory');
+  const { emitText } = require('../lib/output');
   const text = getAdvisory({ skill: 'plan-sdlc' });
-  if (text) process.stdout.write(text + '\n');
+  // emitText() calls process.exit(0) internally — control does not return
+  // here on the success path. The catch below only fires for failures in
+  // require() or getAdvisory() (i.e. before emitText is invoked).
+  if (text) emitText(text);
 } catch (_) {
   // Graceful degradation — silent failure, never break handoff.
 }
