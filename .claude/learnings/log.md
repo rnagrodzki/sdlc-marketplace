@@ -263,3 +263,7 @@ First execute-plan-sdlc dispatch failed: "opus model requires 1M context (extra 
 
 ## 2026-05-08 — ship-sdlc: review threshold=low triggers received-review even on APPROVED verdict
 Verdict was APPROVED but 2 low findings triggered received-review-sdlc dispatch (threshold=low catches all non-info findings). Both fixes were documentation-only (JSDoc clarifications). Pipeline behaved correctly per spec.
+
+## 2026-05-08 — harden-sdlc: ambiguous for execute-plan-sdlc at Step 1 — Agent dispatch
+Applied: 0 proposal(s) | Skipped: 0 | Routed: no
+Trigger: Agent dispatch failed: opus model requires 1M context (extra usage not enabled)
