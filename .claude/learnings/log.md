@@ -233,3 +233,6 @@ Explicit patch bump requested despite suggestedBump=minor (feat commit present).
 ## 2026-05-08 — execute-plan-sdlc: ship-config gating refactor (issue #130 follow-up)
 Plan said `PROJECT_MIGRATIONS is not extended` because the renamed fields are local-only. But `lib/config-version.js` uses a single global `CURRENT_SCHEMA_VERSION` constant for both roles; bumping it from 3 to 4 forced a project-side v3→v4 step to keep the migration walker satisfied. Added a no-op `noopProjectV3ToV4` that just stamps the version. Lesson: when a plan touches a versioned constant shared across registries, audit every consumer of that constant — even if the plan claims a registry is untouched.
 
+
+## 2026-05-08 — execute-plan-sdlc: Astro site devops category + system map update
+Multi-file additive changes across a TypeScript Astro site. Wave structure was forced by skills-meta.ts being touched by 3 tasks (T1, T3, T5) — all needed separate waves. WorkflowGraph.astro used dynamic maxCol computation so no layout fix was needed for the new col-4 node. Agent correctly identified and added the parallel colorHex map entry alongside colorMap — slight plan spec gap (spec only mentioned colorMap), agent self-corrected. Trivial batch (2 tasks, 2 separate files) executed cleanly in parallel with the standard task in Wave 2.

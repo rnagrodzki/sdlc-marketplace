@@ -430,11 +430,11 @@ Pipeline behavior is configured via `.sdlc/local.json`. Create it manually or ru
 
 ### Schema versioning
 
-The local config carries a top-level integer `version` field. The current schema version is **`2`**. Files lacking `version` (or with `version < 2`) are auto-migrated by the loader (`lib/config.js::readLocalConfig`) on the next read. Migration:
+The local config carries a top-level integer `schemaVersion` field. The current schema version is **`4`**. Files lacking `schemaVersion` (or with an older schema version) are auto-migrated by the loader (`lib/config.js::readLocalConfig`) on the next read. Migration:
 
 - Expands legacy `ship.preset` to `ship.steps[]` (full → all six, balanced → all except `version`, minimal → `[execute, commit, pr]`).
 - Subtracts legacy `ship.skip[]` members from the expanded steps.
-- Drops `ship.preset` and `ship.skip`; writes `version: 2` at the top level.
+- Drops `ship.preset` and `ship.skip`; writes `schemaVersion: 4` at the top level.
 - Emits a single stderr deprecation notice on first migration; subsequent reads are silent.
 
 To migrate explicitly, run `/setup-sdlc --migrate`.
@@ -443,7 +443,7 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `version` (top-level) | `2` | `2` | Schema version literal. New configs MUST include `version: 2`. Legacy v1 configs are auto-migrated on read. |
+| `schemaVersion` (top-level) | `4` | `4` | Schema version literal. New configs MUST include `schemaVersion: 4`. Legacy configs are auto-migrated on read. |
 | `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`, `learnings-commit`. Replaces legacy `preset` / `skip`. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type. |
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |
@@ -458,9 +458,9 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 | `awaitRemoteReviewInterval` | `integer` (≥10) | `60` | Seconds between await-remote-review poll attempts. (R57) |
 | `awaitRemoteReviewers` | `string[]` (minItems 1) | `["copilot"]` | Logins (case-insensitive) whose reviews satisfy await-remote-review. When the login is `copilot`, the reviewer must also be a Bot. (R56, R57) |
 
-### Migrating from v1
+### Migrating legacy configs
 
-If your `.sdlc/local.json` was created before SDLC v2 schema (used `preset:` and `skip:`), the loader will auto-migrate on the next ship run and emit a one-line deprecation notice. The mapping is:
+If your `.sdlc/local.json` was created before the current schema (used `preset:` and `skip:`), the loader will auto-migrate on the next ship run and emit a one-line deprecation notice. The mapping is:
 
 - `full` (or legacy `A`) → `[execute, commit, review, version, pr, archive-openspec]`
 - `balanced` (or legacy `B`) → `[execute, commit, review, pr, archive-openspec]` (omits `version`)
@@ -485,7 +485,7 @@ Skip version management, auto-commit, only pause on critical findings.
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "review", "pr", "archive-openspec"],
     "auto": true,
@@ -503,7 +503,7 @@ Full pipeline with high-severity review threshold. PRs open as drafts for team r
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "review", "version", "pr", "archive-openspec"],
     "auto": false,
@@ -521,7 +521,7 @@ Smallest step set with widest review threshold. Suitable for regulated environme
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "pr"],
     "auto": false,
@@ -539,7 +539,7 @@ For when you've already implemented and reviewed manually, and just need to comm
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["commit", "version", "pr"],
     "auto": true,
@@ -557,7 +557,7 @@ For high-stakes branches where any low/medium/high/critical finding should trigg
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "review", "version", "pr"],
     "auto": false,

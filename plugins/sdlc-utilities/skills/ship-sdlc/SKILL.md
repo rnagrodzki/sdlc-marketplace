@@ -97,7 +97,7 @@ PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --bump patc
 # `--steps execute,commit,pr`). To set the model tier forwarded to execute-plan-sdlc,
 # pass `--quality <full|balanced|minimal>` — only forwarded when explicitly passed.
 # Legacy `--preset` and `--skip` are hard-removed (#190) and produce errors.
-# The config-level field is `steps[]` (top-level `version: 2`); preset/skip are no longer persisted.
+# The config-level field is `steps[]` (top-level `schemaVersion: 4`); preset/skip are no longer persisted.
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
