@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Migration
 - v3 → v4 LOCAL config migration runs automatically on first read: legacy boolean `ship.verifyPipeline: true` / `ship.awaitReview: true` are rewritten as `verify-pipeline` / `await-remote-review` entries appended to `ship.steps[]`; `awaitReview*` tunable keys are renamed to `awaitRemoteReview*` (values preserved); legacy keys are removed.
 
+## [0.19.2] - 2026-05-08
+
+### Changed
+- shared lib: extracted duplicated utilities from skill scripts into lib/ modules (diff-truncate, jira-keys, yaml, dimensions, version, state, output, discovery) removing ~250 lines of duplication (#284)
+- shared scripts: improved comment and documentation clarity in diff-truncate.js (UTF-16 unit semantics), output.js (legacy writeJsonLine call shape), and plan-handoff-advisory.js (process.exit control flow) (#284)
+
 ## [0.19.1] - 2026-05-08
 
 ### Added
