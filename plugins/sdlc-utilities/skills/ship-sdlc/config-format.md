@@ -35,17 +35,26 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
 {
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "version": 2,
+  "schemaVersion": 4,
   "ship": {
-    "steps": ["execute", "commit", "review", "pr", "archive-openspec"],
+    "steps": ["execute", "commit", "review", "pr", "verify-pipeline", "await-remote-review", "archive-openspec", "learnings-commit"],
     "bump": "patch",
     "draft": false,
     "auto": false,
     "reviewThreshold": "high",
     "workspace": "prompt",
-    "rebase": true
+    "rebase": true,
+    "verifyPipelineTimeout": 1200,
+    "verifyPipelineInterval": 60,
+    "verifyPipelineMaxIterations": 3,
+    "awaitRemoteReviewTimeout": 600,
+    "awaitRemoteReviewInterval": 60,
+    "awaitRemoteReviewers": ["copilot"]
   }
 }
 ```
+
+`verify-pipeline` and `await-remote-review` are opt-in members of `ship.steps[]`. Add them only when you want post-PR CI verification or to await an automated reviewer's verdict.
 
 ---
 
@@ -54,7 +63,7 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `version` (top-level) | `2` | `2` | Schema version literal. Required for new configs; legacy v1 files are auto-migrated. |
-| `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`. Replaces the legacy `preset` and `skip` fields. |
+| `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `verify-pipeline` (opt-in, R41), `await-remote-review` (opt-in, R50), `archive-openspec`, `learnings-commit`. Replaces the legacy `preset` and `skip` fields. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type applied when the `version` step runs. Overridden by `--bump` on the CLI. |
 | `draft` | `boolean` | `false` | When `true`, PRs are created as drafts. Equivalent to `--draft`. |
 | `auto` | `boolean` | `false` | When `true`, run in non-interactive auto mode (no confirmation prompts). Equivalent to `--auto`. |

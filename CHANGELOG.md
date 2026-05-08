@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
+
+### Renamed
+- `await-review.js` → `await-remote-review.js`; `awaitReviewExhausted` state marker → `awaitRemoteReviewExhausted`; `ship.awaitReviewTimeout` / `awaitReviewInterval` / `awaitReviewers` → `ship.awaitRemoteReviewTimeout` / `awaitRemoteReviewInterval` / `awaitRemoteReviewers`.
+
+### Migration
+- v3 → v4 LOCAL config migration runs automatically on first read: legacy boolean `ship.verifyPipeline: true` / `ship.awaitReview: true` are rewritten as `verify-pipeline` / `await-remote-review` entries appended to `ship.steps[]`; `awaitReview*` tunable keys are renamed to `awaitRemoteReview*` (values preserved); legacy keys are removed.
+
 ## [0.19.0] - 2026-05-08
 
 ### Added

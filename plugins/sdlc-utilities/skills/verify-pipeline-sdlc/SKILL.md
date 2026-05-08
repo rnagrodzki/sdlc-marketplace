@@ -87,7 +87,7 @@ When `fix-applied`: ship-sdlc's verify-pipeline branch dispatches `commit-sdlc` 
 
 When `proposal`: the user (interactive) or ship-sdlc (logging) reads the proposal and decides whether to apply.
 
-When `abort`: ship-sdlc treats this as a skip-with-warning and proceeds to `await-review`.
+When `abort`: ship-sdlc treats this as a skip-with-warning and proceeds to `await-remote-review`.
 
 ## See Also
 

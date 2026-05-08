@@ -77,8 +77,6 @@ function parseArgs(argv) {
   let openspecChange  = null;
   let gc              = false;
   let ttlDays         = null;
-  let verifyPipeline  = null; // R58 — null means not passed; CLI-true wins over config
-  let awaitReview     = null; // R58
   const errors = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -126,15 +124,17 @@ function parseArgs(argv) {
         ttlDays = v;
       }
     } else if (a === '--verify-pipeline') {
-      // R58 — boolean flag enabling the post-PR CI verification step
-      verifyPipeline = true;
+      // Hard-removed (issue #130): the verify-pipeline phase is now opt-in via
+      // step membership in ship.steps[] / --steps. Boolean enabler removed.
+      errors.push('--verify-pipeline is no longer accepted by ship-sdlc. Add `verify-pipeline` to --steps <csv> or to ship.steps[] in .sdlc/local.json.');
     } else if (a === '--await-review') {
-      // R58 — boolean flag enabling the post-PR await-automated-review step
-      awaitReview = true;
+      // Hard-removed (issue #130): the await-remote-review phase is now opt-in
+      // via step membership in ship.steps[] / --steps. Boolean enabler removed.
+      errors.push('--await-review is no longer accepted by ship-sdlc. Add `await-remote-review` to --steps <csv> or to ship.steps[] in .sdlc/local.json.');
     }
   }
 
-  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, verifyPipeline, awaitReview, errors };
+  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -261,23 +261,11 @@ function mergeFlags(cli, config) {
     sources.rebase = 'default';
   }
 
-  // -- verify-pipeline / await-review (R57, R58) --
+  // -- verify-pipeline / await-remote-review tunables (R57) --
   //
-  // Boolean gating flags + their tunables. CLI true overrides config; otherwise
-  // config; otherwise the spec default. CLI was set to `null` (not `false`)
-  // when not passed so we can distinguish "explicitly off" from "not passed".
-
-  // verifyPipeline (boolean, default false)
-  if (cli.verifyPipeline === true) {
-    merged.verifyPipeline  = true;
-    sources.verifyPipeline = 'cli';
-  } else if (cfg.verifyPipeline !== undefined) {
-    merged.verifyPipeline  = cfg.verifyPipeline === true;
-    sources.verifyPipeline = 'config';
-  } else {
-    merged.verifyPipeline  = false;
-    sources.verifyPipeline = 'default';
-  }
+  // The two phases are gated by step membership in flags.steps, not by
+  // boolean flags. These tunables apply when the corresponding step is in
+  // flags.steps; values come from config or fall back to the spec default.
 
   // verifyPipelineTimeout (integer ≥30, default 1200)
   if (cfg.verifyPipelineTimeout !== undefined) {
@@ -306,43 +294,31 @@ function mergeFlags(cli, config) {
     sources.verifyPipelineMaxIterations = 'default';
   }
 
-  // awaitReview (boolean, default false)
-  if (cli.awaitReview === true) {
-    merged.awaitReview  = true;
-    sources.awaitReview = 'cli';
-  } else if (cfg.awaitReview !== undefined) {
-    merged.awaitReview  = cfg.awaitReview === true;
-    sources.awaitReview = 'config';
+  // awaitRemoteReviewTimeout (integer ≥30, default 600)
+  if (cfg.awaitRemoteReviewTimeout !== undefined) {
+    merged.awaitRemoteReviewTimeout  = cfg.awaitRemoteReviewTimeout;
+    sources.awaitRemoteReviewTimeout = 'config';
   } else {
-    merged.awaitReview  = false;
-    sources.awaitReview = 'default';
+    merged.awaitRemoteReviewTimeout  = 600;
+    sources.awaitRemoteReviewTimeout = 'default';
   }
 
-  // awaitReviewTimeout (integer ≥30, default 600)
-  if (cfg.awaitReviewTimeout !== undefined) {
-    merged.awaitReviewTimeout  = cfg.awaitReviewTimeout;
-    sources.awaitReviewTimeout = 'config';
+  // awaitRemoteReviewInterval (integer ≥10, default 60)
+  if (cfg.awaitRemoteReviewInterval !== undefined) {
+    merged.awaitRemoteReviewInterval  = cfg.awaitRemoteReviewInterval;
+    sources.awaitRemoteReviewInterval = 'config';
   } else {
-    merged.awaitReviewTimeout  = 600;
-    sources.awaitReviewTimeout = 'default';
+    merged.awaitRemoteReviewInterval  = 60;
+    sources.awaitRemoteReviewInterval = 'default';
   }
 
-  // awaitReviewInterval (integer ≥10, default 60)
-  if (cfg.awaitReviewInterval !== undefined) {
-    merged.awaitReviewInterval  = cfg.awaitReviewInterval;
-    sources.awaitReviewInterval = 'config';
+  // awaitRemoteReviewers (array of strings, minItems 1, default ["copilot"])
+  if (Array.isArray(cfg.awaitRemoteReviewers) && cfg.awaitRemoteReviewers.length > 0) {
+    merged.awaitRemoteReviewers  = cfg.awaitRemoteReviewers.slice();
+    sources.awaitRemoteReviewers = 'config';
   } else {
-    merged.awaitReviewInterval  = 60;
-    sources.awaitReviewInterval = 'default';
-  }
-
-  // awaitReviewers (array of strings, minItems 1, default ["copilot"])
-  if (Array.isArray(cfg.awaitReviewers) && cfg.awaitReviewers.length > 0) {
-    merged.awaitReviewers  = cfg.awaitReviewers.slice();
-    sources.awaitReviewers = 'config';
-  } else {
-    merged.awaitReviewers  = ['copilot'];
-    sources.awaitReviewers = 'default';
+    merged.awaitRemoteReviewers  = ['copilot'];
+    sources.awaitRemoteReviewers = 'default';
   }
 
   // Pass-through flags that don't come from config.
@@ -527,23 +503,22 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
     },
     // R41-R49: verify-pipeline — opt-in inline-execution step (skill: null,
     // dispatched by ship-sdlc/SKILL.md which parses the JSON verdict). Gated
-    // by flags.verifyPipeline; auto-skipped when 'pr' is excluded from
-    // flags.steps (cannot poll a PR that does not exist).
+    // by step membership in flags.steps; auto-skipped when 'pr' is excluded
+    // from flags.steps (cannot poll a PR that does not exist).
     (() => {
-      const prInSteps = isIn('pr');
-      if (!flags.verifyPipeline) {
+      if (!isIn('verify-pipeline')) {
         return {
           name: 'verify-pipeline',
           skill: null,
           model: null,
           status: 'skipped',
-          skipSource: 'condition',
+          skipSource: skipSource('verify-pipeline'),
           args: '',
-          reason: 'verifyPipeline not enabled',
+          reason: 'not in steps[]',
           pause: false,
         };
       }
-      if (!prInSteps) {
+      if (!isIn('pr')) {
         return {
           name: 'verify-pipeline',
           skill: null,
@@ -562,29 +537,29 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         status: 'will_run',
         skipSource: 'none',
         args: `--timeout ${flags.verifyPipelineTimeout} --interval ${flags.verifyPipelineInterval}`,
-        reason: 'verify CI checks before await-review',
+        reason: 'verify CI checks before await-remote-review',
         pause: true,
       };
     })(),
-    // R50-R56: await-review — opt-in inline-execution step. Gated by
-    // flags.awaitReview; auto-skipped when 'pr' is excluded from flags.steps.
+    // R50-R56: await-remote-review — opt-in inline-execution step. Gated by
+    // step membership in flags.steps; auto-skipped when 'pr' is excluded from
+    // flags.steps.
     (() => {
-      const prInSteps = isIn('pr');
-      if (!flags.awaitReview) {
+      if (!isIn('await-remote-review')) {
         return {
-          name: 'await-review',
+          name: 'await-remote-review',
           skill: null,
           model: null,
           status: 'skipped',
-          skipSource: 'condition',
+          skipSource: skipSource('await-remote-review'),
           args: '',
-          reason: 'awaitReview not enabled',
+          reason: 'not in steps[]',
           pause: false,
         };
       }
-      if (!prInSteps) {
+      if (!isIn('pr')) {
         return {
-          name: 'await-review',
+          name: 'await-remote-review',
           skill: null,
           model: null,
           status: 'skipped',
@@ -595,12 +570,12 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         };
       }
       return {
-        name: 'await-review',
+        name: 'await-remote-review',
         skill: null,
         model: null,
         status: 'will_run',
         skipSource: 'none',
-        args: `--timeout ${flags.awaitReviewTimeout} --interval ${flags.awaitReviewInterval} --reviewers ${flags.awaitReviewers.join(',')}`,
+        args: `--timeout ${flags.awaitRemoteReviewTimeout} --interval ${flags.awaitRemoteReviewInterval} --reviewers ${flags.awaitRemoteReviewers.join(',')}`,
         reason: 'await automated reviewer (e.g., Copilot)',
         pause: false,
       };
@@ -1064,15 +1039,14 @@ function main() {
       workspace: flags.workspace,
       rebase: flags.rebase,
       openspecChange: flags.openspecChange,
-      // R57, R58: post-PR CI verification + await-review flags
-      verifyPipeline: flags.verifyPipeline,
+      // R57: post-PR CI verification + await-remote-review tunables
+      // (gating is via step membership in flags.steps, not boolean flags)
       verifyPipelineTimeout: flags.verifyPipelineTimeout,
       verifyPipelineInterval: flags.verifyPipelineInterval,
       verifyPipelineMaxIterations: flags.verifyPipelineMaxIterations,
-      awaitReview: flags.awaitReview,
-      awaitReviewTimeout: flags.awaitReviewTimeout,
-      awaitReviewInterval: flags.awaitReviewInterval,
-      awaitReviewers: flags.awaitReviewers,
+      awaitRemoteReviewTimeout: flags.awaitRemoteReviewTimeout,
+      awaitRemoteReviewInterval: flags.awaitRemoteReviewInterval,
+      awaitRemoteReviewers: flags.awaitRemoteReviewers,
       skipConfigCheck,
       sources: flagSources,
     },

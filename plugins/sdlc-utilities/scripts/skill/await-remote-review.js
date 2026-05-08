@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * await-review.js
+ * await-remote-review.js
  *
- * Inline-execution polling script for the ship-sdlc `await-review` step.
+ * Inline-execution polling script for the ship-sdlc `await-remote-review` step.
  * Polls `gh api repos/{owner}/{repo}/pulls/{pr}/reviews` (REST) at a
  * configurable interval until a non-PENDING review from a configured
  * reviewer arrives or a timeout elapses.
@@ -10,8 +10,8 @@
  * Implements R50-R56 of docs/specs/ship-sdlc.md.
  *
  * Usage:
- *   node await-review.js [--pr <number>] [--timeout <s>] [--interval <s>]
- *                        [--reviewers <csv>] [--state-file <path>]
+ *   node await-remote-review.js [--pr <number>] [--timeout <s>] [--interval <s>]
+ *                               [--reviewers <csv>] [--state-file <path>]
  *
  * Stdout: exactly ONE JSON line, one of:
  *   {"status":"actionable","state","reviewer","reviewId","submittedAt","prNumber"}
@@ -133,7 +133,7 @@ function writeStateMarker(p, key, value) {
   try {
     fs.writeFileSync(p, JSON.stringify(state, null, 2));
   } catch (err) {
-    process.stderr.write(`await-review: failed to write state marker: ${err.message}\n`);
+    process.stderr.write(`await-remote-review: failed to write state marker: ${err.message}\n`);
   }
 }
 
@@ -160,7 +160,7 @@ function main(argv) {
   // R55: short-circuit on state-marker
   if (args.stateFile) {
     const state = readStateFile(args.stateFile);
-    if (state && state.awaitReviewExhausted === true) {
+    if (state && state.awaitRemoteReviewExhausted === true) {
       emit({ status: 'skipped', reason: 'exhausted', prNumber: args.pr ? Number(args.pr) : null });
       return;
     }
@@ -186,7 +186,7 @@ function main(argv) {
 
   while (Date.now() - startedAt < timeoutMs) {
     iteration += 1;
-    process.stderr.write(`await-review: poll ${iteration} (PR #${prNumber}, reviewers=${args.reviewers.join(',')})\n`);
+    process.stderr.write(`await-remote-review: poll ${iteration} (PR #${prNumber}, reviewers=${args.reviewers.join(',')})\n`);
     const reviews = fetchPrReviews(owner, repo, prNumber);
     const verdict = evaluateReviews(reviews, args.reviewers);
 
@@ -211,7 +211,7 @@ function main(argv) {
 
   // Timeout — R54
   const waitedSeconds = Math.floor((Date.now() - startedAt) / 1000);
-  if (args.stateFile) writeStateMarker(args.stateFile, 'awaitReviewExhausted', true);
+  if (args.stateFile) writeStateMarker(args.stateFile, 'awaitRemoteReviewExhausted', true);
   emit({ status: 'timeout', waitedSeconds, reviewersWatched: args.reviewers, prNumber });
 }
 

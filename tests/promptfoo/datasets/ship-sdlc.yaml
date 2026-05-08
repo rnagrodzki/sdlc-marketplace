@@ -598,50 +598,50 @@
         received-review-sdlc. The verdict label "APPROVED WITH NOTES" is
         treated as display-only and does NOT control the dispatch decision.
 
-- description: "ship-sdlc: --verify-pipeline + --await-review render rows after pr in dry-run (R59)"
+- description: "ship-sdlc: verify-pipeline + await-remote-review render rows after pr in dry-run when in steps[] (R59)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     user_request: >
-      The user invoked `/ship-sdlc --has-plan --verify-pipeline --await-review --dry-run`.
+      The user invoked `/ship-sdlc --has-plan --steps execute,commit,review,pr,verify-pipeline,await-remote-review,archive-openspec,learnings-commit --dry-run`.
       Per R59, both new step rows must appear in the pipeline table immediately after `pr`,
       with status `will_run`. Walk through the dry-run output.
   assert:
     - type: regex
       value: "(verify-pipeline)"
     - type: regex
-      value: "(await-review)"
+      value: "(await-remote-review)"
     - type: regex
       value: "(will_run|will run)"
     - type: llm-rubric
       value: >
-        The dry-run pipeline table shows verify-pipeline and await-review as new rows
-        in this order: pr → verify-pipeline → await-review → learnings-commit.
-        Both rows have status will_run because their respective gating flags
-        (flags.verifyPipeline and flags.awaitReview) were enabled via CLI.
+        The dry-run pipeline table shows verify-pipeline and await-remote-review as new rows
+        in this order: pr → verify-pipeline → await-remote-review → learnings-commit.
+        Both rows have status will_run because both step names are members of flags.steps
+        (the single source of truth for pipeline composition).
 
-- description: "ship-sdlc: verify-pipeline and await-review default to skipped when flags absent"
+- description: "ship-sdlc: verify-pipeline and await-remote-review default to skipped when not in steps[]"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     user_request: >
-      The user invoked `/ship-sdlc --has-plan --dry-run` (without --verify-pipeline
-      or --await-review). Both new opt-in steps should appear in the dry-run table
-      as skipped, with skip reason "verifyPipeline not enabled" / "awaitReview
-      not enabled".
+      The user invoked `/ship-sdlc --has-plan --dry-run` (using BUILT_IN_DEFAULTS.steps,
+      which does NOT include verify-pipeline or await-remote-review). Both new opt-in
+      steps should appear in the dry-run table as skipped, with skip reason
+      "not in steps[]".
   assert:
     - type: regex
       value: "(verify-pipeline)"
     - type: regex
-      value: "(await-review)"
+      value: "(await-remote-review)"
     - type: regex
-      value: "(skipped|not enabled)"
+      value: "(skipped|not in steps)"
 
-- description: "ship-sdlc: verify-pipeline + await-review skipped when pr is excluded from steps"
+- description: "ship-sdlc: verify-pipeline + await-remote-review skipped when pr is excluded from steps[]"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     user_request: >
-      The user invoked `/ship-sdlc --has-plan --verify-pipeline --await-review
-      --steps execute,commit --dry-run`. Because `pr` is not in flags.steps,
-      both new steps must be skipped (cannot poll a PR that does not exist).
+      The user invoked `/ship-sdlc --has-plan --steps execute,commit,verify-pipeline,await-remote-review --dry-run`.
+      Because `pr` is not in flags.steps, both new steps must be skipped
+      (cannot poll a PR that does not exist).
   assert:
     - type: regex
       value: "(skipped)"
@@ -652,8 +652,8 @@
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     user_request: >
-      The user invoked `/ship-sdlc --auto --verify-pipeline`. The PR was opened,
-      and `verify-pipeline.js` polled CI and emitted
+      The user invoked `/ship-sdlc --auto --steps execute,commit,review,pr,verify-pipeline,archive-openspec,learnings-commit`.
+      The PR was opened, and `verify-pipeline.js` polled CI and emitted
       `{"status":"failed","prNumber":42,"failedChecks":[{"name":"unit","conclusion":"fail","logsExcerpt":"FAIL src/foo.test.ts"}]}`.
       Walk through what ship-sdlc does next, citing the relevant R-numbers from
       docs/specs/ship-sdlc.md.

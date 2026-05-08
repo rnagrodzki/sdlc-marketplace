@@ -29,7 +29,7 @@ This skill is for **expert users working on projects with established quality gu
 ## Usage
 
 ```text
-/ship-sdlc [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config] [--gc] [--ttl-days <N>] [--verify-pipeline] [--await-review]
+/ship-sdlc [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config] [--gc] [--ttl-days <N>]
 ```
 
 ---
@@ -39,7 +39,7 @@ This skill is for **expert users working on projects with established quality gu
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
-| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`, `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
+| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `pr`, `verify-pipeline` (opt-in), `await-remote-review` (opt-in), `archive-openspec`, `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
 | `--quality <full\|balanced\|minimal>` | Forwarded to execute-plan-sdlc as `--quality` (model tier). Only forwarded when the user explicitly passes `--quality` to ship; otherwise execute-plan-sdlc applies its own selection. (Renamed from `--preset` in #190 to disambiguate from `--steps`.) | Not forwarded |
 | `--bump patch\|minor\|major\|<label>` | Version bump type forwarded to version-sdlc. The `<label>` form (e.g. `--bump rc`, `--bump beta`) is forwarded verbatim and interpreted by version-sdlc as `--bump patch --pre <label>`. Labels must match `^[a-z][a-z0-9]*$` (lowercase, start with a letter, alphanumeric). Example: `ship-sdlc --bump rc` produces a `1.2.4-rc.1` style release. | `patch` |
 | `--draft` | Create the PR as a draft. | Off |
@@ -50,8 +50,8 @@ This skill is for **expert users working on projects with established quality gu
 | `--openspec-change <name>` | Explicitly select the OpenSpec change to archive, overriding branch-name matching. Used when the branch name does not match the change directory name. | — |
 | `--gc` | Prune stale ship- and execute- state files from `.sdlc/execution/`, then stop without running the pipeline. A file is pruned only when it is older than the TTL AND its branch is no longer in `git branch --list`. Fixes orphan accumulation from interrupted runs (issue #223). | Off |
 | `--ttl-days <N>` | TTL in days used by `--gc` and the terminal cleanup step. Files newer than this are kept regardless of branch existence (in-flight pipelines on detached HEAD or freshly-deleted branches must not be wiped). Configurable via `state.gc.ttlDays` in `.sdlc/config.json`; CLI overrides config. | `7` (or `state.gc.ttlDays`) |
-| `--verify-pipeline` | Enable post-PR CI verification. After the PR is opened, ship-sdlc polls `gh pr checks` until all required checks have non-pending conclusions. On failure: prompts the user (or dispatches `verify-pipeline-sdlc` under `--auto`) to analyze and fix. Configurable via `ship.verifyPipeline` in `.sdlc/local.json`. (R41–R49) | Off |
-| `--await-review` | Enable post-PR await-automated-review. After CI converges (or directly after PR creation when `--verify-pipeline` is off), ship-sdlc polls for an automated reviewer's verdict (default: Copilot). On `CHANGES_REQUESTED` / `COMMENTED`, dispatches received-review-sdlc; on `APPROVED`, logs success and proceeds. Configurable via `ship.awaitReview` in `.sdlc/local.json`. (R50–R56) | Off |
+
+To enable post-PR CI verification, add `verify-pipeline` to `ship.steps` in `.sdlc/local.json` (or pass it via `--steps`). To await an automated reviewer's verdict, add `await-remote-review`. See R41 / R50 in `docs/specs/ship-sdlc.md`.
 
 
 **Removed (#190 hard-remove):** `--preset` and `--skip` are no longer accepted. Passing either produces an error pointing at `--steps <csv>` (for step composition) and `--quality <full|balanced|minimal>` (for the execute-plan-sdlc model tier). Legacy on-disk v1 configs (`ship.preset`/`ship.skip`) are still auto-migrated to v2 by `lib/config.js`.
@@ -127,7 +127,7 @@ plan-sdlc      (--auto if     (--committed)
                                 (--auto, --draft
                                  if applicable)
                                      |
-                          [--verify-pipeline?]
+                       [verify-pipeline ∈ steps[]?]
                                      |
                                      v
                                 Step 5g-i:    (opt-in, R41-R49)
@@ -138,11 +138,11 @@ plan-sdlc      (--auto if     (--committed)
                                  verify-pipeline-sdlc
                                  under --auto)
                                      |
-                          [--await-review?]
+                       [await-remote-review ∈ steps[]?]
                                      |
                                      v
                                 Step 5g-ii:   (opt-in, R50-R56)
-                                await-review
+                                await-remote-review
                                 (poll for Copilot/etc
                                  review; on actionable
                                  dispatch
@@ -376,15 +376,15 @@ Finds the most recent state file for the current branch, skips completed steps, 
 ### Post-PR CI verification + Copilot review (interactive)
 
 ```text
-/ship-sdlc --verify-pipeline --await-review
+/ship-sdlc --steps execute,commit,review,pr,verify-pipeline,await-remote-review,archive-openspec,learnings-commit
 ```
 
-After the PR is opened, ship-sdlc polls `gh pr checks` until CI converges. On failure, it prompts via `AskUserQuestion` (analyze | skip | abort). Once CI is green (or skipped), it polls for a Copilot review and dispatches `received-review-sdlc` on actionable verdicts. (R41–R56)
+After the PR is opened, ship-sdlc polls `gh pr checks` until CI converges. On failure, it prompts via `AskUserQuestion` (analyze | skip | abort). Once CI is green (or skipped), it polls for a Copilot review and dispatches `received-review-sdlc` on actionable verdicts. The two opt-in steps can also be set persistently in `ship.steps[]` in `.sdlc/local.json`. (R41–R56)
 
 ### Post-PR full automation
 
 ```text
-/ship-sdlc --auto --verify-pipeline --await-review
+/ship-sdlc --auto --steps execute,commit,review,pr,verify-pipeline,await-remote-review,archive-openspec,learnings-commit
 ```
 
 Same flow as above, but on CI failure ship-sdlc dispatches `verify-pipeline-sdlc` (subagent) directly with the failed-check log excerpts; on `fix-applied` verdict, ship-sdlc commits and pushes the fix and re-polls (capped at `verifyPipelineMaxIterations`, default 3). On a Copilot review, ship-sdlc dispatches `received-review-sdlc --auto`. (R46, R47, R52)
@@ -451,14 +451,12 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 | `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` \| `"low"` | `"high"` | Minimum severity that triggers the fix loop. `low` triggers on any finding except `info`. |
 | `workspace` | `"branch"` \| `"worktree"` \| `"prompt"` | `"prompt"` | Workspace isolation strategy forwarded to execute-plan-sdlc. |
 | `rebase` | `true` \| `false` \| `"prompt"` | `true` | Rebase strategy before execution and versioning. |
-| `verifyPipeline` | `boolean` | `false` | Enable post-PR CI verification step. CLI `--verify-pipeline` overrides this. (R57) |
 | `verifyPipelineTimeout` | `integer` (≥30) | `1200` | Maximum seconds verify-pipeline polls before giving up with a warning. (R57) |
 | `verifyPipelineInterval` | `integer` (≥10) | `60` | Seconds between verify-pipeline poll attempts. (R57) |
 | `verifyPipelineMaxIterations` | `integer` (1–10) | `3` | Maximum analyze-fix-recheck iterations before verify-pipeline emits a warning and proceeds. (R47, R57) |
-| `awaitReview` | `boolean` | `false` | Enable post-PR await-review step. CLI `--await-review` overrides this. (R57) |
-| `awaitReviewTimeout` | `integer` (≥30) | `600` | Maximum seconds await-review polls before giving up with a warning. (R57) |
-| `awaitReviewInterval` | `integer` (≥10) | `60` | Seconds between await-review poll attempts. (R57) |
-| `awaitReviewers` | `string[]` (minItems 1) | `["copilot"]` | Logins (case-insensitive) whose reviews satisfy await-review. When the login is `copilot`, the reviewer must also be a Bot. (R56, R57) |
+| `awaitRemoteReviewTimeout` | `integer` (≥30) | `600` | Maximum seconds await-remote-review polls before giving up with a warning. (R57) |
+| `awaitRemoteReviewInterval` | `integer` (≥10) | `60` | Seconds between await-remote-review poll attempts. (R57) |
+| `awaitRemoteReviewers` | `string[]` (minItems 1) | `["copilot"]` | Logins (case-insensitive) whose reviews satisfy await-remote-review. When the login is `copilot`, the reviewer must also be a Bot. (R56, R57) |
 
 ### Migrating from v1
 

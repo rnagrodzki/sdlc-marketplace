@@ -230,7 +230,7 @@ function fetchPrMetadata() {
  * Fetch reviews for a PR via the GitHub REST API (`gh api repos/<owner>/<repo>/pulls/<n>/reviews`).
  * Returns a sentinel-empty array on any failure (e.g. unauthenticated `gh`, malformed JSON).
  * Each line of `--jq` output is parsed independently.
- * Used by await-review polling (R51, R56).
+ * Used by await-remote-review polling (R51, R56).
  *
  * @param {string} owner
  * @param {string} repo

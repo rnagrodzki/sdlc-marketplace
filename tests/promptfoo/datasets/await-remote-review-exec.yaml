@@ -1,56 +1,56 @@
-# Exec tests for await-review.js evaluateReviews — pure helper, no gh shell-out.
+# Exec tests for await-remote-review.js evaluateReviews — pure helper, no gh shell-out.
 
-- description: "await-review: actionable verdict on CHANGES_REQUESTED from Copilot Bot"
+- description: "await-remote-review: actionable verdict on CHANGES_REQUESTED from Copilot Bot"
   vars:
-    script_path: "repo://tests/promptfoo/scripts/run-await-review-evaluate.js"
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
     script_args: '--reviews [{"id":1,"state":"CHANGES_REQUESTED","authorLogin":"copilot","authorType":"Bot","submittedAt":"2025-01-01"}] --reviewers copilot'
   assert:
     - type: contains
       value: '"status":"actionable"'
 
-- description: "await-review: actionable verdict on COMMENTED from Copilot Bot"
+- description: "await-remote-review: actionable verdict on COMMENTED from Copilot Bot"
   vars:
-    script_path: "repo://tests/promptfoo/scripts/run-await-review-evaluate.js"
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
     script_args: '--reviews [{"id":1,"state":"COMMENTED","authorLogin":"copilot","authorType":"Bot","submittedAt":"2025-01-01"}] --reviewers copilot'
   assert:
     - type: contains
       value: '"status":"actionable"'
 
-- description: "await-review: approved-clean verdict on APPROVED from Copilot Bot"
+- description: "await-remote-review: approved-clean verdict on APPROVED from Copilot Bot"
   vars:
-    script_path: "repo://tests/promptfoo/scripts/run-await-review-evaluate.js"
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
     script_args: '--reviews [{"id":1,"state":"APPROVED","authorLogin":"copilot","authorType":"Bot","submittedAt":"2025-01-01"}] --reviewers copilot'
   assert:
     - type: contains
       value: '"status":"approved-clean"'
 
-- description: "await-review: case-insensitive login match (Copilot vs COPILOT)"
+- description: "await-remote-review: case-insensitive login match (Copilot vs COPILOT)"
   vars:
-    script_path: "repo://tests/promptfoo/scripts/run-await-review-evaluate.js"
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
     script_args: '--reviews [{"id":1,"state":"CHANGES_REQUESTED","authorLogin":"Copilot","authorType":"Bot","submittedAt":"2025-01-01"}] --reviewers COPILOT'
   assert:
     - type: contains
       value: '"status":"actionable"'
 
-- description: "await-review: copilot login but non-Bot type rejected (R56)"
+- description: "await-remote-review: copilot login but non-Bot type rejected (R56)"
   vars:
-    script_path: "repo://tests/promptfoo/scripts/run-await-review-evaluate.js"
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
     script_args: '--reviews [{"id":1,"state":"APPROVED","authorLogin":"copilot","authorType":"User","submittedAt":"2025-01-01"}] --reviewers copilot'
   assert:
     - type: contains
       value: '"status":null'
 
-- description: "await-review: PENDING reviews are excluded"
+- description: "await-remote-review: PENDING reviews are excluded"
   vars:
-    script_path: "repo://tests/promptfoo/scripts/run-await-review-evaluate.js"
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
     script_args: '--reviews [{"id":1,"state":"PENDING","authorLogin":"copilot","authorType":"Bot","submittedAt":"2025-01-01"}] --reviewers copilot'
   assert:
     - type: contains
       value: '"status":null'
 
-- description: "await-review: latest-by-submittedAt selection (newest CHANGES_REQUESTED beats older APPROVED)"
+- description: "await-remote-review: latest-by-submittedAt selection (newest CHANGES_REQUESTED beats older APPROVED)"
   vars:
-    script_path: "repo://tests/promptfoo/scripts/run-await-review-evaluate.js"
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
     script_args: '--reviews [{"id":1,"state":"APPROVED","authorLogin":"copilot","authorType":"Bot","submittedAt":"2025-01-01"},{"id":2,"state":"CHANGES_REQUESTED","authorLogin":"copilot","authorType":"Bot","submittedAt":"2025-01-02"}] --reviewers copilot'
   assert:
     - type: contains
@@ -58,9 +58,9 @@
     - type: contains
       value: '"matchSubmittedAt":"2025-01-02"'
 
-- description: "await-review: no matching reviewer returns null"
+- description: "await-remote-review: no matching reviewer returns null"
   vars:
-    script_path: "repo://tests/promptfoo/scripts/run-await-review-evaluate.js"
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
     script_args: '--reviews [{"id":1,"state":"APPROVED","authorLogin":"alice","authorType":"User","submittedAt":"2025-01-01"}] --reviewers copilot'
   assert:
     - type: contains

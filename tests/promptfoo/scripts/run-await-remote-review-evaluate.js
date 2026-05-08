@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * run-await-review-evaluate.js
+ * run-await-remote-review-evaluate.js
  *
  * Test driver for the pure helper `evaluateReviews` exported by
- * plugins/sdlc-utilities/scripts/skill/await-review.js.
+ * plugins/sdlc-utilities/scripts/skill/await-remote-review.js.
  *
  * Usage:
- *   node run-await-review-evaluate.js --reviews '<json>' --reviewers '<csv>'
+ *   node run-await-remote-review-evaluate.js --reviews '<json>' --reviewers '<csv>'
  *
  * Stdout: single JSON line with the verdict shape:
  *   {"status":"<actionable|approved-clean|null>","matchState":"<string>","matchLogin":"<string>"}
@@ -19,7 +19,7 @@
 const path = require('path');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
-const AR        = path.join(REPO_ROOT, 'plugins', 'sdlc-utilities', 'scripts', 'skill', 'await-review.js');
+const AR        = path.join(REPO_ROOT, 'plugins', 'sdlc-utilities', 'scripts', 'skill', 'await-remote-review.js');
 
 function getArg(name) {
   const i = process.argv.indexOf(name);

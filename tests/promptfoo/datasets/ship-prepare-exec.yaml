@@ -488,3 +488,98 @@
   assert:
     - type: icontains
       value: '"reviewThreshold": "config"'
+
+# verify-pipeline / await-remote-review steps[]-membership gating (issue #130)
+# After v0.19.0 hard-rename, these two phases are gated by step membership in
+# flags.steps (the same mechanism every other canonical step uses) rather than
+# dedicated boolean flags. The four cases below cover: will_run on inclusion,
+# skipped on omission, conditional skip when pr is excluded, v3→v4 migration of
+# legacy boolean configs, and CLI flag rejection.
+
+- description: "ship-prepare: v4 config with verify-pipeline + await-remote-review in steps[] -> will_run"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-v4-verify-and-await-in-steps"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const vp = o.steps.find(s => s.name === 'verify-pipeline');
+        const ar = o.steps.find(s => s.name === 'await-remote-review');
+        if (!vp || !ar) return false;
+        return vp.status === 'will_run' && vp.skipSource === 'none'
+          && ar.status === 'will_run' && ar.skipSource === 'none';
+
+- description: "ship-prepare: v4 BUILT_IN_DEFAULTS (verify-pipeline excluded) -> skipped with not in steps[]"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const vp = o.steps.find(s => s.name === 'verify-pipeline');
+        if (!vp) return false;
+        return vp.status === 'skipped' && /not in steps/.test(vp.reason);
+
+- description: "ship-prepare: v4 await-remote-review with pr excluded -> skipped (condition)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-v4-await-no-pr"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const ar = o.steps.find(s => s.name === 'await-remote-review');
+        if (!ar) return false;
+        return ar.status === 'skipped'
+          && ar.skipSource === 'condition'
+          && /pr step excluded/.test(ar.reason);
+
+- description: "ship-prepare: v3 boolean config auto-migrates to v4 with steps + renamed keys"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-v3-booleans-migrate"
+  assert:
+    - type: icontains
+      value: "v3→v4 (migrateAwaitReviewBooleansToSteps)"
+    - type: javascript
+      value: |
+        // The migration manifest reflects the on-disk write — exec-runner asserts
+        // the durable shape via the manifest's stepsApplied + post-prepare flags.
+        const o = JSON.parse(output);
+        if (!o.migration || !o.migration.local) return false;
+        if (o.migration.local.migrated !== true) return false;
+        if (o.migration.local.schemaVersion !== 4) return false;
+        if (!o.migration.local.backupPath) return false;
+        // Resolved flags reflect the migrated tunable rename.
+        if (!Array.isArray(o.flags.awaitRemoteReviewers)) return false;
+        if (o.flags.awaitRemoteReviewers[0] !== 'gh-bot') return false;
+        // After migration the resolved steps[] must include both new entries.
+        if (!Array.isArray(o.flags.steps)) return false;
+        if (!o.flags.steps.includes('verify-pipeline')) return false;
+        if (!o.flags.steps.includes('await-remote-review')) return false;
+        // No legacy boolean keys may leak into the resolved flag space.
+        if (o.flags.verifyPipeline !== undefined) return false;
+        if (o.flags.awaitReview !== undefined) return false;
+        return true;
+
+- description: "ship-prepare: --verify-pipeline CLI flag is hard-rejected with migration pointer"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --verify-pipeline"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: "--verify-pipeline is no longer accepted"
+    - type: icontains
+      value: "ship.steps"

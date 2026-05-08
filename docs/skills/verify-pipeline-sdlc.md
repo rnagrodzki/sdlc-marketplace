@@ -37,7 +37,7 @@ Resolves the latest failed check on PR #142, classifies the logs, and emits a JS
 ### Auto-fix from ship-sdlc
 
 ```text
-/ship-sdlc --verify-pipeline --auto
+/ship-sdlc --steps execute,commit,review,version,pr,verify-pipeline --auto
 ```
 
 ship-sdlc dispatches this skill with `--auto`. On `lint` / `test-failure` / `type-error` categories, the skill applies a minimal in-place edit and emits `{"status":"fix-applied", ...}`. ship-sdlc then dispatches commit-sdlc to commit and push, and re-polls CI.
@@ -74,7 +74,7 @@ This skill never commits, pushes, or modifies files outside the project root. Co
 
 - [`/ship-sdlc`](ship-sdlc.md) — invokes this skill from the verify-pipeline step under `--auto`
 - [`/commit-sdlc`](commit-sdlc.md) — invoked by ship-sdlc after this skill returns `fix-applied`
-- [`/received-review-sdlc`](received-review-sdlc.md) — companion skill for processing reviewer feedback (await-review step)
+- [`/received-review-sdlc`](received-review-sdlc.md) — companion skill for processing reviewer feedback (await-remote-review step)
 
 <!--
 NOTE: This section is for GitHub markdown browsing only.
