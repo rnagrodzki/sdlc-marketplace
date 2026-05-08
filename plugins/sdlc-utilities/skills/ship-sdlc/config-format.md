@@ -18,11 +18,11 @@ A JSON Schema is available at `schemas/sdlc-local.schema.json` for IDE autocompl
 
 ## Schema Versioning
 
-The local config carries a top-level integer `version` field. The current schema version is **`2`**. Files lacking a `version` field (or with `version < 2`) are auto-migrated on read by `lib/config.js`:
+The local config carries a top-level integer `schemaVersion` field. The current schema version is **`4`**. Files lacking a `schemaVersion` field (or with an older schema version) are auto-migrated on read by `lib/config.js`:
 
 - Legacy `ship.preset` → expanded to `ship.steps[]`
 - Legacy `ship.skip[]` → subtracted from the expanded `steps[]`
-- Both legacy fields are dropped; top-level `version: 2` is written
+- Both legacy fields are dropped; top-level `schemaVersion: 4` is written
 - Migration is idempotent and emits a single stderr deprecation notice on first read
 
 To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --migrate`.
@@ -34,18 +34,26 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
-    "steps": ["execute", "commit", "review", "pr", "archive-openspec"],
+    "steps": ["execute", "commit", "review", "pr", "verify-pipeline", "await-remote-review", "archive-openspec", "learnings-commit"],
     "bump": "patch",
     "draft": false,
     "auto": false,
     "reviewThreshold": "high",
     "workspace": "prompt",
-    "rebase": true
+    "rebase": true,
+    "verifyPipelineTimeout": 1200,
+    "verifyPipelineInterval": 60,
+    "verifyPipelineMaxIterations": 3,
+    "awaitRemoteReviewTimeout": 600,
+    "awaitRemoteReviewInterval": 60,
+    "awaitRemoteReviewers": ["copilot"]
   }
 }
 ```
+
+`verify-pipeline` and `await-remote-review` are opt-in members of `ship.steps[]`. Add them only when you want post-PR CI verification or to await an automated reviewer's verdict.
 
 ---
 
@@ -53,8 +61,8 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `version` (top-level) | `2` | `2` | Schema version literal. Required for new configs; legacy v1 files are auto-migrated. |
-| `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`. Replaces the legacy `preset` and `skip` fields. |
+| `schemaVersion` (top-level) | `4` | `4` | Schema version literal. Required for new configs; legacy files are auto-migrated. |
+| `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `verify-pipeline` (opt-in, R41), `await-remote-review` (opt-in, R50), `archive-openspec`, `learnings-commit`. Replaces the legacy `preset` and `skip` fields. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type applied when the `version` step runs. Overridden by `--bump` on the CLI. |
 | `draft` | `boolean` | `false` | When `true`, PRs are created as drafts. Equivalent to `--draft`. |
 | `auto` | `boolean` | `false` | When `true`, run in non-interactive auto mode (no confirmation prompts). Equivalent to `--auto`. |
@@ -126,7 +134,7 @@ Running `ship-sdlc --init-config` launches an interactive sequence that writes t
    - `high` = blockers + high-severity findings (recommended)
    - `medium` = blockers + high + medium-severity findings
 
-8. **Write and confirm** — The tool runs `util/ship-init.js` with the collected answers to write the `ship` section to `.sdlc/local.json` (with `version: 2` at the top level) and create `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the ship section already exists, you are asked whether to overwrite it.
+8. **Write and confirm** — The tool runs `util/ship-init.js` with the collected answers to write the `ship` section to `.sdlc/local.json` (with `schemaVersion: 4` at the top level) and create `.sdlc/.gitignore`. The resulting config JSON is displayed for confirmation. If the ship section already exists, you are asked whether to overwrite it.
 
 ---
 
@@ -139,7 +147,7 @@ Skips the version step (manual version bump) and runs auto.
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "review", "pr", "archive-openspec"],
     "bump": "patch",
@@ -158,7 +166,7 @@ All canonical steps run; review threshold catches high-severity findings; PRs de
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "review", "version", "pr", "archive-openspec"],
     "bump": "minor",
@@ -177,7 +185,7 @@ Smallest step set with widest review threshold. Suitable for regulated environme
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "pr"],
     "bump": "patch",

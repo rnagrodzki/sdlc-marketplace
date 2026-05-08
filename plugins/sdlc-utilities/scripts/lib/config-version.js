@@ -29,7 +29,7 @@
 const fs   = require('fs');
 const path = require('path');
 
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 const LOCK_RELATIVE_PATH = path.join('.sdlc', '.migration.lock');
 const LOCK_RETRY_DELAY_MS = 100;

@@ -62,7 +62,7 @@ Returns a table of matching issues.
 Add a comment to PROJ-147 with the root cause analysis
 ```
 
-Converts the markdown to Atlassian Document Format (ADF) via `markdown-to-adf.js` and posts the comment.
+Converts the markdown to Atlassian Document Format (ADF) via `markdown-to-adf.js` and posts the comment. When the tool input declares `contentFormat='adf'`, placeholder detection (C13) walks the parsed ADF tree and applies the regex only to `text` node values — bracket characters in JSON-serialized ADF (e.g., `[null,...]` from a stringified array) never trip the bracket-form regex.
 
 ### Edit issue fields
 
@@ -117,9 +117,27 @@ Resolution order:
 
 1. **Project custom** — `.claude/jira-templates/<IssueTypeName>.md`
 2. **Skill default** — `plugins/sdlc-utilities/skills/jira-sdlc/templates/<IssueTypeName>.md`
-3. **No template** — description is generated without structure
+3. **Subtask fallback** — when none of the above exist, the prepare script consults a fallback map for subtask variants (see below).
+4. **No template** — when no fallback applies, the skill emits a warning and aborts the operation.
 
 Run `/jira-sdlc --init-templates` to export the skill defaults to `.claude/jira-templates/` as a starting point, then edit them to match your team's conventions.
+
+#### Subtask fallback (spec R18)
+
+When an issue type lacks both a custom and a shipped template, the prepare script consults a closed fallback map before resolving to `none`:
+
+| Issue type | Falls back to |
+|---|---|
+| `Sub-bug` | `Bug` |
+| `Sub-task` | `Task` |
+| `Subtask` | `Task` |
+
+When a fallback is applied the skill prints a one-line notice:
+`Using <Parent> template for <Type> — override at .claude/jira-templates/<Type>.md`.
+Override the fallback by creating a custom template at the path shown.
+
+When no fallback applies (e.g., a fictional `Whim` type with no shipped template) the skill prints a warning and stops:
+`No template for <Type>. Run /jira-sdlc --init-templates or create .claude/jira-templates/<Type>.md`.
 
 > **Tip:** On non-English Jira instances, `--init-templates` detects unmapped issue types and interactively asks which default template to use for each.
 
@@ -171,6 +189,15 @@ The cache contains:
 
 After initialization, most operations require a single MCP call instead of 4–8 discovery calls, significantly reducing latency and token usage.
 
+### Cache refresh on cloudId auth errors
+
+When an Atlassian MCP call returns a cloudId authorization error (response text matches `isn't explicitly granted` or HTTP 401/403 with the cloudId in the message), the skill follows this ladder once (spec R23):
+
+1. Call `getAccessibleAtlassianResources` exactly once.
+2. Compare the returned cloudId(s) against the cached value at `~/.sdlc-cache/jira/<site>/<KEY>.json`.
+3. If different, run `/jira-sdlc --force-refresh` and reload the cache.
+4. Retry the original MCP call exactly once. If it still fails with the same error, the skill surfaces the error and stops — it does not loop.
+
 ### Legacy Cache Migration
 
 Earlier versions of this skill stored the cache in-repo at `.sdlc/jira-cache/<KEY>.json` (and before that, `.claude/jira-cache/<KEY>.json`). On the next `--check`, the prepare script detects either legacy location, copies the file to the home layout using the `siteUrl` embedded in the JSON, and emits a warning. The legacy file is left in place for the user to clean up once confident. Migration is idempotent: subsequent runs find the home cache first and skip the legacy probe entirely.
@@ -211,6 +238,10 @@ The resulting cache stores `workflows: { "<Type>": { "unsampled": true } }` for 
 - **Atlassian MCP** — must be configured and connected (`mcp__atlassian__*` tools available in your Claude Code session)
 - **Jira project access** — the authenticated user must have read/write permission on the target project
 - No additional CLI tools required
+
+### Multiple Atlassian MCP namespaces
+
+When both `mcp__atlassian__` and `mcp__claude_ai_Atlassian__` are registered in the deferred-tools list, the skill auto-falls-back from the primary `mcp__atlassian__` namespace to `mcp__claude_ai_Atlassian__` once when the primary returns a cloudId authorization error. The working namespace is persisted for the rest of the session — no per-call probing (spec R23).
 
 ### Harness Configuration
 
@@ -256,6 +287,12 @@ On `approve`, an approval token is written to `$TMPDIR/jira-sdlc/approval-<hash>
 ### Hook enforcement (R21)
 
 A `PreToolUse` hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the payload hash from the tool input at dispatch time, verifies both artifacts exist and are under 10 minutes old, and **blocks dispatch** if either check fails. If dispatch is blocked, the hook's `permissionDecisionReason` is surfaced verbatim — the skill does not retry by guessing what changed.
+
+Canonicalization strips `null`-valued keys recursively (in addition to `undefined`) so that MCP-harness defaulting (e.g., schema-default `commentVisibility: null` injection between artifact write and hook read) cannot desync the skill-side and hook-side hashes.
+
+### Diagnostics
+
+When `SDLC_DEBUG_DUMP=1` is set, the hook writes the received `tool_input` and the canonical-JSON byte-string to `$TMPDIR/jira-sdlc-debug/<hook-hash-prefix>.json`. Use this to diff against the skill artifact (`$TMPDIR/jira-sdlc/critique-<hash>.json`) byte-for-byte when a hash mismatch denial occurs. The dump is diagnostic only — it does not change the deny decision.
 
 ---
 

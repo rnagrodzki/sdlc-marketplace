@@ -4,7 +4,7 @@
 
 Configures the SDLC plugin for a project. On invocation, `/setup-sdlc` shows a single multi-select menu listing every section it manages — version tracking, ship pipeline preferences, Jira, review scope, commit/PR patterns, review dimensions, PR template, plan and execution guardrails, and openspec enrichment. Each row shows a state badge (`set`, `not set`, or `legacy`), and only the sections you tick get configured. For every selected section, the skill prints a verbose header before any prompt — purpose, files modified, consuming skills, and a per-option description block — so you know exactly what each toggle controls before you answer.
 
-Creates `.sdlc/config.json` (project-level config), `.sdlc/local.json` (user-local preferences), and content artifacts (`.sdlc/review-dimensions/*.yaml`, `.claude/pr-template.md`, `openspec/config.yaml` managed block).
+Creates `.sdlc/config.json` (project-level config), `.sdlc/local.json` (user-local preferences), and content artifacts (`.sdlc/review-dimensions/*.yaml`, `.sdlc/pr-template.md`, `openspec/config.yaml` managed block).
 
 ---
 
@@ -14,7 +14,7 @@ Creates `.sdlc/config.json` (project-level config), `.sdlc/local.json` (user-loc
 /setup-sdlc
 ```
 
-Renders the selective-section menu. Sections in state `not set` are pre-checked; `legacy` (migration-required) sections are locked and auto-checked; `set` sections are unchecked by default. Confirm with no rows selected to exit without changes.
+Renders the selective-section menu. All sections are pre-checked by default; `legacy` (migration-required) sections are locked and auto-checked. Confirm with no rows selected to exit without changes. Use `--unset-only` to restore the legacy behavior of pre-checking only `not-set` sections.
 
 ```text
 /setup-sdlc --only jira,review
@@ -26,7 +26,7 @@ Skip the menu, configure only `jira` and `review`. Useful for scripted runs or f
 /setup-sdlc --force
 ```
 
-Pre-check every row in the menu (reconfigure everything) instead of pre-selecting only `not set` rows.
+Pre-check every row in the menu and skip the per-field `keep` prompt — all configured values are reconfirmed rather than accepted with one keystroke.
 
 ---
 
@@ -34,10 +34,10 @@ Pre-check every row in the menu (reconfigure everything) instead of pre-selectin
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--migrate` | Run schema migration via `scripts/skill/migrate-config.js`: relocates legacy `.claude/sdlc.json` to `.sdlc/config.json`, walks the schema-version migration registry (`lib/config-migrations.js`) to bring both project + local configs to `schemaVersion: 3`, and consolidates legacy per-file configs (`.claude/version.json`, `.sdlc/ship-config.json`, etc.) via `lib/config.js::consolidateLegacyFiles`. Idempotent. Backups: legacy relocation writes to `.claude/sdlc.json.bak` (single, no timestamp); other in-place migrations write to `.sdlc/<file>.bak.<safe-iso>`. Setup sweeps to retain 3 newest per role. | — |
+| `--migrate` | Run schema migration via `scripts/skill/migrate-config.js`: relocates legacy `.claude/sdlc.json` to `.sdlc/config.json`, walks the schema-version migration registry (`lib/config-migrations.js`) to bring both project + local configs to `schemaVersion: 3`, and consolidates legacy per-file configs (`.claude/version.json`, `.sdlc/ship-config.json`, etc.) via `lib/config.js::consolidateLegacyFiles`. Idempotent. Backups: legacy relocation writes to `.sdlc/sdlc.json.bak` (single, no timestamp); other in-place migrations write to `.sdlc/<file>.bak.<safe-iso>`. Setup sweeps to retain 3 newest per role. | — |
 | `--skip <section>` | Skip a config section during setup (version, ship, jira, review, commit, pr) | — |
-| `--force` | Pre-check every menu row (reconfigure all sections) | — |
-| `--unset-only` | Pre-check only sections in `not-set` state. Legacy fast-path before #235 — the default flow now walks every configurable field. | — |
+| `--force` | Skip the per-field `keep` prompt for every field — all values are reconfirmed rather than accepted with one keystroke. Does not change which rows are pre-checked (all rows are pre-checked by default). | — |
+| `--unset-only` | Pre-check only sections in `not-set` state. Legacy fast-path before #235 — the default flow now pre-checks all rows. | — |
 | `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | — |
 | `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | — |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | — |
@@ -67,6 +67,18 @@ Detects missing config, walks through version/ship/jira/review/commit/pr setup, 
 ```
 
 Reads `.claude/version.json`, `.sdlc/ship-config.json`, `.sdlc/review.json`, and `.sdlc/jira-config.json`, merges them into `.sdlc/config.json` and `.sdlc/local.json`, and optionally deletes the legacy files.
+
+### Migration cleanup
+
+When `migrate-config.js` successfully relocates `.claude/sdlc.json` → `.sdlc/config.json` and copies `.claude/review-dimensions/` → `.sdlc/review-dimensions/`, it removes the following legacy artifacts in the same run:
+
+- `.claude/sdlc.json` — removed after successful relocation
+- `.claude/sdlc.json.bak` — removed (stale backup from pre-0.19 runs)
+- `.claude/review-dimensions/` — removed after successful copy to `.sdlc/`
+
+Cleanup is idempotent (safe to re-run) and is skipped when `--dry-run` is active.
+
+Backup of the original project config is written to `.sdlc/sdlc.json.bak` before migration.
 
 ### Skip specific sections
 
@@ -147,7 +159,7 @@ Every section the menu can configure. The label, purpose, files modified, and co
 | `pr` | PR title validation rules used by `/pr-sdlc` (title regex, allowed types/scopes, required trailers). | `.sdlc/config.json` | `/pr-sdlc` |
 | `pr-labels` | PR label assignment policy under `pr.labels`. Mode `off` (default) adds no automatic labels — `--label` overrides still work. Mode `rules` evaluates user-defined deterministic rules (branch prefix, commit type, path glob, JIRA type, diff size). Mode `llm` opts into the legacy fuzzy match. Configured via `--only pr-labels`. | `.sdlc/config.json` | `/pr-sdlc` |
 | `review-dimensions` | Review dimensions installed under `.sdlc/review-dimensions/*.yaml`. Each dimension is a focused check set used by `/review-sdlc`. | `.sdlc/review-dimensions/*.yaml` | `/review-sdlc` |
-| `pr-template` | PR description template at `.claude/pr-template.md`, used by `/pr-sdlc` when drafting PRs. | `.claude/pr-template.md` | `/pr-sdlc` |
+| `pr-template` | PR description template at `.sdlc/pr-template.md`, used by `/pr-sdlc` when drafting PRs. | `.sdlc/pr-template.md` | `/pr-sdlc` |
 | `plan-guardrails` | Custom rules at `.sdlc/config.json#plan.guardrails` evaluated by `/plan-sdlc` during critique phases. | `.sdlc/config.json` | `/plan-sdlc` |
 | `execution-guardrails` | Runtime guardrails at `.sdlc/config.json#execute.guardrails` evaluated by `/execute-plan-sdlc` and `/ship-sdlc` before/after each wave. | `.sdlc/config.json` | `/execute-plan-sdlc`, `/ship-sdlc` |
 | `openspec-block` | Managed block in `openspec/config.yaml` providing sdlc-utilities workflow guidance to OpenSpec-aware skills. Idempotent across plugin versions. | `openspec/config.yaml` | `/plan-sdlc`, `/execute-plan-sdlc`, `/ship-sdlc` |
@@ -248,7 +260,7 @@ Scans your project's tech stack, dependencies, and directory structure to propos
 
 #### PR Template
 
-Analyzes project conventions (existing GitHub PR templates, recent PR patterns, JIRA usage) to propose a tailored PR description template. The result is saved to `.claude/pr-template.md` and used automatically by `/pr-sdlc`.
+Analyzes project conventions (existing GitHub PR templates, recent PR patterns, JIRA usage) to propose a tailored PR description template. The result is saved to `.sdlc/pr-template.md` and used automatically by `/pr-sdlc`.
 
 **Direct entry:** `/setup-sdlc --pr-template`
 
@@ -265,6 +277,21 @@ When `openspec/config.yaml` is detected during setup, offers to add a managed bl
 **Direct entry:** `/setup-sdlc --openspec-enrich` or `/setup-sdlc --openspec-enrich --remove-openspec` (removal)
 
 Each option can be individually skipped or accessed later via the `--dimensions`, `--pr-template`, `--guardrails`, or `--openspec-enrich` flags.
+
+### Diff Preview and Confirmation
+
+Before writing any config files, `/setup-sdlc` renders a diff preview comparing the configuration as it was at startup against the values accumulated during the session:
+
+```
+| path                  | before    | after       |
+|-----------------------|-----------|-------------|
+| pr.expectedAccount    | (unset)   | rnagrodzki  |
+| version.tagPrefix     | v         | release/    |
+```
+
+When no fields changed, the preview is replaced with `No changes — nothing to write.` and the write step is skipped.
+
+Otherwise, you are prompted to confirm before the write proceeds. Reject to discard all accumulated answers without touching the config files. In `--auto` mode the confirmation is suppressed and the write proceeds automatically.
 
 ### Step 5: Summary
 
@@ -289,10 +316,10 @@ Plan guardrails    — [N configured via guardrails sub-flow | skipped]
 | `.sdlc/local.json` | User-local config with `review` scope preferences and `ship` settings. Carries top-level `schemaVersion: 3`. Gitignored (selective `.sdlc/.gitignore` block). |
 | `.sdlc/.gitignore` | Selective managed block (issue #231) — committed: `config.json`, `review-dimensions/`. Ignored: `local.json`, `cache/`, `*.bak.*`, `.migration.lock`. Replaces the historical blanket `*\n` content. |
 | `.sdlc/review-dimensions/*.yaml` | Review dimensions created during dimensions sub-flow (via `--dimensions`). Committed to the repo. |
-| `.claude/pr-template.md` | PR template created during PR template sub-flow (via `--pr-template`). |
+| `.sdlc/pr-template.md` | PR template created during PR template sub-flow (via `--pr-template`). Legacy `.claude/pr-template.md` is read as a fallback during the deprecation window — issue #260. |
 | `openspec/config.yaml` | Managed block added/updated by openspec enrichment sub-flow (via `--openspec-enrich`). Only the managed block is modified; user-authored content is preserved. |
 | `.gitignore` (project root) | Managed v2 block (issue #231) listing transient skill artifact patterns (`*-context-*.json`, `*-manifest-*.json`, `*-prepare-*.json`) plus `.sdlc/` runtime patterns (`.sdlc/local.json`, `.sdlc/cache/`, `.sdlc/*.bak.*`, `.sdlc/.migration.lock`). Idempotent — re-running setup-sdlc replaces the block in place; v1 blocks are upgraded to v2. Existing user content is preserved. |
-| `.claude/sdlc.json.bak` | Single one-time backup of the legacy project-config file when migration relocates it to `.sdlc/config.json` (issue #231 acceptance criterion). |
+| `.sdlc/sdlc.json.bak` | Single one-time backup of the legacy project-config file when migration relocates it to `.sdlc/config.json` (issue #231 acceptance criterion). |
 
 ---
 

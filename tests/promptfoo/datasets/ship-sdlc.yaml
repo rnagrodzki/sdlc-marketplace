@@ -597,3 +597,77 @@
         or "≥5 medium". Because flags.auto is true, --auto is forwarded to
         received-review-sdlc. The verdict label "APPROVED WITH NOTES" is
         treated as display-only and does NOT control the dispatch decision.
+
+- description: "ship-sdlc: verify-pipeline + await-remote-review render rows after pr in dry-run when in steps[] (R59)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    user_request: >
+      The user invoked `/ship-sdlc --has-plan --steps execute,commit,review,pr,verify-pipeline,await-remote-review,archive-openspec,learnings-commit --dry-run`.
+      Per R59, both new step rows must appear in the pipeline table immediately after `pr`,
+      with status `will_run`. Walk through the dry-run output.
+  assert:
+    - type: regex
+      value: "(verify-pipeline)"
+    - type: regex
+      value: "(await-remote-review)"
+    - type: regex
+      value: "(will_run|will run)"
+    - type: llm-rubric
+      value: >
+        The dry-run pipeline table shows verify-pipeline and await-remote-review as new rows
+        in this order: pr → verify-pipeline → await-remote-review → learnings-commit.
+        Both rows have status will_run because both step names are members of flags.steps
+        (the single source of truth for pipeline composition).
+
+- description: "ship-sdlc: verify-pipeline and await-remote-review default to skipped when not in steps[]"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    user_request: >
+      The user invoked `/ship-sdlc --has-plan --dry-run` (using BUILT_IN_DEFAULTS.steps,
+      which does NOT include verify-pipeline or await-remote-review). Both new opt-in
+      steps should appear in the dry-run table as skipped, with skip reason
+      "not in steps[]".
+  assert:
+    - type: regex
+      value: "(verify-pipeline)"
+    - type: regex
+      value: "(await-remote-review)"
+    - type: regex
+      value: "(skipped|not in steps)"
+
+- description: "ship-sdlc: verify-pipeline + await-remote-review skipped when pr is excluded from steps[]"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    user_request: >
+      The user invoked `/ship-sdlc --has-plan --steps execute,commit,verify-pipeline,await-remote-review --dry-run`.
+      Because `pr` is not in flags.steps, both new steps must be skipped
+      (cannot poll a PR that does not exist).
+  assert:
+    - type: regex
+      value: "(skipped)"
+    - type: regex
+      value: "(pr step excluded|cannot.*PR)"
+
+- description: "ship-sdlc: verify-pipeline failure under --auto dispatches verify-pipeline-sdlc subagent (R46)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    user_request: >
+      The user invoked `/ship-sdlc --auto --steps execute,commit,review,pr,verify-pipeline,archive-openspec,learnings-commit`.
+      The PR was opened, and `verify-pipeline.js` polled CI and emitted
+      `{"status":"failed","prNumber":42,"failedChecks":[{"name":"unit","conclusion":"fail","logsExcerpt":"FAIL src/foo.test.ts"}]}`.
+      Walk through what ship-sdlc does next, citing the relevant R-numbers from
+      docs/specs/ship-sdlc.md.
+  assert:
+    - type: regex
+      value: "(verify-pipeline-sdlc|R46)"
+    - type: regex
+      value: "(--auto|flags\\.auto)"
+    - type: not-regex
+      value: "(AskUserQuestion)"
+    - type: llm-rubric
+      value: >
+        With flags.auto === true, ship-sdlc dispatches verify-pipeline-sdlc as
+        a subagent (Agent tool, model sonnet) with the failed-check log excerpts —
+        no AskUserQuestion. On fix-applied verdict, ship-sdlc directly dispatches
+        commit-sdlc to commit/push and re-polls verify-pipeline up to
+        flags.verifyPipelineMaxIterations (default 3, R47).

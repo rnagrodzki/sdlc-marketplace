@@ -39,7 +39,7 @@ This skill is for **expert users working on projects with established quality gu
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
-| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`, `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
+| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `pr`, `verify-pipeline` (opt-in), `await-remote-review` (opt-in), `archive-openspec`, `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
 | `--quality <full\|balanced\|minimal>` | Forwarded to execute-plan-sdlc as `--quality` (model tier). Only forwarded when the user explicitly passes `--quality` to ship; otherwise execute-plan-sdlc applies its own selection. (Renamed from `--preset` in #190 to disambiguate from `--steps`.) | Not forwarded |
 | `--bump patch\|minor\|major\|<label>` | Version bump type forwarded to version-sdlc. The `<label>` form (e.g. `--bump rc`, `--bump beta`) is forwarded verbatim and interpreted by version-sdlc as `--bump patch --pre <label>`. Labels must match `^[a-z][a-z0-9]*$` (lowercase, start with a letter, alphanumeric). Example: `ship-sdlc --bump rc` produces a `1.2.4-rc.1` style release. | `patch` |
 | `--draft` | Create the PR as a draft. | Off |
@@ -50,6 +50,8 @@ This skill is for **expert users working on projects with established quality gu
 | `--openspec-change <name>` | Explicitly select the OpenSpec change to archive, overriding branch-name matching. Used when the branch name does not match the change directory name. | — |
 | `--gc` | Prune stale ship- and execute- state files from `.sdlc/execution/`, then stop without running the pipeline. A file is pruned only when it is older than the TTL AND its branch is no longer in `git branch --list`. Fixes orphan accumulation from interrupted runs (issue #223). | Off |
 | `--ttl-days <N>` | TTL in days used by `--gc` and the terminal cleanup step. Files newer than this are kept regardless of branch existence (in-flight pipelines on detached HEAD or freshly-deleted branches must not be wiped). Configurable via `state.gc.ttlDays` in `.sdlc/config.json`; CLI overrides config. | `7` (or `state.gc.ttlDays`) |
+
+To enable post-PR CI verification, add `verify-pipeline` to `ship.steps` in `.sdlc/local.json` (or pass it via `--steps`). To await an automated reviewer's verdict, add `await-remote-review`. See R41 / R50 in `docs/specs/ship-sdlc.md`.
 
 
 **Removed (#190 hard-remove):** `--preset` and `--skip` are no longer accepted. Passing either produces an error pointing at `--steps <csv>` (for step composition) and `--quality <full|balanced|minimal>` (for the execute-plan-sdlc model tier). Legacy on-disk v1 configs (`ship.preset`/`ship.skip`) are still auto-migrated to v2 by `lib/config.js`.
@@ -124,6 +126,27 @@ plan-sdlc      (--auto if     (--committed)
                                 pr-sdlc
                                 (--auto, --draft
                                  if applicable)
+                                     |
+                       [verify-pipeline ∈ steps[]?]
+                                     |
+                                     v
+                                Step 5g-i:    (opt-in, R41-R49)
+                                verify-pipeline
+                                (poll gh pr checks;
+                                 on failure: AskUserQuestion
+                                 or dispatch
+                                 verify-pipeline-sdlc
+                                 under --auto)
+                                     |
+                       [await-remote-review ∈ steps[]?]
+                                     |
+                                     v
+                                Step 5g-ii:   (opt-in, R50-R56)
+                                await-remote-review
+                                (poll for Copilot/etc
+                                 review; on actionable
+                                 dispatch
+                                 received-review-sdlc)
                                      |
                                      v
                                 Step 5h:
@@ -350,6 +373,22 @@ Ships end-to-end and opens the PR as a draft for team review.
 
 Finds the most recent state file for the current branch, skips completed steps, and retries from the point of failure.
 
+### Post-PR CI verification + Copilot review (interactive)
+
+```text
+/ship-sdlc --steps execute,commit,review,pr,verify-pipeline,await-remote-review,archive-openspec,learnings-commit
+```
+
+After the PR is opened, ship-sdlc polls `gh pr checks` until CI converges. On failure, it prompts via `AskUserQuestion` (analyze | skip | abort). Once CI is green (or skipped), it polls for a Copilot review and dispatches `received-review-sdlc` on actionable verdicts. The two opt-in steps can also be set persistently in `ship.steps[]` in `.sdlc/local.json`. (R41–R56)
+
+### Post-PR full automation
+
+```text
+/ship-sdlc --auto --steps execute,commit,review,pr,verify-pipeline,await-remote-review,archive-openspec,learnings-commit
+```
+
+Same flow as above, but on CI failure ship-sdlc dispatches `verify-pipeline-sdlc` (subagent) directly with the failed-check log excerpts; on `fix-applied` verdict, ship-sdlc commits and pushes the fix and re-polls (capped at `verifyPipelineMaxIterations`, default 3). On a Copilot review, ship-sdlc dispatches `received-review-sdlc --auto`. (R46, R47, R52)
+
 ### Set up project config
 
 ```text
@@ -391,11 +430,11 @@ Pipeline behavior is configured via `.sdlc/local.json`. Create it manually or ru
 
 ### Schema versioning
 
-The local config carries a top-level integer `version` field. The current schema version is **`2`**. Files lacking `version` (or with `version < 2`) are auto-migrated by the loader (`lib/config.js::readLocalConfig`) on the next read. Migration:
+The local config carries a top-level integer `schemaVersion` field. The current schema version is **`4`**. Files lacking `schemaVersion` (or with an older schema version) are auto-migrated by the loader (`lib/config.js::readLocalConfig`) on the next read. Migration:
 
 - Expands legacy `ship.preset` to `ship.steps[]` (full → all six, balanced → all except `version`, minimal → `[execute, commit, pr]`).
 - Subtracts legacy `ship.skip[]` members from the expanded steps.
-- Drops `ship.preset` and `ship.skip`; writes `version: 2` at the top level.
+- Drops `ship.preset` and `ship.skip`; writes `schemaVersion: 4` at the top level.
 - Emits a single stderr deprecation notice on first migration; subsequent reads are silent.
 
 To migrate explicitly, run `/setup-sdlc --migrate`.
@@ -404,7 +443,7 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `version` (top-level) | `2` | `2` | Schema version literal. New configs MUST include `version: 2`. Legacy v1 configs are auto-migrated on read. |
+| `schemaVersion` (top-level) | `4` | `4` | Schema version literal. New configs MUST include `schemaVersion: 4`. Legacy configs are auto-migrated on read. |
 | `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`, `learnings-commit`. Replaces legacy `preset` / `skip`. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type. |
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |
@@ -412,10 +451,16 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 | `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` \| `"low"` | `"high"` | Minimum severity that triggers the fix loop. `low` triggers on any finding except `info`. |
 | `workspace` | `"branch"` \| `"worktree"` \| `"prompt"` | `"prompt"` | Workspace isolation strategy forwarded to execute-plan-sdlc. |
 | `rebase` | `true` \| `false` \| `"prompt"` | `true` | Rebase strategy before execution and versioning. |
+| `verifyPipelineTimeout` | `integer` (≥30) | `1200` | Maximum seconds verify-pipeline polls before giving up with a warning. (R57) |
+| `verifyPipelineInterval` | `integer` (≥10) | `60` | Seconds between verify-pipeline poll attempts. (R57) |
+| `verifyPipelineMaxIterations` | `integer` (1–10) | `3` | Maximum analyze-fix-recheck iterations before verify-pipeline emits a warning and proceeds. (R47, R57) |
+| `awaitRemoteReviewTimeout` | `integer` (≥30) | `600` | Maximum seconds await-remote-review polls before giving up with a warning. (R57) |
+| `awaitRemoteReviewInterval` | `integer` (≥10) | `60` | Seconds between await-remote-review poll attempts. (R57) |
+| `awaitRemoteReviewers` | `string[]` (minItems 1) | `["copilot"]` | Logins (case-insensitive) whose reviews satisfy await-remote-review. When the login is `copilot`, the reviewer must also be a Bot. (R56, R57) |
 
-### Migrating from v1
+### Migrating legacy configs
 
-If your `.sdlc/local.json` was created before SDLC v2 schema (used `preset:` and `skip:`), the loader will auto-migrate on the next ship run and emit a one-line deprecation notice. The mapping is:
+If your `.sdlc/local.json` was created before the current schema (used `preset:` and `skip:`), the loader will auto-migrate on the next ship run and emit a one-line deprecation notice. The mapping is:
 
 - `full` (or legacy `A`) → `[execute, commit, review, version, pr, archive-openspec]`
 - `balanced` (or legacy `B`) → `[execute, commit, review, pr, archive-openspec]` (omits `version`)
@@ -440,7 +485,7 @@ Skip version management, auto-commit, only pause on critical findings.
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "review", "pr", "archive-openspec"],
     "auto": true,
@@ -458,7 +503,7 @@ Full pipeline with high-severity review threshold. PRs open as drafts for team r
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "review", "version", "pr", "archive-openspec"],
     "auto": false,
@@ -476,7 +521,7 @@ Smallest step set with widest review threshold. Suitable for regulated environme
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "pr"],
     "auto": false,
@@ -494,7 +539,7 @@ For when you've already implemented and reviewed manually, and just need to comm
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["commit", "version", "pr"],
     "auto": true,
@@ -512,7 +557,7 @@ For high-stakes branches where any low/medium/high/critical finding should trigg
 ```json
 {
   "$schema": "sdlc-local.schema.json",
-  "version": 2,
+  "schemaVersion": 4,
   "ship": {
     "steps": ["execute", "commit", "review", "version", "pr"],
     "auto": false,

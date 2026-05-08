@@ -1,5 +1,5 @@
 export type StepType = 'script' | 'llm' | 'critique' | 'user' | 'dispatch' | 'verify';
-export type SkillCategory = 'planning' | 'review' | 'gitops' | 'workflows' | 'integrations';
+export type SkillCategory = 'planning' | 'review' | 'gitops' | 'workflows' | 'devops' | 'integrations';
 
 export interface PipelineStep {
   id: string;
@@ -232,7 +232,7 @@ export const skillsMeta: SkillMeta[] = [
   {
     slug: 'setup-sdlc',
     command: '/setup-sdlc',
-    category: 'gitops',
+    category: 'review',
     userInvocable: true,
     tagline: 'Unified project setup — configures version, ship, review, and jira settings in one interactive flow.',
     pipeline: [
@@ -273,6 +273,23 @@ export const skillsMeta: SkillMeta[] = [
       { to: 'review-sdlc', label: 'hardens after failure of' },
       { to: 'commit-sdlc', label: 'hardens after failure of' },
       { to: 'setup-sdlc', label: 'strengthens what is configured by' },
+    ],
+  },
+  {
+    slug: 'verify-pipeline-sdlc',
+    command: '/verify-pipeline-sdlc',
+    category: 'devops',
+    userInvocable: true,
+    tagline: 'Analyzes a failed CI run on a PR, classifies the root cause via a deterministic helper, and either applies a minimal fix or emits a proposal as a JSON verdict.',
+    pipeline: [
+      { id: 'consume', label: 'Parse args, load logs', type: 'script', description: 'Reads --pr / --logs; falls back to fetchFailedCheckLogs for the latest failed run' },
+      { id: 'classify', label: 'Classify failure category', type: 'script', description: 'Runs verify-pipeline-sdlc-classify.js to bucket logs into lint/test/type/build/dep/infra/unknown' },
+      { id: 'route', label: 'Apply or propose', type: 'llm', description: 'Actionable categories under --auto trigger an inline Edit; otherwise emits a proposal' },
+      { id: 'verdict', label: 'Emit JSON verdict', type: 'verify', description: 'Single JSON line on stdout: fix-applied | proposal | abort' },
+    ],
+    connections: [
+      { to: 'ship-sdlc', label: 'invoked by verify-pipeline step of' },
+      { to: 'commit-sdlc', label: 'commit after fix-applied verdict' },
     ],
   },
 ];

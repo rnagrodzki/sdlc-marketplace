@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
+
+### Renamed
+- `await-review.js` → `await-remote-review.js`; `awaitReviewExhausted` state marker → `awaitRemoteReviewExhausted`; `ship.awaitReviewTimeout` / `awaitReviewInterval` / `awaitReviewers` → `ship.awaitRemoteReviewTimeout` / `awaitRemoteReviewInterval` / `awaitRemoteReviewers`.
+
+### Migration
+- v3 → v4 LOCAL config migration runs automatically on first read: legacy boolean `ship.verifyPipeline: true` / `ship.awaitReview: true` are rewritten as `verify-pipeline` / `await-remote-review` entries appended to `ship.steps[]`; `awaitReview*` tunable keys are renamed to `awaitRemoteReview*` (values preserved); legacy keys are removed.
+
+## [0.19.1] - 2026-05-08
+
+### Added
+- docs: updated configuration references to use current schema version (v4)
+
+### Fixed
+- ship-sdlc: added error guards for missing script resolution
+- verify-pipeline-sdlc: fixed dynamic script path resolution
+- await-review.js: removed bogus state marker that prematurely signaled completion
+
+## [0.19.0] - 2026-05-08
+
+### Added
+- ship-sdlc: post-PR CI verification and Copilot review integration with pipeline status polling and GitHub Copilot review completion awaiting (#130)
+- verify-pipeline-sdlc: new skill to poll GitHub workflow status until success or failure (#130)
+- verify-pipeline.js, await-review.js, verify-pipeline-sdlc-classify.js: supporting scripts for CI verification and test failure classification (#130)
+- git.js: enhanced utilities for multi-tenant Jira caching in ship.js (#130)
+
+### Fixed
+- await-review.js: removed bogus 'awaitReviewExhausted' state marker that prematurely signaled verdict completion (#130)
+- ship-sdlc and verify-pipeline-sdlc: added missing error guards to handle script resolution failures when sdlc plugin is not installed (#130)
+- verify-pipeline-sdlc: fixed hardcoded paths to use dynamic script resolution pattern consistent with other skills (#130)
+
 ## [0.18.14] - 2026-05-08
 
 ### Added

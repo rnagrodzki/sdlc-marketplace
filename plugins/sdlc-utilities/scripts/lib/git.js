@@ -227,6 +227,72 @@ function fetchPrMetadata() {
 }
 
 /**
+ * Fetch reviews for a PR via the GitHub REST API (`gh api repos/<owner>/<repo>/pulls/<n>/reviews`).
+ * Returns a sentinel-empty array on any failure (e.g. unauthenticated `gh`, malformed JSON).
+ * Each line of `--jq` output is parsed independently.
+ * Used by await-remote-review polling (R51, R56).
+ *
+ * @param {string} owner
+ * @param {string} repo
+ * @param {number|string} prNumber
+ * @returns {Array<{id:number,state:string,authorLogin:string,authorType:string,submittedAt:string|null}>}
+ */
+function fetchPrReviews(owner, repo, prNumber) {
+  if (!owner || !repo || prNumber === undefined || prNumber === null) return [];
+  const raw = exec(`gh api repos/${owner}/${repo}/pulls/${prNumber}/reviews --jq '.[] | {id, state, authorLogin: .user.login, authorType: .user.type, submittedAt: .submitted_at}'`);
+  if (!raw) return [];
+  const reviews = [];
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      reviews.push(JSON.parse(trimmed));
+    } catch (_) {
+      // skip malformed line
+    }
+  }
+  return reviews;
+}
+
+/**
+ * Fetch CI checks for a PR via `gh pr checks <n> --json`.
+ * Returns a sentinel-empty array on any failure.
+ * Used by verify-pipeline polling (R42).
+ *
+ * @param {number|string} prNumber
+ * @returns {Array<{name:string,state:string,bucket:string,workflow:string,event:string,startedAt:string,completedAt:string,link:string}>}
+ */
+function fetchPrChecks(prNumber) {
+  if (prNumber === undefined || prNumber === null) return [];
+  const raw = exec(`gh pr checks ${prNumber} --json name,state,bucket,workflow,event,startedAt,completedAt,link`);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+/**
+ * Fetch a tail-trimmed log excerpt for a failed workflow run via `gh run view --log-failed`.
+ * Returns `{ ok: false }` on any failure (no excerpt available).
+ * Used by verify-pipeline failure analysis (R44).
+ *
+ * @param {string|number} runId
+ * @param {{ maxLines?: number }} [options]
+ * @returns {{ ok: true, excerpt: string } | { ok: false }}
+ */
+function fetchFailedCheckLogs(runId, { maxLines = 200 } = {}) {
+  if (runId === undefined || runId === null || runId === '') return { ok: false };
+  const raw = exec(`gh run view ${runId} --log-failed`);
+  if (!raw) return { ok: false };
+  const lines = raw.split('\n');
+  const tail = lines.length > maxLines ? lines.slice(lines.length - maxLines) : lines;
+  return { ok: true, excerpt: tail.join('\n') };
+}
+
+/**
  * Fetch all labels defined in the repository via `gh`.
  * Returns an empty array if `gh` is unavailable or the command fails.
  * @returns {Array<{ name: string, description: string }>}
@@ -997,6 +1063,9 @@ module.exports = {
   getCommitLog,
   getCommitCount,
   fetchPrMetadata,
+  fetchPrReviews,
+  fetchPrChecks,
+  fetchFailedCheckLogs,
   fetchRepoLabels,
   parseRemoteOwner,
   getGhAccounts,

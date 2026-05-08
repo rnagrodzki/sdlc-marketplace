@@ -86,8 +86,29 @@ function cleanupRelocation(ctx) {
   }
 }
 
+/**
+ * v3 → v4: project-config no-op. The v3→v4 LOCAL migration adds the
+ * `verify-pipeline` / `await-remote-review` step entries and renames
+ * `awaitReview*` tunable keys (issue #130). Project configs do not carry
+ * those fields — they are local-only — but the global
+ * `CURRENT_SCHEMA_VERSION` constant covers both roles, so the project
+ * registry needs a v3→v4 step that simply stamps the new version.
+ *
+ * Idempotent: safe to call against any object shape; only mutates the
+ * `schemaVersion` field.
+ */
+function noopProjectV3ToV4(ctx) {
+  const { paths, readJsonFile, writeJsonFile } = ctx;
+  if (!fs.existsSync(paths.newPath)) return;
+  const data = readJsonFile(paths.newPath);
+  if (!data || typeof data !== 'object') return;
+  data.schemaVersion = 4;
+  writeJsonFile(paths.newPath, data);
+}
+
 const PROJECT_MIGRATIONS = [
   { from: 0, to: 3, run: relocateProjectConfig, rollback: cleanupRelocation },
+  { from: 3, to: 4, run: noopProjectV3ToV4 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -185,9 +206,76 @@ function renameVersionToSchemaVersion(ctx) {
   }
 }
 
+/**
+ * v3 → v4: rewrite legacy boolean ship-config flags into entries in
+ * `ship.steps[]` and rename `awaitReview*` tunable keys.
+ *
+ * Behavior (per docs/specs/ship-sdlc.md R-config-version):
+ *   1. If ship.verifyPipeline === true and 'verify-pipeline' is not already
+ *      in ship.steps[], append it. Always delete ship.verifyPipeline.
+ *   2. If ship.awaitReview === true and 'await-remote-review' is not already
+ *      in ship.steps[], append it. Always delete ship.awaitReview.
+ *   3. Rename ship.awaitReviewTimeout → ship.awaitRemoteReviewTimeout
+ *      (preserve value); same for awaitReviewInterval and awaitReviewers.
+ *   4. Stamp data.schemaVersion = 4 (final stamp re-applied by
+ *      verifyAndMigrate post-chain).
+ *
+ * Idempotent: when no legacy keys are present, the function only stamps the
+ * schemaVersion (which verifyAndMigrate also writes — but a second write of
+ * an unchanged value is harmless).
+ */
+function migrateAwaitReviewBooleansToSteps(ctx) {
+  const { paths, readJsonFile, writeJsonFile } = ctx;
+  if (!fs.existsSync(paths.newPath)) return;
+
+  const data = readJsonFile(paths.newPath);
+  if (!data || typeof data !== 'object') return;
+
+  const ship = data.ship;
+  if (!ship || typeof ship !== 'object') {
+    data.schemaVersion = 4;
+    writeJsonFile(paths.newPath, data);
+    return;
+  }
+
+  const existingSteps = Array.isArray(ship.steps) ? ship.steps.slice() : [];
+
+  if (ship.verifyPipeline === true && !existingSteps.includes('verify-pipeline')) {
+    existingSteps.push('verify-pipeline');
+  }
+  delete ship.verifyPipeline;
+
+  if (ship.awaitReview === true && !existingSteps.includes('await-remote-review')) {
+    existingSteps.push('await-remote-review');
+  }
+  delete ship.awaitReview;
+
+  if (existingSteps.length > 0 || Array.isArray(ship.steps)) {
+    ship.steps = existingSteps;
+  }
+
+  // Rename awaitReview* tunables → awaitRemoteReview*. Preserve values.
+  if (Object.prototype.hasOwnProperty.call(ship, 'awaitReviewTimeout')) {
+    ship.awaitRemoteReviewTimeout = ship.awaitReviewTimeout;
+    delete ship.awaitReviewTimeout;
+  }
+  if (Object.prototype.hasOwnProperty.call(ship, 'awaitReviewInterval')) {
+    ship.awaitRemoteReviewInterval = ship.awaitReviewInterval;
+    delete ship.awaitReviewInterval;
+  }
+  if (Object.prototype.hasOwnProperty.call(ship, 'awaitReviewers')) {
+    ship.awaitRemoteReviewers = ship.awaitReviewers;
+    delete ship.awaitReviewers;
+  }
+
+  data.schemaVersion = 4;
+  writeJsonFile(paths.newPath, data);
+}
+
 const LOCAL_MIGRATIONS = [
   { from: 1, to: 2, run: shipPresetSkipToSteps },
   { from: 2, to: 3, run: renameVersionToSchemaVersion },
+  { from: 3, to: 4, run: migrateAwaitReviewBooleansToSteps },
 ];
 
 // ---------------------------------------------------------------------------
@@ -202,6 +290,8 @@ module.exports = {
   ALL_STEPS,
   relocateProjectConfig,
   cleanupRelocation,
+  noopProjectV3ToV4,
   shipPresetSkipToSteps,
   renameVersionToSchemaVersion,
+  migrateAwaitReviewBooleansToSteps,
 };

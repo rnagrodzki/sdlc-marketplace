@@ -42,7 +42,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["execute", "commit", "review", "version", "pr", "archive-openspec", "learnings-commit"]
+            "enum": ["execute", "commit", "review", "version", "pr", "verify-pipeline", "await-remote-review", "archive-openspec", "learnings-commit"]
           },
           "uniqueItems": true,
           "description": "Pipeline steps to run. Replaces legacy preset/skip fields."
@@ -81,6 +81,46 @@
               "const": "prompt"
             }
           ]
+        },
+        "verifyPipelineTimeout": {
+          "type": "integer",
+          "minimum": 30,
+          "default": 1200,
+          "description": "Maximum seconds verify-pipeline polls before giving up with a warning. (R57)"
+        },
+        "verifyPipelineInterval": {
+          "type": "integer",
+          "minimum": 10,
+          "default": 60,
+          "description": "Seconds between verify-pipeline poll attempts. (R57)"
+        },
+        "verifyPipelineMaxIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum analyze-fix-recheck iterations before verify-pipeline emits a warning and proceeds. (R47, R57)"
+        },
+        "awaitRemoteReviewTimeout": {
+          "type": "integer",
+          "minimum": 30,
+          "default": 600,
+          "description": "Maximum seconds await-remote-review polls before giving up with a warning. (R57)"
+        },
+        "awaitRemoteReviewInterval": {
+          "type": "integer",
+          "minimum": 10,
+          "default": 60,
+          "description": "Seconds between await-remote-review poll attempts. (R57)"
+        },
+        "awaitRemoteReviewers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "default": ["copilot"],
+          "description": "Logins (case-insensitive) whose reviews satisfy await-remote-review. When the login is `copilot`, the reviewer must also be a Bot. (R56, R57)"
         }
       },
       "additionalProperties": false

@@ -1,0 +1,106 @@
+# Exec tests for verify-pipeline.js (evaluateChecks) and
+# verify-pipeline-sdlc-classify.js (classifyLogs). Pure helpers — no gh shell-out.
+
+# ---------------------------------------------------------------------------
+# evaluateChecks: vacuous-green / green / failed / pending precedence
+# ---------------------------------------------------------------------------
+
+- description: "verify-pipeline: evaluateChecks empty array returns green (vacuous pass)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: "--op evaluateChecks --input []"
+  assert:
+    - type: contains
+      value: '"status":"green"'
+
+- description: "verify-pipeline: evaluateChecks all-pass returns green"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: '--op evaluateChecks --input [{"name":"unit","bucket":"pass"},{"name":"lint","bucket":"pass"}]'
+  assert:
+    - type: contains
+      value: '"status":"green"'
+
+- description: "verify-pipeline: evaluateChecks any-fail returns failed (failed wins over pending)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: '--op evaluateChecks --input [{"name":"unit","bucket":"pending"},{"name":"lint","bucket":"fail"}]'
+  assert:
+    - type: contains
+      value: '"status":"failed"'
+
+- description: "verify-pipeline: evaluateChecks pending without fail returns pending"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: '--op evaluateChecks --input [{"name":"unit","bucket":"pass"},{"name":"e2e","bucket":"pending"}]'
+  assert:
+    - type: contains
+      value: '"status":"pending"'
+
+# ---------------------------------------------------------------------------
+# classifyLogs: every category resolved by signal
+# ---------------------------------------------------------------------------
+
+- description: "classifyLogs: lint signal (eslint)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: "--op classifyLogs --input eslint found 5 errors"
+  assert:
+    - type: contains
+      value: '"category":"lint"'
+
+- description: "classifyLogs: test-failure signal"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: "--op classifyLogs --input Tests: 3 failed"
+  assert:
+    - type: contains
+      value: '"category":"test-failure"'
+
+- description: "classifyLogs: type-error signal (TS error code)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: "--op classifyLogs --input error TS2322: foo"
+  assert:
+    - type: contains
+      value: '"category":"type-error"'
+
+- description: "classifyLogs: build-error signal (cannot find module)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: "--op classifyLogs --input Cannot find module foo"
+  assert:
+    - type: contains
+      value: '"category":"build-error"'
+
+- description: "classifyLogs: dependency signal (npm ERR peer dep)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: "--op classifyLogs --input npm ERR! code ERESOLVE peer dep"
+  assert:
+    - type: contains
+      value: '"category":"dependency"'
+
+- description: "classifyLogs: infra signal (runner lost)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: "--op classifyLogs --input Runner lost communication"
+  assert:
+    - type: contains
+      value: '"category":"infra"'
+
+- description: "classifyLogs: empty input returns unknown"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: "--op classifyLogs --input "
+  assert:
+    - type: contains
+      value: '"category":"unknown"'
+
+- description: "classifyLogs: unrecognised noise returns unknown"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-verify-pipeline-evaluate.js"
+    script_args: "--op classifyLogs --input random text with no signal"
+  assert:
+    - type: contains
+      value: '"category":"unknown"'

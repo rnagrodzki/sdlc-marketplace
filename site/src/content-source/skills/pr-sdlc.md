@@ -4,6 +4,8 @@
 
 Analyzes all commits and the diff on the current branch, generates a structured PR description, and opens the PR via the GitHub CLI. Presents the generated description for review before creating. Supports custom per-project templates.
 
+The diff stat and diff content used by the description reflect only the branch's contribution — they use git's three-dot range form (`<base>...HEAD`) so files that landed on the base branch after divergence do not inflate the stats (issue #239). Before computing the diff, the prepare script attempts a best-effort `git fetch origin <base>:<base>` to fast-forward the local base ref; failure (offline, no remote, auth denied) is non-fatal.
+
 ---
 
 ## Usage
@@ -99,7 +101,7 @@ Generates the description, runs critique/improve internally, and creates the PR 
 
 ## Custom PR Templates
 
-By default, `/pr-sdlc` uses an 8-section template (Summary, JIRA Ticket, Business Context, Business Benefits, Technical Design, Technical Impact, Changes Overview, Testing). Replace it with a project-specific template by creating `.claude/pr-template.md`.
+By default, `/pr-sdlc` uses an 8-section template (Summary, JIRA Ticket, Business Context, Business Benefits, Technical Design, Technical Impact, Changes Overview, Testing). Replace it with a project-specific template by creating `.sdlc/pr-template.md`. (Legacy `.claude/pr-template.md` is read as a fallback for two minor versions and emits a one-time deprecation warning — issue #260.)
 
 A template is a plain markdown file with `## Section` headings. The text under each heading is a fill instruction for the LLM:
 
