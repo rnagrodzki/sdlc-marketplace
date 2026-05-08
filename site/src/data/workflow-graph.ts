@@ -1,7 +1,7 @@
 export interface WorkflowNode {
   slug: string;
   command: string;
-  category: 'planning' | 'review' | 'gitops' | 'workflows' | 'integrations';
+  category: 'planning' | 'review' | 'gitops' | 'workflows' | 'devops' | 'integrations';
   lane: 'plan' | 'review' | 'ship';
   col: number;
   tagline: string;
@@ -29,6 +29,7 @@ export const workflowNodes: WorkflowNode[] = [
   { slug: 'pr-sdlc', command: '/pr-sdlc', category: 'gitops', lane: 'ship', col: 1, tagline: 'Create structured pull requests' },
   { slug: 'version-sdlc', command: '/version-sdlc', category: 'gitops', lane: 'ship', col: 2, tagline: 'Bump version and create release' },
   { slug: 'ship-sdlc', command: '/ship-sdlc', category: 'workflows', lane: 'ship', col: 3, tagline: 'Full pipeline orchestrator' },
+  { slug: 'verify-pipeline-sdlc', command: '/verify-pipeline-sdlc', category: 'devops', lane: 'ship', col: 4, tagline: 'Diagnose & fix failed CI runs' },
 ];
 
 export const workflowEdges: WorkflowEdge[] = [
@@ -57,6 +58,10 @@ export const workflowEdges: WorkflowEdge[] = [
   // Harden loop
   { from: 'ship-sdlc', to: 'harden-sdlc', label: 'on failure', style: 'cross-lane' },
   { from: 'harden-sdlc', to: 'setup-sdlc', label: 'tightens guardrails', style: 'dashed' },
+  // verify-pipeline-sdlc
+  { from: 'pr-sdlc', to: 'verify-pipeline-sdlc', label: 'CI failure on', style: 'solid' },
+  { from: 'verify-pipeline-sdlc', to: 'commit-sdlc', label: 'fix-applied', style: 'cross-lane' },
+  { from: 'ship-sdlc', to: 'verify-pipeline-sdlc', label: 'invokes', style: 'dashed' },
 ];
 
 export const laneLabels: Record<string, string> = {

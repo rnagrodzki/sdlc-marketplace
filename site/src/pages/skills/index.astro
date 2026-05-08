@@ -3,12 +3,13 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import SkillCard from '../../components/SkillCard.astro';
 import { getSkillsByCategory } from '../../data/skills-meta';
 
-const categoryOrder = ['planning', 'review', 'gitops', 'workflows', 'integrations'] as const;
+const categoryOrder = ['planning', 'review', 'gitops', 'workflows', 'devops', 'integrations'] as const;
 const categoryLabels = {
   planning: 'Planning & Execution',
   review: 'Code Review',
   gitops: 'Git Operations',
   workflows: 'Full Orchestration',
+  devops: 'DevOps',
   integrations: 'Integrations',
 };
 ---

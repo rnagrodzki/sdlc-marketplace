@@ -1,5 +1,5 @@
 export type StepType = 'script' | 'llm' | 'critique' | 'user' | 'dispatch' | 'verify';
-export type SkillCategory = 'planning' | 'review' | 'gitops' | 'workflows' | 'integrations';
+export type SkillCategory = 'planning' | 'review' | 'gitops' | 'workflows' | 'devops' | 'integrations';
 
 export interface PipelineStep {
   id: string;
@@ -232,7 +232,7 @@ export const skillsMeta: SkillMeta[] = [
   {
     slug: 'setup-sdlc',
     command: '/setup-sdlc',
-    category: 'gitops',
+    category: 'review',
     userInvocable: true,
     tagline: 'Unified project setup — configures version, ship, review, and jira settings in one interactive flow.',
     pipeline: [
@@ -278,7 +278,7 @@ export const skillsMeta: SkillMeta[] = [
   {
     slug: 'verify-pipeline-sdlc',
     command: '/verify-pipeline-sdlc',
-    category: 'workflows',
+    category: 'devops',
     userInvocable: true,
     tagline: 'Analyzes a failed CI run on a PR, classifies the root cause via a deterministic helper, and either applies a minimal fix or emits a proposal as a JSON verdict.',
     pipeline: [
