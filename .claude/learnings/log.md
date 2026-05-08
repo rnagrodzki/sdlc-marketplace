@@ -3,6 +3,12 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-09 — execute-plan-sdlc: bulk-close 20 stale version-sdlc GH issues
+All 20 open issues with `version-sdlc:` titles were auto-harvested learnings from `log.md` (2026-05-08). None had labels. Both cited bug groups (#211/#212/#213 and #219) were already fixed on main before the harvest ran (d4da030 / 8ea8606). Lesson: learnings-harvest should gate on whether the cited bug is still open on main before creating a GH issue — status notes for successful releases should never become issues.
+
+## 2026-05-09 — pr-sdlc: fix(#311) pr-recover-gh-account SSH alias fallback - PR #329
+PR #329 used custom template. Labels `bug` + `enhancement` inferred via llm mode from `fix/` branch prefix (bug) and feat commit subject (enhancement). Branch had 3 commits including a release chore — primary feature commit `feat(#311)` drove label inference. `viaFallback: true` result field added to recovery helper to distinguish fallback-path recovery from direct-path recovery. `host` field normalized across all return branches for consistent caller access.
+
 ## 2026-05-08 — pr-sdlc: feat(#292) ship tunables surfaced via setup-sdlc
 PR #328 used custom template from `.sdlc/pr-template.md`. Title pattern `^(feat|fix|...)\(#\d+\): .+ - .+$` required ` - ` separator; title was 68 chars. Labels `enhancement` + `documentation` inferred via llm mode from `feat/` branch prefix and docs/* changes. `when.stepInActiveSteps` gate mechanism added to SHIP_FIELDS — `skip: true` entries stay in array but are excluded from setup prompts; array order/length stable per R15. `BUILT_IN_DEFAULTS` is now single source for both setup defaults and ship runtime defaults.
 
@@ -221,3 +227,8 @@ Plan called for wave-based agent dispatch but the runtime had no `Agent`/`Task` 
 - Issue body proposed nested config form (verifyPipeline.timeout) but codebase already had flat keys (verifyPipelineTimeout) per spec R57 — always check schema before trusting issue scope descriptions.
 - SHIP_FIELDS had no `condition`/`when` mechanism; added `when: { stepInActiveSteps }` shape + setup.js evaluator. Guardrail: scripts-over-llm-logic correctly identified prose carve-out as the worse option.
 - reviewThreshold=low caused received-review-sdlc dispatch on 2 medium findings (stale doc count, missing min/max on number fields). Both legitimate; min/max addition was the right call over schema-only fallback.
+
+## 2026-05-09 — ship-sdlc: triage #295+ issues with github.com fallback fix
+- 15 open issues ≥#295 were auto-harvested operational PR logs; only #311/#313 described a reproducible bug
+- recoverGhAccountForRepo now queries github.com as fallback when remote uses a non-canonical SSH host alias (e.g. github-rn); returns viaFallback:true on match
+- reviewThreshold=low triggers received-review-sdlc on any finding — even 3 low findings caused a received-review cycle; consider raising threshold to high for repos with clean code

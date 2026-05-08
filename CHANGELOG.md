@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.19.6] - 2026-05-09
+
+### Added
+- pr-recover-gh-account: fallback account query for SSH host aliases — when the remote uses an SSH alias (not canonical github.com), queries fallback account file before failing (#295, #311)
+
+### Fixed
+- pr-recover-gh-account: clarified `fallbackAccounts` JSDoc and added test case for fallback-ignored-on-github behavior (#295)
+
 ## [0.19.5] - 2026-05-08
 
 ### Fixed
