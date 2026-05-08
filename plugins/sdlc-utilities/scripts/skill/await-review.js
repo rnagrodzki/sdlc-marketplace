@@ -192,7 +192,6 @@ function main(argv) {
 
     if (verdict.status === 'actionable' || verdict.status === 'approved-clean') {
       const m = verdict.match;
-      if (args.stateFile) writeStateMarker(args.stateFile, 'awaitReviewExhausted', true);
       emit({
         status: verdict.status,
         state: m.state,

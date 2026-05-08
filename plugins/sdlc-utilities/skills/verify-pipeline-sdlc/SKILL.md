@@ -25,18 +25,19 @@ If `--logs` is provided: when the value is a filesystem path, read its contents;
 If `--logs` is omitted but `--pr` is present (R6): resolve logs internally via `lib/git.js::fetchFailedCheckLogs` for the latest failed run on the PR. The Node code path for this is inline:
 
 ```bash
+GIT_LIB=$(find ~/.claude/plugins -name "git.js" -path "*/sdlc*/scripts/lib/git.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$GIT_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/git.js" ] && GIT_LIB="plugins/sdlc-utilities/scripts/lib/git.js"
+[ -z "$GIT_LIB" ] && { echo "ERROR: Could not locate scripts/lib/git.js. Is the sdlc plugin installed?" >&2; exit 2; }
 node -e "
-const path = require('path');
-const lib = path.join(process.cwd(), 'plugins/sdlc-utilities/scripts/lib/git.js');
-const { fetchPrChecks, fetchFailedCheckLogs } = require(lib);
-const checks = fetchPrChecks(process.argv[1]);
+const { fetchPrChecks, fetchFailedCheckLogs } = require(process.argv[1]);
+const checks = fetchPrChecks(process.argv[2]);
 const failed = checks.find(c => c && c.bucket === 'fail');
 if (!failed || !failed.link) { process.stderr.write('no failed check found\n'); process.exit(0); }
 const m = failed.link.match(/\/actions\/runs\/(\d+)/);
 if (!m) { process.stderr.write('no runId in link\n'); process.exit(0); }
 const out = fetchFailedCheckLogs(m[1], { maxLines: 200 });
 if (out.ok) process.stdout.write(out.excerpt);
-" "$PR_NUMBER"
+" "$GIT_LIB" "$PR_NUMBER"
 ```
 
 If gh is unauthenticated and logs cannot be resolved, emit `{"status":"abort","reason":"gh not authenticated"}` and stop (E2).
@@ -46,7 +47,10 @@ If gh is unauthenticated and logs cannot be resolved, emit `{"status":"abort","r
 Pipe the resolved log text into the classifier helper:
 
 ```bash
-echo "$LOGS" | node plugins/sdlc-utilities/scripts/skill/verify-pipeline-sdlc-classify.js
+CLASSIFY_SCRIPT=$(find ~/.claude/plugins -name "verify-pipeline-sdlc-classify.js" -path "*/sdlc*/scripts/skill/verify-pipeline-sdlc-classify.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$CLASSIFY_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/verify-pipeline-sdlc-classify.js" ] && CLASSIFY_SCRIPT="plugins/sdlc-utilities/scripts/skill/verify-pipeline-sdlc-classify.js"
+[ -z "$CLASSIFY_SCRIPT" ] && { echo "ERROR: Could not locate skill/verify-pipeline-sdlc-classify.js. Is the sdlc plugin installed?" >&2; exit 2; }
+echo "$LOGS" | node "$CLASSIFY_SCRIPT"
 ```
 
 Read the JSON verdict on stdout: `{"category": "<one of seven>", "signals": [...]}`.

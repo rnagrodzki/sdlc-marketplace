@@ -473,6 +473,7 @@ If the `verify-pipeline` step has `status: "will_run"` (gated by `flags.verifyPi
    ```bash
    VP_SCRIPT=$(find ~/.claude/plugins -name "verify-pipeline.js" -path "*/sdlc*/scripts/skill/verify-pipeline.js" 2>/dev/null | sort -V | tail -1)
    [ -z "$VP_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/verify-pipeline.js" ] && VP_SCRIPT="plugins/sdlc-utilities/scripts/skill/verify-pipeline.js"
+   [ -z "$VP_SCRIPT" ] && { echo "ERROR: Could not locate skill/verify-pipeline.js. Is the sdlc plugin installed?" >&2; exit 2; }
    ```
 2. Run the script with the args from `step.args` plus `--state-file <ship-state-path>`:
    ```bash
@@ -510,6 +511,7 @@ If the `await-review` step has `status: "will_run"` (gated by `flags.awaitReview
    ```bash
    AR_SCRIPT=$(find ~/.claude/plugins -name "await-review.js" -path "*/sdlc*/scripts/skill/await-review.js" 2>/dev/null | sort -V | tail -1)
    [ -z "$AR_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/await-review.js" ] && AR_SCRIPT="plugins/sdlc-utilities/scripts/skill/await-review.js"
+   [ -z "$AR_SCRIPT" ] && { echo "ERROR: Could not locate skill/await-review.js. Is the sdlc plugin installed?" >&2; exit 2; }
    ```
 2. Run the script with the args from `step.args` plus `--state-file <ship-state-path>`:
    ```bash
