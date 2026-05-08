@@ -2,6 +2,8 @@
 tests/promptfoo/.promptfoo-data/
 .evidences/
 
+.claude/learnings/log.md
+
 site/node_modules/
 site/dist/
 site/.astro/
