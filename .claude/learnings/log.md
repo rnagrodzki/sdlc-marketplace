@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-08 — pr-sdlc: feat(#292) ship tunables surfaced via setup-sdlc
+PR #328 used custom template from `.sdlc/pr-template.md`. Title pattern `^(feat|fix|...)\(#\d+\): .+ - .+$` required ` - ` separator; title was 68 chars. Labels `enhancement` + `documentation` inferred via llm mode from `feat/` branch prefix and docs/* changes. `when.stepInActiveSteps` gate mechanism added to SHIP_FIELDS — `skip: true` entries stay in array but are excluded from setup prompts; array order/length stable per R15. `BUILT_IN_DEFAULTS` is now single source for both setup defaults and ship runtime defaults.
+
 
 
 
@@ -213,3 +216,8 @@ Plan called for wave-based agent dispatch but the runtime had no `Agent`/`Task` 
 - `applyWhenGates` is a pure function added to setup.js — makes the gate testable without running the full prepare pipeline.
 - promptfoo CLI broken in this env (better-sqlite3 NODE_MODULE_VERSION mismatch on Node v26); exec test assertions verified directly with `node -e` inline assertion scripts instead.
 - Existing test for `shipFields.length === 7` needed updating to 13 — always check length assertions in datasets when adding new SHIP_FIELDS entries.
+
+## 2026-05-08 — ship-sdlc: feat/surface-verify-pipeline-await-remote-review-tunables
+- Issue body proposed nested config form (verifyPipeline.timeout) but codebase already had flat keys (verifyPipelineTimeout) per spec R57 — always check schema before trusting issue scope descriptions.
+- SHIP_FIELDS had no `condition`/`when` mechanism; added `when: { stepInActiveSteps }` shape + setup.js evaluator. Guardrail: scripts-over-llm-logic correctly identified prose carve-out as the worse option.
+- reviewThreshold=low caused received-review-sdlc dispatch on 2 medium findings (stale doc count, missing min/max on number fields). Both legitimate; min/max addition was the right call over schema-only fallback.
