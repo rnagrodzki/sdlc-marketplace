@@ -1,8 +1,9 @@
 # Script execution tests for setup.js P7 contract (shipFields).
 # These tests run setup.js directly against fixture directories (no LLM).
-# Covers: P7 shipFields emission, field shape, order, and v2 schema migration (issues #152, #180).
+# Covers: P7 shipFields emission, field shape, order, v2 schema migration (issues #152, #180),
+# and when-gate evaluation (issue #292).
 
-- description: "setup-prepare: emits shipFields with 7 entries (v2: steps replaces preset+skip)"
+- description: "setup-prepare: emits shipFields with 13 entries (7 base + 6 R57 tunables, issue #292)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
     script_cwd: "{{project_root}}"
@@ -11,9 +12,9 @@
     - type: icontains
       value: '"shipFields"'
     - type: javascript
-      value: "JSON.parse(output).shipFields.length === 7"
+      value: "JSON.parse(output).shipFields.length === 13"
 
-- description: "setup-prepare: shipFields order is stable (steps → reviewThreshold)"
+- description: "setup-prepare: shipFields order is stable (steps → reviewThreshold → 6 R57 tunables, issue #292)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
     script_cwd: "{{project_root}}"
@@ -22,7 +23,7 @@
     - type: javascript
       value: |
         const names = JSON.parse(output).shipFields.map(f => f.name);
-        const expected = ['steps','bump','draft','auto','workspace','rebase','reviewThreshold'];
+        const expected = ['steps','bump','draft','auto','workspace','rebase','reviewThreshold','verifyPipelineTimeout','verifyPipelineInterval','verifyPipelineMaxIterations','awaitRemoteReviewTimeout','awaitRemoteReviewInterval','awaitRemoteReviewers'];
         return JSON.stringify(names) === JSON.stringify(expected)
 
 - description: "setup-prepare: shipFields entries have the full 6-key descriptor shape"
@@ -160,3 +161,58 @@
         if (!pr) return false;
         const ea = pr.fields.find(f => f.name === 'expectedAccount');
         return Boolean(ea) && ea.type === 'string' && ea.default === 'test-user'
+
+# ---------------------------------------------------------------------------
+# Issue #292 — when-gate evaluation: setup.js --steps <csv> marks gated entries
+# ---------------------------------------------------------------------------
+
+- description: "setup-prepare (issue #292): when verify-pipeline NOT in steps[], 3 verifyPipeline* entries have skip:true"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_args: "--steps execute,commit,review,pr,await-remote-review"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const vp = out.shipFields.filter(f => f.name.startsWith('verifyPipeline'));
+        return vp.length === 3 && vp.every(f => f.skip === true)
+
+- description: "setup-prepare (issue #292): when await-remote-review NOT in steps[], 3 awaitRemoteReview* entries have skip:true"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_args: "--steps execute,commit,review,verify-pipeline,pr"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const ar = out.shipFields.filter(f => f.name.startsWith('awaitRemoteReview'));
+        return ar.length === 3 && ar.every(f => f.skip === true)
+
+- description: "setup-prepare (issue #292): when both verify-pipeline and await-remote-review in steps[], no entries have skip:true"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_args: "--steps execute,commit,verify-pipeline,await-remote-review,pr"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        return out.shipFields.every(f => f.skip === false)
+
+- description: "setup-prepare (issue #292): entries without 'when' are never skip:true regardless of steps"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_args: "--steps execute"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const nonGated = out.shipFields.filter(f => !f.when);
+        return nonGated.length === 7 && nonGated.every(f => f.skip === false)

@@ -347,17 +347,18 @@ function detect(projectRoot) {
 
 /**
  * Parse a minimal subset of CLI flags relevant to the prepare contract
- * (issue #235). Style mirrors `version.js::parseArgs` for cross-script
+ * (issue #235, issue #292). Style mirrors `version.js::parseArgs` for cross-script
  * consistency. Unknown flags are ignored — the wider flag surface (`--migrate`,
  * `--skip`, `--only`, sub-flow direct-entry flags) is parsed by SKILL.md.
  *
  * @param {string[]} argv — process.argv
- * @returns {{ flags: { unsetOnly: boolean, force: boolean }, defaultSelectionMode: 'all' | 'unset-only' }}
+ * @returns {{ flags: { unsetOnly: boolean, force: boolean, steps: string[]|null }, defaultSelectionMode: 'all' | 'unset-only' }}
  */
 function parseArgs(argv) {
   const args = argv.slice(2);
   let unsetOnly = false;
   let force = false;
+  let steps = null; // null means "not provided via CLI"
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -365,6 +366,12 @@ function parseArgs(argv) {
       unsetOnly = true;
     } else if (a === '--force') {
       force = true;
+    } else if (a === '--steps' && args[i + 1]) {
+      // --steps <csv> — comma-separated step names; used by setup-sdlc to pass
+      // the user's just-selected ship.steps[] so the when-evaluator can mark
+      // gated shipFields entries with skip: true (issue #292 / R15).
+      steps = args[i + 1].split(',').map(s => s.trim()).filter(Boolean);
+      i++;
     }
   }
 
@@ -373,9 +380,37 @@ function parseArgs(argv) {
   const defaultSelectionMode = force ? 'all' : (unsetOnly ? 'unset-only' : 'all');
 
   return {
-    flags: { unsetOnly, force },
+    flags: { unsetOnly, force, steps },
     defaultSelectionMode,
   };
+}
+
+/**
+ * Apply when-gate evaluation to shipFields (issue #292 / P7).
+ *
+ * For each entry in SHIP_FIELDS:
+ *   - Entries without `when` → skip: false
+ *   - Entries with `when.stepInActiveSteps` → skip: true if the step is absent
+ *     from `activeSteps`, skip: false if present.
+ *
+ * The array order and length are preserved (skipped entries remain in place).
+ *
+ * @param {object[]} fields — raw SHIP_FIELDS array
+ * @param {string[]|null} activeSteps — resolved steps[]; null means unknown (all skip: false)
+ * @returns {object[]} new array with skip property added to each entry
+ */
+function applyWhenGates(fields, activeSteps) {
+  return fields.map(field => {
+    const entry = Object.assign({}, field);
+    if (entry.when && entry.when.stepInActiveSteps) {
+      entry.skip = activeSteps == null
+        ? false
+        : !activeSteps.includes(entry.when.stepInActiveSteps);
+    } else {
+      entry.skip = false;
+    }
+    return entry;
+  });
 }
 
 if (require.main === module) {
@@ -385,6 +420,10 @@ if (require.main === module) {
     const parsed = parseArgs(process.argv);
     result.flags = parsed.flags;
     result.defaultSelectionMode = parsed.defaultSelectionMode;
+    // Apply when-gate evaluation to shipFields (issue #292 / P7).
+    // --steps <csv> supplies the actively selected steps[]; when absent, all
+    // entries default to skip: false (no gating information available).
+    result.shipFields = applyWhenGates(result.shipFields, parsed.flags.steps);
     writeOutput(result, 'setup-prepare', 0);
   } catch (err) {
     process.stderr.write(`setup-prepare: unexpected error: ${err.message}\n`);
@@ -392,4 +431,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { detect, parseArgs };
+module.exports = { detect, parseArgs, applyWhenGates };

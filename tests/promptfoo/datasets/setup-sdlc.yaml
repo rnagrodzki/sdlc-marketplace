@@ -354,3 +354,57 @@
         a migration is needed and that running `/setup-sdlc --migrate` will
         relocate the file to `.sdlc/config.json` and stamp `schemaVersion: 3`.
         The skill MUST NOT silently overwrite either file.
+
+# ---------------------------------------------------------------------------
+# Issue #292 — when-gate: skip:true entries are excluded from prompting
+# ---------------------------------------------------------------------------
+
+- description: "setup-sdlc (issue #292): skip:true fields from prepare are not prompted — verify-pipeline deselected"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-clean-project.md"
+    user_request: >
+      Run /setup-sdlc. I am configuring the ship section. The prepare script has returned
+      shipFields where verifyPipelineTimeout, verifyPipelineInterval, and
+      verifyPipelineMaxIterations each have skip: true (because verify-pipeline is not in my
+      selected steps[]). The remaining 10 shipFields have skip: false. Walk me through the
+      ship field loop and show me which questions you ask.
+  assert:
+    - type: not-icontains-any
+      value:
+        - "verifyPipelineTimeout"
+        - "verifyPipelineInterval"
+        - "verifyPipelineMaxIterations"
+    - type: llm-rubric
+      value: >
+        The skill is configuring the ship section. The three verifyPipeline* fields
+        (verifyPipelineTimeout, verifyPipelineInterval, verifyPipelineMaxIterations) have
+        skip: true in the prepare output. The skill MUST NOT ask the user any question about
+        those three fields. The skill MUST ask about all remaining fields whose skip is false.
+        This demonstrates that the skip gate from the prepare script is honored per R15 and P7.
+
+- description: "setup-sdlc (issue #292): skip:false fields ARE prompted when their step is selected"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-clean-project.md"
+    user_request: >
+      Run /setup-sdlc. I am configuring the ship section. The prepare script has returned
+      shipFields where ALL entries have skip: false because both verify-pipeline and
+      await-remote-review are in my selected steps[]. Walk me through the ship field loop
+      and confirm you ask about verifyPipelineTimeout and awaitRemoteReviewers.
+  assert:
+    - type: icontains-any
+      value:
+        - "verifyPipelineTimeout"
+        - "verify-pipeline poll timeout"
+    - type: icontains-any
+      value:
+        - "awaitRemoteReviewers"
+        - "await-remote-review"
+        - "Reviewer logins"
+    - type: llm-rubric
+      value: >
+        The skill is configuring the ship section. All shipFields have skip: false.
+        The skill MUST ask the user about verifyPipelineTimeout (or its label) and
+        awaitRemoteReviewers (or its label). This demonstrates that when skip is false,
+        gated fields surface correctly in the prompt loop per R15 and P7.

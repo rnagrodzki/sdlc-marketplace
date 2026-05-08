@@ -262,6 +262,7 @@ Options: `yes` (write detected values directly), `customize` (iterate `section.f
 
 For each entry `field` in `section.fields` (when iterating), dispatch one AskUserQuestion:
 
+- **Skip gate (prepare-sourced):** If `field.skip === true` (set by the prepare script when a `when.stepInActiveSteps` gate is unsatisfied — see P7), skip this field entirely. Do NOT ask the user anything; do NOT write any value for this field. Move to the next entry.
 - **Question prompt:** `field.label`
 - **Helper text:** `field.description` (verbatim from manifest)
 - **Choices:** `field.options` (or free-text input when `options` is `null`)
@@ -275,6 +276,8 @@ Skip a field when an upstream answer makes it irrelevant: for `version`, skip `v
 - `multi-select` fields → write the array of selected options
 - `boolean` fields → map `yes` → `true`, `no` → `false` (exception: `rebase` writes `auto`/`skip`/`prompt` verbatim — do NOT translate to yes/no)
 - `string` fields → write the entered string; omit when empty (and the field is optional)
+- `number` fields → coerce the answer to a JavaScript integer (use `parseInt`); validate against `field.min` (when present, value must be ≥ min) and `field.max` (when present, value must be ≤ max); re-prompt on invalid input, citing the violated bound in the error message
+- `list` fields → accept comma-separated input; split on `,` and trim each element to produce a string array; write the resulting array
 
 You MUST issue exactly one AskUserQuestion per `section.fields[]` entry that survives the gating above. Do not batch, reorder, or hand-enumerate fields — the manifest owns the list.
 

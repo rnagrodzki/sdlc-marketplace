@@ -69,6 +69,12 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
 | `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` | `"high"` | Minimum review-finding severity that triggers the received-review fix loop. See table below. |
 | `workspace` | `"branch"` \| `"worktree"` \| `"prompt"` | `"prompt"` | Workspace isolation strategy for execute-plan-sdlc. `"branch"` = use a feature branch, `"worktree"` = use a git worktree, `"prompt"` = ask each time. Forwarded to execute-plan-sdlc as a hint. |
 | `rebase` | `true` \| `false` \| `"prompt"` | `true` | When `true`, auto-rebase onto the default branch before execution (execute-plan-sdlc) and before versioning (ship-sdlc). When `false`, skip rebase. When `"prompt"`, ask each time. |
+| `verifyPipelineTimeout` | `integer` (≥30) | `1200` | Maximum seconds `verify-pipeline` polls CI checks before giving up and proceeding (R57). Only prompted in `setup-sdlc` when `verify-pipeline` is in `ship.steps[]`. |
+| `verifyPipelineInterval` | `integer` (≥10) | `60` | Seconds between `verify-pipeline` poll attempts (R57). Only prompted in `setup-sdlc` when `verify-pipeline` is in `ship.steps[]`. |
+| `verifyPipelineMaxIterations` | `integer` (1–10) | `3` | Maximum analyze-fix-recheck iterations before `verify-pipeline` gives up (R47, R57). Only prompted in `setup-sdlc` when `verify-pipeline` is in `ship.steps[]`. |
+| `awaitRemoteReviewTimeout` | `integer` (≥30) | `600` | Maximum seconds `await-remote-review` polls for a reviewer response (R57). Only prompted in `setup-sdlc` when `await-remote-review` is in `ship.steps[]`. |
+| `awaitRemoteReviewInterval` | `integer` (≥10) | `60` | Seconds between `await-remote-review` poll attempts (R57). Only prompted in `setup-sdlc` when `await-remote-review` is in `ship.steps[]`. |
+| `awaitRemoteReviewers` | `string[]` (minItems 1) | `["copilot"]` | Reviewer logins (case-insensitive) whose review satisfies the `await-remote-review` gate. Login `copilot` also requires `user.type === "Bot"` (R56, R57). Only prompted in `setup-sdlc` when `await-remote-review` is in `ship.steps[]`. |
 
 ### reviewThreshold Levels
 

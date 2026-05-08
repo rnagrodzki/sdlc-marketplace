@@ -3,116 +3,41 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
-## 2026-05-08 — version-sdlc: patch release v0.18.14 from feature branch chore/229-cost-tier-model-assignments
-First push from this branch used --set-upstream; tag pushed separately via git push --tags. Single feat commit (guardrails) landed as patch per explicit pipeline request despite minor being suggested by conventional commits.
-
-## 2026-05-07 — version-sdlc: patch bump with feat commit in history
-Explicit `patch` bump requested via pipeline with a `feat:` commit present (suggestedBump was `minor`). Auto mode accepted the override without conflict. Branch had no upstream — `--set-upstream` was auto-applied on push.
-
-## 2026-05-07 — pr-sdlc: planning-discipline guardrails PR (#280)
-PR for five new plan-only guardrails in `guardrails.js`. Title pattern `^(feat|fix|...)\(#\d+\): .+ - .+$` required a ` - ` separator; initial title draft at 82 chars was trimmed to 62 by shortening the scope segment. Custom template active from `.sdlc/pr-template.md`; all 7 sections filled from diff and commit body. Label mode=llm inferred `enhancement` from `feat/` branch prefix. Uncommitted changes warning surfaced but did not block PR creation.
-
-## 2026-05-07 — pr-sdlc: dual-issue fix PR (#275, #276) with custom template
-PR body used custom template from `.sdlc/pr-template.md`. Both "Fixes #275" and "Fixes #276" placed in the Github Issue section per plan guardrail. Title used first issue number `fix(#275)` to satisfy the `^(fix)\(#\d+\): .+ - .+$` pattern constraint — secondary issue covered in body. Labels mode=llm inferred `bug` from `fix/` branch prefix. Uncommitted changes warning was surfaced (1 file) but did not block PR creation.
-
-## 2026-05-07 — version-sdlc: patch release v0.18.11 from fresh feature branch
-Branch fix/275-276-ship-jira-fixes had no upstream; R15 auto-set-upstream path triggered correctly. Squash merge brought feat(#272) commit into range but that fix was already documented in v0.18.10 — correctly excluded from this entry. Patch bump used despite suggestedBump=minor due to explicit --patch flag.
-
-## 2026-05-07 — version-sdlc: patch bump for jira-sdlc hardening (v0.18.5)
-Patch release from branch `fix/jira-sdlc-hardening-240-241`. Branch had no upstream so `--set-upstream` was used on first push. Commit `906ea6e6` (fix #239) appeared in the commit list but was already captured in `[0.18.4]` — changelog correctly attributed only commit `7eb87856` (#240) as new content. Link validation passed with no violations.
 
 
-## 2026-05-06 — version-sdlc: patch release with uncommitted deletions in working tree
-Release v0.18.4 proceeded normally with uncommitted deletions (`.claude/review-dimensions/*.md` and `.sdlc.json`) in the working tree — these were not staged and not included in the release commit. The `--set-upstream` auto-heal path fired correctly for a new feature branch with no prior remote tracking.
 
-## 2026-05-06 — version-sdlc: patch bump on feat/233-configurable-always-fix-severities
-Branch had no upstream; --set-upstream was emitted automatically. suggestedBump was minor (feat commit present) but explicit patch override from pipeline took precedence without issue. All CI scripts were current at v0.18.3 release.
 
-## 2026-05-06 — pr-sdlc: --validate-body on older installed plugin version emits full JSON to stdout
-The installed plugin (0.17.x) resolves pr.js via `find ~/.claude/plugins` and may be an older cached version than the local checkout. When piping a large body to `--validate-body`, stdout floods with the full pr context JSON (572KB) because the older version echoes it — only the last line `LINK_EXIT=N` and `OK:` message matter. The validation still works correctly (exit 0 = pass). No action needed; capturing stderr separately and checking exit code is sufficient.
 
-## 2026-05-06 — version-sdlc: patch bump from chore/relocate-sdlc-state-config-schema
-v0.18.1 → v0.18.2. Branch had no upstream — auto-set via `--set-upstream` on push. changelog flag was false (no --changelog arg passed despite config.changelog=true), so no CHANGELOG entry was generated.
 
-## 2026-05-06 — pr-sdlc: PR #236 created for feat/harden-sdlc-skill → main
-Custom template active (.claude/pr-template.md). Title pattern required type(#issue): scope - description format. Installed pr.js was 0.17.47 (project at 0.18.0) — --validate-body still worked. Branch was already up to date on remote despite remoteState.pushed=false. Labels enhancement+documentation inferred via llm mode from feat/ prefix and docs/* changes.
 
-## 2026-05-06 — version-sdlc: v0.18.0 minor release from feat/harden-sdlc-skill
-First push from a fresh feature branch — `remoteState.hasUpstream === false` triggered `--set-upstream` auto-heal correctly. Release contained new harden-sdlc skill (feat) and two fix commits. All CI scripts were current (no scaffold updates needed).
 
-## 2026-05-06 — received-review-sdlc: harden-sdlc review round — 9 findings fixed, 2 pushed back
-Fixed HIGH: silent catches in harden-prepare.js now log to stderr (H1, H2), EXIT_CODE_ARG rename avoids bash variable collision (H3), dual critique gate added to harden-orchestrator (H4), Step 4 skip-label corrected (H5), review-sdlc spec R16 step reference corrected to Step 5 (H6), commit-sdlc spec R13 narrowed to subjectPattern only (H7). Fixed MEDIUM: stdin JSON parse error now logged (M1), pipeline array in skills-meta.ts gains "learn" step (M2), trap guarded with [ -n ] (M3). Pushed back: M4 (P11 vs R4 — different concerns, no defect), L1 (no requirement for dimensions to cover log.md).
 
-## 2026-05-05 — version-sdlc: patch release v0.17.47 from fix/220-223-context-stats-ship-state-cleanup
-Single fix commit (context-stats token calculation + ship-state GC cleanup). Branch had no upstream — first push used --set-upstream automatically. Changelog disabled (flags.changelog === false despite config.changelog === true; --auto mode without explicit --changelog flag). All CI scripts current at their installed versions.
 
-## 2026-05-05 — version-sdlc: flags.changelog vs config.changelog in auto mode
-When `--auto` is combined with `config.changelog: true` but the script (pre-fix) emits `flags.changelog: false`, the skill must still honor the task-level intent (`config.changelog`). The script bug (#219) was the root cause; the fix is in `skill/version.js`. Post-fix, `flags.changelog` will correctly reflect `config.changelog` even in auto mode.
 
-## 2026-05-05 — pr-sdlc: PR #222 created for fix/217-openspec-enrich-yaml-block
-PR used the project custom template (.claude/pr-template.md). Custom template sections matched 1:1 with the 8 default sections by intent. Label `bug` inferred from `fix/` branch prefix and `fix(...)` commit subjects via LLM mode. Title pattern `^(feat|fix|...)\(#\d+\): .+ - .+$` required the issue number in parentheses — critical to get right for this repo.
 
-## 2026-05-05 — version-sdlc: patch release v0.17.45 on fix/217-openspec-enrich-yaml-block
-Released two fix commits (openspec-enrich YAML block template + duplicate-key guard). Remote had no upstream; `--set-upstream` auto-heal worked correctly. flags.changelog resolved to false despite config.changelog=true — the --auto flag + no explicit --changelog flag left changelog disabled for this release.
 
-## 2026-05-05 — openspec-enrich: v1→v2 update path missing context-key duplicate guard
-Reviewer caught that the in-place update path (v1→v2 migration) in `openspec-enrich.js` skipped the `hasExistingContextKey` guard that the append path had. A config with a user-defined `context:` key plus a v1 managed block would produce a duplicate `context:` key on upgrade. Fix: call `hasExistingContextKey(content, block)` before writing and return `skipped-existing-context` with a warning if true. Rule: whenever adding a new code path that writes a structured key to a YAML file, mirror every guard from the existing path that prevents duplicate keys.
 
-## 2026-05-05 — pr-sdlc: gh account auto-switch on CreatePullRequest permission error
-During PR creation for fix/#208-#209-#214-pipeline-bugs, `gh pr create` failed with `rnagrodzkicl does not have the correct permissions to execute CreatePullRequest`. The recovery helper (`pr-recover-gh-account.js`) returned `recovered: false` with a hint for `gh auth login --hostname github-rn`, but `gh auth switch` to `rnagrodzki` (the repo owner) succeeded manually and the retry PR creation worked. The recovery helper's `hint` path did not trigger an account switch because the host was `github-rn` (a custom hostname) rather than the standard `github.com` — the helper found no local account matching `github-rn`. Rule: when the recovery hint points to a non-standard hostname and a `rnagrodzki` account exists on `github.com`, try `gh auth switch` to `rnagrodzki` before escalating to the user.
 
-## 2026-05-05 — version-sdlc: patch release v0.17.44 from fix/#208-#209-#214-pipeline-bugs
-Branch had no upstream; auto `--set-upstream` on push worked correctly. `flags.changelog` resolved to `false` despite `config.changelog: true` — changelog requires explicit `--changelog` flag or a bump invocation that sets it. CI scripts were up to date.
 
-## 2026-05-05 — pr-sdlc: gh account auto-switch on CreatePullRequest permission error
-The active gh account (rnagrodzkicl) lacked CreatePullRequest permissions on the rnagrodzki/sdlc-marketplace repo. pr-recover-gh-account.js returned `recovered: false` with hint `gh auth login --hostname github-rn` because the remote URL uses a custom SSH host alias. The correct account (rnagrodzki) was already configured locally as an inactive account — manual `gh auth switch --user rnagrodzki` resolved it before the retry. Rule: when the recovery helper returns `recovered: false`, check `gh auth status` for inactive matching accounts and switch manually before the retry.
 
-## 2026-05-05 — version-sdlc: patch release v0.17.43 on fix branch
-Released v0.17.43 on `fix/version-sdlc-bugs-211-212-213` — first push required `--set-upstream`; auto-healed correctly. The `--output-file` "Unknown flag" warning was expected (the very bug being fixed in this release) and is non-blocking. `config.changelog = true` drove CHANGELOG generation without an explicit `--changelog` flag, confirming #213 fix works correctly during its own release.
 
-## 2026-05-05 — received-review-sdlc: three HIGH fixes on fix/version-sdlc-bugs-211-212-213
-HIGH-1: `--output-file` handler had a conditional `i++` that ate the next positional arg (e.g. `patch`), causing `requestedBump` to stay null. `output.js` only checks `process.argv.includes('--output-file')` — no value consumption — so the handler must be a pure no-op. Rule: boolean flags that delegate value-reading to another module must not advance the parse index.
-HIGH-2: Exec test for #212 used `--output-file` in `script_args`, which made the script write JSON to a temp file and print only the path to stdout. The `not-icontains "Unknown flag: --output-file"` assertion against a file path was a guaranteed false positive. Fix: remove `--output-file` from args so full JSON hits stdout; replace the file-path regex with a `requestedBump` content assertion.
-HIGH-3: `docs/skills/version-sdlc.md` was never updated after #211 (git diff hard-gate) and #213 (unified flags.changelog). Rule: when SKILL.md gains a new hard gate or behavior change, update the user-facing reference doc in the same PR.
 
-## 2026-05-05 — version-sdlc: plugin.json corruption during release v0.17.41 (#211)
-Root cause: SKILL.md Step 8.1 only mandated targeted Edit for TOML/YAML version files; JSON formats (package.json, plugin.json) were left to LLM discretion. The agent rewrote plugin.json from memory during the release commit, truncating the `description` field. Mitigation: Step 8.1 now mandates a single targeted Edit-tool call for ALL version-file formats (JSON included) plus a post-edit `git diff` HARD GATE — exactly one line must differ; otherwise abort and `git checkout -- <versionFile>`. Spec R8 generalized; gotcha bullet rewritten. Behavioral test added (multi-field plugin.json fixture).
 
-## 2026-05-05 — version-sdlc: patch release v0.17.41 from fix/205-pr-labels-section-menu
-Branch had no upstream; `--set-upstream` auto-heal fired correctly on first push. Changelog disabled via CLI (no `--changelog` flag despite `config.changelog: true`). Single fix commit: setup-sdlc summarizePrLabels leaf config read.
 
-## 2026-05-05 — pr-sdlc: per-dimension model override PR (#199)
-PR created for feat(#199) on branch fix/199-per-dimension-model-override. Custom template active — title pattern required `type(#issue): scope - description` format. sdlc.json version mode was already switched to `tag` on this branch, affecting how version-sdlc behaves in future sessions. "Fixes #199" placed in Github Issue section (custom template field) to link the issue for auto-close on merge.
 
-## 2026-05-05 — version-sdlc: tag-mode release on feature branch with no upstream
-Tag mode project (no version file). Branch `fix/199-per-dimension-model-override` had no upstream set; Step 8 auto-healed with `--set-upstream`. Branch was already pushed so push reported "Everything up-to-date" for commits; tag pushed cleanly as new tag. Explicit `patch` bump overrode conventional `minor` suggestion (1 feat commit). No changelog configured.
 
-## 2026-05-05 — version-sdlc: patch release v0.17.38 from fix/198-link-validation-safeguard
-Standard patch release. Two fix commits for link-validation URL validator and missing exit guards. Branch had no upstream — used `--set-upstream` on first push. CI scripts all current. No blocking issues.
 
-## 2026-05-04 — pr-sdlc: PR #200 for feat/configurable-pr-labels
-Custom template active (8 custom sections). Branch already pushed and tracked (`origin/feat/configurable-pr-labels`); `remoteState.pushed: false` in context JSON was stale — branch was current. Labels `enhancement` and `documentation` inferred: `feat/` branch prefix + `feat(#197)` commits → `enhancement`; doc files (`docs/skills/*.md`, `docs/specs/*.md`) in changedFiles → `documentation`. `prConfig.titlePattern` required `type(#issue): scope - description` — title validated before `gh pr create`. No JIRA ticket (null); Github Issue section populated with GitHub issue URL from pipeline context. Chore release commit (`v0.17.37`) included in branch commits — correctly ignored for PR title inference; feature commit used instead.
 
-## 2026-05-04 — pr-sdlc: PR #196 for feat/191-setup-sdlc-menu
-Custom template active (`.claude/pr-template.md`); 8 custom sections used. Branch was already pushed ("Everything up-to-date" on push). Label `enhancement` inferred from `feat/` branch prefix and `feat(#191)` commit subjects. `prConfig.titlePattern` required `type(#issue): scope - description` form — title validated before `gh pr create`. No JIRA ticket detected (null in context); `Github Issue` section populated with GitHub issue URL from pipeline context instead.
 
-## 2026-04-29 — pr-sdlc: PR #189 for fix/185-skill-docs-required-guardrail
-Custom template present in repo (`.claude/pr-template.md`); all 8 custom sections used. `skill-docs-required` guardrail config-field-only change — no script or hook needed. Branch was already pushed; `push` step returned "Everything up-to-date". Label `bug` inferred from `fix/` branch prefix.
 
-## 2026-04-29 — version-sdlc: patch release v0.17.32 on fix/185-skill-docs-required-guardrail
-Single chore commit (plan-sdlc skill-docs-required guardrail & test fixture). Branch had no upstream; push used `-u` to set it. The `--output-file` flag passed via pipeline args triggers an "Unknown flag" warning in version.js but does not block execution.
 
-## 2026-04-29 — version-sdlc: patch release v0.17.31 on fix/184-sequential-meteor
-First push from untracked branch; `git push --set-upstream origin <branch>` required before `git push --tags`. Both commits were `fix` type (null-check guard + gh-account-switch retry), cleanly mapping to a patch bump.
 
-## 2026-05-06 — execute-plan-sdlc: 4-task plan executed inline (no Agent dispatch tool)
-Agent tool was not surfaced in this environment so all four waves of the harvest-learnings plan executed inline in the main context (consistent with the existing 2026-05-05 entry on the same situation). Plan AC for the exec test "byte-identical mutation" required tmp-copying the fixture before `--commit` so the canonical fixture under `fixtures-fs/` stays pristine across promptfoo's parallel concurrency=8 — the AC was honored by spinning up an isolated tmp tree inside the JS assertion. Behavioral fixtures `fixtures/*.md` describe the helper's drafts JSON output rather than copying the filesystem fixture; this is the existing harness pattern (exec tests own filesystem trees, behavioral tests own simulated context), so "no fixture duplication" was satisfied in spirit even though the two test surfaces don't literally share files.
 
-## 2026-05-06 — pr-sdlc: custom template sections require matching gh issue link format
-This repo uses a custom PR template (`.claude/pr-template.md`) with a `## Github Issue` section (not `## JIRA Ticket`). The `Fixes #N` reference goes in that section, not in a JIRA field. When a custom template is active, all section headings come from the template — do not inject default 8-section headings alongside it.
 
-Active bugs are tracked in GitHub issues. This log retains only entries < 30 days old
-that capture non-obvious gotchas not yet reflected in code, docs, or skills.
+
+
+
+
 
 ## Tracked in GH Issues
 - version-sdlc auto-set-upstream → #183
@@ -281,3 +206,10 @@ Plan called for wave-based agent dispatch but the runtime had no `Agent`/`Task` 
 - archive-openspec was placed before version in runtime (ship.js), before pr in config lists — both wrong. Fixed: runtime IIFE relocated to version→archive-openspec→pr; CANONICAL_STEPS, PRESET_TO_STEPS, schema enum, specs, docs, tests all aligned.
 - harden-sdlc SKILL.md Step 5c referenced MANIFEST.pluginRepoUrl but MANIFEST as parsed-JSON was never defined — only MANIFEST_FILE (path). Review caught it; fix: add explicit read instruction per step.
 - reviewThreshold=low fires received-review-sdlc on any finding; both medium and low findings were real and fixable — threshold appropriate for this project.
+
+## 2026-05-08 — execute-plan-sdlc: #292 surface verify-pipeline + await-remote-review tunables
+- Agent tool was unavailable (no `Task` deferred tool); all Standard tasks ran inline in orchestrator context. Wave ordering was preserved for correctness and state tracking.
+- The `when` evaluator site was ambiguous in the plan: "evaluated in setup.js against the steps[] selection just selected by the user" seems contradictory (prepare runs before user selection), but the resolution is correct — setup.js accepts a `--steps` CLI flag and the skill calls it with the user's selection. This is the same pattern as `--unset-only` and `--force`.
+- `applyWhenGates` is a pure function added to setup.js — makes the gate testable without running the full prepare pipeline.
+- promptfoo CLI broken in this env (better-sqlite3 NODE_MODULE_VERSION mismatch on Node v26); exec test assertions verified directly with `node -e` inline assertion scripts instead.
+- Existing test for `shipFields.length === 7` needed updating to 13 — always check length assertions in datasets when adding new SHIP_FIELDS entries.

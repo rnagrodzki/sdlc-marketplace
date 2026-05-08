@@ -267,57 +267,57 @@ function mergeFlags(cli, config) {
   // boolean flags. These tunables apply when the corresponding step is in
   // flags.steps; values come from config or fall back to the spec default.
 
-  // verifyPipelineTimeout (integer ≥30, default 1200)
+  // verifyPipelineTimeout (integer ≥30, default from BUILT_IN_DEFAULTS)
   if (cfg.verifyPipelineTimeout !== undefined) {
     merged.verifyPipelineTimeout  = cfg.verifyPipelineTimeout;
     sources.verifyPipelineTimeout = 'config';
   } else {
-    merged.verifyPipelineTimeout  = 1200;
+    merged.verifyPipelineTimeout  = BUILT_IN_DEFAULTS.verifyPipelineTimeout;
     sources.verifyPipelineTimeout = 'default';
   }
 
-  // verifyPipelineInterval (integer ≥10, default 60)
+  // verifyPipelineInterval (integer ≥10, default from BUILT_IN_DEFAULTS)
   if (cfg.verifyPipelineInterval !== undefined) {
     merged.verifyPipelineInterval  = cfg.verifyPipelineInterval;
     sources.verifyPipelineInterval = 'config';
   } else {
-    merged.verifyPipelineInterval  = 60;
+    merged.verifyPipelineInterval  = BUILT_IN_DEFAULTS.verifyPipelineInterval;
     sources.verifyPipelineInterval = 'default';
   }
 
-  // verifyPipelineMaxIterations (integer 1-10, default 3)
+  // verifyPipelineMaxIterations (integer 1-10, default from BUILT_IN_DEFAULTS)
   if (cfg.verifyPipelineMaxIterations !== undefined) {
     merged.verifyPipelineMaxIterations  = cfg.verifyPipelineMaxIterations;
     sources.verifyPipelineMaxIterations = 'config';
   } else {
-    merged.verifyPipelineMaxIterations  = 3;
+    merged.verifyPipelineMaxIterations  = BUILT_IN_DEFAULTS.verifyPipelineMaxIterations;
     sources.verifyPipelineMaxIterations = 'default';
   }
 
-  // awaitRemoteReviewTimeout (integer ≥30, default 600)
+  // awaitRemoteReviewTimeout (integer ≥30, default from BUILT_IN_DEFAULTS)
   if (cfg.awaitRemoteReviewTimeout !== undefined) {
     merged.awaitRemoteReviewTimeout  = cfg.awaitRemoteReviewTimeout;
     sources.awaitRemoteReviewTimeout = 'config';
   } else {
-    merged.awaitRemoteReviewTimeout  = 600;
+    merged.awaitRemoteReviewTimeout  = BUILT_IN_DEFAULTS.awaitRemoteReviewTimeout;
     sources.awaitRemoteReviewTimeout = 'default';
   }
 
-  // awaitRemoteReviewInterval (integer ≥10, default 60)
+  // awaitRemoteReviewInterval (integer ≥10, default from BUILT_IN_DEFAULTS)
   if (cfg.awaitRemoteReviewInterval !== undefined) {
     merged.awaitRemoteReviewInterval  = cfg.awaitRemoteReviewInterval;
     sources.awaitRemoteReviewInterval = 'config';
   } else {
-    merged.awaitRemoteReviewInterval  = 60;
+    merged.awaitRemoteReviewInterval  = BUILT_IN_DEFAULTS.awaitRemoteReviewInterval;
     sources.awaitRemoteReviewInterval = 'default';
   }
 
-  // awaitRemoteReviewers (array of strings, minItems 1, default ["copilot"])
+  // awaitRemoteReviewers (array of strings, minItems 1, default from BUILT_IN_DEFAULTS)
   if (Array.isArray(cfg.awaitRemoteReviewers) && cfg.awaitRemoteReviewers.length > 0) {
     merged.awaitRemoteReviewers  = cfg.awaitRemoteReviewers.slice();
     sources.awaitRemoteReviewers = 'config';
   } else {
-    merged.awaitRemoteReviewers  = ['copilot'];
+    merged.awaitRemoteReviewers  = BUILT_IN_DEFAULTS.awaitRemoteReviewers.slice();
     sources.awaitRemoteReviewers = 'default';
   }
 

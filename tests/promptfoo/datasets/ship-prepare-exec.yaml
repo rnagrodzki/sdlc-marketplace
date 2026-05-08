@@ -583,3 +583,28 @@
       value: "--verify-pipeline is no longer accepted"
     - type: icontains
       value: "ship.steps"
+
+# ---------------------------------------------------------------------------
+# Issue #292 — BUILT_IN_DEFAULTS single-source for R57 tunables
+# With empty cfg.ship (no R57 keys set), mergeFlags MUST resolve defaults from
+# BUILT_IN_DEFAULTS rather than inline literals.
+# ---------------------------------------------------------------------------
+
+- description: "ship-prepare (issue #292): empty cfg.ship resolves verifyPipelineTimeout=1200 from BUILT_IN_DEFAULTS"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.flags.verifyPipelineTimeout === 1200
+          && o.flags.verifyPipelineInterval === 60
+          && o.flags.verifyPipelineMaxIterations === 3
+          && o.flags.awaitRemoteReviewTimeout === 600
+          && o.flags.awaitRemoteReviewInterval === 60
+          && Array.isArray(o.flags.awaitRemoteReviewers)
+          && o.flags.awaitRemoteReviewers.length === 1
+          && o.flags.awaitRemoteReviewers[0] === 'copilot'

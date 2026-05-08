@@ -194,7 +194,7 @@ For each non-delegated section, these are the fields the verbose header reveals 
 
 #### `ship`
 
-The seven `ship` fields are imported verbatim from `scripts/lib/ship-fields.js` (single source of truth for both `/ship-sdlc` and `/setup-sdlc`). Run `/setup-sdlc --only ship` to see each field's default and description in the verbose header before answering.
+The 13 `ship` fields are imported verbatim from `scripts/lib/ship-fields.js` (single source of truth for both `/ship-sdlc` and `/setup-sdlc`). Six of the 13 are R57 tunables (`verifyPipelineTimeout`, `verifyPipelineInterval`, `verifyPipelineMaxIterations`, `awaitRemoteReviewTimeout`, `awaitRemoteReviewInterval`, `awaitRemoteReviewers`) prompted only when the gating step (`verify-pipeline` or `await-remote-review`) is in the selected `ship.steps[]` — the prepare script applies these `when.stepInActiveSteps` gates per issue #292 / R15. Run `/setup-sdlc --only ship` to see each field's default and description in the verbose header before answering.
 
 ---
 

@@ -177,6 +177,13 @@ function summarizeShip(cfg) {
   if (Array.isArray(cfg.steps)) parts.push(`steps: ${cfg.steps.join(',')}`);
   if (cfg.bump) parts.push(`bump: ${cfg.bump}`);
   if (cfg.workspace) parts.push(`workspace: ${cfg.workspace}`);
+  // R57 tunables — render only when configured (silent when absent)
+  if (cfg.verifyPipelineTimeout != null) parts.push(`verifyPipelineTimeout: ${cfg.verifyPipelineTimeout}`);
+  if (cfg.verifyPipelineInterval != null) parts.push(`verifyPipelineInterval: ${cfg.verifyPipelineInterval}`);
+  if (cfg.verifyPipelineMaxIterations != null) parts.push(`verifyPipelineMaxIterations: ${cfg.verifyPipelineMaxIterations}`);
+  if (cfg.awaitRemoteReviewTimeout != null) parts.push(`awaitRemoteReviewTimeout: ${cfg.awaitRemoteReviewTimeout}`);
+  if (cfg.awaitRemoteReviewInterval != null) parts.push(`awaitRemoteReviewInterval: ${cfg.awaitRemoteReviewInterval}`);
+  if (Array.isArray(cfg.awaitRemoteReviewers) && cfg.awaitRemoteReviewers.length > 0) parts.push(`awaitRemoteReviewers: ${cfg.awaitRemoteReviewers.join(',')}`);
   return parts.join('  ');
 }
 
