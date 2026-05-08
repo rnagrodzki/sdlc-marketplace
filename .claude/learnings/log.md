@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-08 — version-sdlc: patch release v0.18.14 from feature branch chore/229-cost-tier-model-assignments
+First push from this branch used --set-upstream; tag pushed separately via git push --tags. Single feat commit (guardrails) landed as patch per explicit pipeline request despite minor being suggested by conventional commits.
+
 ## 2026-05-07 — version-sdlc: patch bump with feat commit in history
 Explicit `patch` bump requested via pipeline with a `feat:` commit present (suggestedBump was `minor`). Auto mode accepted the override without conflict. Branch had no upstream — `--set-upstream` was auto-applied on push.
 
