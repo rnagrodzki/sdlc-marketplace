@@ -6,12 +6,13 @@ import { skillsMeta, getSkillsByCategory } from '../data/skills-meta';
 
 const base = import.meta.env.BASE_URL;
 
-const categoryOrder = ['planning', 'review', 'gitops', 'workflows', 'integrations'] as const;
+const categoryOrder = ['planning', 'review', 'gitops', 'workflows', 'devops', 'integrations'] as const;
 const categoryLabels = {
   planning: 'Planning & Execution',
   review: 'Code Review',
   gitops: 'Git Operations',
   workflows: 'Full Orchestration',
+  devops: 'DevOps',
   integrations: 'Integrations',
 };
 
@@ -21,15 +22,15 @@ const featureCards = [
     color: 'var(--color-planning)',
     colorHex: '#3b82f6',
     href: `${base}/workflows/plan-execute/`,
-    body: 'Use /plan-sdlc and /execute-plan-sdlc to decompose requirements into parallel task waves, then execute with adaptive intelligence.',
+    body: 'From Jira tickets to structured plans to parallel wave execution. The planning lane handles the full lifecycle of turning requirements into working code.',
     icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="12" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="12" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>`,
   },
   {
-    title: 'Multi-Dimension Review',
+    title: 'Review Cycle',
     color: 'var(--color-review)',
     colorHex: '#f59e0b',
     href: `${base}/workflows/review-cycle/`,
-    body: '/review-sdlc dispatches parallel subagents across custom review dimensions, deduplicates findings, and posts structured PR comments.',
+    body: 'Initialize review dimensions, run multi-dimensional code reviews, and process feedback with dual critique gates that prevent blind acceptance.',
     icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M7 10l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   },
   {
@@ -37,7 +38,7 @@ const featureCards = [
     color: 'var(--color-gitops)',
     colorHex: '#22c55e',
     href: `${base}/workflows/ship/`,
-    body: 'From /commit-sdlc to /pr-sdlc to /version-sdlc — a complete git workflow with structured descriptions and semantic versioning.',
+    body: 'Smart commits, structured PRs with custom templates, and semantic versioning with changelogs. Every release artifact is consistent and traceable.',
     icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2l2.5 5H17l-4 3 1.5 5L10 12l-4.5 3L7 10 3 7h4.5L10 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
   },
   {
@@ -45,8 +46,16 @@ const featureCards = [
     color: 'var(--color-workflows)',
     colorHex: '#06b6d4',
     href: `${base}/workflows/full-orchestration/`,
-    body: '/ship-sdlc chains execute, commit, review, fix, version, and PR into a single automated pipeline with conditional review loops.',
+    body: 'One command runs the entire pipeline — execute, commit, review, fix, version, PR. Conditional loops handle review findings automatically.',
     icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h2m10 0h2M10 3v2m0 10v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  },
+  {
+    title: 'Spec-Driven Development',
+    color: 'var(--color-integrations)',
+    colorHex: '#a855f7',
+    href: `${base}/workflows/openspec/`,
+    body: 'Combine OpenSpec specifications with SDLC execution. Propose changes, write delta specs, then plan and execute with spec compliance checks built in.',
+    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 8h6M7 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
   },
 ];
 
