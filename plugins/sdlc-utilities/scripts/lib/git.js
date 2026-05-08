@@ -566,16 +566,22 @@ function isGhCreatePrPermissionError(errorText) {
  *
  * Behavior:
  *   - If `errorText` is not a permission error → `{ recovered: false, reason: "non-permission-error" }`
- *   - If matching account is already active → `{ recovered: false, switched: false, reason: "already-active", account }`
- *   - If matching account exists and switch succeeds → `{ recovered: true, switched: true, account, previousAccount }`
- *   - If no matching account → `{ recovered: false, switched: false, hint: "gh auth login --hostname <host>" }`
+ *   - If matching account is already active → `{ recovered: false, switched: false, reason: "already-active", account, host }`
+ *   - If matching account exists and switch succeeds → `{ recovered: true, switched: true, account, previousAccount, host }`
+ *   - If no matching account on parsed host AND host is non-canonical (≠ "github.com"), queries
+ *     `github.com` as fallback (or consults `opts.fallbackAccounts` for hermetic test injection).
+ *     On fallback match: returns `{ recovered: true, ..., viaFallback: true, host: "github.com" }`.
+ *     On fallback no-match: returns `{ recovered: false, hint: "gh auth login --hostname github.com", host: "github.com" }`.
+ *   - If no matching account and host is already `github.com` → `{ recovered: false, hint: "gh auth login --hostname github.com", host }`
  *
  * For test injection (so promptfoo exec tests can run hermetically), pass
- * `accounts` and `remote` directly instead of letting the function call gh.
+ * `accounts`, `remote`, and optionally `fallbackAccounts` directly instead of
+ * letting the function call gh. `fallbackAccounts` is only consulted when
+ * `opts.dryRun` is set (mirrors the `accounts` injection pattern).
  *
  * @param {string} projectRoot
  * @param {string} errorText
- * @param {{ accounts?: Array<{login:string, active?:boolean}>, remote?: {host:string,owner:string,repo:string}, dryRun?: boolean }} [opts]
+ * @param {{ accounts?: Array<{login:string, active?:boolean}>, fallbackAccounts?: Array<{login:string, active?:boolean}>, remote?: {host:string,owner:string,repo:string}, dryRun?: boolean }} [opts]
  * @returns {object}
  */
 function recoverGhAccountForRepo(projectRoot, errorText, opts = {}) {
@@ -600,6 +606,88 @@ function recoverGhAccountForRepo(projectRoot, errorText, opts = {}) {
 
   const match = selectAccountForOwner(owner, accounts);
   if (!match) {
+    // No match on the parsed host. If the host is a non-canonical SSH alias (≠ "github.com"),
+    // try github.com as a fallback — the real account may be registered under the canonical host.
+    if (host !== 'github.com') {
+      let fallbackAccounts = opts.fallbackAccounts;
+      if (!fallbackAccounts) {
+        const fallbackResult = getGhAccounts('github.com');
+        if (fallbackResult.error) {
+          return { recovered: false, switched: false, reason: 'gh-status-error', error: fallbackResult.error };
+        }
+        fallbackAccounts = fallbackResult.accounts;
+      }
+
+      const fallbackMatch = selectAccountForOwner(owner, fallbackAccounts);
+      if (!fallbackMatch) {
+        return {
+          recovered: false,
+          switched: false,
+          hint: 'gh auth login --hostname github.com',
+          owner,
+          host: 'github.com',
+        };
+      }
+
+      const fallbackActive = fallbackAccounts.find(a => a && a.active) || null;
+      const previousAccount = fallbackActive ? fallbackActive.login : null;
+
+      if (fallbackMatch.active) {
+        return {
+          recovered: false,
+          switched: false,
+          reason: 'already-active',
+          account: fallbackMatch.login,
+          host: 'github.com',
+        };
+      }
+
+      if (opts.dryRun) {
+        return {
+          recovered: true,
+          switched: true,
+          account: fallbackMatch.login,
+          previousAccount,
+          host: 'github.com',
+          viaFallback: true,
+          dryRun: true,
+        };
+      }
+
+      const switchResult = exec(`gh auth switch --hostname github.com --user ${fallbackMatch.login}`);
+      const verify = getGhAccounts('github.com');
+      if (verify.error || !Array.isArray(verify.accounts)) {
+        return {
+          recovered: false,
+          switched: false,
+          reason: 'switch-verify-failed',
+          error: verify.error,
+          host: 'github.com',
+        };
+      }
+      const newActive = verify.accounts.find(a => a && a.active);
+      if (newActive && newActive.login.toLowerCase() === fallbackMatch.login.toLowerCase()) {
+        return {
+          recovered: true,
+          switched: true,
+          account: fallbackMatch.login,
+          previousAccount,
+          host: 'github.com',
+          viaFallback: true,
+        };
+      }
+
+      return {
+        recovered: false,
+        switched: false,
+        reason: 'switch-failed',
+        account: fallbackMatch.login,
+        previousAccount,
+        host: 'github.com',
+        error: switchResult,
+      };
+    }
+
     return {
       recovered: false,
       switched: false,
@@ -618,6 +706,7 @@ function recoverGhAccountForRepo(projectRoot, errorText, opts = {}) {
       switched: false,
       reason: 'already-active',
       account: match.login,
+      host,
     };
   }
 
@@ -627,6 +716,7 @@ function recoverGhAccountForRepo(projectRoot, errorText, opts = {}) {
       switched: true,
       account: match.login,
       previousAccount,
+      host,
       dryRun: true,
     };
   }
@@ -641,6 +731,7 @@ function recoverGhAccountForRepo(projectRoot, errorText, opts = {}) {
       switched: false,
       reason: 'switch-verify-failed',
       error: verify.error,
+      host,
     };
   }
   const newActive = verify.accounts.find(a => a && a.active);
@@ -650,6 +741,7 @@ function recoverGhAccountForRepo(projectRoot, errorText, opts = {}) {
       switched: true,
       account: match.login,
       previousAccount,
+      host,
     };
   }
 
@@ -659,6 +751,7 @@ function recoverGhAccountForRepo(projectRoot, errorText, opts = {}) {
     reason: 'switch-failed',
     account: match.login,
     previousAccount,
+    host,
     error: switchResult,
   };
 }

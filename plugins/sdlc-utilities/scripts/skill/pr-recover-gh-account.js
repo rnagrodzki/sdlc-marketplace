@@ -13,14 +13,20 @@
  *   This script is a thin CLI wrapper.
  *
  * Inputs:
- *   --error-file <path>       Read stderr text from <path>. Required unless --error is passed.
- *   --error <string>          Inline error text (alternative to --error-file).
- *   --project-root <path>     Override project root (defaults to process.cwd()).
- *   --dry-run                 Skip the live `gh auth switch`; require --accounts-file and --owner.
- *   --accounts-file <path>    Read accounts JSON from file (used with --dry-run for hermetic tests).
- *                             Format: [{"login":"alice","active":true}, ...]
- *   --owner <login>           Override repo owner detection (used with --dry-run).
- *   --host <host>             Override remote host (used with --dry-run, default "github.com").
+ *   --error-file <path>             Read stderr text from <path>. Required unless --error is passed.
+ *   --error <string>                Inline error text (alternative to --error-file).
+ *   --project-root <path>           Override project root (defaults to process.cwd()).
+ *   --dry-run                       Skip the live `gh auth switch`; require --accounts-file and --owner.
+ *   --accounts-file <path>          Read accounts JSON from file (used with --dry-run for hermetic tests).
+ *                                   Format: [{"login":"alice","active":true}, ...]
+ *   --fallback-accounts-file <path> Read fallback accounts JSON from file (used with --dry-run only).
+ *                                   Injected as `opts.fallbackAccounts` so the github.com fallback branch
+ *                                   in recoverGhAccountForRepo runs hermetically without a live gh call.
+ *                                   Only relevant when --host is not "github.com" (if --host is "github.com",
+ *                                   no fallback runs and this flag is ignored).
+ *                                   Format: [{"login":"alice","active":false}, ...]
+ *   --owner <login>                 Override repo owner detection (used with --dry-run).
+ *   --host <host>                   Override remote host (used with --dry-run, default "github.com").
  *
  * Output:
  *   Single-line JSON to stdout. Exit code 0 on every documented branch
@@ -47,6 +53,7 @@ function parseArgs(argv) {
     projectRoot: process.cwd(),
     dryRun: false,
     accountsFile: null,
+    fallbackAccountsFile: null,
     owner: null,
     host: 'github.com',
   };
@@ -72,6 +79,10 @@ function parseArgs(argv) {
         break;
       case '--accounts-file':
         args.accountsFile = next;
+        i++;
+        break;
+      case '--fallback-accounts-file':
+        args.fallbackAccountsFile = next;
         i++;
         break;
       case '--owner':
@@ -145,6 +156,25 @@ function main() {
     }
     opts.accounts = accounts;
     opts.remote = { host: args.host, owner: args.owner, repo: 'unknown' };
+
+    if (args.fallbackAccountsFile) {
+      let fallbackAccounts;
+      try {
+        fallbackAccounts = JSON.parse(fs.readFileSync(args.fallbackAccountsFile, 'utf8'));
+      } catch (e) {
+        process.stderr.write(
+          `pr-recover-gh-account: could not read fallback accounts file: ${e.message}\n`
+        );
+        process.exit(2);
+      }
+      if (!Array.isArray(fallbackAccounts)) {
+        process.stderr.write(
+          'pr-recover-gh-account: fallback accounts file must contain a JSON array\n'
+        );
+        process.exit(2);
+      }
+      opts.fallbackAccounts = fallbackAccounts;
+    }
   }
 
   const result = recoverGhAccountForRepo(args.projectRoot, errorText, opts);

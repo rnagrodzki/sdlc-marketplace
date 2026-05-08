@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-09 — execute-plan-sdlc: bulk-close 20 stale version-sdlc GH issues
+All 20 open issues with `version-sdlc:` titles were auto-harvested learnings from `log.md` (2026-05-08). None had labels. Both cited bug groups (#211/#212/#213 and #219) were already fixed on main before the harvest ran (d4da030 / 8ea8606). Lesson: learnings-harvest should gate on whether the cited bug is still open on main before creating a GH issue — status notes for successful releases should never become issues.
+
 ## 2026-05-08 — pr-sdlc: feat(#292) ship tunables surfaced via setup-sdlc
 PR #328 used custom template from `.sdlc/pr-template.md`. Title pattern `^(feat|fix|...)\(#\d+\): .+ - .+$` required ` - ` separator; title was 68 chars. Labels `enhancement` + `documentation` inferred via llm mode from `feat/` branch prefix and docs/* changes. `when.stepInActiveSteps` gate mechanism added to SHIP_FIELDS — `skip: true` entries stay in array but are excluded from setup prompts; array order/length stable per R15. `BUILT_IN_DEFAULTS` is now single source for both setup defaults and ship runtime defaults.
 
