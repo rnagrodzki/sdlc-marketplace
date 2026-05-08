@@ -78,6 +78,9 @@ function slugifyBranch(branch) {
  * @returns {string} Absolute path: `<mainWorktree>/.sdlc/execution/`
  */
 function resolveStateDir() {
+  // SDLC_STATE_DIR_OVERRIDE lets test harnesses point at a fixture's .sdlc/execution/
+  // without needing a real git repo in the fixture directory.
+  if (process.env.SDLC_STATE_DIR_OVERRIDE) return process.env.SDLC_STATE_DIR_OVERRIDE;
   const mainWorktree = resolveMainWorktree();
   return path.join(mainWorktree, '.sdlc', 'execution');
 }
@@ -88,7 +91,7 @@ function resolveStateDir() {
 
 /**
  * Find the most recent state file matching `<prefix>-<branchSlug>-*.json`.
- * @param {string} prefix      e.g. `"ship"` or `"execute"`
+ * @param {string} prefix      e.g. `"ship"`, `"execute"`, or `"plan"`
  * @param {string} branchSlug  Slugified branch name (via slugifyBranch)
  * @returns {{ file: string, fullPath: string } | null}
  *   `file` is relative to the state directory parent (`".sdlc/execution/<filename>"`),
@@ -154,7 +157,7 @@ function findStateFile(prefix, branchSlug) {
  * is the absolute path for callers that want to read the file.
  *
  * @param {object} opts
- * @param {string}  opts.prefix      "ship" | "execute"
+ * @param {string}  opts.prefix      "ship" | "execute" | "plan"
  * @param {string} [opts.branch]     If provided, restricts to this branch's slug.
  * @returns {{stateFile: string|null, fullPath: string|null, found: boolean}}
  */
@@ -241,7 +244,7 @@ function writeState(filePath, data) {
 /**
  * Create a new state file in the state directory.
  * File name format: `<prefix>-<branchSlug>-<YYYYMMDDTHHmmssZ>.json`
- * @param {string} prefix   e.g. `"ship"` or `"execute"`
+ * @param {string} prefix   e.g. `"ship"`, `"execute"`, or `"plan"`
  * @param {string} branch   Raw branch name (will be slugified internally)
  * @param {object} data     Initial state data
  * @returns {string}  Absolute path to the created file
@@ -313,7 +316,7 @@ function resolveBranch(argBranch) {
 function parseStateFilename(name) {
   // Trailing `-<16 chars>.json` where timestamp pattern is ISO-compact:
   // 8 digits (date) + 'T' + 6 digits (time) + 'Z'.
-  const m = name.match(/^(ship|execute)-(.+)-(\d{8}T\d{6}Z)\.json$/);
+  const m = name.match(/^(ship|execute|plan)-(.+)-(\d{8}T\d{6}Z)\.json$/);
   if (!m) return null;
   return { prefix: m[1], slug: m[2], timestamp: m[3] };
 }

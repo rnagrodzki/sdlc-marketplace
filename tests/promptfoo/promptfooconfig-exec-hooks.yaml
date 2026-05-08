@@ -17,3 +17,4 @@ tests:
   - file://datasets/hook-git-guard-exec.yaml
   - file://datasets/hook-error-report-exec.yaml
   - file://datasets/jira-sdlc-hook-exec.yaml
+  - file://datasets/hook-stop-plan-integrity-exec.yaml

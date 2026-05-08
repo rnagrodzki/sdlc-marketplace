@@ -189,6 +189,21 @@ The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads i
 | `.sdlc/learnings/log.md` | Planning learnings appended after writing: scope decisions, clarification patterns, decomposition issues. |
 | Step 7 context-heaviness advisory | When the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget), Step 7 prepends a `/compact` advisory above the handoff menu. Sidecar is written by the `UserPromptSubmit` hook `hooks/context-stats.js`. Implementation: [`scripts/lib/context-advisory.js`](../../plugins/sdlc-utilities/scripts/lib/context-advisory.js) consumed via the wrapper [`scripts/skill/plan-handoff-advisory.js`](../../plugins/sdlc-utilities/scripts/skill/plan-handoff-advisory.js). Pipeline state survives `/compact` (PreCompact + SessionStart hooks). |
 
+## Plan Integrity
+
+When `plan-sdlc` runs, it writes a per-branch plan integrity state file at `.sdlc/execution/plan-<branchSlug>-<ts>.json`. The state file records four checkpoint markers as ISO timestamps:
+
+| Marker | Written when |
+|---|---|
+| `skillInvoked` | Step 0 prepare — plan-sdlc was invoked |
+| `planFile` | After Step 0 path resolution — plan file path resolved and recorded |
+| `guardrailsEvaluated` | End of Step 3 — guardrail-compliance gate completed |
+| `critiqueRan` | Final action of Step 3 — all critique checks completed |
+
+A sibling field `planFilePath` stores the absolute path to the plan file so the hook can stat it for non-empty content.
+
+The `stop-plan-integrity.js` Stop hook reads this state file at session end and warns when any checkpoint is missing or when the recorded plan file is absent or empty. If no state file exists but the transcript shows plan mode was active, the hook warns that `plan-sdlc` was not invoked. The hook is advisory-only and always exits 0. See [`hooks/stop-plan-integrity.js`](../../plugins/sdlc-utilities/hooks/stop-plan-integrity.js) and [issue #285](https://github.com/rnagrodzki/sdlc-marketplace/issues/285).
+
 ---
 
 ## Prerequisites
