@@ -254,3 +254,12 @@ Multi-file additive changes across a TypeScript Astro site. Wave structure was f
 ## 2026-05-08 — harden-sdlc: user-code for setup-sdlc at Step 0 Pre-flight
 Applied: 2 proposal(s) across plan-guardrails, review-dimensions | Skipped: 0 | Routed: no
 Trigger: preflight check is wrong: localIsV1: true was already migrated several times; schemaVersion also keeps showing as mis
+
+## 2026-05-08 — ship-sdlc: commit-sdlc fails without issue number in branch name
+Branch `chore/extract-shared-script-utilities` has no issue number, causing commit-sdlc to reject with pattern error. Pass `--issue 284` to commit-sdlc when branch name lacks a number. Issue number comes from plan header ("Tracking issue: #N").
+
+## 2026-05-08 — ship-sdlc: opus model dispatch requires extra context (1M tokens)
+First execute-plan-sdlc dispatch failed: "opus model requires 1M context (extra usage not enabled)". Resumed next session without --resume flag (started fresh). Prior state file cleaned by terminal step.
+
+## 2026-05-08 — ship-sdlc: review threshold=low triggers received-review even on APPROVED verdict
+Verdict was APPROVED but 2 low findings triggered received-review-sdlc dispatch (threshold=low catches all non-info findings). Both fixes were documentation-only (JSDoc clarifications). Pipeline behaved correctly per spec.
