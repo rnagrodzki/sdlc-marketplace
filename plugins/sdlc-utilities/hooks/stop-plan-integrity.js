@@ -10,9 +10,9 @@
  *   2. If no plan state file exists, scan the last 64 KB of the transcript for
  *      "Plan mode is active". If found, warn that plan-sdlc was not invoked.
  *
- * Reads stdin: yes (Stop event payload contains transcript_path).
- * Note: this hook deliberately reads stdin, unlike stop-state-save.js which does
- * not. The transcript_path field is required for the fallback signal.
+ * Reads stdin: only when the state-file primary path misses. The transcript_path
+ * is consumed by the fallback signal; the state-file branch returns without ever
+ * touching stdin to avoid synchronous I/O on the common path.
  *
  * Exit codes:
  *   0 = always (advisory-only contract; see R21)
@@ -44,24 +44,7 @@ try {
   const { exec } = require('../scripts/lib/git');
 
   // -------------------------------------------------------------------------
-  // 1. Read stdin (Stop event payload → transcript_path)
-  // -------------------------------------------------------------------------
-
-  let transcriptPath = null;
-  try {
-    const raw = fs.readFileSync('/dev/stdin', 'utf8');
-    if (raw && raw.trim()) {
-      const payload = JSON.parse(raw);
-      if (typeof payload.transcript_path === 'string') {
-        transcriptPath = payload.transcript_path;
-      }
-    }
-  } catch (_) {
-    // Malformed or missing stdin — proceed without transcript path
-  }
-
-  // -------------------------------------------------------------------------
-  // 2. Get current branch
+  // 1. Get current branch
   // -------------------------------------------------------------------------
 
   // SDLC_BRANCH_OVERRIDE allows test harnesses to inject a branch name without
@@ -72,7 +55,7 @@ try {
   const branchSlug = slugifyBranch(branch);
 
   // -------------------------------------------------------------------------
-  // 3. State-file-first branch
+  // 2. State-file-first branch (no I/O on the primary path)
   // -------------------------------------------------------------------------
 
   const found = findStateFile('plan', branchSlug);
@@ -139,7 +122,26 @@ try {
   }
 
   // -------------------------------------------------------------------------
-  // 5. Transcript-fallback branch (state file absent)
+  // 3. Read stdin (Stop event payload → transcript_path)
+  //    Deferred until here: only the fallback path needs the transcript, so
+  //    when a state file exists we never touch stdin.
+  // -------------------------------------------------------------------------
+
+  let transcriptPath = null;
+  try {
+    const raw = fs.readFileSync('/dev/stdin', 'utf8');
+    if (raw && raw.trim()) {
+      const payload = JSON.parse(raw);
+      if (typeof payload.transcript_path === 'string') {
+        transcriptPath = payload.transcript_path;
+      }
+    }
+  } catch (_) {
+    // Malformed or missing stdin — proceed without transcript path
+  }
+
+  // -------------------------------------------------------------------------
+  // 4. Transcript-fallback branch (state file absent)
   // -------------------------------------------------------------------------
 
   if (!transcriptPath) {
