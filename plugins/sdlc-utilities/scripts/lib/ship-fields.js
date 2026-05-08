@@ -83,6 +83,60 @@ const SHIP_FIELDS = [
     default: 'high',
     description: 'Findings at or above this severity halt the pipeline',
   },
+  {
+    name: 'verifyPipelineTimeout',
+    label: 'verify-pipeline poll timeout (seconds)',
+    type: 'number',
+    default: 1200,
+    min: 30,
+    description: 'Maximum seconds verify-pipeline polls before giving up. (R57)',
+    when: { stepInActiveSteps: 'verify-pipeline' },
+  },
+  {
+    name: 'verifyPipelineInterval',
+    label: 'verify-pipeline poll interval (seconds)',
+    type: 'number',
+    default: 60,
+    min: 10,
+    description: 'Seconds between verify-pipeline poll attempts. (R57)',
+    when: { stepInActiveSteps: 'verify-pipeline' },
+  },
+  {
+    name: 'verifyPipelineMaxIterations',
+    label: 'verify-pipeline max analyze-fix iterations',
+    type: 'number',
+    default: 3,
+    min: 1,
+    max: 10,
+    description: 'Maximum analyze-fix-recheck iterations. (R47, R57)',
+    when: { stepInActiveSteps: 'verify-pipeline' },
+  },
+  {
+    name: 'awaitRemoteReviewTimeout',
+    label: 'await-remote-review poll timeout (seconds)',
+    type: 'number',
+    default: 600,
+    min: 30,
+    description: 'Maximum seconds await-remote-review polls. (R57)',
+    when: { stepInActiveSteps: 'await-remote-review' },
+  },
+  {
+    name: 'awaitRemoteReviewInterval',
+    label: 'await-remote-review poll interval (seconds)',
+    type: 'number',
+    default: 60,
+    min: 10,
+    description: 'Seconds between await-remote-review poll attempts. (R57)',
+    when: { stepInActiveSteps: 'await-remote-review' },
+  },
+  {
+    name: 'awaitRemoteReviewers',
+    label: 'Reviewer logins satisfying await-remote-review',
+    type: 'list',
+    default: ['copilot'],
+    description: 'Logins (case-insensitive) whose reviews satisfy the gate. (R56, R57)',
+    when: { stepInActiveSteps: 'await-remote-review' },
+  },
 ];
 
 // Derived: values legally allowed in ship.steps[] (and as members of the
@@ -115,6 +169,12 @@ const BUILT_IN_DEFAULTS = {
   reviewThreshold: 'high',
   workspace: 'prompt',
   rebase: true,
+  verifyPipelineTimeout: 1200,
+  verifyPipelineInterval: 60,
+  verifyPipelineMaxIterations: 3,
+  awaitRemoteReviewTimeout: 600,
+  awaitRemoteReviewInterval: 60,
+  awaitRemoteReviewers: ['copilot'],
 };
 
 module.exports = { SHIP_FIELDS, VALID_SKIP, VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS, RESERVED_STEPS };
