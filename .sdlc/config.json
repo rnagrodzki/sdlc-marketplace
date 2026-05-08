@@ -81,7 +81,7 @@
       },
       {
         "id": "flag-coherence-cross-skill",
-        "description": "When skill A dispatches skill B (e.g., ship-sdlc → version-sdlc) and B's prepare script resolves a flag from CLI + config inputs, every SKILL.md decision site in B that gates on that flag must cite the resolved field from prepare output (e.g., flags.X === true). Sites that inspect raw $ARGUMENTS, the original CLI string, or config.X directly after Step 1 (CONSUME) fail this guardrail. The only exception is sites that genuinely concern persistent project state (e.g., CI scaffolding) — these must cite config.X AND include an inline rationale comment explaining the divergence.",
+        "description": "When skill A dispatches skill B, B's prepare script resolves flags from CLI + config inputs; every SKILL.md decision site gating on that flag must cite the resolved field from prepare output (e.g., flags.X === true). Sites inspecting raw $ARGUMENTS, the original CLI string, or config.X directly after Step 1 (CONSUME) fail this guardrail. Exception: persistent project-state sites (e.g., CI scaffolding) must cite config.X AND include an inline rationale comment.",
         "severity": "error"
       },
       {
@@ -117,6 +117,11 @@
       {
         "id": "ambiguity-stops-and-asks",
         "description": "When two or more codebase patterns are viable for the same requirement with materially different downstream implications, the plan must EITHER record the choice in Key Decisions with rationale, OR the skill must AskUserQuestion before committing. Silent selection between viable patterns is a critique failure.",
+        "severity": "error"
+      },
+      {
+        "id": "state-machine-idempotency",
+        "description": "Tasks that modify migration, initialization, or preflight-check logic must include test cases verifying that the same check does not re-trigger after state has been successfully transitioned. Idempotency must be explicitly tested: run once, verify state change; run again, verify no re-triggering or state corruption.",
         "severity": "error"
       }
     ]

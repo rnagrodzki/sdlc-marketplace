@@ -31,6 +31,7 @@ Review Node.js scripts for clarity, correctness, and maintainability. This proje
 - [ ] Consistent patterns across lib modules (e.g., similar error handling, similar function signatures)
 - [ ] YAML/JSON parsing has proper error handling for malformed input
 - [ ] No unnecessary complexity — prefer simple, direct code over abstractions
+- [ ] Migration, initialization, and preflight-check logic is idempotent — the same check must not re-trigger after state has been successfully transitioned; guard conditions prevent re-execution on already-migrated state
 
 ## Severity Guide
 
@@ -44,3 +45,5 @@ Review Node.js scripts for clarity, correctness, and maintainability. This proje
 | Dead code | low |
 | Magic number without explanation | low |
 | Commented-out code blocks | info |
+| Migration/preflight check re-triggers on already-migrated state | high |
+| Missing guard condition preventing double-execution of state transition | medium |

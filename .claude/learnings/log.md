@@ -250,3 +250,7 @@ Multi-file additive changes across a TypeScript Astro site. Wave structure was f
 - Original ship.js `detectResumeState` resolved state dir from `process.cwd()` (worktree-local); canonical `lib/state.js::resolveStateDir` resolves from main worktree. This is the documented correct path; any worktree-local-only consumer would have been a bug.
 
 **Stash hazard:** A `git checkout HEAD -- file` was needed when a stash pop conflicted on an unrelated file (`.sdlc/config.json` modified at session start). Lesson: avoid stashing during long execution; modify only files within the task surface.
+
+## 2026-05-08 — harden-sdlc: user-code for setup-sdlc at Step 0 Pre-flight
+Applied: 2 proposal(s) across plan-guardrails, review-dimensions | Skipped: 0 | Routed: no
+Trigger: preflight check is wrong: localIsV1: true was already migrated several times; schemaVersion also keeps showing as mis
