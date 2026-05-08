@@ -36,7 +36,7 @@ Read the manifest JSON from `MANIFEST_FILE`. The manifest contains:
 | `surfaces.errorReportSkillPath` | Resolved REFERENCE.md path for `error-report-sdlc` |
 | `pipeline.shipState` / `pipeline.executeState` | Optional paused-pipeline state, or `null` |
 | `repository.root` / `repository.branch` / `repository.recentDiffSummary` | Repo metadata |
-| `pluginRepoUrl` | Constant URL of the plugin's GitHub repository (issue #288) — surfaced verbatim to the user prompt and forwarded as context to error-report-sdlc |
+| `pluginRepoUrl` | Constant URL of the plugin's GitHub repository (issue #288) — read directly from `MANIFEST_FILE` by SKILL.md (Steps 5c and 6) to construct the user-facing prompt; NOT included in orchestrator output JSON |
 
 If you need the full body of a specific dimension or copilot instruction file to
 draft a proposal, you MAY Read the file via the `path` field in the manifest. Do

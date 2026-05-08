@@ -219,10 +219,11 @@ When `RESULT.classification === "ambiguous"` AND
 `RESULT.errorReportPayload != null`, the orchestrator concluded the failure
 *may* be a plugin defect even though the evidence was not strong enough to
 classify it as one. After the per-proposal apply/skip flow above completes,
-present an opt-in upstream-report offer:
+read `pluginRepoUrl` from `MANIFEST_FILE` (the field is at the top level of
+the manifest JSON), then present an opt-in upstream-report offer:
 
 > This failure may also be a plugin defect. File a GitHub issue at
-> `<MANIFEST.pluginRepoUrl>`?
+> `<pluginRepoUrl>`?
 
 Use AskUserQuestion with options: **dispatch error-report-sdlc** | **skip**.
 
@@ -243,9 +244,10 @@ on `ambiguous` (pure user-code ambiguity), this sub-step is suppressed entirely
 
 When `RESULT.classification == "plugin-defect"`:
 
-1. Display `RESULT.errorReportPayload` to the user as the proposed
+1. Read `pluginRepoUrl` from `MANIFEST_FILE` (top-level field). Display
+   `RESULT.errorReportPayload` to the user as the proposed
    `error-report-sdlc` dispatch payload, naming the target repository as
-   `<MANIFEST.pluginRepoUrl>` (sourced from the prepare-script manifest, not
+   `<pluginRepoUrl>` (sourced from the prepare-script manifest, not
    hardcoded in this SKILL).
 2. Use AskUserQuestion: **dispatch error-report-sdlc** | **cancel**.
 3. On `dispatch error-report-sdlc`: Glob `**/error-report-sdlc/REFERENCE.md`,
