@@ -1,0 +1,16 @@
+[
+  {
+    "number": 501,
+    "title": "PR #42 opened for feat/add-auth merged successfully",
+    "body": "An open issue whose title fuzzy-matches the pr-sdlc operational note.",
+    "state": "OPEN",
+    "closedAt": null
+  },
+  {
+    "number": 502,
+    "title": "v0.19.0 released changelog generated ship pipeline",
+    "body": "An open issue whose title fuzzy-matches the version-sdlc operational note.",
+    "state": "OPEN",
+    "closedAt": null
+  }
+]

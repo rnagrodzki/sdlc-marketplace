@@ -48,6 +48,12 @@ PR #328 used custom template from `.sdlc/pr-template.md`. Title pattern `^(feat|
 
 
 
+## 2026-05-09 — execute-plan-sdlc: fixture SHA must be exactly 40 hex chars for parseFixReferences regex
+The `\b([0-9a-f]{40})\b` regex requires exactly 40 hex chars. Fixture SHA `abc1234567890123456789012345678901234567890` was 43 chars; `abc1234567890abcdef1234567890abcdef123456` was 41; only `abc1234567890abcdef1234567890abcdef12345` (40 chars) matched. Always count fixture SHA length before asserting AC-CL3 or similar.
+
+## 2026-05-09 — execute-plan-sdlc: promptfoo broken on Node v26 (NODE_MODULE_VERSION 147 vs 141)
+Running `promptfoo eval` on Node 26 fails with `ERR_DLOPEN_FAILED` for `better-sqlite3`. Workaround: verify deterministic helper logic directly via `node <helper> --output-file` with fixture cwd + fake env vars. Behavioral tests (LLM provider tests) still require promptfoo.
+
 ## Tracked in GH Issues
 - version-sdlc auto-set-upstream → #183
 - pr-sdlc post-failure gh-switch → #184

@@ -33,7 +33,7 @@ module.exports = (output) => {
   }
 
   const approvedFile = path.join(tmp, 'approved.json');
-  fs.writeFileSync(approvedFile, JSON.stringify({ approvedClusterIds: [target.id] }));
+  fs.writeFileSync(approvedFile, JSON.stringify({ processedClusterIds: [target.id] }));
   execFileSync('node', [helper, '--commit', approvedFile], { cwd: tmp, env, encoding: 'utf8' });
 
   const afterRaw = fs.readFileSync(dstLog, 'utf8');
