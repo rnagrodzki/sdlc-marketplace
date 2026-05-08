@@ -106,7 +106,7 @@
 - description: "ship-prepare: --bump with version excluded from --steps produces error"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --bump minor --steps execute,commit,review,pr,archive-openspec"
+    script_args: "--has-plan --bump minor --steps execute,commit,review,archive-openspec,pr"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
@@ -185,7 +185,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const expected = ['execute','commit','review','pr','archive-openspec','learnings-commit'];
+        const expected = ['execute','commit','review','archive-openspec','pr','learnings-commit'];
         return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
     - type: icontains
       value: '"bump": "patch"'
@@ -232,7 +232,7 @@
 
 # archive-openspec step tests (issue #162)
 
-- description: "ship-prepare: archive-openspec step appears between commit-fixes and version"
+- description: "ship-prepare: archive-openspec step appears between version and pr"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan"
@@ -242,10 +242,10 @@
     - type: javascript
       value: |
         const steps = JSON.parse(output).steps.map(s => s.name);
-        const cfIdx = steps.indexOf('commit-fixes');
-        const aoIdx = steps.indexOf('archive-openspec');
         const vIdx = steps.indexOf('version');
-        return cfIdx < aoIdx && aoIdx < vIdx
+        const aoIdx = steps.indexOf('archive-openspec');
+        const prIdx = steps.indexOf('pr');
+        return vIdx < aoIdx && aoIdx < prIdx
 
 - description: "ship-prepare: --openspec-change triggers conditional archive-openspec step"
   vars:
@@ -312,7 +312,7 @@
       value: |
         const o = JSON.parse(output);
         const steps = o.flags.steps;
-        const expected = ['execute','commit','review','pr','archive-openspec','learnings-commit'];
+        const expected = ['execute','commit','review','archive-openspec','pr','learnings-commit'];
         return JSON.stringify(steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: legacy preset:minimal + skip:[pr] migrates to [execute, commit]"
@@ -337,7 +337,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const expected = ['execute','commit','review','version','pr','archive-openspec','learnings-commit'];
+        const expected = ['execute','commit','review','version','archive-openspec','pr','learnings-commit'];
         return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: legacy A/B/C preset codes resolve to canonical equivalents (B → balanced)"
@@ -350,7 +350,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const expected = ['execute','commit','review','pr','archive-openspec','learnings-commit'];
+        const expected = ['execute','commit','review','archive-openspec','pr','learnings-commit'];
         return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: already-migrated v2 config passes through unchanged"
@@ -363,7 +363,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const expected = ['execute','commit','review','pr','archive-openspec'];
+        const expected = ['execute','commit','review','archive-openspec','pr'];
         return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: CLI --steps fully overrides config (#190)"
@@ -394,7 +394,7 @@
       value: |
         const o = JSON.parse(output);
         const versionStep = o.steps.find(s => s.name === 'version');
-        const expected = ['execute','commit','review','pr','archive-openspec'];
+        const expected = ['execute','commit','review','archive-openspec','pr'];
         return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
           && versionStep.status === 'skipped'
           && versionStep.skipSource === 'config'

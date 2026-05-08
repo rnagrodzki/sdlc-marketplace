@@ -100,6 +100,58 @@
         payload (skill, step, operation, errorText, errorType=script crash). It
         gates the dispatch behind user approval — does not auto-file the issue.
 
+- description: "harden-sdlc: ambiguous + plugin evidence → Step 5c offers error-report-sdlc dispatch (issue #288)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-ambiguous-plugin-evidence-context.md"
+    user_request: >
+      The user invoked /harden-sdlc after execute-plan-sdlc Wave 2 failed. The
+      orchestrator returned classification="ambiguous" with a non-null
+      errorReportPayload because the rationale cites both plugin evidence
+      (harden-orchestrator.md emitting malformed JSON) and user content (vague
+      plan task). The manifest's pluginRepoUrl is
+      https://github.com/rnagrodzki/sdlc-marketplace. Describe what Step 5c
+      surfaces to the user.
+  assert:
+    - type: regex
+      value: "(5c|ambiguous.*upstream|upstream.*report|plugin defect|file.*GitHub issue)"
+    - type: regex
+      value: "(rnagrodzki/sdlc-marketplace|pluginRepoUrl|github\\.com/rnagrodzki)"
+    - type: regex
+      value: "(dispatch error-report-sdlc|error-report-sdlc.*dispatch)"
+    - type: regex
+      value: "(skip|opt.in|opt-in|AskUserQuestion)"
+    - type: llm-rubric
+      value: >
+        After the per-proposal apply/skip flow completes, the response describes
+        Step 5c as an opt-in upstream-report offer surfaced via AskUserQuestion
+        with options "dispatch error-report-sdlc" and "skip". The prompt text
+        sources the plugin repo URL from the manifest's pluginRepoUrl field
+        (not hardcoded). On dispatch, the response describes following the same
+        Glob-then-follow pattern as Step 6 to invoke error-report-sdlc with
+        the orchestrator-supplied errorReportPayload. The strengthen-only
+        invariant is preserved — no surface is auto-edited; the user must
+        explicitly approve.
+
+- description: "harden-sdlc: ambiguous WITHOUT plugin evidence → Step 5c suppressed (errorReportPayload=null)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-ambiguous-no-plugin-evidence-context.md"
+    user_request: >
+      The user invoked /harden-sdlc after plan-sdlc emitted ambiguous evidence
+      with no plugin signal in the rationale. The orchestrator returned
+      classification="ambiguous" with errorReportPayload=null. Describe what
+      should happen after the per-proposal apply/skip flow completes.
+  assert:
+    - type: not-regex
+      value: "(dispatch error-report-sdlc|file.*GitHub issue|upstream.report.offer|plugin defect)"
+    - type: llm-rubric
+      value: >
+        Step 5c is suppressed — no upstream-report offer is surfaced because
+        errorReportPayload is null (pure user-code ambiguity). The response
+        proceeds with only the user-side proposals from the apply/skip flow
+        and does not mention dispatching error-report-sdlc.
+
 - description: "harden-sdlc: missing --failure-text → exits with error, no execution"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"

@@ -42,7 +42,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["execute", "commit", "review", "version", "pr", "verify-pipeline", "await-remote-review", "archive-openspec", "learnings-commit"]
+            "enum": ["execute", "commit", "review", "version", "archive-openspec", "pr", "verify-pipeline", "await-remote-review", "learnings-commit"]
           },
           "uniqueItems": true,
           "description": "Pipeline steps to run. Replaces legacy preset/skip fields."

@@ -20,6 +20,12 @@ const surfaces = require(path.join(LIB, 'harden-surfaces'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { detectResumeState } = require(path.join(LIB, 'state'));
 
+// Plugin repo URL (issue #288). Hardcoded inline by design — do NOT extract to
+// lib/harden-surfaces.js, do NOT share with error-report-prepare.js::TARGET_REPO.
+// The two constants live independently in their own scripts so each script has
+// a single, locally-visible source of truth.
+const PLUGIN_REPO_URL = 'https://github.com/rnagrodzki/sdlc-marketplace';
+
 // ---------------------------------------------------------------------------
 // CLI parsing — mirror error-report-prepare.js posture
 // ---------------------------------------------------------------------------
@@ -195,6 +201,7 @@ function main() {
       branch: safeExec('git rev-parse --abbrev-ref HEAD'),
       recentDiffSummary: safeExec('git diff --shortstat HEAD~1..HEAD 2>/dev/null'),
     },
+    pluginRepoUrl: PLUGIN_REPO_URL,
     timestamp: new Date().toISOString(),
     errors: surfaceLoadErrors,
   };

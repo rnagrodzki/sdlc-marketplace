@@ -39,7 +39,7 @@ This skill is for **expert users working on projects with established quality gu
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
-| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `pr`, `verify-pipeline` (opt-in), `await-remote-review` (opt-in), `archive-openspec`, `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
+| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `verify-pipeline` (opt-in), `await-remote-review` (opt-in), `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
 | `--quality <full\|balanced\|minimal>` | Forwarded to execute-plan-sdlc as `--quality` (model tier). Only forwarded when the user explicitly passes `--quality` to ship; otherwise execute-plan-sdlc applies its own selection. (Renamed from `--preset` in #190 to disambiguate from `--steps`.) | Not forwarded |
 | `--bump patch\|minor\|major\|<label>` | Version bump type forwarded to version-sdlc. The `<label>` form (e.g. `--bump rc`, `--bump beta`) is forwarded verbatim and interpreted by version-sdlc as `--bump patch --pre <label>`. Labels must match `^[a-z][a-z0-9]*$` (lowercase, start with a letter, alphanumeric). Example: `ship-sdlc --bump rc` produces a `1.2.4-rc.1` style release. | `patch` |
 | `--draft` | Create the PR as a draft. | Off |
@@ -189,12 +189,12 @@ The pipeline prints every decision and state change. Here is a realistic full ou
 I'm using the ship-sdlc skill.
 
 Ship config loaded from .sdlc/local.json (schema v2)
-  steps: [execute, commit, review, pr, archive-openspec], draft: false, bump: patch
+  steps: [execute, commit, review, archive-openspec, pr], draft: false, bump: patch
   reviewThreshold: high
 
 Flag resolution (CLI overrides config):
   auto:    true  (from CLI --auto)
-  steps:   [execute, commit, review, pr, archive-openspec]  (from config)
+  steps:   [execute, commit, review, archive-openspec, pr]  (from config)
   preset:  balanced  (CLI legacy sugar; expanded to steps before resolution)
   bump:    patch (from config default)
   draft:   false (from built-in default)
@@ -307,7 +307,7 @@ Step  Skill                 Result
 ================================================================
 
 Decisions log:
-  - Steps resolved: [execute, commit, review, pr, archive-openspec] (from config; --quality balanced forwarded to execute-plan-sdlc because user passed --quality)
+  - Steps resolved: [execute, commit, review, archive-openspec, pr] (from config; --quality balanced forwarded to execute-plan-sdlc because user passed --quality)
   - Version step skipped (from config default, bump type: patch)
   - Review found 2 medium, 1 low issues — below threshold, deferred
   - PR created (from --auto flag)
@@ -344,7 +344,7 @@ Runs the quality preset with no confirmation prompts except at received-review-s
 ### Dry run to preview the pipeline
 
 ```text
-/ship-sdlc --dry-run --steps execute,commit,review,pr,archive-openspec
+/ship-sdlc --dry-run --steps execute,commit,review,archive-openspec,pr
 ```
 
 Displays the full pipeline table showing which steps will run, which are skipped, and which flags are forwarded. No steps are executed.
@@ -352,7 +352,7 @@ Displays the full pipeline table showing which steps will run, which are skipped
 ### Skip execute and version
 
 ```text
-/ship-sdlc --steps commit,review,pr,archive-openspec
+/ship-sdlc --steps commit,review,archive-openspec,pr
 ```
 
 Useful when you've already implemented the changes manually and want to commit, review, and open a PR.
@@ -376,7 +376,7 @@ Finds the most recent state file for the current branch, skips completed steps, 
 ### Post-PR CI verification + Copilot review (interactive)
 
 ```text
-/ship-sdlc --steps execute,commit,review,pr,verify-pipeline,await-remote-review,archive-openspec,learnings-commit
+/ship-sdlc --steps execute,commit,review,archive-openspec,pr,verify-pipeline,await-remote-review,learnings-commit
 ```
 
 After the PR is opened, ship-sdlc polls `gh pr checks` until CI converges. On failure, it prompts via `AskUserQuestion` (analyze | skip | abort). Once CI is green (or skipped), it polls for a Copilot review and dispatches `received-review-sdlc` on actionable verdicts. The two opt-in steps can also be set persistently in `ship.steps[]` in `.sdlc/local.json`. (R41–R56)
@@ -384,7 +384,7 @@ After the PR is opened, ship-sdlc polls `gh pr checks` until CI converges. On fa
 ### Post-PR full automation
 
 ```text
-/ship-sdlc --auto --steps execute,commit,review,pr,verify-pipeline,await-remote-review,archive-openspec,learnings-commit
+/ship-sdlc --auto --steps execute,commit,review,archive-openspec,pr,verify-pipeline,await-remote-review,learnings-commit
 ```
 
 Same flow as above, but on CI failure ship-sdlc dispatches `verify-pipeline-sdlc` (subagent) directly with the failed-check log excerpts; on `fix-applied` verdict, ship-sdlc commits and pushes the fix and re-polls (capped at `verifyPipelineMaxIterations`, default 3). On a Copilot review, ship-sdlc dispatches `received-review-sdlc --auto`. (R46, R47, R52)
@@ -444,7 +444,7 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `schemaVersion` (top-level) | `4` | `4` | Schema version literal. New configs MUST include `schemaVersion: 4`. Legacy configs are auto-migrated on read. |
-| `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`, `learnings-commit`. Replaces legacy `preset` / `skip`. |
+| `steps` | `string[]` | `["execute","commit","review","version","archive-openspec","pr","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `learnings-commit`. Replaces legacy `preset` / `skip`. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type. |
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |
 | `auto` | `boolean` | `false` | Run in non-interactive mode by default. |
@@ -462,8 +462,8 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 
 If your `.sdlc/local.json` was created before the current schema (used `preset:` and `skip:`), the loader will auto-migrate on the next ship run and emit a one-line deprecation notice. The mapping is:
 
-- `full` (or legacy `A`) → `[execute, commit, review, version, pr, archive-openspec]`
-- `balanced` (or legacy `B`) → `[execute, commit, review, pr, archive-openspec]` (omits `version`)
+- `full` (or legacy `A`) → `[execute, commit, review, version, archive-openspec, pr]`
+- `balanced` (or legacy `B`) → `[execute, commit, review, archive-openspec, pr]` (omits `version`)
 - `minimal` (or legacy `C`) → `[execute, commit, pr]`
 
 Any legacy `skip[]` entries are subtracted from the expanded set. To trigger the migration explicitly, run `/setup-sdlc --migrate`.
@@ -487,7 +487,7 @@ Skip version management, auto-commit, only pause on critical findings.
   "$schema": "sdlc-local.schema.json",
   "schemaVersion": 4,
   "ship": {
-    "steps": ["execute", "commit", "review", "pr", "archive-openspec"],
+    "steps": ["execute", "commit", "review", "archive-openspec", "pr"],
     "auto": true,
     "bump": "patch",
     "draft": false,
@@ -505,7 +505,7 @@ Full pipeline with high-severity review threshold. PRs open as drafts for team r
   "$schema": "sdlc-local.schema.json",
   "schemaVersion": 4,
   "ship": {
-    "steps": ["execute", "commit", "review", "version", "pr", "archive-openspec"],
+    "steps": ["execute", "commit", "review", "version", "archive-openspec", "pr"],
     "auto": false,
     "bump": "minor",
     "draft": true,

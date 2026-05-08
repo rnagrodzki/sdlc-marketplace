@@ -40,6 +40,10 @@
 - R13: Prepare script output is the single authoritative source for all contracted fields (P-fields) — script-provided values take unconditional precedence over skill-generated content, and all factual context (config, surface contents, sibling-skill paths, repo state) must originate from script output to ensure deterministic behavior.
 - R-config-version (issue #232): The prepare script `skill/harden-prepare.js` MUST call `verifyAndMigrate(projectRoot, 'project')` at start. The call is short-circuited when CLI `--skip-config-check` OR env `SDLC_SKIP_CONFIG_CHECK=1` is present; both gates resolve into a single `flags.skipConfigCheck` boolean in the prepare output (CLI > env > default false). On migration failure the prepare emits non-zero exit and an `errors[]` entry naming the failing step; SKILL.md halts with that text verbatim.
   - Acceptance: prepare output includes `flags.skipConfigCheck` and a `migration` block (or null when skipped); SKILL.md gates further work on `errors.length === 0`.
+- R-ambig-offer (issue #288): When orchestrator returns `classification="ambiguous"` AND `errorReportPayload` is non-null (plugin evidence cited in rationale), SKILL.md MUST present an opt-in AskUserQuestion offering `error-report-sdlc` dispatch alongside the per-proposal apply/skip flow. Strengthen-only invariant preserved — no surface is auto-edited; the user explicitly approves the dispatch.
+  - Acceptance: SKILL.md Step 5 contains a `5c` sub-step gated on `RESULT.classification === 'ambiguous' && RESULT.errorReportPayload != null` that surfaces an `AskUserQuestion` with options `dispatch error-report-sdlc | skip`; on dispatch, the canonical Glob-then-follow path from Step 6 is reused.
+- R-orchestrator-ambig (issue #288): `harden-orchestrator` MUST populate `errorReportPayload` on `ambiguous` classification only when the rationale cites plugin evidence (script crash inside `plugins/sdlc-utilities/`, agent malformed JSON, prepare-script exit 2). Pure user-code ambiguity emits `errorReportPayload: null`.
+  - Acceptance: orchestrator response-shape rules in `agents/harden-orchestrator.md` document that `ambiguous + errorReportPayload != null` is a valid combination and provide a JSON example; `ambiguous + errorReportPayload == null` remains valid for user-code ambiguity.
 
 ## Workflow Phases
 
@@ -58,7 +62,7 @@
 
 - G1: Proposal coherence — every emitted proposal MUST cite a specific failure-signal element (a guardrail id, a dimension name, a copilot pattern, or a verbatim phrase from `failure.text`) in its `rationale`
 - G2: Surface coverage — when failure signal is non-empty, the orchestrator MUST evaluate every loaded surface (skip is acceptable but must be intentional, not omission)
-- G3: Classification accuracy — `classification` MUST match observable evidence; `plugin-defect` requires the failure to point at plugin code (script crash inside `plugins/sdlc-utilities/`, agent malformed JSON, prepare-script exit 2), not user-code or config
+- G3: Classification accuracy — `classification` MUST match observable evidence; `plugin-defect` requires the failure to point at plugin code (script crash inside `plugins/sdlc-utilities/`, agent malformed JSON, prepare-script exit 2), not user-code or config. An `ambiguous` classification MAY carry a non-null `errorReportPayload` when the rationale cites plugin evidence (R-orchestrator-ambig); pure user-code ambiguity emits `errorReportPayload: null`.
 - G4: No-silent-write invariant — across all paths (success, cancel, agent crash, validation fail) the count of files written without an `apply` AskUserQuestion answer MUST be zero
 
 ## Prepare Script Contract
@@ -74,6 +78,7 @@
 - P9: `surfaces.errorReportSkillPath` (string) — absolute path to resolved `error-report-sdlc/REFERENCE.md`
 - P10: `pipeline.shipState` / `pipeline.executeState` — optional summaries of paused pipeline state (or `null`)
 - P11: `repository.root` / `repository.branch` / `repository.recentDiffSummary` — git short-stat only, no full body
+- P12: `pluginRepoUrl` (string) — constant URL of the plugin's GitHub repository, surfaced verbatim to the user prompt and forwarded as context to error-report-sdlc.
 
 ## Error Handling
 

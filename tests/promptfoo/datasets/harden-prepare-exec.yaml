@@ -1,0 +1,24 @@
+# Script execution tests for harden-prepare.js.
+# These tests run harden-prepare.js directly against fixture directories (no LLM).
+
+- description: "harden-prepare: emits pluginRepoUrl constant in manifest (issue #288)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/harden-prepare.js"
+    script_args: '--failure-text "test failure" --skill plan-sdlc'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: '"pluginRepoUrl": "https://github.com/rnagrodzki/sdlc-marketplace"'
+
+- description: "harden-prepare: pluginRepoUrl is the constant string regardless of CLI flags"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/harden-prepare.js"
+    script_args: '--failure-text "another failure" --skill execute-plan-sdlc --step "Step 5" --operation "wave-dispatch"'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: javascript
+      value: |
+        const m = JSON.parse(output);
+        return m.pluginRepoUrl === 'https://github.com/rnagrodzki/sdlc-marketplace'

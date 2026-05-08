@@ -36,7 +36,7 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "schemaVersion": 4,
   "ship": {
-    "steps": ["execute", "commit", "review", "pr", "verify-pipeline", "await-remote-review", "archive-openspec", "learnings-commit"],
+    "steps": ["execute", "commit", "review", "version", "archive-openspec", "pr", "verify-pipeline", "await-remote-review", "learnings-commit"],
     "bump": "patch",
     "draft": false,
     "auto": false,
@@ -62,7 +62,7 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `schemaVersion` (top-level) | `4` | `4` | Schema version literal. Required for new configs; legacy files are auto-migrated. |
-| `steps` | `string[]` | `["execute","commit","review","version","pr","archive-openspec","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `pr`, `verify-pipeline` (opt-in, R41), `await-remote-review` (opt-in, R50), `archive-openspec`, `learnings-commit`. Replaces the legacy `preset` and `skip` fields. |
+| `steps` | `string[]` | `["execute","commit","review","version","archive-openspec","pr","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `verify-pipeline` (opt-in, R41), `await-remote-review` (opt-in, R50), `learnings-commit`. Replaces the legacy `preset` and `skip` fields. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type applied when the `version` step runs. Overridden by `--bump` on the CLI. |
 | `draft` | `boolean` | `false` | When `true`, PRs are created as drafts. Equivalent to `--draft`. |
 | `auto` | `boolean` | `false` | When `true`, run in non-interactive auto mode (no confirmation prompts). Equivalent to `--auto`. |
@@ -111,7 +111,7 @@ A flag passed directly on the command line always wins. If no flag is given, the
 
 Running `ship-sdlc --init-config` launches an interactive sequence that writes the `ship` section to `.sdlc/local.json`. The steps are:
 
-1. **Steps to run** — Select the pipeline steps to run by default (multi-select). Choices: `execute`, `commit`, `review`, `version`, `pr`, `archive-openspec`. Default: all six.
+1. **Steps to run** — Select the pipeline steps to run by default (multi-select). Choices: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`. Default: all six.
 
 2. **Default bump type** — Choose the default version increment: `patch`, `minor`, or `major`.
 
@@ -149,7 +149,7 @@ Skips the version step (manual version bump) and runs auto.
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "schemaVersion": 4,
   "ship": {
-    "steps": ["execute", "commit", "review", "pr", "archive-openspec"],
+    "steps": ["execute", "commit", "review", "archive-openspec", "pr"],
     "bump": "patch",
     "draft": false,
     "auto": true,
@@ -168,7 +168,7 @@ All canonical steps run; review threshold catches high-severity findings; PRs de
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "schemaVersion": 4,
   "ship": {
-    "steps": ["execute", "commit", "review", "version", "pr", "archive-openspec"],
+    "steps": ["execute", "commit", "review", "version", "archive-openspec", "pr"],
     "bump": "minor",
     "draft": true,
     "auto": false,

@@ -118,15 +118,15 @@ const PROJECT_MIGRATIONS = [
 // PRESET_TO_STEPS map duplicated locally to avoid pulling in lib/config.js
 // (circular dependency hazard during T6). Keep in sync with lib/config.js.
 const PRESET_TO_STEPS = {
-  full:     ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec', 'learnings-commit'],
-  balanced: ['execute', 'commit', 'review',            'pr', 'archive-openspec', 'learnings-commit'],
-  minimal:  ['execute', 'commit',                      'pr',                     'learnings-commit'],
-  A:        ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec', 'learnings-commit'],
-  B:        ['execute', 'commit', 'review',            'pr', 'archive-openspec', 'learnings-commit'],
-  C:        ['execute', 'commit',                      'pr',                     'learnings-commit'],
+  full:     ['execute', 'commit', 'review', 'version', 'archive-openspec', 'pr', 'learnings-commit'],
+  balanced: ['execute', 'commit', 'review',            'archive-openspec', 'pr', 'learnings-commit'],
+  minimal:  ['execute', 'commit',                                          'pr', 'learnings-commit'],
+  A:        ['execute', 'commit', 'review', 'version', 'archive-openspec', 'pr', 'learnings-commit'],
+  B:        ['execute', 'commit', 'review',            'archive-openspec', 'pr', 'learnings-commit'],
+  C:        ['execute', 'commit',                                          'pr', 'learnings-commit'],
 };
 
-const ALL_STEPS = ['execute', 'commit', 'review', 'version', 'pr', 'archive-openspec', 'learnings-commit'];
+const ALL_STEPS = ['execute', 'commit', 'review', 'version', 'archive-openspec', 'pr', 'learnings-commit'];
 
 /**
  * v1 → v2: ship.preset/skip → ship.steps[].

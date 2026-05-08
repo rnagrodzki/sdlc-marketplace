@@ -10,7 +10,7 @@
  *
  * Options:
  *   --steps <csv>               Comma-separated pipeline steps to run (default: all six canonical steps).
- *                               Valid values: execute, commit, review, version, pr, archive-openspec.
+ *                               Valid values: execute, commit, review, version, archive-openspec, pr.
  *   --bump patch|minor|major    Version bump type (default: patch)
  *   --draft                     Mark PR as draft (default: false)
  *   --auto                      Skip interactive approval prompts (default: false)
