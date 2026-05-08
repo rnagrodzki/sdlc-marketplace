@@ -51,7 +51,7 @@ function detect(projectRoot) {
   if (unifiedExists) {
     try {
       parsedProjectConfig = JSON.parse(fs.readFileSync(unifiedPath, 'utf8'));
-      projectConfigSections = Object.keys(parsedProjectConfig).filter(k => k !== '$schema');
+      projectConfigSections = Object.keys(parsedProjectConfig).filter(k => k !== '$schema' && k !== 'schemaVersion');
     } catch (_) {
       // file exists but is not valid JSON — report it as existing with no sections
     }
@@ -74,7 +74,7 @@ function detect(projectRoot) {
           Object.prototype.hasOwnProperty.call(parsed.ship, 'preset') ||
           Object.prototype.hasOwnProperty.call(parsed.ship, 'skip')
         );
-      const noVersion = parsed.version == null;
+      const noVersion = parsed.schemaVersion == null && parsed.version == null;
       localIsV1 = hasLegacyShipKeys || (noVersion && !!parsed.ship);
     } catch (_) {
       // unreadable JSON — leave localIsV1 false; downstream tooling handles errors
