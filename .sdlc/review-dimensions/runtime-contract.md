@@ -21,6 +21,7 @@ Review the command→script→skill execution pipeline for correctness and resil
 - [ ] Commands that invoke scripts capture output via `--output-file` flag — the script writes JSON to a crypto-random temp file and prints its path to stdout. Never use `mktemp` in the bash block
 - [ ] The temp file variable name is unique per command (e.g., `PR_CONTEXT_FILE`, `MANIFEST_FILE`, `VERSION_CONTEXT_FILE`) and not a generic name like `TMPFILE` that could shadow across steps
 - [ ] Every temp file created by a command has a corresponding `rm -f` cleanup that executes on all exit paths — success, error, and user cancellation (look for cleanup noted in the workflow, not just in the "happy path")
+- [ ] When a task creates state files under multiple prefixes (e.g., `plan-*`, `ship-*`, `execute-*`), the cleanup / GC logic must enumerate and sweep ALL created prefixes — not a subset. Asymmetric cleanup (sweeping `ship-*` and `execute-*` but omitting `plan-*`) leaves permanent orphans. Each new prefix must be added to the GC sweep at the same time it is introduced.
 - [ ] Exit code handling matches script semantics: `0` = success with usable output, `1` = errors captured in JSON `errors` array, `2` = script crash — the command checks both `$?` and the `errors` array in the JSON
 - [ ] `$ARGUMENTS` is passed to `node "$SCRIPT"` so that CLI flags reach the script as individual arguments — not concatenated into a single string
 - [ ] JSON field names that the skill reads from the script output match the fields the script actually produces — no field name mismatches (e.g., skill reads `customTemplate` but script outputs `custom_template`)
@@ -41,6 +42,7 @@ Review the command→script→skill execution pipeline for correctness and resil
 | JSON field name mismatch between script output and skill reader | high |
 | Script writes errors to stdout instead of stderr — corrupts JSON | high |
 | `$ARGUMENTS` not passed to script — flags silently ignored | high |
+| GC sweep omits a prefix class introduced by the same task | high |
 | Version skew workaround missing null-vs-absent check | medium |
 | Temp variable name shadows another variable in the same flow | medium |
 | `--project-root` default assumption wrong for the usage context | medium |
