@@ -99,3 +99,289 @@
   assert:
     - type: javascript
       value: file://assertions/harvest-learnings-commit.js
+
+# ── Classifier cases (Task 1) ────────────────────────────────────────────────
+
+# AC-CL1 — Operational-note: pr-sdlc, version-sdlc, ship-sdlc all classify as operational-note.
+- description: "harvest-learnings: pr-sdlc/version-sdlc/ship-sdlc clusters classify as operational-note"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST": "/dev/null",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        const opNotes = j.clusters.filter(c => c.status === 'operational-note');
+        const skills = opNotes.map(c => c.skill).sort();
+        return skills.length === 3
+          && skills.includes('pr-sdlc')
+          && skills.includes('version-sdlc')
+          && skills.includes('ship-sdlc')
+          && opNotes.every(c => c.dedupReason === 'skill-prefix');
+
+# AC-CL2 — already-fixed via PR: cluster citing Fixes #100 (MERGED) classifies as already-fixed.
+- description: "harvest-learnings: cluster citing Fixes #100 (MERGED) classifies as already-fixed"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST": "/dev/null",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        const c = j.clusters.find(c => c.skill === 'setup-sdlc' && /SSH alias/.test(c.summary));
+        return c
+          && c.status === 'already-fixed'
+          && c.dedupReason === 'fix-on-main'
+          && c.fixRef
+          && c.fixRef.type === 'pr'
+          && c.fixRef.value === 100;
+
+# AC-CL3 — already-fixed via SHA: cluster citing 40-hex SHA on main classifies as already-fixed.
+- description: "harvest-learnings: cluster citing 40-hex SHA on main classifies as already-fixed"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST": "/dev/null",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        const c = j.clusters.find(c => c.skill === 'setup-sdlc' && /worktree creation race/.test(c.summary));
+        return c
+          && c.status === 'already-fixed'
+          && c.dedupReason === 'fix-on-main'
+          && c.fixRef
+          && c.fixRef.type === 'sha';
+
+# AC-CL4 — NOT already-fixed: cluster citing PR #999 (OPEN) stays draft.
+- description: "harvest-learnings: cluster citing open PR #999 is NOT already-fixed (stays draft)"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST": "/dev/null",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        const c = j.clusters.find(c => c.skill === 'setup-sdlc' && /PR #999/.test(c.summary));
+        return c && c.status === 'draft';
+
+# AC-CL5 — Real bug (no fix reference, non-operational skill) classifies as draft.
+- description: "harvest-learnings: cluster with no fix reference and non-operational skill classifies as draft"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST": "/dev/null",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        const c = j.clusters.find(c => c.skill === 'setup-sdlc' && /real bug/.test(c.summary));
+        return c && c.status === 'draft' && !c.dedupReason;
+
+# AC-CL6 — Operational-note takes precedence over fuzzy-title possibly-tracked.
+- description: "harvest-learnings: operational-note classification takes precedence over fuzzy-title match"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST": "{{project_root}}/harvest-fakes/gh-list-fuzzy.json",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        // All three operational-skill clusters must still be operational-note
+        // even when a fuzzy-matching open issue exists for them.
+        const opNotes = j.clusters.filter(c => c.status === 'operational-note');
+        return opNotes.length === 3
+          && opNotes.every(c => c.dedupReason === 'skill-prefix')
+          && !opNotes.some(c => c.status === 'possibly-tracked');
+
+# ── Close-stale cases (Task 2) ───────────────────────────────────────────────
+
+# AC-CS1 — --close-stale emits tmpfile on stdout, exits 0, JSON shape correct.
+- description: "harvest-learnings: --close-stale emits valid JSON with closures and skipped arrays"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--close-stale"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST_HARVESTED": "{{project_root}}/harvest-fakes/gh-list-harvested.json",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        return Array.isArray(j.closures)
+          && Array.isArray(j.skipped)
+          && typeof j.harvestDate === 'string'
+          && typeof j.dryRun === 'boolean';
+
+# AC-CS2 — Issue citing merged PR → in closures with fixRef.type === 'pr'.
+- description: "harvest-learnings: --close-stale: issue citing merged PR appears in closures"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--close-stale"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST_HARVESTED": "{{project_root}}/harvest-fakes/gh-list-harvested.json",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        const c = j.closures.find(x => x.number === 211);
+        return c && c.fixRef && c.fixRef.type === 'pr';
+
+# AC-CS3 — Issue citing on-main SHA → in closures with fixRef.type === 'sha'.
+- description: "harvest-learnings: --close-stale: issue citing on-main SHA appears in closures"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--close-stale"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST_HARVESTED": "{{project_root}}/harvest-fakes/gh-list-harvested.json",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        const c = j.closures.find(x => x.number === 212);
+        return c && c.fixRef && c.fixRef.type === 'sha';
+
+# AC-CS4 — Issue citing open PR → in skipped, NOT in closures.
+- description: "harvest-learnings: --close-stale: issue citing open PR is skipped, not closed"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--close-stale"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST_HARVESTED": "{{project_root}}/harvest-fakes/gh-list-harvested.json",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        const inClosures = j.closures.some(x => x.number === 213);
+        const inSkipped = j.skipped.some(x => x.number === 213);
+        return !inClosures && inSkipped;
+
+# AC-CS5 — Issue with no fix reference → in skipped, NOT in closures.
+- description: "harvest-learnings: --close-stale: issue with no fix reference is skipped"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--close-stale"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST_HARVESTED": "{{project_root}}/harvest-fakes/gh-list-harvested.json",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        const inClosures = j.closures.some(x => x.number === 214);
+        const inSkipped = j.skipped.some(x => x.number === 214);
+        return !inClosures && inSkipped;
+
+# AC-CS6 — --dry-run flag reflected in output JSON.
+- description: "harvest-learnings: --close-stale --dry-run sets dryRun=true in output"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--close-stale --dry-run"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-classifier-cases"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST_HARVESTED": "{{project_root}}/harvest-fakes/gh-list-harvested.json",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: |
+        const j = JSON.parse(output);
+        return j.dryRun === true;
+
+# ── Commit contract cases (Task 5) ──────────────────────────────────────────
+
+# AC-CM1 — --commit accepts processedClusterIds, removes all cluster types,
+#           preserves trailer, fails loud on old approvedClusterIds key,
+#           no-op for unknown ids.
+- description: "harvest-learnings: --commit with processedClusterIds removes all cluster types, preserves trailer"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-commit-processed"
+    script_env: >-
+      {
+        "GH_HARVEST_FAKE_LIST": "/dev/null",
+        "GIT_HARVEST_FAKE_MERGE_BASE": "{{project_root}}/harvest-fakes/git-merge-base.json",
+        "GH_HARVEST_FAKE_PR": "{{project_root}}/harvest-fakes/gh-pr.json"
+      }
+  assert:
+    - type: javascript
+      value: file://assertions/harvest-learnings-commit-processed.js

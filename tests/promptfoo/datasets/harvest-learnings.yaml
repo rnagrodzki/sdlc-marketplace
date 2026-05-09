@@ -83,8 +83,8 @@
       value: >
         The response makes exactly 2 `gh issue create` invocations (for
         skill-alpha and skill-gamma). The skipped cluster (skill-beta) gets
-        NO `gh issue create` and is NOT included in the approvedClusterIds
-        passed to `--commit`. The `--commit` payload's approvedClusterIds
+        NO `gh issue create` and is NOT included in the processedClusterIds
+        passed to `--commit`. The `--commit` payload's processedClusterIds
         array contains exactly 2 ids (alpha and gamma) — never the skipped
         beta. The skipped entry remains in log.md after the commit step.
 
@@ -120,3 +120,112 @@
         the drafts) and stops. It does NOT call `gh issue create` for any
         draft. It does NOT invoke the helper with `--commit`. log.md is
         unchanged. The dry-run nature of the run is explicit in the output.
+
+# AC7 (Task 3) — New classifiers: operational-note and already-fixed silently skipped;
+# --label harvested on gh issue create; close-stale step invoked and approved closes executed.
+- description: "harvest-learnings: operational-note/already-fixed skipped; --label harvested; close-stale runs"
+  vars:
+    skill_path: ".claude/commands/harvest-learnings.md"
+    project_context: "file://fixtures/harvest-learnings-classifier-cases.md"
+    user_request: >
+      Run /harvest-learnings. The drafts JSON has 5 clusters:
+      - 1 operational-note (pr-sdlc) — id aaa111000001
+      - 1 operational-note (version-sdlc) — id bbb222000002
+      - 1 already-fixed (setup-sdlc, Fixes #100 merged) — id ccc333000003
+      - 2 drafts (setup-sdlc real bug; commit-sdlc truncation bug) — ids ddd444000004 and eee555000005
+
+      Assume the user sees the classification plan in Step 4 and selects
+      "approve all". Then the user approves both drafts in the approval loop.
+      Both gh issue create calls succeed. Then the close-stale step runs;
+      the closures JSON shows issue #211 proposed for closure. The user
+      approves it.
+
+      Show what gh commands the command emits, and what ends up in the
+      processedClusterIds passed to --commit.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must satisfy ALL of the following:
+        (1) The operational-note clusters (pr-sdlc, version-sdlc) are silently
+        skipped — NO `gh issue create` is called for them. They should not
+        appear in any approval loop.
+        (2) The already-fixed cluster (setup-sdlc SSH alias) is silently skipped
+        — NO `gh issue create` is called for it.
+        (3) `gh issue create` is called exactly TWICE — once for the real-bug
+        draft and once for the commit-sdlc truncation draft. Each invocation
+        includes `--label harvested`.
+        (4) Before the first `gh issue create`, the command ensures the
+        `harvested` label exists via `gh label create harvested ... --force`.
+        (5) The --commit payload's `processedClusterIds` includes ALL FIVE
+        cluster ids: the 2 operational-notes, the 1 already-fixed, and the 2
+        approved drafts.
+        (6) The close-stale step runs after the create loop. The command
+        presents issue #211 for approval, the user approves it, and
+        `gh issue close 211` is invoked with a reason comment.
+        (7) The Step 11 summary reports: created 2 issues, skipped 2
+        operational-notes, skipped 1 already-fixed, closed 1 stale
+        (or equivalent language capturing all four categories).
+
+# AC8 (Task 4) — Classification preview gate: table shown before any gh issue create.
+- description: "harvest-learnings: classification table is shown before any gh issue create"
+  vars:
+    skill_path: ".claude/commands/harvest-learnings.md"
+    project_context: "file://fixtures/harvest-learnings-classifier-cases.md"
+    user_request: >
+      Run /harvest-learnings. The drafts JSON has 5 clusters (2 operational-note,
+      1 already-fixed, 2 draft). Show only Step 4 of the workflow — what the
+      command presents to the user before any issue creation begins.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response presents a classification table (Step 4) that includes
+        ALL 5 clusters, one row each. The table shows the status and proposed
+        disposition for each cluster. The response asks the user to select
+        "approve all", "modify", or "abort". NO `gh issue create` is called
+        yet. The table is presented BEFORE any approval loop for individual
+        drafts.
+
+# AC9 (Task 4) — Abort: no gh issue create, no log mutation.
+- description: "harvest-learnings: abort in Step 4 prevents any gh issue create and log mutation"
+  vars:
+    skill_path: ".claude/commands/harvest-learnings.md"
+    project_context: "file://fixtures/harvest-learnings-classifier-cases.md"
+    user_request: >
+      Run /harvest-learnings. The drafts JSON has 5 clusters (2 operational-note,
+      1 already-fixed, 2 draft). The user sees the classification table in Step 4
+      and selects "abort". Show what the command does.
+  assert:
+    - type: llm-rubric
+      value: >
+        After the user selects "abort" in Step 4, the command stops immediately.
+        It does NOT call `gh issue create` for any cluster.
+        It does NOT invoke the helper with `--commit`. log.md is unchanged.
+        No approval loop for individual drafts is shown.
+
+# AC10 (Task 4) — Modify-then-approve: flipping operational-note to draft causes issue creation.
+- description: "harvest-learnings: modify loop lets user flip operational-note to draft, then creates issue"
+  vars:
+    skill_path: ".claude/commands/harvest-learnings.md"
+    project_context: "file://fixtures/harvest-learnings-classifier-cases.md"
+    user_request: >
+      Run /harvest-learnings. The drafts JSON has 5 clusters. After seeing the
+      classification table in Step 4, the user selects "modify". The user picks
+      the pr-sdlc cluster (id aaa111000001, status operational-note) and changes
+      its status to "draft". Then the user selects "approve all". The user then
+      approves the modified pr-sdlc cluster and both existing draft clusters in
+      the approval loop. All three gh issue create calls succeed.
+
+      Show what gh commands are produced and what processedClusterIds contains.
+  assert:
+    - type: llm-rubric
+      value: >
+        After the modify-then-approve flow:
+        (1) `gh issue create` is called EXACTLY 3 times: for the re-promoted
+        pr-sdlc cluster, the setup-sdlc real-bug draft, and the commit-sdlc
+        truncation draft. Each includes `--label harvested`.
+        (2) The version-sdlc operational-note (id bbb222000002) and the
+        already-fixed cluster (id ccc333000003) are still silently skipped
+        (NOT sent to gh issue create).
+        (3) The `processedClusterIds` passed to `--commit` includes ALL 5
+        cluster ids (the 3 approved drafts + version-sdlc op-note +
+        already-fixed).

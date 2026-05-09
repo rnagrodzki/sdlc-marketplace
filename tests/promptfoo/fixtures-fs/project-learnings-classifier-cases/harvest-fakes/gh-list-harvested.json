@@ -1,0 +1,22 @@
+[
+  {
+    "number": 211,
+    "title": "setup-sdlc: SSH alias resolution fails when IdentityFile absent",
+    "body": "Description of the bug.\n\nFixes #100\n\nSource: learnings/log.md (lines 14-18)"
+  },
+  {
+    "number": 212,
+    "title": "setup-sdlc: worktree creation race on concurrent runs",
+    "body": "Description of the race.\n\nFixed in abc1234567890abcdef1234567890abcdef12345\n\nSource: learnings/log.md (lines 19-22)"
+  },
+  {
+    "number": 213,
+    "title": "setup-sdlc: PR #999 open — still investigating",
+    "body": "The fix for this issue is proposed in https://github.com/owner/repo/pull/999 but it is not yet merged.\n\nSource: learnings/log.md (lines 23-25)"
+  },
+  {
+    "number": 214,
+    "title": "setup-sdlc: real bug with no fix reference",
+    "body": "No fix reference in this body. Still open.\n\nSource: learnings/log.md (lines 27-29)"
+  }
+]
