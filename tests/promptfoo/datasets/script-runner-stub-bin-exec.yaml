@@ -1,0 +1,43 @@
+# Script execution tests for the `script_stub_bin` PATH-prepend var added to
+# tests/promptfoo/providers/script-runner.js (resolves issue #290 — Option B).
+# Verifies (a) stub binary on PATH is invoked, (b) bad path returns provider
+# error, (c) without the var, no stub marker appears (negative control).
+#
+# Fixture: tests/promptfoo/fixtures-fs/stub-bin-gh/
+#   bin/gh    — executable shell stub printing "STUB-GH-INVOKED <args>"
+#   runner.js — invokes `gh --version` via execSync (PATH lookup)
+
+# AC1 — Positive: script_stub_bin set → stub `gh` intercepts PATH lookup, marker visible.
+- description: "script_stub_bin: stub gh on PATH is invoked instead of real gh"
+  vars:
+    project_root: "file://fixtures-fs/stub-bin-gh"
+    script_path: "{{project_root}}/runner.js"
+    script_cwd: "{{project_root}}"
+    script_stub_bin: "bin"
+  assert:
+    - type: contains
+      value: "STUB-GH-INVOKED"
+
+# AC2 — Error path: script_stub_bin points to non-existent dir → provider returns error.
+# Uses error-runner.js wrapper to invoke the provider's callApi directly, so the
+# `{error}` response can be asserted via stdout. (Provider's `{error}` return is
+# classified as ERROR by promptfoo, not PASS/FAIL — wrapper bridges that gap.)
+- description: "script_stub_bin: non-existent path returns provider error"
+  vars:
+    project_root: "file://fixtures-fs/stub-bin-gh"
+    script_path: "{{project_root}}/error-runner.js"
+    script_args: "{{repo_root}}/tests/promptfoo/providers/script-runner.js"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: "script_stub_bin path not found or not a directory"
+
+# AC3 — Negative control: no script_stub_bin set → STUB marker is absent (var actually toggles behavior).
+- description: "script_stub_bin: omitted var does not silently apply a stub (no marker in output)"
+  vars:
+    project_root: "file://fixtures-fs/stub-bin-gh"
+    script_path: "{{project_root}}/runner.js"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: not-contains
+      value: "STUB-GH-INVOKED"
