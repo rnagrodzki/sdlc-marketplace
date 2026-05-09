@@ -3,6 +3,9 @@
 Append-only learnings log for the `sdlc-marketplace` repository.
 Entries flow from incidents, debugging sessions, and evolution cycles.
 
+## 2026-05-09 — version-sdlc: patch release for harvest-learnings triage improvements
+Feature branch feat/330-harvest-learnings-triage-improvements had no upstream; --set-upstream auto-heal on push worked correctly. Commit range included a squash-merged commit (39808b93) already captured in v0.19.6 — correctly excluded from CHANGELOG entry for v0.19.7.
+
 ## 2026-05-09 — execute-plan-sdlc: bulk-close 20 stale version-sdlc GH issues
 All 20 open issues with `version-sdlc:` titles were auto-harvested learnings from `log.md` (2026-05-08). None had labels. Both cited bug groups (#211/#212/#213 and #219) were already fixed on main before the harvest ran (d4da030 / 8ea8606). Lesson: learnings-harvest should gate on whether the cited bug is still open on main before creating a GH issue — status notes for successful releases should never become issues.
 
@@ -238,3 +241,9 @@ Plan called for wave-based agent dispatch but the runtime had no `Agent`/`Task` 
 - 15 open issues ≥#295 were auto-harvested operational PR logs; only #311/#313 described a reproducible bug
 - recoverGhAccountForRepo now queries github.com as fallback when remote uses a non-canonical SSH host alias (e.g. github-rn); returns viaFallback:true on match
 - reviewThreshold=low triggers received-review-sdlc on any finding — even 3 low findings caused a received-review cycle; consider raising threshold to high for repos with clean code
+
+## 2026-05-09 — ship-sdlc: harvest-learnings #330 triage pipeline
+- State file created for `main` branch, then migrated to feature branch after execute-plan-sdlc created it via workspace:branch. The migrate step (`skill/ship.js migrate`) resolved cleanly — no manual intervention needed. Pattern confirmed working.
+- `review-orchestrator.md` had an ambient dirty change (opus→sonnet model swap) at session start despite `git status` reporting clean. Commit agent stashed and restored it; stayed out of the feature commits. Watch for ambient dirty changes in future sessions.
+- `promptfoo eval` non-functional on Node 26 due to `better-sqlite3` ABI mismatch. Exec tests verified directly via `node` invocations on fixtures. Pre-existing env issue — not caused by this PR.
+- Review threshold `low` triggered received-review for medium+low+info findings. 2 medium issues fixed (verifyError propagation, temp-file trap). 1 medium disagreed (git rev-parse is correct for repo-local scripts, not plugin scripts).
