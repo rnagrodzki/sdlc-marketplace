@@ -6,6 +6,7 @@
 # Fixtures:
 #   project-compact-recovery-stale          — one .compact-recovery-main.json with mtime 25h ago
 #   project-compact-recovery-current-branch — one .compact-recovery-main.json with fresh savedAt
+#   project-commit-config                   — clean dir (no compact-recovery files); idempotency check
 
 # ---------------------------------------------------------------------------
 # Case 1: stale compact-recovery file (>24h) is swept on session-start

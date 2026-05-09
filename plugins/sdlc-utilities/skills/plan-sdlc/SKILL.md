@@ -141,6 +141,11 @@ Naming convention: `YYYY-MM-DD-<feature-name>.md`. Create the directory if neede
 
 **planFile marker (implements R20, issue #285; consumed by `hooks/stop-plan-integrity.js` per R21):** After path resolution, record the resolved plan path in the plan integrity state. Run in both plan-mode and normal-mode branches. Errors are swallowed — marker writes must not block plan creation.
 
+**State-file lifecycle (R20 Lifecycle, fixes #334):** The plan state file follows three rules that callers do NOT need to implement directly — they are enforced inside `skill/plan.js` and `hooks/stop-plan-integrity.js`:
+- **Prune-on-write** — the `--output-file` prepare branch prunes pre-existing `plan-<branchSlug>-*.json` files for the current branch before writing the new state file, so at most one marker per branch exists between plan-sdlc invocations. The `--mark` branch does NOT prune (it would unlink its own target).
+- **Consume-then-delete** — the Stop hook reads `planIntegrity` markers, evaluates the gates, then unlinks the marker regardless of outcome (single-shot semantics). Subsequent Stop events on the same branch fall through to the transcript-fallback path — this is correct R21 behavior.
+- **GC orphan sweep** — `ship-sdlc --gc` and `execute-plan-sdlc --gc` sweep stale `plan-*` markers (TTL-expired or branch-deleted) alongside `ship-*` and `execute-*` files; the JSON output includes a `plan` bucket alongside `ship` and `execute`.
+
 Each `--mark` block re-resolves `$SCRIPT` independently: SKILL.md bash blocks each run as a separate Bash tool invocation, so shell variables do NOT persist across blocks.
 
 ```bash

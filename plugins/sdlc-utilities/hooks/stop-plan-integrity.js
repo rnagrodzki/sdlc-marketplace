@@ -64,8 +64,8 @@ try {
     // State file exists — check all four markers and the planFilePath stat.
     // Capture the full path before reading so we can delete it after evaluation
     // regardless of integrity outcome (single-shot semantics, issue #334).
-    // found is { file, fullPath } — we need fullPath for fs.unlinkSync.
-    const markerPath = found.fullPath || found;
+    // findStateFile returns { file, fullPath, ... } when found, null otherwise.
+    const markerPath = found.fullPath;
     const stateResult = readState('plan', branchSlug);
     if (!stateResult || !stateResult.data) {
       // Unreadable state file — consume and exit silently (can't verify accurately)
