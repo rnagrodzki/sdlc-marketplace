@@ -40,7 +40,7 @@ const MARKER_DESCRIPTIONS = {
 };
 
 try {
-  const { findStateFile, readState, slugifyBranch } = require('../scripts/lib/state');
+  const { findStateFile, readState, deleteState, slugifyBranch } = require('../scripts/lib/state');
   const { exec } = require('../scripts/lib/git');
 
   // -------------------------------------------------------------------------
@@ -62,9 +62,14 @@ try {
 
   if (found) {
     // State file exists — check all four markers and the planFilePath stat.
+    // Capture the full path before reading so we can delete it after evaluation
+    // regardless of integrity outcome (single-shot semantics, issue #334).
+    // found is { file, fullPath } — we need fullPath for fs.unlinkSync.
+    const markerPath = found.fullPath || found;
     const stateResult = readState('plan', branchSlug);
     if (!stateResult || !stateResult.data) {
-      // Unreadable state file — treat as silent (can't verify, can't warn accurately)
+      // Unreadable state file — consume and exit silently (can't verify accurately)
+      try { deleteState(markerPath); } catch (_) { /* best-effort */ }
       process.exit(0);
     }
 
@@ -97,6 +102,11 @@ try {
         if (!missing.includes('planFile')) missing.push('planFile');
       }
     }
+
+    // Consume-then-delete: remove marker regardless of integrity outcome.
+    // Wrapped in try/catch so a failed unlink cannot break the advisory-only
+    // exit-0 contract. deleteState is silent on errors but we wrap anyway.
+    try { deleteState(markerPath); } catch (_) { /* best-effort */ }
 
     if (missing.length === 0) {
       // All checks passed — silent exit

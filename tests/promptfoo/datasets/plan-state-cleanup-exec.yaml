@@ -1,0 +1,82 @@
+# Script execution tests for plan-state lifecycle: prune-at-init and consume-then-delete (issue #334).
+#
+# Surfaces under test:
+#   - scripts/skill/plan.js: pruneStateFiles before initState (prune-at-init)
+#   - hooks/stop-plan-integrity.js: deleteState after evaluation (consume-then-delete)
+#
+# Fixtures:
+#   project-plan-state-stale     — two same-branch plan-*.json files + one other-branch file
+#   plan-integrity-complete      — single complete plan marker (all four checkpoints present)
+
+# ---------------------------------------------------------------------------
+# Case 1: prune-at-init removes prior same-branch plan markers
+# ---------------------------------------------------------------------------
+
+- description: "plan-prepare: prune-at-init removes prior same-branch plan-*.json files, leaves other-branch file (issue #334)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-plan-state.js"
+    script_args: "--project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-state-stale"
+  assert:
+    # After run: exactly one plan file for current-branch exists
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return data.planFileCount === 1;
+    # Other-branch file must survive prune
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return data.otherBranchFilesPresent === true;
+    # Script itself exits 0 (non-fatal marker write)
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return data.exitCode === 0;
+
+# ---------------------------------------------------------------------------
+# Case 2: idempotency — second run leaves exactly one plan file
+# ---------------------------------------------------------------------------
+
+- description: "plan-prepare: prune-at-init is idempotent — second invocation leaves exactly one plan file (issue #334)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-plan-state.js"
+    script_args: "--project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-state-stale"
+  assert:
+    # Same assertion as Case 1: second run also leaves exactly one plan file
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return data.planFileCount === 1;
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return data.otherBranchFilesPresent === true;
+
+# ---------------------------------------------------------------------------
+# Case 3: stop-plan-integrity consume-then-delete removes marker after evaluation
+# ---------------------------------------------------------------------------
+
+- description: "stop-plan-integrity: marker is deleted after integrity evaluation (consume-then-delete, issue #334)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-stop-plan-integrity.js"
+    script_args: "--project-root {{project_root}} --fix-planfile-path --report-state-files"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/plan-integrity-complete"
+  assert:
+    # Hook exits 0 (advisory-only contract preserved)
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return data.exitCode === 0;
+    # No [plan-integrity] warnings emitted (all markers present, file non-empty)
+    - type: not-icontains
+      value: '[plan-integrity]'
+    # Marker file is gone after hook ran
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return Array.isArray(data.stateFiles) && !data.stateFiles.some(f => f.startsWith('plan-'));

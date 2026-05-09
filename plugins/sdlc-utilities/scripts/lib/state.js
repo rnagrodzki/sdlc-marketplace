@@ -421,7 +421,7 @@ function gcStateFiles({ prefix = null, ttlDays = 7, knownBranches = [], now } = 
  *
  * Implements R-ship-init-prune (issue #255).
  *
- * @param {string} prefix      "ship" | "execute"
+ * @param {string} prefix      "ship" | "execute" | "plan"
  * @param {string} branchSlug  branch slug as produced by `slugifyBranch`
  * @returns {string[]} filenames that were removed (basename only, not absolute paths)
  */

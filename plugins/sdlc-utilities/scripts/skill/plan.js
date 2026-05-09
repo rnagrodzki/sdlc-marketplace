@@ -31,7 +31,7 @@ const { detectActiveChanges, validateChange } = require(path.join(LIB, 'openspec
 const { readSection } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
-const { initState, findStateFile, readState, writeState, slugifyBranch } = require(path.join(LIB, 'state'));
+const { initState, findStateFile, readState, writeState, slugifyBranch, pruneStateFiles } = require(path.join(LIB, 'state'));
 const { exec } = require(path.join(LIB, 'git'));
 
 // ---------------------------------------------------------------------------
@@ -152,9 +152,12 @@ function main() {
 
   // Write skillInvoked marker (R20) — plan-sdlc was invoked (issue #285).
   // Done early so the marker is present even if later steps fail.
+  // Prune prior plan markers for this branch before writing a new one (issue #334):
+  // ensures at most one plan-<branchSlug>-*.json exists per branch.
   try {
     const branch = exec('git branch --show-current');
     if (branch) {
+      pruneStateFiles('plan', slugifyBranch(branch));
       initState('plan', branch, {
         planIntegrity: { skillInvoked: new Date().toISOString() },
       });

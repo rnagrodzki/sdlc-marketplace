@@ -31,6 +31,7 @@ let projectRoot   = process.cwd();
 let transcriptFile = null;
 let fixPlanfilePath = false;
 let branchOverride = null; // passed as SDLC_BRANCH_OVERRIDE to the hook
+let reportStateFiles = false; // when true, append stateFiles[] to output JSON
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--project-root' && args[i + 1]) {
@@ -41,6 +42,8 @@ for (let i = 0; i < args.length; i++) {
     fixPlanfilePath = true;
   } else if (args[i] === '--branch' && args[i + 1]) {
     branchOverride = args[++i];
+  } else if (args[i] === '--report-state-files') {
+    reportStateFiles = true;
   }
 }
 
@@ -142,5 +145,16 @@ const output = {
   stderr: result.stderr || '',
   exitCode: result.status ?? -1,
 };
+
+// --report-state-files: list .sdlc/execution/ contents after the hook ran.
+// Enables assertions about file deletion (consume-then-delete contract).
+if (reportStateFiles) {
+  try {
+    const stateDir = path.join(projectRoot, '.sdlc', 'execution');
+    output.stateFiles = fs.existsSync(stateDir) ? fs.readdirSync(stateDir) : [];
+  } catch (_) {
+    output.stateFiles = [];
+  }
+}
 
 console.log(JSON.stringify(output));

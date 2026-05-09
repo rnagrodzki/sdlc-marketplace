@@ -11,6 +11,7 @@
 #   project-ship-state-stale    — one stale ship-* file (mtime 2024) + one fresh ship-main-*
 #   project-ship-state-rename   — single ship-main-* file ready for migrate
 #   project-execute-state-stale — one stale execute-* file with deleted branch
+#   project-plan-state-orphan   — one stale plan-* file (deleted branch) + one stale execute-* file
 
 # ---------------------------------------------------------------------------
 # state/ship.js gc --dry-run: lists candidates without deleting
@@ -76,6 +77,49 @@
   assert:
     - type: contains
       value: 'execute-deletedbranch-20240101T000000Z.json'
+    - type: contains
+      value: 'stale+branch-gone'
+    # Issue #334: output shape now includes a 'plan' bucket alongside 'execute'
+    - type: contains
+      value: '"plan"'
+
+# ---------------------------------------------------------------------------
+# state/execute.js gc: plan-prefix files in orphan fixture are swept (issue #334)
+# ---------------------------------------------------------------------------
+
+- description: "state/execute.js gc reports stale plan-* file for deleted branch as stale+branch-gone (issue #334)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "gc --ttl-days 7"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-state-orphan"
+  assert:
+    - type: contains
+      value: 'plan-deletedbranch-20240101T000000Z.json'
+    - type: contains
+      value: 'stale+branch-gone'
+    - type: contains
+      value: '"plan"'
+
+# ---------------------------------------------------------------------------
+# state/ship.js gc: plan bucket appears in output JSON (issue #334)
+# ---------------------------------------------------------------------------
+
+- description: "state/ship.js gc output includes plan bucket alongside ship and execute (issue #334)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/ship.js"
+    script_args: "gc --ttl-days 7"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-state-orphan"
+  assert:
+    - type: contains
+      value: '"plan"'
+    - type: contains
+      value: '"ship"'
+    - type: contains
+      value: '"execute"'
+    - type: contains
+      value: 'plan-deletedbranch-20240101T000000Z.json'
     - type: contains
       value: 'stale+branch-gone'
 

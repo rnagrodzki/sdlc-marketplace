@@ -856,7 +856,8 @@ function main() {
     try {
       const ship    = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
       const execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
-      report = { ttlDays, ship, execute };
+      const plan    = gcStateFiles({ prefix: 'plan',    ttlDays, knownBranches });
+      report = { ttlDays, ship, execute, plan };
     } catch (err) {
       errors.push(`gc failed: ${err.message}`);
       writeOutput({ action: 'gc', errors, warnings }, 'ship-prepare', 1);

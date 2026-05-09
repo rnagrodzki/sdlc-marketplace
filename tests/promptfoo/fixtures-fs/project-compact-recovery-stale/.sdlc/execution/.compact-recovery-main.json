@@ -1,0 +1,6 @@
+{
+  "pipeline": "ship-sdlc",
+  "branch": "main",
+  "savedAt": "2026-01-01T00:00:00.000Z",
+  "currentStep": "execute"
+}
