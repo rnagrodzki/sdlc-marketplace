@@ -29,7 +29,7 @@ YYYY-MM-DD` accepted).
    ```
    Invoke:
    ```bash
-   node "$HELPER_PATH" --output-file $ARGUMENTS
+   node "$HELPER_PATH" --output-file "$ARGUMENTS"
    ```
    Capture stdout — it is the absolute path to the drafts JSON in `os.tmpdir()`.
 
@@ -71,7 +71,11 @@ YYYY-MM-DD` accepted).
 
    On `approve all`: write the confirmed status set to
    `/tmp/harvest-approved-classifications-$$.json` for audit, then proceed to
-   Step 5.
+   Step 5. Register cleanup so the temp file is removed on exit:
+   ```bash
+   APPROVED_FILE="/tmp/harvest-approved-classifications-$$.json"
+   trap 'rm -f "$APPROVED_FILE"' EXIT INT TERM
+   ```
 
    `possibly-tracked` confirmation (the old per-cluster confirm prompt) is
    subsumed into the modify loop in this step.
@@ -122,13 +126,18 @@ YYYY-MM-DD` accepted).
      ...possiblyTrackedDupeIds,  // user confirmed duplicate in Step 4
    ]
    ```
-   Write a temp file at `/tmp/harvest-processed-$$.json`:
+   Write a temp file at `/tmp/harvest-processed-$$.json` and register cleanup:
+   ```bash
+   PROCESSED_FILE="/tmp/harvest-processed-$$.json"
+   trap 'rm -f "$APPROVED_FILE" "$PROCESSED_FILE"' EXIT INT TERM
+   ```
+   File contents:
    ```json
    { "processedClusterIds": ["<id1>", "<id2>", ...] }
    ```
    Then run:
    ```bash
-   node <helper-path> --commit <tmpfile>
+   node <helper-path> --commit "$PROCESSED_FILE"
    ```
    The helper atomically rewrites `log.md`, removing the line ranges of ALL
    processed clusters — not just approved drafts.

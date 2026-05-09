@@ -21,6 +21,9 @@ module.exports = (output) => {
   }
 
   const helper = path.join(__dirname, '..', '..', '..', '.claude', 'scripts', 'harvest-learnings.js');
+  // Coupling: drafts.logPath is always `<fixture-root>/.claude/learnings/log.md`
+  // (set by exec-only promptfoo runner staging the fixture-fs into a tmpdir).
+  // Strip that suffix to recover the fixture root for sibling fakes (harvest-fakes/).
   const projRoot = path.dirname(drafts.logPath).replace(/\/.claude\/learnings$/, '');
   const fakePr = path.join(projRoot, 'harvest-fakes', 'gh-pr.json');
   const fakeMerge = path.join(projRoot, 'harvest-fakes', 'git-merge-base.json');

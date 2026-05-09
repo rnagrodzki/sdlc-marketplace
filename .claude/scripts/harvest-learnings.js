@@ -389,7 +389,7 @@ function verifyFixOnMain(refs) {
   return { verified: false };
 }
 
-function classifyCluster(cluster, issues) {
+function classifyCluster(cluster, issues, ghErrors) {
   // 0) Operational-note: skill-prefix match — must precede fuzzy-title check
   if (OPERATIONAL_SKILLS.has(cluster.skill)) {
     return { status: 'operational-note', dedupReason: 'skill-prefix' };
@@ -402,7 +402,11 @@ function classifyCluster(cluster, issues) {
     if (result.verified) {
       return { status: 'already-fixed', dedupReason: 'fix-on-main', fixRef: result.fixRef };
     }
-    // If verifyError, treat as unverified (stays draft) — error surfaced in gh field
+    // If verifyError, treat as unverified (stays draft); record first error
+    // for surfacing via the manifest's gh.verifyError field.
+    if (result.verifyError && ghErrors && !ghErrors.verifyError) {
+      ghErrors.verifyError = result.verifyError;
+    }
   }
 
   // 1) Source-range overlap → tracked
@@ -483,10 +487,15 @@ function modeOutputFile(args) {
 
   const { issues, listError } = fetchExistingIssues();
 
+  const ghErrors = {};
   const clusters = filtered.map((c) => {
-    const verdict = classifyCluster(c, issues);
+    const verdict = classifyCluster(c, issues, ghErrors);
     return Object.assign({}, c, verdict);
   });
+
+  const gh = {};
+  if (listError) gh.listError = listError;
+  if (ghErrors.verifyError) gh.verifyError = ghErrors.verifyError;
 
   const out = {
     logPath,
@@ -495,7 +504,7 @@ function modeOutputFile(args) {
     dryRun,
     clusters,
     skippedTrivial,
-    gh: listError ? { listError } : {},
+    gh,
   };
 
   writeOutput(out);
@@ -589,6 +598,9 @@ function modeCommit(args) {
 }
 
 function modeCloseStale(args) {
+  // Note: --dry-run only flags the output JSON (consumer suppresses
+  // `gh issue close`); the gh issue list + verifyFixOnMain calls below
+  // are read-only and always run so the consumer has data to preview.
   const dryRun = args.includes('--dry-run');
 
   const fakeListEnv = process.env.GH_HARVEST_FAKE_LIST_HARVESTED;
