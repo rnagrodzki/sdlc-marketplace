@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Stub `gh` binary used by tests/promptfoo/datasets/script-runner-stub-bin-exec.yaml
+# to verify that the script-runner provider's `script_stub_bin` var prepends a
+# fixture's bin/ dir to PATH, intercepting external CLI lookups.
+echo "STUB-GH-INVOKED $@"
+exit 0

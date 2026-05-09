@@ -10,6 +10,12 @@
  *                            `~/.sdlc-cache/...` layouts. Accepts a relative path (resolved
  *                            against `script_cwd`) or an absolute path.
  *   script_env             — (optional) JSON string or object of extra env vars
+ *   script_stub_bin        — (optional) path to a directory whose binaries should shadow real
+ *                            CLIs on PATH (e.g., a stub `gh` for testing). Accepts a relative
+ *                            path (resolved against `script_cwd`) or an absolute path. Prepended
+ *                            to PATH after `script_env` merge so any user-supplied `script_env.PATH`
+ *                            is honored as the base. Asymmetry: `hook-runner.js` does not implement
+ *                            this — hook tests do not exec external CLIs (YAGNI).
  *   script_capture_stderr  — (optional) when truthy, append stderr to output even on exit 0
  */
 const path = require('path');
@@ -62,6 +68,23 @@ class ScriptRunnerProvider {
         try { extra = JSON.parse(extra); } catch (_) { extra = {}; }
       }
       if (extra && typeof extra === 'object') Object.assign(env, extra);
+    }
+    // PATH stub injection: prepend a fixture's bin dir to PATH so spawned children resolve
+    // stub binaries (e.g., a fake `gh`) before real CLIs. Order matters — this is the LAST
+    // PATH mutation so user-supplied `script_env.PATH` (if any) is honored as the base.
+    if (vars.script_stub_bin) {
+      if (typeof vars.script_stub_bin !== 'string') {
+        return { error: `script-runner: script_stub_bin must be a string path, got ${typeof vars.script_stub_bin}` };
+      }
+      const stubBin = path.isAbsolute(vars.script_stub_bin)
+        ? vars.script_stub_bin
+        : path.resolve(cwd || process.cwd(), vars.script_stub_bin);
+      let stat;
+      try { stat = fs.statSync(stubBin); } catch (_) { stat = null; }
+      if (!stat || !stat.isDirectory()) {
+        return { error: `script-runner: script_stub_bin path not found or not a directory: ${stubBin}` };
+      }
+      env.PATH = stubBin + path.delimiter + (env.PATH || '');
     }
 
     const result = spawnSync('node', [scriptPath, ...scriptArgs], {
