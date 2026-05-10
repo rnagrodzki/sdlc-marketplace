@@ -403,7 +403,7 @@ function cmdCleanupPipeline(opts) {
 
   const report = {
     currentRun: { valid: true, cleaned: false },
-    gc: { ship: { deleted: [], kept: [] }, execute: { deleted: [], kept: [] } },
+    gc: { ship: { deleted: [], kept: [] }, execute: { deleted: [], kept: [] }, plan: { deleted: [], kept: [] } },
     force: !!opts.force,
     ttlDays,
   };
@@ -426,9 +426,10 @@ function cmdCleanupPipeline(opts) {
     report.currentRun = { valid: true, cleaned: true };
   }
 
-  // GC sweep for both prefixes
+  // GC sweep for all three prefixes
   report.gc.ship    = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
   report.gc.execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
+  report.gc.plan    = gcStateFiles({ prefix: 'plan',    ttlDays, knownBranches });
 
   process.stdout.write(JSON.stringify(report, null, 2) + '\n');
   process.exit(0);
@@ -451,7 +452,7 @@ function cmdGc(opts) {
     const now = Date.now();
     const ttlMs = ttlDays * 86400000;
 
-    const out = { ship: { wouldDelete: [], wouldKeep: [] }, execute: { wouldDelete: [], wouldKeep: [] } };
+    const out = { ship: { wouldDelete: [], wouldKeep: [] }, execute: { wouldDelete: [], wouldKeep: [] }, plan: { wouldDelete: [], wouldKeep: [] } };
 
     let entries = [];
     try { entries = fs.readdirSync(stateDir); } catch (_) { /* empty */ }
@@ -481,8 +482,9 @@ function cmdGc(opts) {
 
   const ship    = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
   const execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
+  const plan    = gcStateFiles({ prefix: 'plan',    ttlDays, knownBranches });
 
-  process.stdout.write(JSON.stringify({ ttlDays, ship, execute }, null, 2) + '\n');
+  process.stdout.write(JSON.stringify({ ttlDays, ship, execute, plan }, null, 2) + '\n');
   process.exit(0);
 }
 

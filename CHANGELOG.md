@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.19.9] - 2026-05-09
+
+### Fixed
+- plan-state-cleanup: marker lifecycle and GC integration for .sdlc/execution/ plan-*.json files (#334)
+- plan-state-cleanup: review fixes — dead code removal and documentation updates (#334)
+- promptfoo-exec: add script_stub_bin PATH-prepend for spawned child process fixture invocation (#290)
+
 ## [0.19.8] - 2026-05-09
 
 ### Fixed

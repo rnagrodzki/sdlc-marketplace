@@ -445,7 +445,7 @@ function cmdGc(opts) {
     const liveSlugs = new Set(knownBranches.map(slugifyBranch));
     const now = Date.now();
     const ttlMs = ttlDays * 86400000;
-    const out = { wouldDelete: [], wouldKeep: [] };
+    const out = { execute: { wouldDelete: [], wouldKeep: [] }, plan: { wouldDelete: [], wouldKeep: [] } };
 
     let entries = [];
     try { entries = fs.readdirSync(stateDir); } catch (_) { /* empty */ }
@@ -453,17 +453,19 @@ function cmdGc(opts) {
     for (const name of entries) {
       if (!name.endsWith('.json')) continue;
       const parsed = parseStateFilename(name);
-      if (!parsed || parsed.prefix !== 'execute') continue;
+      if (!parsed) continue;
+      const bucket = out[parsed.prefix];
+      if (!bucket) continue;
       let stat;
       try { stat = fs.statSync(path.join(stateDir, name)); } catch (_) { continue; }
       const fresh = (now - stat.mtimeMs) < ttlMs;
       const branchExists = liveSlugs.has(parsed.slug);
       if (fresh) {
-        out.wouldKeep.push({ file: name, branch: parsed.slug, reason: 'ttl-fresh' });
+        bucket.wouldKeep.push({ file: name, branch: parsed.slug, reason: 'ttl-fresh' });
       } else if (branchExists) {
-        out.wouldKeep.push({ file: name, branch: parsed.slug, reason: 'branch-exists' });
+        bucket.wouldKeep.push({ file: name, branch: parsed.slug, reason: 'branch-exists' });
       } else {
-        out.wouldDelete.push({ file: name, branch: parsed.slug, reason: 'stale+branch-gone' });
+        bucket.wouldDelete.push({ file: name, branch: parsed.slug, reason: 'stale+branch-gone' });
       }
     }
 
@@ -471,8 +473,9 @@ function cmdGc(opts) {
     process.exit(0);
   }
 
-  const result = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
-  process.stdout.write(JSON.stringify({ ttlDays, ...result }, null, 2) + '\n');
+  const execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
+  const plan    = gcStateFiles({ prefix: 'plan',    ttlDays, knownBranches });
+  process.stdout.write(JSON.stringify({ ttlDays, execute, plan }, null, 2) + '\n');
   process.exit(0);
 }
 

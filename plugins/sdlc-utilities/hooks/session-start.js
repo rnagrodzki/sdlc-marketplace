@@ -132,6 +132,7 @@ try {
   // Per-branch recovery file (issue #256). Read only the file matching the
   // current branch — never scan-and-filter across branches. branchSlug is null
   // when not in a git repo or no current branch; in that case skip the read.
+  let consumedRecoveryPath = null;
   if (branchSlug) {
     const recoveryPath = path.join(recoveryDir, `.compact-recovery-${branchSlug}.json`);
     if (fs.existsSync(recoveryPath)) {
@@ -162,7 +163,35 @@ try {
 
       // Delete after reading — single-use
       fs.unlinkSync(recoveryPath);
+      consumedRecoveryPath = recoveryPath;
     }
+  }
+
+  // Stale-sweep pass: remove `.compact-recovery-*.json` files older than 24h
+  // (issue #334). These are orphaned files left by sessions where the single-use
+  // unlink never fired (JSON parse error, permission failure, session kill, etc.).
+  // The sweep threshold (24h) is an order of magnitude beyond the freshness gate
+  // (1h), so the sweep cannot delete a file the consume path above would still want.
+  const staleThresholdMs = 24 * 60 * 60 * 1000; // 24 hours
+  try {
+    const sweepEntries = fs.readdirSync(recoveryDir);
+    for (const entry of sweepEntries) {
+      // Only target per-branch compact-recovery files
+      if (!/^\.compact-recovery-.+\.json$/.test(entry)) continue;
+      const entryPath = path.join(recoveryDir, entry);
+      // Skip the file we just consumed above — avoid double-unlink
+      if (entryPath === consumedRecoveryPath) continue;
+      try {
+        const stat = fs.statSync(entryPath);
+        if (Date.now() - stat.mtimeMs > staleThresholdMs) {
+          fs.unlinkSync(entryPath);
+        }
+      } catch (sweepErr) {
+        console.error('[sdlc/session-start] stale compact-recovery sweep error:', sweepErr.message);
+      }
+    }
+  } catch (sweepErr) {
+    console.error('[sdlc/session-start] stale compact-recovery sweep error:', sweepErr.message);
   }
 
   // Legacy `.compact-recovery.json` (no branch suffix, pre-#256 layout).
@@ -176,10 +205,13 @@ try {
       if (Date.now() - stat.mtimeMs > maxAgeMs) {
         fs.unlinkSync(legacyPath);
       }
-    } catch { /* best-effort */ }
+    } catch (legacyErr) {
+      console.error('[sdlc/session-start] legacy compact-recovery cleanup error:', legacyErr.message);
+    }
   }
-} catch {
+} catch (err) {
   // Graceful degradation — skip compact recovery on any error
+  console.error('[sdlc/session-start] compact-recovery consumption failed:', err.message);
 }
 
 // ---------------------------------------------------------------------------
