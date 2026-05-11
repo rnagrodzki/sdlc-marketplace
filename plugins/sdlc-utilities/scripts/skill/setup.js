@@ -18,6 +18,7 @@ const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH, PROJECT_SECTIONS } = req
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { SHIP_FIELDS } = require(path.join(LIB, 'ship-fields'));
 const { SETUP_SECTIONS } = require(path.join(LIB, 'setup-sections'));
+const { detectBaseBranchSafe } = require(path.join(LIB, 'git'));
 const { OPENSPEC_ENRICH_VERSION } = require(path.join(__dirname, '..', 'util', 'openspec-enrich'));
 
 // ---------------------------------------------------------------------------
@@ -130,13 +131,8 @@ function detect(projectRoot) {
     tagPrefix = prefixMatch ? prefixMatch[1] : '';
   }
 
-  // --- Default branch detection ---
-  let defaultBranch = execSafe(
-    "git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'"
-  );
-  if (!defaultBranch) {
-    defaultBranch = 'main';
-  }
+  // --- Default branch detection (issue #339: shared helper, never throws) ---
+  const defaultBranch = detectBaseBranchSafe(projectRoot);
 
   // ---------------------------------------------------------------------------
   // Assemble output

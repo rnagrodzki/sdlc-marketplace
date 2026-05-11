@@ -46,7 +46,19 @@ This is lightweight — reviewing and filtering, not generating from scratch.
 
 ### Step 2 (PRESENT) — Interactive Selection
 
-Present refined proposals as a numbered list with evidence. Use AskUserQuestion:
+Present refined proposals as a numbered list with evidence. Each proposal must display its `[category]` tag (implements R-#336-category). Format:
+
+```
+Proposed guardrails:
+  1. [planning-discipline]  state-premise — Plan must state the underlying problem in one sentence
+  2. [framework]            island-only-interactivity — Use island pattern for interactive components only
+  3. [scope]                no-scope-creep — Implementation must stay within the task's stated scope
+  ...
+```
+
+**Stage A — Standard selection**
+
+Use AskUserQuestion:
 
 > Install which guardrails?
 
@@ -54,10 +66,22 @@ Options:
 
 - **all** — install all proposed guardrails
 - **select** — comma-separated numbers to install a subset
-- **custom** — prompt user for id, description, severity to add alongside selections
-- **cancel** — exit without changes
+- **cancel** — exit without changes (skips Stage B)
 
-On **custom**: collect id (validate kebab-case pattern `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`), description, severity (default: error). Allow multiple custom entries.
+**Stage B — Custom guardrails (always-on, unless Stage A was cancelled)**
+
+After Stage A completes (whether any standard guardrails were selected or not), always run this prompt. Use AskUserQuestion:
+
+> Add custom project-specific guardrails?
+
+Options: **yes** / **no**
+
+On **yes**: enter per-guardrail ID/description/severity loop:
+- Collect id (validate kebab-case pattern `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
+- Collect description
+- Collect severity (default: error)
+- After each entry ask: "Add another custom guardrail?" yes/no — loop until no
+Allow multiple custom entries. Custom guardrails are added alongside the standard selections from Stage A.
 
 ### Step 3 (WRITE) — Write Config
 
@@ -101,7 +125,8 @@ Parse output. If `overall` is "pass", report success with count. If "fail", show
 
 - **skill/guardrails.js is the source of truth for scanning.** Do not duplicate its Glob/Read logic. The skill reviews the script's output.
 - **Config write is read-merge-write.** `writeSection` handles merging. In `--add` mode, the skill must read existing guardrails from the prepare output and prepend them to the selection before writing.
-- **Custom guardrails need ID validation.** The kebab-case pattern `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` must be enforced before writing.
+- **Stage B runs after any non-cancel Stage A outcome.** If the user selects all/select in Stage A with no custom entries expected, Stage B still runs — it is always-on. Only a Stage A cancel skips Stage B.
+- **Custom guardrails need ID validation.** The kebab-case pattern `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` must be enforced in Stage B before writing.
 
 ## See Also
 

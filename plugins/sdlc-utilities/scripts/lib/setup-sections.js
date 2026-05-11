@@ -52,7 +52,7 @@
  */
 
 const { SHIP_FIELDS } = require('./ship-fields');
-const { parseRemoteOwner } = require('./git');
+const { parseRemoteOwner, detectBaseBranchSafe } = require('./git');
 
 // ---------------------------------------------------------------------------
 // Section descriptors
@@ -220,6 +220,9 @@ function summarizeCommit(cfg) {
 function summarizePr(cfg) {
   if (!cfg) return '';
   const parts = [];
+  if (cfg.defaultBranch) {
+    parts.push(`defaultBranch: ${cfg.defaultBranch}`);
+  }
   if (cfg.titlePattern) {
     const trimmed = cfg.titlePattern.length > 40
       ? cfg.titlePattern.slice(0, 37) + '...'
@@ -383,6 +386,14 @@ const SETUP_SECTIONS = [
     delegatedTo: 'inline-pr-builder',
     confirmDetected: false,
     fields: [
+      {
+        name: 'defaultBranch',
+        label: 'Target branch for PRs',
+        type: 'string',
+        options: null,
+        default: detectBaseBranchSafe(process.cwd()),
+        description: 'Branch PRs are merged into. Auto-detected from the remote default branch; override for repos using develop, release/*, etc. When set, /pr-sdlc uses this value before falling back to runtime git detection (issue #339).',
+      },
       {
         name: 'expectedAccount',
         label: 'Expected gh account',

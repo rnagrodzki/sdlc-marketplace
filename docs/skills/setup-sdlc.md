@@ -156,7 +156,7 @@ Every section the menu can configure. The label, purpose, files modified, and co
 | `jira` | Default Jira project key used by `/jira-sdlc`, `/commit-sdlc`, and `/pr-sdlc` when extracting or assigning ticket IDs. | `.sdlc/config.json` | `/jira-sdlc`, `/commit-sdlc`, `/pr-sdlc` |
 | `review` | Default scope for `/review-sdlc` (committed/staged/working/worktree/all). Local to each developer. | `.sdlc/local.json` | `/review-sdlc` |
 | `commit` | Commit message validation rules used by `/commit-sdlc` (subject regex, allowed types/scopes, required trailers). | `.sdlc/config.json` | `/commit-sdlc` |
-| `pr` | PR title validation rules used by `/pr-sdlc` (title regex, allowed types/scopes, required trailers). | `.sdlc/config.json` | `/pr-sdlc` |
+| `pr` | PR title validation rules used by `/pr-sdlc` (title regex, allowed types/scopes, required trailers) plus `defaultBranch` — the target merge branch, auto-detected from the remote default and overridable for `develop`/`release/*` repos (issue #339). | `.sdlc/config.json` | `/pr-sdlc` |
 | `pr-labels` | PR label assignment policy under `pr.labels`. Mode `off` (default) adds no automatic labels — `--label` overrides still work. Mode `rules` evaluates user-defined deterministic rules (branch prefix, commit type, path glob, JIRA type, diff size). Mode `llm` opts into the legacy fuzzy match. Configured via `--only pr-labels`. | `.sdlc/config.json` | `/pr-sdlc` |
 | `review-dimensions` | Review dimensions installed under `.sdlc/review-dimensions/*.yaml`. Each dimension is a focused check set used by `/review-sdlc`. | `.sdlc/review-dimensions/*.yaml` | `/review-sdlc` |
 | `pr-template` | PR description template at `.sdlc/pr-template.md`, used by `/pr-sdlc` when drafting PRs. | `.sdlc/pr-template.md` | `/pr-sdlc` |
@@ -268,6 +268,13 @@ Analyzes project conventions (existing GitHub PR templates, recent PR patterns, 
 
 Scans the project's codebase structure, dependencies, and architecture to propose and configure plan guardrails in `.sdlc/config.json`. Each guardrail defines a constraint that `/plan-sdlc` evaluates during its critique phases.
 
+Proposals are displayed with their `[category]` tag (e.g. `[framework]`, `[scope]`, `[planning-discipline]`) so you can see at a glance which signal triggered each rule. Framework-specific proposals (Svelte/Astro island pattern, Prisma migration enforcement) are emitted automatically when the corresponding signal is detected (issue #336).
+
+Selection is a two-stage flow:
+
+- **Stage A** — Standard catalog: choose `all`, `select <numbers>`, or `cancel`. The `custom` option has moved to Stage B.
+- **Stage B** (always-on unless Stage A cancelled) — "Add custom project-specific guardrails?" Entering `yes` opens a per-guardrail ID/description/severity loop; `no` proceeds directly to write.
+
 **Direct entry:** `/setup-sdlc --guardrails` or `/setup-sdlc --guardrails --add` (expansion mode)
 
 #### OpenSpec Enrichment
@@ -285,6 +292,7 @@ Before writing any config files, `/setup-sdlc` renders a diff preview comparing 
 ```
 | path                  | before    | after       |
 |-----------------------|-----------|-------------|
+| pr.defaultBranch      | (unset)   | develop     |
 | pr.expectedAccount    | (unset)   | rnagrodzki  |
 | version.tagPrefix     | v         | release/    |
 ```

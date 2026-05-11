@@ -85,6 +85,20 @@ function parseArgs(argv) {
 }
 
 // ---------------------------------------------------------------------------
+// Branch name validation
+// ---------------------------------------------------------------------------
+// Both `--base <branch>` (CLI flag) and `pr.defaultBranch` (config file) are
+// interpolated into `git rev-parse` shell commands. Restrict accepted characters
+// to a conservative subset of valid Git ref characters to defeat shell
+// metacharacter injection. Source: refnames may contain alphanumerics, `.`,
+// `_`, `-`, and `/`. Anything else is rejected with a clear error.
+const BRANCH_NAME_RE = /^[A-Za-z0-9._\-/]+$/;
+
+function validateBranchName(name) {
+  return typeof name === 'string' && name.length > 0 && BRANCH_NAME_RE.test(name);
+}
+
+// ---------------------------------------------------------------------------
 // JIRA ticket detection
 // ---------------------------------------------------------------------------
 // Issue #284, task 21: regex sourced from `lib/jira-keys.js` so pr.js and
@@ -246,8 +260,17 @@ function main() {
   }
 
   // Step 5: Detect base branch
+  // Resolution cascade (issue #339): --base CLI flag > config.pr.defaultBranch > git auto-detect
   let baseBranch;
   if (baseBranchOverride) {
+    if (!validateBranchName(baseBranchOverride)) {
+      errors.push(
+        `--base value "${baseBranchOverride}" is not a valid branch name. ` +
+        `Branch names must contain only letters, digits, '.', '_', '-', or '/'.`
+      );
+      writeOutput({ errors, warnings, currentBranch, baseBranchOverride }, 'pr-context', 1);
+      return;
+    }
     const exists = exec(
       `git rev-parse --verify origin/${baseBranchOverride} 2>/dev/null`,
       { cwd: projectRoot, shell: true }
@@ -259,12 +282,42 @@ function main() {
     }
     baseBranch = baseBranchOverride;
   } else {
-    try {
-      baseBranch = detectBaseBranch(projectRoot);
-    } catch (err) {
-      errors.push(err.message);
-      writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
-      return;
+    // Check config.pr.defaultBranch before falling back to git detection
+    const prConfigForBase = readSection(projectRoot, 'pr') || {};
+    const configDefaultBranch = typeof prConfigForBase.defaultBranch === 'string'
+      ? prConfigForBase.defaultBranch.trim()
+      : '';
+    if (configDefaultBranch) {
+      if (!validateBranchName(configDefaultBranch)) {
+        errors.push(
+          `config.pr.defaultBranch value "${configDefaultBranch}" is not a valid branch name. ` +
+          `Branch names must contain only letters, digits, '.', '_', '-', or '/'. ` +
+          `Update pr.defaultBranch in .sdlc/config.json.`
+        );
+        writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
+        return;
+      }
+      const exists = exec(
+        `git rev-parse --verify origin/${configDefaultBranch} 2>/dev/null`,
+        { cwd: projectRoot, shell: true }
+      );
+      if (!exists) {
+        errors.push(
+          `config.pr.defaultBranch is set to "${configDefaultBranch}" but "origin/${configDefaultBranch}" does not exist on the remote. ` +
+          `Update pr.defaultBranch in .sdlc/config.json or remove the field to use git auto-detection.`
+        );
+        writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
+        return;
+      }
+      baseBranch = configDefaultBranch;
+    } else {
+      try {
+        baseBranch = detectBaseBranch(projectRoot);
+      } catch (err) {
+        errors.push(err.message);
+        writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
+        return;
+      }
     }
   }
 

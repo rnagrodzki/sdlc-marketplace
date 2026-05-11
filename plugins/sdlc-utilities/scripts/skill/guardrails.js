@@ -168,6 +168,7 @@ function detectLanguagesAndFrameworks(projectRoot, signals) {
       angular:  'angular',
       '@angular/core': 'angular',
       svelte:   'svelte',
+      astro:    'astro',
       hapi:     'hapi',
       koa:      'koa',
       // Serverless / IaC
@@ -646,6 +647,45 @@ function buildProposals(signals, target) {
     evidence: 'Universal guardrail — always applicable.',
   });
 
+  // Framework-specific guardrails (issue #336)
+  // Spec allows shared id with framework-specific description. Svelte and Astro
+  // both use the islands pattern but with different runtime semantics, so each
+  // framework gets its own description while sharing the proposal id.
+  if (signals.frameworks.includes('svelte')) {
+    proposals.push({
+      id: 'island-only-interactivity',
+      description: isPlan
+        ? 'Tasks must use Svelte components as interactive islands only — default to static markup and reach for `<script>` blocks only where interactivity is required.'
+        : 'Use Svelte components as interactive islands only; default to static markup. Add `<script>` interactivity only where it is required, not by default.',
+      severity: 'warning',
+      category: 'framework',
+      evidence: 'Detected framework(s): svelte.',
+    });
+  }
+  if (signals.frameworks.includes('astro')) {
+    proposals.push({
+      id: 'island-only-interactivity',
+      description: isPlan
+        ? 'Tasks must keep Astro components static by default — opt into client hydration (`client:load`, `client:idle`, `client:visible`) only for components that require interactivity.'
+        : 'Astro components must be static by default. Use `client:*` directives only for components that genuinely require client-side interactivity; avoid unnecessary hydration.',
+      severity: 'warning',
+      category: 'framework',
+      evidence: 'Detected framework(s): astro.',
+    });
+  }
+
+  if (signals.dbType === 'prisma') {
+    proposals.push({
+      id: 'prisma-migration-required',
+      description: isPlan
+        ? 'Tasks that modify the Prisma schema must include a corresponding `prisma migrate` step. Schema changes without migrations are a blocking issue.'
+        : 'Prisma schema changes must be accompanied by a migration file (`prisma migrate dev` or `prisma migrate deploy`). Do not modify schema.prisma without generating a migration.',
+      severity: 'error',
+      category: 'framework',
+      evidence: 'Detected Prisma ORM (prisma/ directory present).',
+    });
+  }
+
   // Planning-discipline guardrails — plan target only
   if (isPlan) {
     proposals.push({
@@ -687,6 +727,18 @@ function buildProposals(signals, target) {
       category: 'planning-discipline',
       evidence: 'Universal guardrail — always applicable to non-trivial plans.',
     });
+  }
+
+  // Internal invariant: every proposal must carry a non-empty category field.
+  // Throw early with the offending id list to surface missing categories at
+  // dev time rather than silently emitting malformed output. Placed after ALL
+  // proposal pushes (including isPlan-gated ones) so future proposals cannot
+  // bypass the check.
+  const missingCategory = proposals.filter(p => !p.category);
+  if (missingCategory.length > 0) {
+    throw new Error(
+      `buildProposals: proposals missing category field: ${missingCategory.map(p => p.id).join(', ')}`
+    );
   }
 
   return proposals;

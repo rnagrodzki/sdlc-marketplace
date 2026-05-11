@@ -289,7 +289,18 @@ PR title validation is configured in `.sdlc/config.json` under the `pr` key. All
 | `titlePatternError` | string | Human-readable error message displayed when `titlePattern` validation fails. |
 | `allowedTypes` | array of strings | Allowed PR title type prefixes (e.g., `feat`, `fix`, `breaking`). Absence allows any type. Used for title generation hints only; validation uses `titlePattern`. |
 | `allowedScopes` | array of strings | Allowed PR title scopes (the parenthetical in `feat(scope)`). Absence allows any scope. Used for title generation hints only; validation uses `titlePattern`. |
+| `defaultBranch` | string | Target branch PRs are merged into (issue #339). When set, `/pr-sdlc` uses this value without runtime git detection. Override for repos using `develop`, `release/*`, etc. Configured by `/setup-sdlc` pr section (auto-detected default). |
 | `expectedAccount` | string | Expected GitHub login that should be active when `/pr-sdlc` runs (issue #234). When set, the prepare script halts hard if the active `gh` account differs, preventing wrong-account PRs in multi-account setups. Cascades to the `origin` remote owner when unset. |
+
+### Base Branch Resolution (issue #339)
+
+`skill/pr.js` resolves the target base branch via a three-step cascade:
+
+1. **`--base <branch>` CLI flag** — explicit override, highest priority. Verified against `origin/<branch>`; errors if not found on the remote.
+2. **`config.pr.defaultBranch`** — value from `.sdlc/config.json` under `pr.defaultBranch`. Verified against `origin/<value>`; surfaces a precise error naming the config path if the branch does not exist on the remote.
+3. **Git auto-detection** — falls back to `git symbolic-ref refs/remotes/origin/HEAD` → `main` → `master` (the existing `detectBaseBranch` behavior).
+
+Configure `pr.defaultBranch` via `/setup-sdlc` (pr section) for repos where the default branch is `develop`, `release/*`, or any non-standard name — this prevents the git auto-detect from resolving to the wrong base on every PR.
 
 ### Preflight (issue #234)
 

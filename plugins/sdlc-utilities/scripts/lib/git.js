@@ -109,6 +109,27 @@ function detectBaseBranch(projectRoot) {
 }
 
 /**
+ * Non-throwing variant of detectBaseBranch — falls back to 'main' on any error.
+ *
+ * Intended for callers that run at module-load time (e.g. setup-sections.js field
+ * defaults) where a throw would abort the require() call. Uses the same detection
+ * strategy as detectBaseBranch (origin/HEAD symbolic ref → 'main' → 'master') but
+ * swallows all errors and returns 'main' as the last-resort fallback.
+ *
+ * Implements: setup-sdlc spec R-defaultBranch (issue #339).
+ *
+ * @param {string} projectRoot
+ * @returns {string}
+ */
+function detectBaseBranchSafe(projectRoot) {
+  try {
+    return detectBaseBranch(projectRoot);
+  } catch (_) {
+    return 'main';
+  }
+}
+
+/**
  * Best-effort fetch of the base branch from origin to fast-forward the local ref.
  *
  * Used before computing branch-contribution diffs (review-sdlc, pr-sdlc — issue #239)
@@ -1151,6 +1172,7 @@ module.exports = {
   // Shared
   checkGitState,
   detectBaseBranch,
+  detectBaseBranchSafe,
   fetchBaseRef,
   buildBranchContribDiffCmd,
   getChangedFiles,
