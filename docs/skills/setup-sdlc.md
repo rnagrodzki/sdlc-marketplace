@@ -2,7 +2,7 @@
 
 ## Overview
 
-Configures the SDLC plugin for a project. On invocation, `/setup-sdlc` shows a single multi-select menu listing every section it manages — version tracking, ship pipeline preferences, Jira, review scope, commit/PR patterns, review dimensions, PR template, plan and execution guardrails, and openspec enrichment. Each row shows a state badge (`set`, `not set`, or `legacy`), and only the sections you tick get configured. For every selected section, the skill prints a verbose header before any prompt — purpose, files modified, consuming skills, and a per-option description block — so you know exactly what each toggle controls before you answer.
+Configures the SDLC plugin for a project. On invocation, `/setup-sdlc` shows a numbered list of sections printed directly to chat — version tracking, ship pipeline preferences, Jira, review scope, commit/PR patterns, review dimensions, PR template, plan and execution guardrails, and openspec enrichment. Each row shows a state badge (`set`, `not set`, or `legacy`). Reply with the numbers to configure (or `all` / `not-set` / `none`) to select which sections to configure. For every selected section, the skill prints a verbose header before any prompt — purpose, files modified, consuming skills, and a per-option description block — so you know exactly what each toggle controls before you answer.
 
 Creates `.sdlc/config.json` (project-level config), `.sdlc/local.json` (user-local preferences), and content artifacts (`.sdlc/review-dimensions/*.yaml`, `.sdlc/pr-template.md`, `openspec/config.yaml` managed block).
 
@@ -178,7 +178,7 @@ For each non-delegated section, these are the fields the verbose header reveals 
 | `tagPrefix` | `v` | Prefix prepended to the version when `/version-sdlc` creates a release tag (e.g., prefix `v` produces `v1.2.3`). Empty string is allowed. |
 | `changelog` | `false` | When true, `/version-sdlc` and `/ship-sdlc` append a release entry to `changelogFile` on every bump. |
 | `changelogFile` | `CHANGELOG.md` | Path to the changelog file appended by `/version-sdlc` when changelog is enabled. |
-| `preRelease` | (empty) | When set (e.g., `rc`, `beta`), `/version-sdlc` and `/ship-sdlc` default to a pre-release bump on every default invocation until an explicit `major\|minor\|patch` graduates the release. Must match `^[a-z][a-z0-9]*$`. |
+| `preRelease` | (empty) | When set (e.g., `rc`, `beta`), `/version-sdlc` and `/ship-sdlc` default to a pre-release bump on every default invocation until an explicit `major\|minor\|patch` graduates the release. Must match `^[a-z][a-z0-9]*$`. When set, setup-sdlc validates compatibility with the configured `fileType` before writing: `pubspec.yaml` blocks with a clear/proceed prompt; `pyproject.toml` and `version-file` require explicit confirmation; other types proceed silently. |
 
 #### `jira`
 
@@ -320,7 +320,7 @@ Plan guardrails    — [N configured via guardrails sub-flow | skipped]
 
 | File | Purpose |
 |------|---------|
-| `.sdlc/config.json` | Unified project config with `version`, `jira`, `commit`, `pr` sections, and optional `plan.guardrails`. Carries top-level `schemaVersion: 3` (issue #232). The `version` section may include an optional `preRelease` field (lowercase label matching `^[a-z][a-z0-9]*$`) — when set, `version-sdlc` and `ship-sdlc` produce a pre-release version (e.g. `1.2.4-rc.1`) on every default bump until an explicit `major\|minor\|patch` graduates the release. Configured interactively via the customize path of Step 3a (version section). |
+| `.sdlc/config.json` | Unified project config with `version`, `jira`, `commit`, `pr` sections, and optional `plan.guardrails`. Carries top-level `schemaVersion: 3` (issue #232). The `version` section may include an optional `preRelease` field (lowercase label matching `^[a-z][a-z0-9]*$`) — when set, `version-sdlc` and `ship-sdlc` produce a pre-release version (e.g. `1.2.4-rc.1`) on every default bump until an explicit `major\|minor\|patch` graduates the release. Configured interactively via the customize path of Step 3a (version section). The `version.preRelease` field is gated by a fileType-compatibility check at setup time (see spec R-version-prerelease-compat). |
 | `.sdlc/local.json` | User-local config with `review` scope preferences and `ship` settings. Carries top-level `schemaVersion: 3`. Gitignored (selective `.sdlc/.gitignore` block). |
 | `.sdlc/.gitignore` | Selective managed block (issue #231) — committed: `config.json`, `review-dimensions/`. Ignored: `local.json`, `cache/`, `*.bak.*`, `.migration.lock`. Replaces the historical blanket `*\n` content. |
 | `.sdlc/review-dimensions/*.yaml` | Review dimensions created during dimensions sub-flow (via `--dimensions`). Committed to the repo. |

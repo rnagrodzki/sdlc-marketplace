@@ -95,12 +95,16 @@ The JSON contains these top-level keys:
 
 ### Step 1 -- Selective-Section Menu
 
-Render a single multi-select menu populated from `prepare.sections[]`. Every visible row, badge, and per-option description is sourced from the manifest in `scripts/lib/setup-sections.js` — do NOT hardcode option labels here.
+<!-- Implements R-menu-1, R-menu-4. Fixes #337. Step 1 is plain chat output; AskUserQuestion is intentionally NOT used here. -->
+
+**Direct-entry flag bypass (preserved):** When `--only`, `--force`, `--dimensions`, `--pr-template`, `--guardrails`, `--execution-guardrails`, or `--openspec-enrich` was passed, `selectedIds` are resolved before Step 1 by the flag-alias routing table in Step 0. Skip the entire menu (no numbered list, no chat prompt) and jump to Step 2/3 with the resolved id set.
+
+**Phase 1 — Render the status block.** Print the status block as before, using `section.label` and `section.summary` verbatim:
 
 **State badge per row** (driven by `section.state`):
-- `[set]` — section is already configured (greyed-out toggle, off by default).
-- `[not set]` — section has no config (toggle on by default).
-- `[legacy]` — section needs migration; toggle is auto-checked AND locked when `section.locked` is true.
+- `[set]` — section is already configured.
+- `[not set]` — section has no config.
+- `[legacy]` — section needs migration; locked when `section.locked` is true.
 
 **Layout:**
 
@@ -113,38 +117,48 @@ Detected configuration:
   [not set]  <id>            <summary or "—">
   [legacy]   <id>            <summary>  (locked — migration required)
   ...
-
-Select sections to configure (space toggle, enter confirm):
-  [ ] <id>  — <one-line: section.purpose first sentence>
-  [x] <id>  — <one-line: section.purpose first sentence>
-  ...
 ```
 
-Render every row in `prepare.sections[]` exactly once, in array order. Use `section.label` and `section.summary` verbatim for the status block; use the first sentence of `section.purpose` for the menu hint.
-
-**Default selection (which rows are pre-checked):** issue #235 flips the default — every row is pre-checked unless the user opts in to the legacy unset-only fast-path. The selection mode is resolved by `skill/setup.js` and surfaced as `flags.unsetOnly` in the prepare output; SKILL.md cites that resolved field (per `flag-coherence-cross-skill`).
-
-| Condition | Pre-checked rows |
-|---|---|
-| `section.locked` is `true` | always checked, cannot toggle |
-| `--force` passed | every row |
-| `--only <ids>` passed | only the listed ids; other rows hidden, menu skipped |
-| `flags.unsetOnly === true` | rows where `section.state === 'not-set'` (legacy fast-path) |
-| Otherwise | every row (default — issue #235) |
-
-**Flag aliases:** See the flag-alias routing table in Step 0. When any direct-entry flag is passed (and `--only` is not), the translation is already applied before Step 1 runs — skip the menu and proceed to Step 3 with the resolved id selected.
-
-**Empty selection guard:** If the user confirms with no rows selected (and `--only` was not passed), print:
+**Phase 2 — Print the numbered menu directly to chat.** One line per row in `prepare.sections[]` order, format:
 
 ```
-No sections selected — no changes made.
+<N>. [<state>] <section.label> — <first sentence of section.purpose>
 ```
 
-Skip Steps 2–3b, jump to Step 4 (which will print "no changes" since nothing was written).
+- N is 1-indexed, assigned in array order.
+- `<state>` mirrors the badge: `set` | `not-set` | `legacy`.
+- Locked legacy rows append ` (locked — required)` after the description.
+- All strings MUST come from the manifest (`scripts/lib/setup-sections.js`); do NOT hardcode labels or descriptions.
 
-**Locked rows refuse toggle:** If the user attempts to uncheck a `locked: true` row, re-display the menu with a one-line note: `"<id> is locked — needsMigration is true; complete migration first."` Locked rows always proceed into Step 3 regardless of selection.
+Example rendering:
+```
+1. [set] Version — Configures how version-sdlc bumps the project version.
+2. [not-set] Ship — Configures the ship-sdlc pipeline defaults.
+3. [legacy] Review (locked — required) — Configures review dimensions for review-sdlc.
+```
 
-Use AskUserQuestion with `multiSelect` to dispatch the menu. The question text is `"Select sections to configure"`; choices are the rows; selected values are the section ids to process. Defer migration and field collection to Step 2 / Step 3.
+**Phase 3 — Ask via plain chat (NOT `AskUserQuestion`).** Print the following prompt as a literal chat message, then end the model turn so the user's next message is the answer:
+
+```
+Reply with the numbers to configure (e.g. 1,3,5 or 1-3,7), or type:
+  all       — configure every section
+  not-set   — configure only sections currently [not set]
+  none      — exit without changes
+Default: <prepare.menuInputContract.defaultToken>
+```
+
+Do NOT wrap this in `AskUserQuestion`. It is a literal chat output followed by a turn boundary.
+
+**Phase 4 — Parse the reply** against `prepare.menuInputContract` (data, not LLM heuristics):
+- Empty reply → use `prepare.menuInputContract.defaultToken` (`all` or `not-set`).
+- `all` → every `prepare.sections[].id`.
+- `not-set` → ids where `section.state === 'not-set'`.
+- `none` or `cancel` → empty list → print `No sections selected — no changes made.` and jump to Step 4.
+- Comma- or space-separated numbers, optionally including `M-N` ranges → resolve each token to a row by 1-indexed position; union the results.
+- **Always-include rule:** rows where `section.locked === true` are added to the resolved id list regardless of reply content (preserves R-menu-3). If the only resolved ids are locked rows and the user replied `none`, the no-changes guard does NOT fire (locked rows still enter Step 3).
+- **Invalid input:** if any token is unknown or out of range, print one line: `Invalid input: "<token>" is not a number, range, or known keyword. Try again.` Then re-print the numbered list and the prompt; wait for a new reply. Maximum 3 retries; after that, exit with `No valid input after 3 attempts — no changes made.` and a one-line note.
+
+Store the resolved section ids as `selectedIds`. Defer migration and field collection to Step 2 / Step 3.
 
 ---
 
@@ -256,7 +270,7 @@ If `section.confirmDetected === true` (currently only `version`), dispatch a met
 
 Options: `yes` (write detected values directly), `customize` (iterate `section.fields`), `skip` (write nothing for this section).
 
-- On **yes**: Build the section value from `prepare.detected.*` (e.g., for `version`: `{ mode: 'file', versionFile, fileType, tagPrefix }`; if `prepare.detected.versionFile` is null, use `{ mode: 'tag', tagPrefix }`). Do NOT write `preRelease` on the yes path.
+- On **yes**: Build the section value from `prepare.detected.*` (e.g., for `version`: `{ mode: 'file', versionFile, fileType, tagPrefix }`; if `prepare.detected.versionFile` is null, use `{ mode: 'tag', tagPrefix }`). Do NOT write `preRelease` on the yes path — the yes path uses detected values only, none of which include `preRelease`. The version compat check (below) does not apply on the yes path since no `preRelease` is collected here.
 - On **customize**: continue to the field iteration below.
 - On **skip**: stop processing this section; do not write anything.
 
@@ -270,6 +284,20 @@ For each entry `field` in `section.fields` (when iterating), dispatch one AskUse
 - **Validation:** if `field.validate` is defined, re-prompt on failure showing the regex/constraint inline
 
 Skip a field when an upstream answer makes it irrelevant: for `version`, skip `versionFile` and `fileType` if `mode === 'tag'`; skip `changelogFile` if `changelog === false`; omit `preRelease` from the written config when the user enters an empty string.
+
+<!-- Implements R-version-prerelease-compat, G4. Fixes #338. -->
+**Version pre-release compatibility check:**
+After all version section fields are collected and BEFORE storing the section object:
+
+1. If `mode === 'tag'` or `preRelease` is empty/omitted → skip this check (no preRelease to validate).
+2. Let `compat = prepare.preReleaseCompat[<chosen-fileType>]`.
+3. Branch on `compat.level`:
+   - `compatible` → store the section as-is; no prompt.
+   - `partial` or `unknown` → print `compat.message`, then use AskUserQuestion (single-select): "Proceed with `preRelease: <value>` for `<fileType>`?" → options `yes` (store as-is), `no` (omit `preRelease` from the stored section).
+   - `incompatible` → print `compat.message`, then use AskUserQuestion (single-select): "Pre-release labels are not supported for `<fileType>`. Clear `preRelease`, or proceed anyway?" → options `clear` (omit `preRelease` from the stored section), `proceed` (store as-is, accepting risk).
+4. The check runs once per version-section dispatch; it does NOT re-trigger if the same compat verdict was already resolved within the same setup-sdlc invocation (state-machine idempotency: a single run never asks the same question twice for the same `(fileType, preRelease)` pair).
+
+This check applies only to the `version` section and only when `mode === 'file'` (the `fileType` field is known). When `mode === 'tag'`, no `fileType` is configured so the check is skipped.
 
 **Answer mapping when assembling the section object:**
 - `enum` fields → write the selected option string verbatim

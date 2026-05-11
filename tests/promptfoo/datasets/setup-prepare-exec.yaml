@@ -216,3 +216,52 @@
         const out = JSON.parse(output);
         const nonGated = out.shipFields.filter(f => !f.when);
         return nonGated.length === 7 && nonGated.every(f => f.skip === false)
+
+# ---------------------------------------------------------------------------
+# Issue #338 — preReleaseCompat; Issue #337 — menuInputContract
+# ---------------------------------------------------------------------------
+
+- description: "setup-prepare (#338): preReleaseCompat contains all six fileType keys with correct levels"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const pc = out.preReleaseCompat;
+        if (!pc) return false;
+        const expected = {
+          'package.json': 'compatible',
+          'cargo.toml': 'compatible',
+          'plugin.json': 'compatible',
+          'pyproject.toml': 'partial',
+          'pubspec.yaml': 'incompatible',
+          'version-file': 'unknown',
+        };
+        return Object.entries(expected).every(([k, v]) => pc[k] && pc[k].level === v) &&
+               Object.keys(pc).length === 6
+
+- description: "setup-prepare (#337): menuInputContract.defaultToken === 'all' when --unset-only is absent"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        return out.menuInputContract && out.menuInputContract.defaultToken === 'all'
+
+- description: "setup-prepare (#337): menuInputContract.defaultToken === 'not-set' when --unset-only is passed"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_args: "--unset-only"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        return out.menuInputContract && out.menuInputContract.defaultToken === 'not-set'

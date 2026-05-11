@@ -39,6 +39,46 @@ function execSafe(cmd) {
 }
 
 // ---------------------------------------------------------------------------
+// Static compatibility tables (T2: R-version-prerelease-compat, #338)
+// ---------------------------------------------------------------------------
+
+/**
+ * Static map of fileType → pre-release compatibility level.
+ * Emitted verbatim in prepare output as `preReleaseCompat`.
+ * Data-only — no detection-time inputs; SKILL.md cites `level` by name.
+ */
+const PRE_RELEASE_COMPAT = {
+  'package.json': { level: 'compatible', message: '' },
+  'cargo.toml':   { level: 'compatible', message: '' },
+  'plugin.json':  { level: 'compatible', message: '' },
+  'pyproject.toml': {
+    level: 'partial',
+    message: 'pyproject.toml uses PEP 440 pre-release format (e.g., .rc1), which differs from semver (-rc.1). /version-sdlc writes a semver string that may not parse cleanly with PEP 440 tooling. Confirm before writing.',
+  },
+  'pubspec.yaml': {
+    level: 'incompatible',
+    message: 'pubspec.yaml does not support semver pre-release labels. Setting preRelease will break /version-sdlc at bump time.',
+  },
+  'version-file': {
+    level: 'unknown',
+    message: 'Plain text version files accept any string, but downstream tooling that reads this file may not. Confirm before writing.',
+  },
+};
+
+/**
+ * Contract describing accepted free-text patterns for Step 1's numbered-list reply.
+ * Emitted in prepare output as `menuInputContract` with `defaultToken` overlaid per-invocation.
+ * SKILL.md cites this object when constructing the prompt and parsing the reply.
+ */
+const MENU_INPUT_CONTRACT = {
+  tokens: { all: 'all', notSet: 'not-set', none: 'none', cancel: 'cancel' },
+  allowsNumbers: true,
+  allowsRanges: true,
+  separators: [',', ' '],
+  // defaultToken is overlaid per-invocation in the main block based on flags.unsetOnly
+};
+
+// ---------------------------------------------------------------------------
 // Detection logic
 // ---------------------------------------------------------------------------
 
@@ -189,6 +229,7 @@ function detect(projectRoot) {
       managedBlockVersion: openspecManagedBlockVersion,
     },
     shipFields: SHIP_FIELDS,
+    preReleaseCompat: PRE_RELEASE_COMPAT,
   };
 
   result.needsMigration =
@@ -420,6 +461,12 @@ if (require.main === module) {
     // --steps <csv> supplies the actively selected steps[]; when absent, all
     // entries default to skip: false (no gating information available).
     result.shipFields = applyWhenGates(result.shipFields, parsed.flags.steps);
+    // Overlay menuInputContract with per-invocation defaultToken (#337)
+    result.menuInputContract = Object.assign(
+      {},
+      MENU_INPUT_CONTRACT,
+      { defaultToken: parsed.flags.unsetOnly ? 'not-set' : 'all' },
+    );
     writeOutput(result, 'setup-prepare', 0);
   } catch (err) {
     process.stderr.write(`setup-prepare: unexpected error: ${err.message}\n`);
