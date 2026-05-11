@@ -234,7 +234,7 @@
     - type: icontains
       value: '.sdlc/config.json'
 
-- description: "pr.js #339: --base CLI flag takes precedence over config.pr.defaultBranch (baseBranchOverride is set)"
+- description: "pr.js #339: --base CLI flag takes precedence over config.pr.defaultBranch (error-path reflection — fixture has no remote, so the cascade is observed via baseBranchOverride echoed in the error payload rather than a successful base resolution)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
     script_args: "--base main"
@@ -252,3 +252,14 @@
   assert:
     - type: icontains
       value: '"prConfig": null'
+
+- description: "pr.js: rejects pr.defaultBranch containing shell metacharacters before any shell interpolation reaches git rev-parse"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-invalid-default-branch"
+  assert:
+    - type: icontains
+      value: 'is not a valid branch name'
+    - type: icontains
+      value: 'config.pr.defaultBranch'

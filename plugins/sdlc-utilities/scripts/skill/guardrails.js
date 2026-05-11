@@ -648,15 +648,29 @@ function buildProposals(signals, target) {
   });
 
   // Framework-specific guardrails (issue #336)
-  if (signals.frameworks.includes('svelte') || signals.frameworks.includes('astro')) {
+  // Spec allows shared id with framework-specific description. Svelte and Astro
+  // both use the islands pattern but with different runtime semantics, so each
+  // framework gets its own description while sharing the proposal id.
+  if (signals.frameworks.includes('svelte')) {
     proposals.push({
       id: 'island-only-interactivity',
       description: isPlan
-        ? 'Tasks must use the island pattern for interactive components only — default to static markup; no unnecessary client-side hydration.'
-        : 'Use island pattern for interactive components only; default to static markup. Avoid unnecessary client-side hydration.',
+        ? 'Tasks must use Svelte components as interactive islands only — default to static markup and reach for `<script>` blocks only where interactivity is required.'
+        : 'Use Svelte components as interactive islands only; default to static markup. Add `<script>` interactivity only where it is required, not by default.',
       severity: 'warning',
       category: 'framework',
-      evidence: `Detected framework(s): ${signals.frameworks.filter(f => f === 'svelte' || f === 'astro').join(', ')}.`,
+      evidence: 'Detected framework(s): svelte.',
+    });
+  }
+  if (signals.frameworks.includes('astro')) {
+    proposals.push({
+      id: 'island-only-interactivity',
+      description: isPlan
+        ? 'Tasks must keep Astro components static by default — opt into client hydration (`client:load`, `client:idle`, `client:visible`) only for components that require interactivity.'
+        : 'Astro components must be static by default. Use `client:*` directives only for components that genuinely require client-side interactivity; avoid unnecessary hydration.',
+      severity: 'warning',
+      category: 'framework',
+      evidence: 'Detected framework(s): astro.',
     });
   }
 
@@ -670,16 +684,6 @@ function buildProposals(signals, target) {
       category: 'framework',
       evidence: 'Detected Prisma ORM (prisma/ directory present).',
     });
-  }
-
-  // Internal invariant: every proposal must carry a non-empty category field.
-  // Throw early with the offending id list to surface missing categories at
-  // dev time rather than silently emitting malformed output.
-  const missingCategory = proposals.filter(p => !p.category);
-  if (missingCategory.length > 0) {
-    throw new Error(
-      `buildProposals: proposals missing category field: ${missingCategory.map(p => p.id).join(', ')}`
-    );
   }
 
   // Planning-discipline guardrails — plan target only
@@ -723,6 +727,18 @@ function buildProposals(signals, target) {
       category: 'planning-discipline',
       evidence: 'Universal guardrail — always applicable to non-trivial plans.',
     });
+  }
+
+  // Internal invariant: every proposal must carry a non-empty category field.
+  // Throw early with the offending id list to surface missing categories at
+  // dev time rather than silently emitting malformed output. Placed after ALL
+  // proposal pushes (including isPlan-gated ones) so future proposals cannot
+  // bypass the check.
+  const missingCategory = proposals.filter(p => !p.category);
+  if (missingCategory.length > 0) {
+    throw new Error(
+      `buildProposals: proposals missing category field: ${missingCategory.map(p => p.id).join(', ')}`
+    );
   }
 
   return proposals;
