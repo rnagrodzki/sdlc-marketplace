@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.19.10] - 2026-05-11
+
+### Added
+- setup-guardrails: categorized proposals with framework-specific guardrails for Svelte, Astro, and Prisma; two-stage custom prompt flow (#336)
+- pr-sdlc: `defaultBranch` field in the `pr` config section with safe base-branch detection helper, replacing duplicate git symbolic-ref logic (#336)
+
+### Fixed
+- pr-sdlc: shell-injection safety and proposal invariant check placement in default-branch validation (#339)
+
 ## [0.19.9] - 2026-05-09
 
 ### Fixed
