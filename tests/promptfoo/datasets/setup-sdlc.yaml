@@ -34,12 +34,13 @@
     # Behavioral
     - type: llm-rubric
       value: >
-        The response renders the multi-select menu populated from prepare.sections[]. All 11
-        rows show up at least by id. The user's selection of `jira` is honored, and ONLY the
-        jira section enters the dispatch loop in Step 3 — the response does NOT walk through
-        version, ship, review, commit, or pr. Before asking any jira-specific question, the
-        response prints a verbose header for jira including Purpose, Files modified, and
-        Consumed by lines sourced from the manifest.
+        The response renders the numbered list menu from prepare.sections[] directly in chat
+        (not AskUserQuestion). All rows show up at least by id. The user's reply of `jira`
+        (or the corresponding number) is honored, and ONLY the jira section enters the
+        dispatch loop in Step 3 — the response does NOT walk through version, ship, review,
+        commit, or pr. Before asking any jira-specific question, the response prints a verbose
+        header for jira including Purpose, Files modified, and Consumed by lines sourced from
+        the manifest.
 
 - description: "setup-sdlc: clean project + user accepts pre-checked menu, full flow runs"
   vars:
@@ -52,9 +53,9 @@
   assert:
     - type: icontains
       value: "version"
-    # Pre-check expectation: every row defaulted on
+    # Numbered list expectation: every row appears with a number prefix
     - type: regex
-      value: "(\\[x\\]|pre-check|default selection|all selected)"
+      value: "(1\\.|2\\.|not-set|not set|default|all)"
     # Verbose header for version
     - type: icontains-all
       value:
@@ -63,11 +64,12 @@
         - "Consumed by"
     - type: llm-rubric
       value: >
-        The response acknowledges that on a clean project all not-set rows are pre-checked
-        in the multi-select menu by default. It confirms the default selection and proceeds
-        to render Step 3 for the first selected section (`version`). The verbose header for
-        version contains four labelled lines: Purpose, Files modified, Consumed by, and
-        Config file (or equivalent). The header text comes from the manifest, not freeform copy.
+        The response renders a numbered list of prepare.sections[] rows directly in chat
+        (not via AskUserQuestion). On a clean project the default token is `all`. It then
+        asks a free-text question (not AskUserQuestion) for which sections to configure,
+        and proceeds to render Step 3 for the first selected section (`version`). The verbose
+        header for version contains four labelled lines: Purpose, Files modified, Consumed by,
+        and Config file (or equivalent). The header text comes from the manifest, not freeform copy.
 
 - description: "setup-sdlc: legacy fixture + migration row locked and cannot be toggled off"
   vars:
@@ -92,13 +94,12 @@
         complete first. The response does NOT proceed with version skipped; instead it
         either re-displays the menu with a note, or confirms migration will run.
 
-- description: "setup-sdlc: empty selection at menu exits cleanly with no changes"
+- description: "setup-sdlc: reply 'none' at numbered-list menu exits cleanly with no changes"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
     project_context: "file://fixtures/setup-fully-configured.md"
     user_request: >
-      Run /setup-sdlc. The menu appears. I uncheck every (non-locked) row and confirm
-      with no rows selected. Tell me what happens.
+      Run /setup-sdlc. The numbered list menu appears. I reply "none". Tell me what happens.
   assert:
     - type: icontains-any
       value:
@@ -108,7 +109,7 @@
     # Must NOT walk through any section
     - type: llm-rubric
       value: >
-        The response detects the empty selection and exits cleanly with a "no changes" /
+        The response detects the "none" reply and exits cleanly with a "no changes" /
         "no sections selected" summary. It does NOT enter the Step 3 dispatch loop, does
         NOT run any AskUserQuestion for individual fields, and does NOT write any config
         files. The summary at Step 5 reflects "nothing was configured."
@@ -408,3 +409,279 @@
         The skill MUST ask the user about verifyPipelineTimeout (or its label) and
         awaitRemoteReviewers (or its label). This demonstrates that when skip is false,
         gated fields surface correctly in the prompt loop per R15 and P7.
+
+# ---------------------------------------------------------------------------
+# Issues #337 + #338 — numbered-list menu redesign + preRelease compat check
+# ---------------------------------------------------------------------------
+
+- description: "setup-sdlc (#337): menu-numbered-list-rendered — Step 1 prints numbered list, no AskUserQuestion tool call"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc. Show me exactly what Step 1 looks like — how sections are presented.
+  assert:
+    - type: regex
+      value: "1\\."
+    - type: regex
+      value: "\\[set\\]|\\[not.set\\]|\\[not-set\\]"
+    - type: llm-rubric
+      value: >
+        Step 1 renders a numbered list of prepare.sections[] rows in chat — one line per row,
+        with a 1-indexed number prefix, a [state] badge, the section label, and the first
+        sentence of section.purpose. The skill does NOT invoke AskUserQuestion for section
+        selection — it emits the list as plain chat text and asks a free-text question for
+        the user's reply. The list includes at least version, ship, jira, review, commit, pr.
+
+- description: "setup-sdlc (#337): menu-reply-none-exits — reply 'none' exits with no-changes summary"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc. The menu appears. I reply "none". Show what happens.
+  assert:
+    - type: icontains-any
+      value:
+        - "no changes"
+        - "no sections selected"
+        - "nothing to configure"
+    - type: llm-rubric
+      value: >
+        The user replied "none" to the numbered-list prompt. The skill prints a "no changes"
+        message and exits without entering Step 3 or writing any config files. No AskUserQuestion
+        for individual fields fires. The R-menu-4 contract is satisfied: a none/cancel reply
+        exits cleanly.
+
+- description: "setup-sdlc (#337): menu-reply-numbers-subset — comma-separated numbers select only those sections"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc. The numbered list appears. I reply "1,3" (sections 1 and 3). Show which
+      sections enter Step 3.
+  assert:
+    - type: llm-rubric
+      value: >
+        The skill parses the reply "1,3" and resolves sections 1 and 3 by their 1-indexed
+        position in prepare.sections[]. Only those two sections (plus any locked rows) enter
+        Step 3. The skill does NOT configure any other sections.
+
+- description: "setup-sdlc (#337): menu-reply-range — range 2-4 selects sections 2, 3, 4"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc. The menu appears. I reply "2-4". Which sections enter Step 3?
+  assert:
+    - type: llm-rubric
+      value: >
+        The skill parses the range "2-4" and resolves sections 2, 3, and 4 by 1-indexed
+        position (inclusive range). Only sections 2, 3, 4 (plus any locked rows) enter Step 3.
+        No other sections are configured.
+
+- description: "setup-sdlc (#337): menu-reply-mixed — mixed input '1-2,5' selects union of range and number"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc. The numbered list appears. I reply "1-2,5". Which sections enter Step 3?
+  assert:
+    - type: llm-rubric
+      value: >
+        The skill parses the mixed input "1-2,5" as the union of range 1-2 and number 5,
+        resolving to sections 1, 2, and 5 by 1-indexed position. Only those sections (plus
+        any locked rows) enter Step 3.
+
+- description: "setup-sdlc (#337): menu-reply-all — reply 'all' configures every section"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc. I reply "all". Describe which sections will be configured.
+  assert:
+    - type: llm-rubric
+      value: >
+        The skill parses the reply "all" and selects every section id from prepare.sections[].
+        All sections enter Step 3 for configuration.
+
+- description: "setup-sdlc (#337): menu-reply-not-set — reply 'not-set' selects only unset sections"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-clean-project.md"
+    user_request: >
+      Run /setup-sdlc. I reply "not-set". Which sections enter Step 3?
+  assert:
+    - type: llm-rubric
+      value: >
+        The skill parses the reply "not-set" and resolves to only the sections where
+        section.state === 'not-set'. On a clean project, all sections qualify. Locked rows
+        are always included regardless of reply.
+
+- description: "setup-sdlc (#337): menu-reply-empty-uses-default — empty reply resolves to defaultToken"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc. The menu shows defaultToken 'all'. I reply with nothing (empty message).
+      What does the skill configure?
+  assert:
+    - type: llm-rubric
+      value: >
+        The skill interprets an empty reply as using the defaultToken from
+        prepare.menuInputContract.defaultToken. When defaultToken is 'all', an empty reply
+        selects every section. The skill does NOT re-prompt for input; it proceeds with the
+        default resolution.
+
+- description: "setup-sdlc (#337): menu-reply-invalid-reprompts — out-of-range number re-prompts with error"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc. I reply "99" (a number out of range). What happens next?
+  assert:
+    - type: icontains-any
+      value:
+        - "invalid"
+        - "out of range"
+        - "not a number"
+    - type: llm-rubric
+      value: >
+        The skill detects that "99" is out of range (no section at position 99). It prints
+        a one-line error message citing the offending token: something like
+        'Invalid input: "99" is not a number, range, or known keyword. Try again.'
+        It then re-prints the numbered list and the prompt and waits for a new reply.
+
+- description: "setup-sdlc (#337): menu-locked-row-always-included — locked row included even when reply is 'none'"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-legacy-migration.md"
+    user_request: >
+      Run /setup-sdlc. A locked legacy row exists (version, locked: true). I reply "none".
+      Does the locked row still get configured?
+  assert:
+    - type: icontains-any
+      value:
+        - "locked"
+        - "migration"
+        - "required"
+    - type: llm-rubric
+      value: >
+        The user replied "none" but a locked row (locked: true) is present. The skill always
+        includes locked rows in the resolved id list regardless of reply content. The locked
+        row still enters Step 3. The no-changes guard does NOT fire because the resolved list
+        is non-empty (locked row). This implements R-menu-3.
+
+- description: "setup-sdlc (#338): prerelease-compatible-silent — package.json + preRelease='rc' writes without prompt"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-clean-project.md"
+    user_request: >
+      Run /setup-sdlc --only version. The detected fileType is 'package.json'. I pick
+      mode=file, answer all version fields, and enter 'rc' for preRelease. What happens before
+      the config is written?
+  assert:
+    - type: not-icontains-any
+      value:
+        - "incompatible"
+        - "partial"
+        - "confirm"
+        - "Proceed with preRelease"
+    - type: llm-rubric
+      value: >
+        The fileType is 'package.json' which has compat level 'compatible'. After collecting
+        preRelease='rc', the skill performs no compat prompt — it proceeds silently to store
+        the section with preRelease='rc'. No AskUserQuestion for compatibility is dispatched.
+
+- description: "setup-sdlc (#338): prerelease-partial-confirm-yes — pyproject.toml + preRelease='rc' → confirm yes → writes"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-clean-project.md"
+    user_request: >
+      Run /setup-sdlc --only version. The detected fileType is 'pyproject.toml'. I pick
+      mode=file and enter 'rc' for preRelease. The compat prompt appears. I pick 'yes'.
+      What is written to .sdlc/config.json?
+  assert:
+    - type: icontains
+      value: "pyproject.toml"
+    - type: icontains
+      value: "rc"
+    - type: llm-rubric
+      value: >
+        The fileType is 'pyproject.toml' (compat level 'partial'). After collecting
+        preRelease='rc', the skill prints prepare.preReleaseCompat['pyproject.toml'].message
+        and dispatches a yes/no AskUserQuestion. The user picks 'yes'. The config is written
+        with preRelease: 'rc' included in the version section.
+
+- description: "setup-sdlc (#338): prerelease-partial-confirm-no — pyproject.toml + preRelease='rc' → confirm no → omits"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-clean-project.md"
+    user_request: >
+      Run /setup-sdlc --only version. The detected fileType is 'pyproject.toml'. I pick
+      mode=file and enter 'rc' for preRelease. The compat prompt appears. I pick 'no'.
+      What is written to .sdlc/config.json?
+  assert:
+    - type: llm-rubric
+      value: >
+        The fileType is 'pyproject.toml' (compat level 'partial'). After collecting
+        preRelease='rc', the skill prints the partial message and dispatches a yes/no
+        AskUserQuestion. The user picks 'no'. The config is written with preRelease OMITTED
+        from the version section (the field is cleared per the no path).
+
+- description: "setup-sdlc (#338): prerelease-incompatible-clear — pubspec.yaml + preRelease='rc' → clear → omits"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-clean-project.md"
+    user_request: >
+      Run /setup-sdlc --only version. The detected fileType is 'pubspec.yaml'. I pick
+      mode=file and enter 'rc' for preRelease. The incompatible warning appears. I pick 'clear'.
+      What is written?
+  assert:
+    - type: icontains-any
+      value:
+        - "pubspec.yaml does not support"
+        - "not supported"
+        - "incompatible"
+    - type: llm-rubric
+      value: >
+        The fileType is 'pubspec.yaml' (compat level 'incompatible'). After collecting
+        preRelease='rc', the skill prints prepare.preReleaseCompat['pubspec.yaml'].message
+        (the incompatible warning) and dispatches a clear/proceed AskUserQuestion. The user
+        picks 'clear'. The config is written with preRelease OMITTED. The incompatible message
+        appears verbatim before the prompt, per the plan contract.
+
+- description: "setup-sdlc (#338): prerelease-incompatible-proceed — pubspec.yaml + preRelease='rc' → proceed → writes"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-clean-project.md"
+    user_request: >
+      Run /setup-sdlc --only version. The detected fileType is 'pubspec.yaml'. I pick
+      mode=file and enter 'rc' for preRelease. The incompatible warning appears. I pick 'proceed'.
+      What is written?
+  assert:
+    - type: icontains
+      value: "rc"
+    - type: llm-rubric
+      value: >
+        The fileType is 'pubspec.yaml' (compat level 'incompatible'). The skill prints the
+        incompatible warning and dispatches a clear/proceed AskUserQuestion. The user picks
+        'proceed' (accepting risk). The config is written with preRelease: 'rc' verbatim.
+
+- description: "setup-sdlc (#338): prerelease-idempotent — second invocation with same fixture does not re-prompt compat"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/setup-sdlc/SKILL.md"
+    project_context: "file://fixtures/setup-fully-configured.md"
+    user_request: >
+      Run /setup-sdlc --only version on a project that already has version.preRelease='rc' and
+      fileType='pyproject.toml' written. I pick 'yes' at confirmDetected to keep detected values.
+      Does the compat check fire again?
+  assert:
+    - type: llm-rubric
+      value: >
+        The version section has confirmDetected: true. When the user picks 'yes' at the
+        confirmDetected meta-prompt, the skill builds the section from prepare.detected.*
+        values only (mode, versionFile, fileType, tagPrefix). The yes path does NOT include
+        preRelease (per the SKILL.md note). Therefore no preRelease is collected and the
+        compat check is skipped entirely — it only fires when preRelease is non-empty after
+        field collection. The idempotency contract is satisfied: a second invocation via the
+        yes path never triggers the compat prompt.
