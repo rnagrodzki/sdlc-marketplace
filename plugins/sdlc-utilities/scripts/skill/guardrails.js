@@ -168,6 +168,7 @@ function detectLanguagesAndFrameworks(projectRoot, signals) {
       angular:  'angular',
       '@angular/core': 'angular',
       svelte:   'svelte',
+      astro:    'astro',
       hapi:     'hapi',
       koa:      'koa',
       // Serverless / IaC
@@ -645,6 +646,41 @@ function buildProposals(signals, target) {
     category: 'quality',
     evidence: 'Universal guardrail — always applicable.',
   });
+
+  // Framework-specific guardrails (issue #336)
+  if (signals.frameworks.includes('svelte') || signals.frameworks.includes('astro')) {
+    proposals.push({
+      id: 'island-only-interactivity',
+      description: isPlan
+        ? 'Tasks must use the island pattern for interactive components only — default to static markup; no unnecessary client-side hydration.'
+        : 'Use island pattern for interactive components only; default to static markup. Avoid unnecessary client-side hydration.',
+      severity: 'warning',
+      category: 'framework',
+      evidence: `Detected framework(s): ${signals.frameworks.filter(f => f === 'svelte' || f === 'astro').join(', ')}.`,
+    });
+  }
+
+  if (signals.dbType === 'prisma') {
+    proposals.push({
+      id: 'prisma-migration-required',
+      description: isPlan
+        ? 'Tasks that modify the Prisma schema must include a corresponding `prisma migrate` step. Schema changes without migrations are a blocking issue.'
+        : 'Prisma schema changes must be accompanied by a migration file (`prisma migrate dev` or `prisma migrate deploy`). Do not modify schema.prisma without generating a migration.',
+      severity: 'error',
+      category: 'framework',
+      evidence: 'Detected Prisma ORM (prisma/ directory present).',
+    });
+  }
+
+  // Internal invariant: every proposal must carry a non-empty category field.
+  // Throw early with the offending id list to surface missing categories at
+  // dev time rather than silently emitting malformed output.
+  const missingCategory = proposals.filter(p => !p.category);
+  if (missingCategory.length > 0) {
+    throw new Error(
+      `buildProposals: proposals missing category field: ${missingCategory.map(p => p.id).join(', ')}`
+    );
+  }
 
   // Planning-discipline guardrails — plan target only
   if (isPlan) {

@@ -218,3 +218,37 @@
   assert:
     - type: not-icontains
       value: 'Deprecation: .claude/pr-template.md'
+
+# --- config.pr.defaultBranch cascade (#339) ---
+
+- description: "pr.js #339: config.pr.defaultBranch set to non-existent branch produces clear error naming config path"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-default-branch"
+  assert:
+    - type: icontains
+      value: 'config.pr.defaultBranch'
+    - type: icontains
+      value: 'develop'
+    - type: icontains
+      value: '.sdlc/config.json'
+
+- description: "pr.js #339: --base CLI flag takes precedence over config.pr.defaultBranch (baseBranchOverride is set)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_args: "--base main"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-default-branch"
+  assert:
+    - type: icontains
+      value: '"baseBranchOverride": "main"'
+
+- description: "pr.js #339: no config.pr.defaultBranch field falls back to git auto-detection (existing behavior preserved)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-no-config"
+  assert:
+    - type: icontains
+      value: '"prConfig": null'

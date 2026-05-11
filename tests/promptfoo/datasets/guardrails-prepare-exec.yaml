@@ -237,3 +237,74 @@
   assert:
     - type: javascript
       value: "(() => { const d = JSON.parse(output); const m = Object.fromEntries(d.proposals.map(p => [p.id, p])); return ['state-premise','smallest-viable-cut','failure-audience','explicit-non-goals','ambiguity-stops-and-asks'].every(id => m[id]?.category === 'planning-discipline'); })()"
+
+# --- Framework-specific guardrails (#336) ---
+
+- description: "guardrails-prepare #336: Svelte project emits island-only-interactivity proposal"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-svelte-app"
+  assert:
+    - type: icontains
+      value: '"id": "island-only-interactivity"'
+    - type: javascript
+      value: "(() => { const d = JSON.parse(output); const p = d.proposals.find(x => x.id === 'island-only-interactivity'); return p?.category === 'framework' && p?.severity === 'warning'; })()"
+
+- description: "guardrails-prepare #336: Astro project emits island-only-interactivity proposal"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-astro-app"
+  assert:
+    - type: icontains
+      value: '"id": "island-only-interactivity"'
+    - type: javascript
+      value: "(() => { const d = JSON.parse(output); const p = d.proposals.find(x => x.id === 'island-only-interactivity'); return p?.category === 'framework' && p?.severity === 'warning'; })()"
+
+- description: "guardrails-prepare #336: Prisma project emits prisma-migration-required proposal"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-prisma-app"
+  assert:
+    - type: icontains
+      value: '"id": "prisma-migration-required"'
+    - type: javascript
+      value: "(() => { const d = JSON.parse(output); const p = d.proposals.find(x => x.id === 'prisma-migration-required'); return p?.category === 'framework' && p?.severity === 'error'; })()"
+
+- description: "guardrails-prepare #336: non-Svelte/Astro project does NOT emit island-only-interactivity"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-mongodb-express"
+  assert:
+    - type: not-icontains
+      value: '"id": "island-only-interactivity"'
+
+- description: "guardrails-prepare #336: non-Prisma project does NOT emit prisma-migration-required"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-mongodb-express"
+  assert:
+    - type: not-icontains
+      value: '"id": "prisma-migration-required"'
+
+- description: "guardrails-prepare #336: every proposal in a Svelte project has non-empty category"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-svelte-app"
+  assert:
+    - type: javascript
+      value: "(() => { const d = JSON.parse(output); return d.proposals.every(p => typeof p.category === 'string' && p.category.length > 0); })()"
+
+- description: "guardrails-prepare #336: every proposal in a baseline project has non-empty category"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/guardrails.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-mongodb-express"
+  assert:
+    - type: javascript
+      value: "(() => { const d = JSON.parse(output); return d.proposals.every(p => typeof p.category === 'string' && p.category.length > 0); })()"

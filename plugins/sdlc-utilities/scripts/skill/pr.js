@@ -246,6 +246,7 @@ function main() {
   }
 
   // Step 5: Detect base branch
+  // Resolution cascade (issue #339): --base CLI flag > config.pr.defaultBranch > git auto-detect
   let baseBranch;
   if (baseBranchOverride) {
     const exists = exec(
@@ -259,12 +260,33 @@ function main() {
     }
     baseBranch = baseBranchOverride;
   } else {
-    try {
-      baseBranch = detectBaseBranch(projectRoot);
-    } catch (err) {
-      errors.push(err.message);
-      writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
-      return;
+    // Check config.pr.defaultBranch before falling back to git detection
+    const prConfigForBase = readSection(projectRoot, 'pr') || {};
+    const configDefaultBranch = typeof prConfigForBase.defaultBranch === 'string'
+      ? prConfigForBase.defaultBranch.trim()
+      : '';
+    if (configDefaultBranch) {
+      const exists = exec(
+        `git rev-parse --verify origin/${configDefaultBranch} 2>/dev/null`,
+        { cwd: projectRoot, shell: true }
+      );
+      if (!exists) {
+        errors.push(
+          `config.pr.defaultBranch is set to "${configDefaultBranch}" but "origin/${configDefaultBranch}" does not exist on the remote. ` +
+          `Update pr.defaultBranch in .sdlc/config.json or remove the field to use git auto-detection.`
+        );
+        writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
+        return;
+      }
+      baseBranch = configDefaultBranch;
+    } else {
+      try {
+        baseBranch = detectBaseBranch(projectRoot);
+      } catch (err) {
+        errors.push(err.message);
+        writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
+        return;
+      }
     }
   }
 
