@@ -2,7 +2,7 @@
 
 ## Overview
 
-Configures the SDLC plugin for a project. On invocation, `/setup-sdlc` shows a numbered list of sections printed directly to chat — version tracking, ship pipeline preferences, Jira, review scope, commit/PR patterns, review dimensions, PR template, plan and execution guardrails, and openspec enrichment. Each row shows a state badge (`set`, `not set`, or `legacy`). Reply with the numbers to configure (or `all` / `not-set` / `none`) to select which sections to configure. For every selected section, the skill prints a verbose header before any prompt — purpose, files modified, consuming skills, and a per-option description block — so you know exactly what each toggle controls before you answer.
+Configures the SDLC plugin for a project. On invocation, `/setup-sdlc` shows a numbered list of sections printed directly to chat — version tracking, ship pipeline preferences, Jira, review scope, commit/PR patterns, review dimensions, PR template, plan and execution guardrails, and openspec enrichment. Each row shows a state badge (`set`, `not-set`, or `legacy`). Reply with the numbers to configure (or `all` / `not-set` / `none`) to select which sections to configure. For every selected section, the skill prints a verbose header before any prompt — purpose, files modified, consuming skills, and a per-option description block — so you know exactly what each toggle controls before you answer.
 
 Creates `.sdlc/config.json` (project-level config), `.sdlc/local.json` (user-local preferences), and content artifacts (`.sdlc/review-dimensions/*.yaml`, `.sdlc/pr-template.md`, `openspec/config.yaml` managed block).
 

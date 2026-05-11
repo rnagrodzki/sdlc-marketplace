@@ -462,11 +462,10 @@ if (require.main === module) {
     // entries default to skip: false (no gating information available).
     result.shipFields = applyWhenGates(result.shipFields, parsed.flags.steps);
     // Overlay menuInputContract with per-invocation defaultToken (#337)
-    result.menuInputContract = Object.assign(
-      {},
-      MENU_INPUT_CONTRACT,
-      { defaultToken: parsed.flags.unsetOnly ? 'not-set' : 'all' },
-    );
+    result.menuInputContract = {
+      ...MENU_INPUT_CONTRACT,
+      defaultToken: parsed.flags.unsetOnly ? 'not-set' : 'all',
+    };
     writeOutput(result, 'setup-prepare', 0);
   } catch (err) {
     process.stderr.write(`setup-prepare: unexpected error: ${err.message}\n`);

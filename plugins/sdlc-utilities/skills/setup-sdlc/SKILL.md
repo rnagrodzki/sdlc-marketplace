@@ -57,7 +57,7 @@ SCRIPT=$(find ~/.claude/plugins -name "setup.js" -path "*/sdlc*/scripts/skill/se
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/setup.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/setup.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/setup.js" >&2; exit 2; }
 
-PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file)
+PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -144,6 +144,7 @@ Reply with the numbers to configure (e.g. 1,3,5 or 1-3,7), or type:
   all       — configure every section
   not-set   — configure only sections currently [not set]
   none      — exit without changes
+  cancel    — exit without changes (alias for none)
 Default: <prepare.menuInputContract.defaultToken>
 ```
 
@@ -295,7 +296,7 @@ After all version section fields are collected and BEFORE storing the section ob
    - `compatible` → store the section as-is; no prompt.
    - `partial` or `unknown` → print `compat.message`, then use AskUserQuestion (single-select): "Proceed with `preRelease: <value>` for `<fileType>`?" → options `yes` (store as-is), `no` (omit `preRelease` from the stored section).
    - `incompatible` → print `compat.message`, then use AskUserQuestion (single-select): "Pre-release labels are not supported for `<fileType>`. Clear `preRelease`, or proceed anyway?" → options `clear` (omit `preRelease` from the stored section), `proceed` (store as-is, accepting risk).
-4. The check runs once per version-section dispatch; it does NOT re-trigger if the same compat verdict was already resolved within the same setup-sdlc invocation (state-machine idempotency: a single run never asks the same question twice for the same `(fileType, preRelease)` pair).
+4. The check runs once per version-section dispatch; it does NOT re-trigger if the same compat verdict was already resolved within a single uninterrupted execution of Step 3 (state-machine idempotency: a single run never asks the same question twice for the same `(fileType, preRelease)` pair).
 
 This check applies only to the `version` section and only when `mode === 'file'` (the `fileType` field is known). When `mode === 'tag'`, no `fileType` is configured so the check is skipped.
 
