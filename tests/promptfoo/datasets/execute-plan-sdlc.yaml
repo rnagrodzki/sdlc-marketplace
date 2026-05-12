@@ -192,3 +192,90 @@
         staging window picks it up and the entry lands in the feature commit.
         The response does NOT describe Learning Capture as running after Step 9
         or as a standalone post-summary section.
+
+# Issue #353 — Wave-level Agent dispatch: wave-runner model in Step 5b
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc (issue #353): Step 5b dispatches one wave-runner Agent per wave, not one per task"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      A plan has 2 waves: Wave 1 contains tasks T1 (Standard) and T2 (Standard);
+      Wave 2 contains tasks T3 (Standard) and T4 (Standard). There are no Trivial
+      tasks. Walk through Step 5b for both waves — how many Agent dispatches happen
+      from main context, and what do the wave-runner Agents receive?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response describes exactly 2 Agent dispatches from main context (one
+        wave-runner Agent per wave, not 4 per-task dispatches). Each wave-runner
+        Agent receives the wave manifest (task descriptions, file lists, assigned
+        models, prior-wave context), the per-task template inlined as perTaskTemplate,
+        and is responsible for fanning out per-task sub-agents internally. The
+        response must NOT describe 4 individual Agent dispatches from main context.
+
+- description: "execute-plan-sdlc (issue #353): in-wave trivial batch absorbed into wave-runner dispatch"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      Wave 1 contains 3 tasks: T1 (Standard, sonnet), T2 (Trivial, haiku), T3
+      (Trivial, haiku). Walk through Step 5b for this wave — how many Agent
+      dispatches happen from main context, and what does the wave-runner's prompt
+      body include for the trivial batch?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response describes exactly 1 Agent dispatch from main context (one
+        wave-runner Agent for the entire wave). The wave-runner Agent's prompt
+        body includes the batchedTrivialTemplate (inlined from
+        classifying-and-waving-tasks.md) because the wave has 2+ Trivial tasks.
+        The wave-runner handles the trivial batch internally. The response must
+        NOT describe a separate batch-haiku Agent dispatch from main context for
+        the trivial tasks within this wave.
+
+- description: "execute-plan-sdlc (issue #353): Step 5c parses WAVE_SUMMARY and runs filesystem verification"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      The wave-runner Agent has returned. Its final line is:
+      `WAVE_SUMMARY: {"wave":1,"status":"completed","tasks":[{"id":"t1","name":"Add dispatchMode","complexity":"Standard","risk":"Low","status":"DONE","filesChanged":["plugins/ship.js"],"verifyToken":"dispatchMode in plugins/ship.js","attempts":[{"model":"sonnet","status":"DONE"}],"finalModel":"sonnet"}],"verification":{"ran":false},"escalationsUsed":0}`
+      Walk through Step 5c — what does main context do with this output?
+  assert:
+    - type: icontains
+      value: "WAVE_SUMMARY"
+    - type: regex
+      value: "(git diff|filesystem)"
+    - type: llm-rubric
+      value: >
+        Main context parses the WAVE_SUMMARY token, extracts filesChanged
+        (['plugins/ship.js']) and verifyToken ('dispatchMode in plugins/ship.js'),
+        then runs git diff --stat to confirm the file changed (filesystem
+        verification). It also greps for the verify token symbol. If git diff
+        shows no change, it classifies this as a phantom success. It then runs
+        the verification suite (tests/build/lint per plan). State writes
+        (task-done, wave-done via state/execute.js) happen after verification
+        passes. The response must NOT describe the wave-runner performing git
+        diff or state writes.
+
+- description: "execute-plan-sdlc (issue #353): high-risk gate fires in main context before wave-runner dispatch"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      Wave 3 contains one task classified as HIGH RISK (T5: architectural change).
+      Walk through Step 5a — when does the AskUserQuestion fire relative to the
+      wave-runner Agent dispatch?
+  assert:
+    - type: regex
+      value: "(AskUserQuestion|high.risk gate)"
+    - type: llm-rubric
+      value: >
+        Step 5a fires BEFORE the wave-runner Agent is dispatched. The
+        AskUserQuestion lists the high-risk task names and waits for user
+        approval (yes/skip/cancel). Only after the user approves does main
+        context dispatch the wave-runner Agent for Wave 3. The wave-runner
+        Agent itself does NOT fire the high-risk gate — that is a main-context
+        responsibility.

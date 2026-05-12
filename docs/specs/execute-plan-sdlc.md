@@ -24,7 +24,7 @@
 - R5: Small-plan direct execution for total tasks ≤3 AND all Trivial/Standard AND no high-risk — no wave orchestration, no state file
 - R6: Single trivial task in a wave executed inline; 2+ trivials batched into one haiku agent
 - R7: Critique wave structure before execution: file conflicts, dependency integrity, risk clustering, context sufficiency
-- R8: Every agent prompt includes full task text (never a reference to the plan file), exact file list, expected deliverable, and prior-wave context
+- R8: Step 5b dispatches one wave-runner Agent per wave when the wave contains 1+ Standard or Complex task, OR a Trivial in-wave batch. The wave-runner Agent receives the wave manifest, prior-wave context, and reuses the per-task and batched-trivial prompt templates internally to fan out per-task sub-agents within its own context. Two-level isolation: execute-main → wave-runner Agent → per-task sub-agent. Every per-task agent prompt still includes full task text (never a reference to the plan file), exact file list, expected deliverable, and prior-wave context. (Fixes #353.)
 - R9: Filesystem verification mandatory after each wave: `git diff --stat` confirms claimed changes; canary check greps for verification token
 - R10: Completion checklist parsing: cross-check `files_created`/`files_modified` against `git diff --stat`, verify STATUS field, handle NEEDS_CONTEXT and BLOCKED statuses
 - R11: Spec compliance review after each wave for non-trivial tasks (skip for Speed quality tier — `--quality full`)
@@ -48,6 +48,20 @@
 - R-config-version (issue #232): execute-plan-sdlc has no dedicated prepare script (the skill orchestrates plan execution directly), so the verifyAndMigrate call sits in the inline node block at Step 1 (LOAD) "Guardrail loading". That node block MUST also call `verifyAndMigrate(projectRoot, 'project')` and `verifyAndMigrate(projectRoot, 'local')` UNLESS `process.env.SDLC_SKIP_CONFIG_CHECK === '1'` OR the CLI `--skip-config-check` flag was passed. Both gates resolve to the same skip behavior. On migration failure the skill MUST halt with the failing step name surfaced before any wave is dispatched.
   - Acceptance: when invoked from ship-sdlc (which has already run verifyAndMigrate and exported `SDLC_SKIP_CONFIG_CHECK=1`), the inline block does not re-run migration; when invoked standalone, the block runs migration before guardrail loading.
 - R29 (issue #231): All references to the learnings log path (`.claude/learnings/log.md` in R27) are updated to `.sdlc/learnings/log.md`. This is a path-flip only — the learning-capture-before-Step-9 ordering requirement (R27) is unchanged.
+
+- R-wave-runner-contract (issue #353): The wave-runner Agent is the sole executor within a wave. Its contract is:
+  - **Input** (provided verbatim in the Agent prompt body): `{ waveNumber, totalWaves, qualityTier, escalationBudget, tasks: [{id, name, complexity, risk, files, description, acceptanceCriteria, assignedModel}], priorWaveContext: { planSummary, completedTaskIds, filesAdded, filesModified, interfacesCreated, decisionsFromPriorWaves }, perTaskTemplate, batchedTrivialTemplate }`. The `perTaskTemplate` and `batchedTrivialTemplate` fields carry the full inline content of the respective templates from `classifying-and-waving-tasks.md`, pasted by main context at dispatch time (not a path reference — wave-runner Agents must not need to Read files at the project root).
+  - **Output (final line):** `WAVE_SUMMARY: <single-line-json>` where json = `{ wave: N, status: 'completed' | 'failed' | 'partial', tasks: [{ id, name, complexity, risk, status: 'DONE'|'DONE_WITH_CONCERNS'|'NEEDS_CONTEXT'|'BLOCKED'|'FAILED', filesChanged: [...], verifyToken?: "<symbol> in <file>", attempts: [{model, status, error?}], finalModel, error? }], verification: { ran: bool, command?, passed?: bool, errorExcerpt?: string }, escalationsUsed: N }`.
+  - The output schema preserves enough fidelity that Step 6 recovery and Step 5c filesystem/canary checks in main context can reconstruct what each per-task sub-agent did.
+  - Per-task retries (haiku→sonnet→opus, budget 2) remain wave-runner's responsibility — semantics preserved, scope moved one layer down. Attempts are recorded in `attempts[]`.
+
+- R-main-context-steps (issue #353): The following steps are main-context responsibilities of execute-plan-sdlc and MUST NOT move into the wave-runner Agent: Step 2b (small-plan direct execution), Step 5 pre-wave trivial batch, Step 5a-pre (pre-wave guardrail check), Step 5a (high-risk gate), Step 5c (filesystem verification, canary check, conflict detection, completion-checklist parsing), Step 5c-bis (spec compliance reviewer), Step 5c-ter (post-wave guardrail check), Step 5d (state writes), Step 5e (inter-wave critique), and Step 6 (recovery escalation). When execute is invoked via Skill tool from ship-sdlc, all of these surfaces fire in ship's main context, restoring supervision.
+
+- R-tier-prompt-invariant (issue #353): Step 4 tier-selection AskUserQuestion fires in execute-plan-sdlc's invocation context. ship-sdlc MUST NOT synthesize a default `--quality` value when forwarding to execute — only forward `--quality` if the user explicitly passed it to ship. Otherwise the prompt fires for the user in ship's main context, enabling informed quality selection.
+
+- R-wave-abort-resume (issue #353): Inter-wave abort is the explicit break point. Mid-wave abort is not supported (wave-runner runs to wave completion or wave failure). `--resume` re-enters at the first wave with `status !== 'completed'` per existing `state/execute.js` resume detection.
+
+- R-small-plan-inline (issue #353): Step 2b small-plan direct-execution (≤3 tasks, all Trivial/Standard, no high-risk) bypasses wave-runner Agents entirely. Tasks execute inline in main context. Wave-runner Agents do not apply to this path.
 
 ## Workflow Phases
 

@@ -689,3 +689,76 @@
       value: 'Cannot combine --workspace with --tree'
     - type: icontains
       value: '"errors"'
+
+# Issue #353 — Wave-level Agent dispatch: dispatchMode field on every step
+# ---------------------------------------------------------------------------
+
+- description: "ship-prepare (issue #353): execute step has dispatchMode=skill"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const execute = (o.steps || []).find(s => s.name === 'execute');
+        return execute !== undefined && execute.dispatchMode === 'skill';
+
+- description: "ship-prepare (issue #353): sub-skill steps (commit, review, received-review, commit-fixes, version, pr) all have dispatchMode=agent"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const agentSteps = ['commit', 'review', 'received-review', 'commit-fixes', 'version', 'pr'];
+        return agentSteps.every(name => {
+          const step = (o.steps || []).find(s => s.name === name);
+          return step !== undefined && step.dispatchMode === 'agent';
+        });
+
+- description: "ship-prepare (issue #353): inline-Bash steps (archive-openspec, learnings-commit, cleanup) all have dispatchMode=null"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const inlineSteps = ['archive-openspec', 'learnings-commit', 'cleanup'];
+        return inlineSteps.every(name => {
+          const step = (o.steps || []).find(s => s.name === name);
+          return step !== undefined && Object.prototype.hasOwnProperty.call(step, 'dispatchMode') && step.dispatchMode === null;
+        });
+
+- description: "ship-prepare (issue #353): no --quality passed → execute step args is empty (no default quality synthesized)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const execute = (o.steps || []).find(s => s.name === 'execute');
+        return execute !== undefined && (!execute.args || !execute.args.includes('--quality'));
+
+- description: "ship-prepare (issue #353): all steps include dispatchMode field (isolation invariant extended)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return (o.steps || []).every(s => Object.prototype.hasOwnProperty.call(s, 'dispatchMode'));

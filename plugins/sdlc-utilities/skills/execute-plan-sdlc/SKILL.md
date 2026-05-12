@@ -192,6 +192,8 @@ After classifying tasks, apply complexity routing before wave building:
 **If total tasks ≤ 3 AND all tasks are Trivial or Standard AND no high-risk tasks:**
 Print: `Small plan — executing directly without wave orchestration.`
 
+Wave-runner Agents (Step 5b) do not apply to this path — small plans are fast enough to run inline.
+
 Execute each task sequentially in the main context (no agent dispatch). Run verification after each task.
 
 After all tasks complete in the small-plan path, if `activeGuardrails` is non-empty, perform a single guardrail evaluation (same as Step 5c-ter) against the cumulative `git diff --stat`. Error violations prompt the user; warning violations are reported.
@@ -260,6 +262,8 @@ Always present all 3 tiers. Default is Balanced. When the user selects a tier (f
 
 **Pre-wave:** If there is 1 pre-wave trivial task, execute it inline in the main context. If there are 2+ pre-wave trivials, dispatch them as a single batch agent (haiku) using the Batched Trivial Tasks Prompt Template in `./classifying-and-waving-tasks.md`. Mark each complete in TodoWrite after inline execution or after the batch agent returns.
 
+This dispatch is NOT a wave-runner Agent — it is a direct batch-haiku dispatch from main context for tasks that have no in-wave dependencies.
+
 **For each wave:**
 
 **5a-pre. Pre-wave guardrail check (error-severity only)** — Skip if `activeGuardrails` is empty.
@@ -299,42 +303,42 @@ Options:
 - **skip** — skip high-risk tasks, continue with remaining waves
 - **cancel** — stop execution entirely
 
-**5b. Dispatch agents** — One agent per standard/complex task, all in a single message (parallel). If the wave contains 2+ trivial tasks, include one additional batch agent (haiku) dispatched alongside the others using the Batched Trivial Tasks Prompt Template in `./classifying-and-waving-tasks.md`. A single trivial in a wave is executed inline before dispatch. Each agent prompt must include:
-- Full task text (never a reference to the plan file — paste the entire task body)
-- Exact list of files the agent may touch
-- Expected deliverable: what changed + how to verify
-- For complex tasks: brief summary of relevant changes from prior waves
-- **Model**: pass `model: "<assigned-model>"` to the Agent tool (haiku, sonnet, or opus per the selected quality tier)
-  **This is REQUIRED on every dispatch — no exceptions.** Omitting `model:` causes the agent to inherit the parent model (opus), defeating the quality-tier system. Before sending any Agent dispatch message, verify: does every Agent call in this message include `model:`? If not, add it.
-- **Mode**: pass `mode: "bypassPermissions"` to the Agent tool on every dispatch.
+**5b. Dispatch wave-runner Agent** — One wave-runner Agent per wave (implements R8, R-wave-runner-contract from the spec). Build the wave-runner Agent's prompt from:
 
-**5c. Collect and verify** — After all agents return:
+1. Read `./wave-runner-template.md` for the algorithm, contract, and constraints.
+2. Inline the full content of the per-task template from `./classifying-and-waving-tasks.md` (lines 109–187) as the `perTaskTemplate` input.
+3. When the wave contains 2+ Trivial tasks, also inline the batched-trivial template from `./classifying-and-waving-tasks.md` (lines 189–257) as the `batchedTrivialTemplate` input.
+4. Provide the complete wave manifest: `waveNumber`, `totalWaves`, `qualityTier`, `escalationBudget: 2`, and the full task array with `id`, `name`, `complexity`, `risk`, `files`, `description`, `acceptanceCriteria`, `assignedModel`, and `verifyToken` for each task.
+5. Provide `priorWaveContext` from the state: `planSummary`, `completedTaskIds`, `filesAdded`, `filesModified`, `interfacesCreated`, `decisionsFromPriorWaves`.
 
-1. **Filesystem verification (mandatory, always first):** Run `git diff --stat` in the main context. For each agent, confirm that the files it claimed to modify actually appear in the diff. If an agent reported success but `git diff --stat` shows no changes to its expected files, classify this as a **phantom success** (see Step 6).
+Dispatch with:
+- `model: <highest model among wave tasks>` — haiku if all tasks are Trivial; sonnet if any Standard; opus if any Complex.
+- `mode: bypassPermissions`
+- **`model:` is REQUIRED — no exceptions.** Omitting it causes the wave-runner to inherit the parent model (opus), defeating the quality-tier system.
 
-2. **Canary check per agent:** For each agent that reported creating or modifying code, grep in the main context for the verification token the agent reported (`VERIFY: <symbol> in <file>`). This catches cases where `git diff` shows the file changed but the agent's actual edits were incomplete or overwritten.
+The wave-runner Agent handles in-wave per-task fan-out internally — it dispatches one per-task Agent per Standard/Complex task and one batch-haiku Agent for any 2+ Trivials, all within its own context. A single Trivial in a wave is dispatched by the wave-runner as an inline single-agent, not a batch. Per-task retries (haiku→sonnet→opus, budget 2) are the wave-runner's responsibility.
 
-3. **Conflict detection:** Check `git diff --stat` for files touched by multiple agents in this wave. If found, treat as a file conflict.
+**5c. Collect and verify** — After the wave-runner Agent returns:
+
+0. **Parse `WAVE_SUMMARY`:** Extract the `WAVE_SUMMARY: <json>` token from the wave-runner's final line. This provides per-task `filesChanged`, `verifyToken`, `status`, and `attempts`. If the token is missing or malformed, re-dispatch the wave-runner once with a format reminder (counts as a wave-level retry).
+
+1. **Filesystem verification (mandatory, always first):** Run `git diff --stat` in the main context. For each task in `WAVE_SUMMARY.tasks`, confirm that the files in `filesChanged` actually appear in the diff. If the wave-runner reported success for a task but `git diff --stat` shows no changes to its expected files, classify this as a **phantom success** (see Step 6).
+
+2. **Canary check per task:** For each task with a `verifyToken` in the `WAVE_SUMMARY`, grep in the main context for the symbol (`VERIFY: <symbol> in <file>`). This catches cases where `git diff` shows the file changed but the actual edits were incomplete or overwritten.
+
+3. **Conflict detection:** Check `git diff --stat` for files touched by multiple tasks in this wave. If found, treat as a file conflict.
 
 4. **Verification suite:** Run verification commands specified in the plan (tests, build, lint).
 
-5. **Completion checklist parsing:** Parse each agent's structured completion checklist:
-   ```
-   COMPLETE: files_created=[...] files_modified=[...] tests_added=[...] tests_pass=[...] build_pass=[...]
-   VERIFY: <symbol> in <file>
-   STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
-   ```
-   Cross-check `files_created`/`files_modified` against `git diff --stat` (step 1 above), `tests_pass` against actually running the test command, and VERIFY token presence. If the checklist is missing or malformed, treat as incomplete — re-dispatch once with a checklist format reminder.
-
-6. **Agent status handling:**
+5. **Task status handling** (from `WAVE_SUMMARY.tasks[].status`):
    - STATUS: DONE → proceed normally
    - STATUS: DONE_WITH_CONCERNS → read the concerns; if about correctness, investigate before proceeding; if observational, note and continue
-   - STATUS: NEEDS_CONTEXT → provide missing context, re-dispatch (counts as one retry)
-   - STATUS: BLOCKED → assess the blocker: provide context + re-dispatch, escalate model, break task smaller, or escalate to user
+   - STATUS: NEEDS_CONTEXT or BLOCKED → re-dispatch a fresh wave-runner Agent scoped to only the failing tasks, passing previous `attempts[]` and errors (counts as one wave-level retry toward the 2-retry budget)
+   - STATUS: FAILED (after 2 retries inside wave-runner) → apply recovery from Step 6
 
-7. On any failure → apply recovery from Step 6.
+6. On any failure → apply recovery from Step 6.
 
-**Never trust agent self-reports alone.** An agent reporting "modified 3 files, build passes" means nothing until `git diff --stat` confirms the files changed and a build in the main context confirms it compiles.
+**Never trust agent self-reports alone.** A wave-runner reporting "all tasks complete" means nothing until `git diff --stat` confirms the files changed and a build in the main context confirms it compiles. `WAVE_SUMMARY` is the structured input to verification — it does not replace verification.
 
 **5c-bis. Spec compliance review (Standard and Complex tasks only):**
 
@@ -342,7 +346,7 @@ Skip for waves containing only Trivial tasks. Skip if the Speed quality tier (`-
 
 After mechanical verification passes (Steps 5c.1–4), dispatch a single spec compliance reviewer (sonnet). At dispatch time, Read `./spec-compliance-reviewer.md` and use it as the prompt template. Provide:
 - Each non-trivial task's full specification text
-- The files each agent's completion checklist listed as modified
+- The files each task's `WAVE_SUMMARY.tasks[].filesChanged` listed as modified
 
 The reviewer reads actual code and returns per-task verdicts:
 - ✅ Task N: Spec compliant
@@ -389,6 +393,8 @@ Running verification... [status]
 Proceeding to Wave N+1 (N tasks)
 ```
 
+The progress report is rendered from `WAVE_SUMMARY` payload — per-task names, statuses, and `filesChanged` from the summary. State writes happen after wave-runner returns and main-context verification completes.
+
 **State persistence:** After each wave completes, update the execution state via `state/execute.js`. Locate the script:
 ```bash
 STATE_SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/execute.js" 2>/dev/null | sort -V | tail -1)
@@ -401,9 +407,11 @@ node "$STATE_SCRIPT" init --branch <branch> --quality <X> --total-tasks <N>
 ```
 
 Before each wave: `node "$STATE_SCRIPT" wave-start --wave <N>`
-After each task: `node "$STATE_SCRIPT" task-done --wave <N> --task <id> --name "<name>" --complexity <c> --risk <r> --files-changed '<json>'` (or `task-fail` on failure)
-After each wave: `node "$STATE_SCRIPT" wave-done --wave <N>` (or `wave-fail`)
+After each task (sourced from `WAVE_SUMMARY.tasks[]`): `node "$STATE_SCRIPT" task-done --wave <N> --task <id> --name "<name>" --complexity <c> --risk <r> --files-changed '<json>'` (or `task-fail` when `task.status === 'FAILED'`)
+After each wave: `node "$STATE_SCRIPT" wave-done --wave <N>` (or `wave-fail` when `WAVE_SUMMARY.status === 'failed'`)
 Update context: `node "$STATE_SCRIPT" context --data '<json>'`
+
+The `state/execute.js` CLI surface is unchanged — only the SKILL.md call-site shape shifts (writes happen after wave-runner returns, driven by `WAVE_SUMMARY` data, but with the same arguments).
 
 On successful completion: `node "$STATE_SCRIPT" cleanup`
 On failure: preserve the state file for `--resume`.
@@ -568,7 +576,7 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 - Execute more than 2 retries on any single task
 - Automatically commit or push — workspace isolation (branching/worktree) is controlled by the `--workspace` flag, not ad-hoc decisions
 - Reference external sub-skills by name — this skill is fully self-contained
-- Dispatch a separate agent per trivial task — execute a single trivial inline; batch 2+ trivials into one haiku agent using the Batched Trivial Tasks Prompt Template
+- Dispatch one Agent per task from main context — Step 5b dispatches one wave-runner Agent per wave. Per-task fan-out (including trivial batching) is the wave-runner's internal responsibility. The only exception is the pre-wave trivial batch, which is dispatched directly from main context before the wave loop begins.
 - Delete the execution state file on failure or interruption — it is needed for `--resume`
 - Write state files for small-plan direct execution (≤3 tasks) — they execute without waves and are fast enough to re-run
 - Auto-override error-severity guardrail violations in `--auto` mode — guardrails exist to prevent drift; always block

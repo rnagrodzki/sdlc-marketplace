@@ -25,7 +25,7 @@
 ## Core Requirements
 
 - R1: 7-step pipeline sequence: execute-plan-sdlc → commit-sdlc → review-sdlc → received-review-sdlc (conditional) → commit-sdlc fixes (conditional) → version-sdlc → pr-sdlc
-- R2: All sub-skills dispatched as Agents (never Skill tool) to maintain context isolation — each Agent loads its SKILL.md independently
+- R2: Sub-skills are dispatched per `steps[].dispatchMode` emitted by ship.js. `execute-plan-sdlc` uses Skill tool (`dispatchMode: 'skill'`) so its wave-by-wave progress, high-risk gates, and tier-selection prompts stream in ship's main context. All other sub-skills use Agent dispatch (`dispatchMode: 'agent'`) for context isolation. Inline-Bash steps emit `dispatchMode: null`. (Fixes #353.)
 - R3: Pipeline plan is a binding contract: steps with `status: "will_run"` must execute; LLM cannot override
 - R4: Step statuses computed by `skill/ship.js`: `will_run`, `skipped`, `conditional`
 - R5: Skip set provenance tracked via `skipSource`: `cli`, `config`, `auto`, `condition`, `none`; fabrication guard blocks (error, exit code 1) on `default` source
@@ -89,6 +89,9 @@
 - R-agent-isolation-script-driven (named requirement — intentional; this spec uses named identifiers for cross-reference stability alongside sequential R-numbers, consistent with R-config-version, R-config-skip, R-config-failure-mode, and R-ship-init-prune): ship.js emits an isolation field on every step object in steps[]. Valid values: null (no isolation; default for all current steps) or "worktree" (reserved for future parallel steps needing true isolation via Agent SDK worktrees). SKILL.md Step 5 Agent dispatch passes isolation: step.isolation to the Agent tool when non-null and omits the isolation parameter when null (the Agent tool's isolation schema enum does not accept null). The LLM must not add, remove, or change the isolation parameter from what ship.js computed.
   - Acceptance: Spec entry exists with this body. Runtime emission and SKILL.md forwarding are verified by promptfoo exec tests: "ship-prepare: computeSteps includes isolation field null on all steps" and "ship-prepare: cleanup step has isolation null".
 
+- R-execute-skill-dispatch (named requirement — consistent with R-agent-isolation-script-driven naming convention): `execute-plan-sdlc` is dispatched via the Skill tool because it is an orchestrator whose Step 5a high-risk gate, Step 4 tier prompt, and Step 5d wave reports require visibility in ship's main context. Agent isolation would hide these signals from the user, preventing supervision and mid-pipeline abort. ship.js emits `dispatchMode: 'skill'` for the execute step; SKILL.md Step 5 branches on this field verbatim. All other sub-skills retain `dispatchMode: 'agent'` for context isolation. (Fixes #353.)
+  - Acceptance: Spec entry exists with this body. `computeSteps()` in ship.js emits `dispatchMode: 'skill'` on the execute step object. SKILL.md Step 5 invokes execute-plan-sdlc via Skill tool when `step.dispatchMode === 'skill'`.
+
 - R40: `flags.reviewThreshold` enum `{critical, high, medium, low}` controls minimum severity that dispatches `received-review-sdlc`:
   - `critical` → trigger on any critical finding
   - `high` → trigger on any critical OR high finding
@@ -140,7 +143,7 @@
 - G3: Step values valid — all CLI `--steps` values are recognized step names (`VALID_STEPS` from `lib/ship-fields.js`)
 - G4: At least one step will run — pipeline is not entirely skipped
 - G5: Flag coherence — `--bump` without version step produces error (exit code 1, blocking). The `--bump` value space accepts `major|minor|patch` or any pre-release label matching `^[a-z][a-z0-9]*$`; values outside this set are rejected at parse time before the version step runs.
-- G6: Pipeline contract — every `will_run` step was dispatched as Agent
+- G6: Pipeline contract — every `will_run` step was dispatched per its `dispatchMode` field (Agent for `'agent'`, Skill tool for `'skill'`, inline-Bash for `null`)
 - G6a: Pipeline completion gate — `state/ship.js cleanup` validates all steps are in terminal state (`completed`, `skipped`, or `failed`) before deleting the state file. Steps still `pending` or `in_progress` cause cleanup to refuse deletion and exit 1.
 - G7: Staging gap filled — `git add -A -- ':!.sdlc/'` ran between execute and commit
 - G8: Rebase attempted — rebase ran after commits, before version (when applicable)
@@ -156,6 +159,7 @@
 - P7: `steps[].model` (string) — model for Agent dispatch per step, computed from skill specs (e.g., `"sonnet"` for review-sdlc, `"haiku"` for commit-sdlc)
 - P8 (issue #232): `migration` (object | null) — `{ project: { schemaVersion, migrated, backupPath, stepsApplied }, local: { ... } }` after `verifyAndMigrate` runs at pipeline entry. Null only when both calls were short-circuited by `SDLC_SKIP_CONFIG_CHECK=1` or `--skip-config-check`. On migration failure, `migration` is null AND `errors[]` carries the failing step identifier.
 - P9: steps[].isolation (string | null) — Agent SDK isolation parameter forwarded verbatim by SKILL.md Step 5. null for non-isolated dispatch (default); "worktree" reserved for future parallel-isolated steps. Never derived by the LLM.
+- P10: `steps[].dispatchMode` (string | null) — `'skill'` for `execute-plan-sdlc`, `'agent'` for every other sub-skill step, `null` for inline-Bash steps (`skill === null`). Consumed verbatim by SKILL.md Step 5. Never derived by the LLM.
 
 ## Error Handling
 
@@ -171,7 +175,7 @@
 
 ## Constraints
 
-- C1: Must not invoke sub-skills via Skill tool — all dispatched as Agents for context isolation
+- C1: Must not deviate from per-step `dispatchMode`. `execute-plan-sdlc` is Skill-tool invoked; all other sub-skills are Agent-dispatched. The LLM must not override `steps[].dispatchMode`.
 - C2: Must not skip critique step (Step 3)
 - C3: Must not forward `--auto` to sub-skills that don't support it (execute-plan-sdlc, review-sdlc)
 - C4: Must not automatically resolve review findings — received-review-sdlc handles this
@@ -186,7 +190,8 @@
 - C13: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
 - C14: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 - C15: The LLM must not add, remove, or change the steps[].isolation field when dispatching Agents in Step 5. Isolation comes verbatim from ship.js prepare output, or is omitted when ship.js emits null (Agent tool schema enum forbids passing null).
-- C16: Combining `--workspace` with `--branch` or `--tree`, or combining `--branch` and `--tree` together, is an error. ship.js exits non-zero with a clear message naming the conflicting flags.
+- C16: The LLM must not override `steps[].dispatchMode`. If `'skill'`, invoke via Skill tool. If `'agent'`, invoke via Agent tool with `model: step.model` and `isolation: step.isolation`. If `null`, the step is an inline-Bash operation.
+- C17: Combining `--workspace` with `--branch` or `--tree`, or combining `--branch` and `--tree` together, is an error. ship.js exits non-zero with a clear message naming the conflicting flags.
 
 ## Step-Emitter Contract
 

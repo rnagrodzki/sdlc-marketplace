@@ -89,9 +89,19 @@ Select a preset by name (full/balanced/minimal) or choose `custom` to edit indiv
 
 ---
 
-## Agent Protocol
+## Wave-Runner Agent Model
 
-Each dispatched agent fills a structured completion checklist at the end of its output:
+For each wave, execute-plan-sdlc dispatches **one wave-runner Agent** (not one per task). The wave-runner Agent receives the full wave manifest — all task descriptions, file lists, assigned models, and prior-wave context — and fans out per-task sub-agents internally within its own context. This keeps the execute-plan-sdlc main context bounded to wave-level events rather than per-task output. (Fixes #353.)
+
+**Two-level isolation:** execute-main → wave-runner Agent → per-task sub-agents. Per-task retries (haiku → sonnet → opus, budget 2) happen inside the wave-runner. The wave-runner returns a structured `WAVE_SUMMARY` token as its final line, which the main context parses for filesystem verification, state writes, and recovery decisions.
+
+**In-wave trivial batch:** When a wave has 2+ Trivial tasks, the wave-runner dispatches them as a single batch-haiku Agent internally. The main context does not directly dispatch per-task or batch agents during waves.
+
+**Wave-runner does not handle:** state writes, inter-wave critique, high-risk gates, guardrail checks, or spec compliance review — those remain in main context (visible to the user when execute is run from ship-sdlc via Skill tool).
+
+### Per-task completion protocol
+
+Each per-task sub-agent (dispatched inside the wave-runner) fills a structured completion checklist:
 
 ```
 COMPLETE: files_created=[...] files_modified=[...] tests_added=[yes|no|n/a] tests_pass=[yes|no|n/a] build_pass=[yes|no|n/a]
@@ -99,13 +109,7 @@ VERIFY: <symbol_name> in <file_path>
 STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
 ```
 
-**Status handling:**
-- **DONE** — task complete; proceed to verification
-- **DONE_WITH_CONCERNS** — task complete but agent has doubts; orchestrator reads concerns before proceeding
-- **NEEDS_CONTEXT** — agent needs additional information; orchestrator provides it and re-dispatches (counts as retry)
-- **BLOCKED** — agent cannot complete the task; orchestrator assesses and responds (provide context, escalate model, break task smaller, or escalate to user)
-
-The VERIFY token is grepped in the filesystem to confirm changes persisted. If the checklist is missing or malformed, the agent is re-dispatched once with a format reminder.
+The wave-runner aggregates these into a `WAVE_SUMMARY` JSON object that main context verifies. The VERIFY token is grepped in the filesystem to confirm changes persisted. If the checklist is missing or malformed, the wave-runner re-dispatches the task once with a format reminder.
 
 ---
 
@@ -134,6 +138,10 @@ Plans with 4 or more tasks use standard wave execution with state persistence af
 After each wave completes, execution state is written to `.sdlc/execution/execute-<branch>-<timestamp>.json` in the main working tree. This JSON file records completed waves, task status, file changes, and contextual information (interfaces created, decisions made) needed to resume in a fresh session. When execution runs in a worktree, state is written to the main repo root so it survives worktree cleanup.
 
 **Resuming:** Pass `--resume` to pick up from the last completed wave. The state file contains enough context for a new session to continue without prior conversation history. If the plan file has changed since execution started (detected via content hash), you are prompted to resume with the old structure or restart.
+
+**Inter-wave abort:** Pressing Ctrl-C between waves (after a wave-runner Agent has returned and before the next wave starts) leaves the state file populated with completed waves. The next invocation with `--resume` picks up at the first non-completed wave. Mid-wave abort is not supported — waves run to completion or failure before control returns to main context.
+
+**Abort/resume from ship-sdlc:** When execute-plan-sdlc is invoked via Skill tool from ship-sdlc (fixes #353), inter-wave gates and wave reports stream in ship's main context. Ctrl-C between waves stops the ship pipeline; `/ship-sdlc --resume` or `/execute-plan-sdlc --resume` resumes from the first pending wave.
 
 **Automatic detection:** Even without `--resume`, if a state file exists for the current branch, the skill offers to resume in interactive mode. In `--auto` mode, it starts a fresh run instead (pass `--resume` explicitly to auto-resume).
 

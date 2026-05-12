@@ -394,6 +394,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           : 'plan detected in context',
       pause: false,
       isolation: null,
+      dispatchMode: 'skill',
     },
     {
       name: 'commit',
@@ -405,6 +406,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       reason: isIn('commit') ? 'pending (will check after execute)' : 'not in steps[]',
       pause: false,
       isolation: null,
+      dispatchMode: 'agent',
     },
     {
       name: 'review',
@@ -416,6 +418,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       reason: isIn('review') ? 'in steps[]' : 'not in steps[]',
       pause: false,
       isolation: null,
+      dispatchMode: 'agent',
     },
     {
       name: 'received-review',
@@ -427,6 +430,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       reason: 'triggered by review verdict (critical/high findings)',
       pause: true,
       isolation: null,
+      dispatchMode: 'agent',
     },
     {
       name: 'commit-fixes',
@@ -438,6 +442,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       reason: 'triggered if review fixes applied',
       pause: false,
       isolation: null,
+      dispatchMode: 'agent',
     },
     {
       name: 'version',
@@ -460,6 +465,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           : 'in steps[]',
       pause: true,
       isolation: null,
+      dispatchMode: 'agent',
     },
     // archive-openspec: conditional step between version and pr
     (() => {
@@ -478,6 +484,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           reason: 'not in steps[]',
           pause: false,
           isolation: null,
+          dispatchMode: null,
         };
       }
       if (!archiveActionable) {
@@ -493,6 +500,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
             : 'change already archived',
           pause: false,
           isolation: null,
+          dispatchMode: null,
         };
       }
       return {
@@ -505,6 +513,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         reason: `openspec change "${changeName}" ready for archive`,
         pause: !flags.auto,
         isolation: null,
+        dispatchMode: null,
       };
     })(),
     {
@@ -525,6 +534,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           : 'in steps[]',
       pause: false,
       isolation: null,
+      dispatchMode: 'agent',
     },
     // R41-R49: verify-pipeline — opt-in inline-execution step (skill: null,
     // dispatched by ship-sdlc/SKILL.md which parses the JSON verdict). Gated
@@ -542,6 +552,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           reason: 'not in steps[]',
           pause: false,
           isolation: null,
+          dispatchMode: null,
         };
       }
       if (!isIn('pr')) {
@@ -555,6 +566,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           reason: 'pr step excluded — cannot verify CI for a non-existent PR',
           pause: false,
           isolation: null,
+          dispatchMode: null,
         };
       }
       return {
@@ -567,6 +579,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         reason: 'verify CI checks before await-remote-review',
         pause: true,
         isolation: null,
+        dispatchMode: null,
       };
     })(),
     // R50-R56: await-remote-review — opt-in inline-execution step. Gated by
@@ -584,6 +597,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           reason: 'not in steps[]',
           pause: false,
           isolation: null,
+          dispatchMode: null,
         };
       }
       if (!isIn('pr')) {
@@ -597,6 +611,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           reason: 'pr step excluded — cannot await review on a non-existent PR',
           pause: false,
           isolation: null,
+          dispatchMode: null,
         };
       }
       return {
@@ -609,6 +624,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         reason: 'await automated reviewer (e.g., Copilot)',
         pause: false,
         isolation: null,
+        dispatchMode: null,
       };
     })(),
     {
@@ -626,6 +642,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         : 'not in steps[]',
       pause: false,
       isolation: null,
+      dispatchMode: null,
     },
   ];
 
@@ -664,6 +681,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
     },
     reserved: true,
     isolation: null,
+    dispatchMode: null,
   });
 
   return steps;

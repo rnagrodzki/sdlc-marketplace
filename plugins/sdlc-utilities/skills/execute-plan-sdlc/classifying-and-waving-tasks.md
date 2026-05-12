@@ -108,7 +108,9 @@ On resource-constrained systems or when tasks share mutable state (databases, ca
 
 ## Agent Prompt Template
 
-Use this template for every agent dispatch in Step 5b. Fill all placeholders. Never abbreviate the task text or reference the plan file.
+This template's content is inlined by execute-plan-sdlc Step 5b into the wave-runner Agent's prompt body as the `perTaskTemplate` input. It is no longer dispatched as a standalone Agent from main context — the wave-runner Agent uses it internally to fan out per-task sub-agents within its own context.
+
+Use this template for every per-task agent dispatch inside wave-runner. Fill all placeholders. Never abbreviate the task text or reference the plan file.
 
 ```
 You are implementing a single task from a larger plan. Focus only on your assigned task.
@@ -188,7 +190,9 @@ If you find issues during self-review, fix them before reporting.
 
 ## Batched Trivial Tasks Prompt Template
 
-Use this template when dispatching 2+ trivial tasks as a single batch agent. Fill all placeholders. Tasks are listed sequentially; the agent completes them in order.
+This template's content is inlined by execute-plan-sdlc Step 5b into the wave-runner Agent's prompt body as the `batchedTrivialTemplate` input. It is no longer dispatched as a standalone Agent from main context — the wave-runner Agent uses it internally when the wave has 2+ Trivial tasks.
+
+Use this template when dispatching 2+ trivial tasks as a single batch agent inside wave-runner. Fill all placeholders. Tasks are listed sequentially; the agent completes them in order.
 
 ~~~
 You are implementing a batch of trivial tasks from a larger plan. Complete all tasks in the order listed. Each task is small and self-contained.
