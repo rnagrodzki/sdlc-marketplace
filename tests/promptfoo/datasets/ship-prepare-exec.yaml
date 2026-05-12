@@ -663,6 +663,8 @@
   assert:
     - type: icontains
       value: '"workspace": "worktree"'
+    - type: icontains
+      value: '"workspace": "cli"'
 
 - description: "ship-prepare: --branch and --tree together is an error"
   vars:
@@ -673,5 +675,17 @@
   assert:
     - type: icontains
       value: 'Cannot combine --branch and --tree'
+    - type: icontains
+      value: '"errors"'
+
+- description: "ship-prepare: --workspace with --tree is an error"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --workspace worktree --tree"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: 'Cannot combine --workspace with --tree'
     - type: icontains
       value: '"errors"'
