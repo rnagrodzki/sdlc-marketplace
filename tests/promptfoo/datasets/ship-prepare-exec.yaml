@@ -608,3 +608,84 @@
           && Array.isArray(o.flags.awaitRemoteReviewers)
           && o.flags.awaitRemoteReviewers.length === 1
           && o.flags.awaitRemoteReviewers[0] === 'copilot'
+
+# ---------------------------------------------------------------------------
+# Issue #337 — Per-step isolation field (agent dispatch worktree isolation)
+# ---------------------------------------------------------------------------
+
+- description: "ship-prepare: computeSteps includes isolation field null on all steps"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"isolation": null'
+    - type: icontains
+      value: '"reserved": true'
+    - type: icontains
+      value: '"name": "execute"'
+
+- description: "ship-prepare: cleanup step has isolation null"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const cleanup = (o.steps || []).find(s => s.name === 'cleanup');
+        return cleanup !== undefined && Object.prototype.hasOwnProperty.call(cleanup, 'isolation') && cleanup.isolation === null;
+
+# Workspace shortcuts (issue #350)
+
+- description: "ship-prepare: --branch shortcut sets workspace=branch"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --branch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"workspace": "branch"'
+    - type: icontains
+      value: '"workspace": "cli"'
+
+- description: "ship-prepare: --tree shortcut sets workspace=worktree"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --tree"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"workspace": "worktree"'
+    - type: icontains
+      value: '"workspace": "cli"'
+
+- description: "ship-prepare: --branch and --tree together is an error"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --branch --tree"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: 'Cannot combine --branch and --tree'
+    - type: icontains
+      value: '"errors"'
+
+- description: "ship-prepare: --workspace with --tree is an error"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --workspace worktree --tree"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: 'Cannot combine --workspace with --tree'
+    - type: icontains
+      value: '"errors"'

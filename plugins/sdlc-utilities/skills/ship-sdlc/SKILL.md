@@ -2,7 +2,7 @@
 name: ship-sdlc
 description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Chains execute-plan-sdlc, commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, and pr-sdlc with conditional review-fix loop. Arguments: [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config]. The `<label>` form for --bump (e.g. `--bump rc`) is forwarded to version-sdlc, where it is interpreted as `--bump patch --pre <label>`; labels must match `^[a-z][a-z0-9]*$`. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
-argument-hint: "[--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
+argument-hint: "[--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--branch | --tree] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
 model: sonnet
 ---
 
@@ -92,6 +92,8 @@ SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/shi
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --bump patch --workspace branch)
+# Example with shorthand:
+# PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --bump patch --branch)
 # Pipeline composition (which steps run) comes from config `ship.steps[]`. To override
 # the resolved step list for a single run, pass `--steps <csv>` (e.g.
 # `--steps execute,commit,pr`). To set the model tier forwarded to execute-plan-sdlc,
@@ -343,7 +345,7 @@ For each step that will run:
 
 2. **Record step start** via state/ship.js.
 
-3. **Dispatch Agent** with: skill name, args from `step.invocation`, model from `step.model`, and brief pipeline context (branch, previous step results needed for this step). Pass `model: step.model` to the Agent tool on every dispatch. Agent prompt template:
+3. **Dispatch Agent** with: skill name, args from `step.invocation`, model from `step.model`, and brief pipeline context (branch, previous step results needed for this step). Pass `model: step.model` to the Agent tool on every dispatch. When `step.isolation` is non-null, additionally pass `isolation: step.isolation`; when `step.isolation` is null, omit the `isolation` parameter entirely (the Agent tool schema does not accept `null` for `isolation`). The LLM must not add, remove, or change the `isolation` parameter from what `ship.js` computed (implements R-agent-isolation-script-driven, C15). Agent prompt template:
    ```
    You are executing the <skill-name> skill. Invoke `/<skill-name> <args>` using the Skill tool — this loads the SKILL.md automatically. Return a structured result:
    (1) status — success or failure
@@ -782,6 +784,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Copy example args from this document when dispatching sub-skill Agents — use the `invocation` field from the skill/ship.js output, which contains the exact computed args
 - Add `--steps` flags not present in the user's original invocation. Pipeline composition derives from CLI `--steps` > config `ship.steps[]` > built-in defaults. Legacy `--preset` and `--skip` are hard-removed (#190); passing them produces an error.
 - Dispatch pipeline step Agents without `model: step.model` — the model field is computed by skill/ship.js from each skill's spec. Omitting it defaults all steps to opus.
+- Add, remove, or change the `isolation` parameter on Agent dispatches — isolation comes verbatim from `step.isolation`. Adding `isolation: "worktree"` when `step.isolation` is null causes hidden Agent SDK worktrees that conflict with `--workspace branch` (issue #350).
 - Ignore cleanup validation failures — if `state/ship.js cleanup` exits with code 1, the pipeline contract was violated. Surface the violation and preserve state.
 
 ---

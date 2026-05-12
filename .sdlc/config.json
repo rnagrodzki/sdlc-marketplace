@@ -123,6 +123,16 @@
         "id": "state-machine-idempotency",
         "description": "Tasks that modify migration, initialization, or preflight-check logic must include test cases verifying that the same check does not re-trigger after state has been successfully transitioned. Idempotency must be explicitly tested: run once, verify state change; run again, verify no re-triggering or state corruption.",
         "severity": "error"
+      },
+      {
+        "id": "agent-dispatch-script-driven",
+        "description": "Agent dispatch parameters (model, isolation, args) must come verbatim from the prepare-script output (step.model, step.isolation, step.invocation). The LLM must not add or override these fields. Plans that describe dispatching agents with parameters not present in the prepare output fail this guardrail.",
+        "severity": "error"
+      },
+      {
+        "id": "flag-semantic-consistency-cross-skill",
+        "description": "A CLI flag name used across user-invoked skill prepare scripts (plugins/*/scripts/skill/*.js) must mean the same thing in every script that defines it. Plans that introduce a flag in one skill with semantics that conflict with the same flag name in another user-invoked skill fail this guardrail. Internal helper scripts (scripts/state/*.js, scripts/lib/*.js, scripts/util/*.js) are out of scope — they have private argument vocabularies controlled by their SKILL.md callers, not by users. When adding a new flag to a skill prepare script, the plan must include grep evidence that the flag name is unused, or unused with a conflicting meaning, across other user-invoked skill prepare scripts.",
+        "severity": "error"
       }
     ]
   },
