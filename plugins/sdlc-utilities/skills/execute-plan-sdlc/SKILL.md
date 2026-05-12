@@ -303,7 +303,7 @@ Options:
 - **skip** — skip high-risk tasks, continue with remaining waves
 - **cancel** — stop execution entirely
 
-**5b. Dispatch wave-runner Agent** — One wave-runner Agent per wave (implements R8, R-wave-runner-contract from the spec). Build the wave-runner Agent's prompt from:
+**5b. Dispatch wave-runner Agent** — One wave-runner Agent per wave (implements R8, R-wave-runner-contract (named requirement, see spec) from the spec). Build the wave-runner Agent's prompt from:
 
 1. Read `./wave-runner-template.md` for the algorithm, contract, and constraints.
 2. Inline the full content of the per-task template from `./classifying-and-waving-tasks.md` (lines 109–187) as the `perTaskTemplate` input.
@@ -333,7 +333,7 @@ The wave-runner Agent handles in-wave per-task fan-out internally — it dispatc
 5. **Task status handling** (from `WAVE_SUMMARY.tasks[].status`):
    - STATUS: DONE → proceed normally
    - STATUS: DONE_WITH_CONCERNS → read the concerns; if about correctness, investigate before proceeding; if observational, note and continue
-   - STATUS: NEEDS_CONTEXT or BLOCKED → re-dispatch a fresh wave-runner Agent scoped to only the failing tasks, passing previous `attempts[]` and errors (counts as one wave-level retry toward the 2-retry budget)
+   - STATUS: NEEDS_CONTEXT or BLOCKED → re-dispatch a fresh wave-runner Agent scoped to only the failing tasks, passing previous `attempts[]` and errors (counts as one wave-level retry toward the 2-retry budget). The recovery wave-runner inherits the previous `attempts[]` for each failing task; its per-task retry budget is reduced by the attempts already consumed (e.g., if a task already used 2 retries inside the original wave-runner, the recovery wave-runner receives 0 remaining per-task retries for that task and must escalate immediately). This prevents a FAILED task from receiving a fresh budget via re-dispatch.
    - STATUS: FAILED (after 2 retries inside wave-runner) → apply recovery from Step 6
 
 6. On any failure → apply recovery from Step 6.

@@ -315,7 +315,7 @@ On **edit**: ask what to change, update flags, rebuild the pipeline table, and r
 ### Pre-step validation
 
 Before dispatching each step, read its `status` from the skill/ship.js output:
-1. `"will_run"` → dispatch per `step.dispatchMode` (Skill tool when `'skill'`, Agent tool when `'agent'`). Inline-Bash steps (`skill === null`, `dispatchMode: null`) are not dispatched via a tool — they are run directly in main context as Bash. This is non-negotiable.
+1. `"will_run"` → dispatch per `step.dispatchMode` (Skill tool when `'skill'`, Agent tool when `'agent'`). Inline-executed steps (`skill === null`, `dispatchMode: null`) are not dispatched via a tool — they are handled directly in main context (either as Bash commands or as conditional logic such as parsing a JSON verdict, as specified per-step). This is non-negotiable.
 2. `"conditional"` → evaluate the runtime condition (e.g., review verdict). If condition met → dispatch per `step.dispatchMode`. If not → print why with the specific condition that was not met.
 3. `"skipped"` → print "skipped" with the `reason` and `skipSource` from the script output.
 

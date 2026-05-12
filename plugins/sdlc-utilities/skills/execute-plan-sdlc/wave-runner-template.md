@@ -66,6 +66,7 @@ Send all Agent dispatches in one message:
 
 - One per-task Agent per Standard/Complex task, using `perTaskTemplate`. Fill the template placeholders with the full task text, file list, acceptance criteria, and prior-wave context.
 - One batch Agent for the trivial group (if 2+ Trivials), using `batchedTrivialTemplate`. Include ordering constraints if any trivials touch the same file.
+- A single Trivial task (no batch) is dispatched as an individual per-task Agent using `perTaskTemplate`, same as a Standard task.
 - Pass `mode: bypassPermissions` and `model: <task.assignedModel>` on every sub-Agent dispatch. **`model:` is required on every dispatch — no exceptions.**
 
 ### 3. Collect per-task results

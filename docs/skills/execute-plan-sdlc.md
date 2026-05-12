@@ -109,7 +109,7 @@ VERIFY: <symbol_name> in <file_path>
 STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
 ```
 
-The wave-runner aggregates these into a `WAVE_SUMMARY` JSON object that main context verifies. The VERIFY token is grepped in the filesystem to confirm changes persisted. If the checklist is missing or malformed, the wave-runner re-dispatches the task once with a format reminder.
+This checklist is parsed by the wave-runner Agent (not main context) for each of its sub-agents, and the wave-runner then aggregates the results into a single `WAVE_SUMMARY` JSON token — main context only ever sees that wave-level summary. The wave-runner aggregates these into a `WAVE_SUMMARY` JSON object that main context verifies. The VERIFY token is grepped in the filesystem to confirm changes persisted. If the checklist is missing or malformed, the wave-runner re-dispatches the task once with a format reminder.
 
 ---
 
