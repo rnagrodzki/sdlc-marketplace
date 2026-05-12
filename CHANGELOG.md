@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.19.13] - 2026-05-12
+
+### Added
+- setup-sdlc: configurable git worktree placement with four layouts (inside/sibling/central/template); workspace wizard step with live previews, mismatch detection, and nameTemplate support (#351)
+- setup-sdlc: workspace section in setup wizard with numbered layout menu, conditional follow-up fields, and writes to `.sdlc/local.json` (#351)
+- worktree-doctor: new diagnostic CLI for layout-match, gitignore, config-resolution, and orphan checks with migration hints (#351)
+- ensure-worktree-gitignore hook: SessionStart hook that adds `.claude/worktrees/` to root `.gitignore` when `layout=inside` (#351)
+
+### Fixed
+- config: all skill and util callers now resolve `.sdlc/` config from the main worktree root, fixing dead config paths when invoked from a linked worktree (#351)
+- worktree-create: replaced shell-interpolated `exec()` with `execFileSync` in `branchExists()` for shell-injection safety; added stderr warning on path fallback (#351)
+- ensure-worktree-gitignore hook: changed silent catch to stderr error log; hook still exits 0; broadened matcher from `startup` to `startup|clear|compact` (#351)
+
 ## [0.19.12] - 2026-05-12
 
 ### Fixed

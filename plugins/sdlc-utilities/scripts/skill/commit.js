@@ -29,7 +29,7 @@ const path = require('node:path');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { exec, checkGitState, splitDiffByFile } = require(path.join(LIB, 'git'));
-const { readSection } = require(path.join(LIB, 'config'));
+const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { truncateDiff } = require(path.join(LIB, 'diff-truncate'));
@@ -90,7 +90,7 @@ function parseArgs(argv) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const projectRoot = process.cwd();
+  const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
   const { noStash, scope, type, amend, auto, warnings: parseWarnings } = parseArgs(process.argv);
 
   const errors   = [];

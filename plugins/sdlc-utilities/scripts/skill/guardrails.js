@@ -26,7 +26,7 @@ const fs   = require('fs');
 const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { readSection } = require(path.join(LIB, 'config'));
+const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveDimensionsDir } = require(path.join(LIB, 'dimensions'));
 
@@ -36,7 +36,7 @@ const { resolveDimensionsDir } = require(path.join(LIB, 'dimensions'));
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let projectRoot = process.cwd();
+  let projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/ (overridable via --project-root)
   let mode = 'init';
   let target = 'plan';
 

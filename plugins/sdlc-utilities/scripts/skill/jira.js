@@ -33,6 +33,7 @@ const { writeOutput } = require(path.join(LIB, 'output'));
 const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
 const { parseRemoteOwner } = require(path.join(LIB, 'git'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
+const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Home-cache path helpers
@@ -854,7 +855,7 @@ function copyTemplate(copyType, copyFrom, templatesDir) {
 // multiple sites are cached).
 
 async function validateBodySubcommand({ projectKey, cacheDir, site, bodyFile, wantJson }) {
-  const projectRoot = process.cwd();
+  const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
 
   let body = '';
   if (bodyFile) {
@@ -906,7 +907,7 @@ function main() {
   const { projectKey, cacheDir, templatesDir: templatesOverride, subcommand, saveFieldName, copyType, copyFrom, site, skipWorkflowDiscovery, bodyFile, wantJson, errors } = parsed;
 
   // Issue #232: verifyAndMigrate gate (CLI > env > default false).
-  const projectRoot = process.cwd();
+  const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
   const skipConfigCheck = resolveSkipConfigCheck(process.argv);
   const cv = ensureConfigVersion(projectRoot, { skip: skipConfigCheck, roles: ['project'] });
   if (cv.errors.length > 0) {

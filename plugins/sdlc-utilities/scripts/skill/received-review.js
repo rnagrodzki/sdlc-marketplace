@@ -40,7 +40,7 @@ const {
 } = require(path.join(LIB, 'git'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
-const { readSection, readProjectConfig } = require(path.join(LIB, 'config'));
+const { readSection, readProjectConfig, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Severity parsing (issue #233)
@@ -114,7 +114,7 @@ function parseArgs(argv) {
   let prNumber = null;
   let owner = null;
   let repo = null;
-  let projectRoot = process.cwd();
+  let projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/ (overridable via --project-root)
   let auto = false;
 
   for (let i = 0; i < args.length; i++) {

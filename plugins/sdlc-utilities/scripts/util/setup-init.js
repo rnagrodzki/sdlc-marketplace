@@ -142,6 +142,9 @@ function sweepBackups(projectRoot, warnings) {
 // ---------------------------------------------------------------------------
 
 function main() {
+  // setup-init operates on cwd; resolveSdlcRoot() requires existing main-worktree resolution.
+  // This is the bootstrap path — it CREATES .sdlc/ in first-time runs where no main worktree
+  // context is yet established. See issue #351 for the exception rationale.
   const projectRoot = process.cwd();
   const cli = parseArgs(process.argv);
 

@@ -249,7 +249,7 @@ For each id selected in Step 1 (call this list `selectedIds`), in `prepare.secti
 
    | `delegatedTo` value | Dispatcher |
    |---|---|
-   | `null` | Generic field-loop (3.G below) — dispatch one AskUserQuestion per `section.fields[]` entry, optionally gated by `section.confirmDetected` |
+   | `null` | Generic field-loop (3.G below) — dispatch one AskUserQuestion per `section.fields[]` entry, optionally gated by `section.confirmDetected`. The `workspace` section uses this dispatcher with field-specific augmentations described in 3.workspace below (R24). |
    | `'inline-commit-builder'` | Inline commit-pattern builder (3.commit below) — same conditional logic as legacy Step 3e, gated by the verbose header above |
    | `'inline-pr-builder'` | Inline PR-pattern builder (3.pr below) — same conditional logic as legacy Step 3f |
    | `'setup-dimensions'` | Run scan phase (Step 3.S below), then read and follow `@setup-dimensions.md` passing scan results as "Scan Input". Pass through `--add` and `--no-copilot` modifiers if present. |
@@ -396,6 +396,113 @@ On **skip**: Do not write a pr section.
 
 Store the assembled `pr` config for use in the "Writing config files" step.
 
+#### 3.workspace. Workspace worktree wizard (workspace section in 3.G)
+
+<!-- Implements R24. Fixes #351. -->
+
+The `workspace` section uses the generic 3.G field-loop dispatcher
+(`delegatedTo: null`, fields from `scripts/lib/workspace-fields.js::WORKSPACE_FIELDS`),
+but the layout field requires a numbered menu with live previews and a
+mismatch warning before the AskUserQuestion fires. The augmentations below
+override the default 3.G rendering for this section only.
+
+**Pre-computed context.** The workspace section row carries a `context` object
+populated by the prepare script (`scripts/skill/setup.js` → `scripts/lib/workspace-context.js`).
+It is the single source of truth for menu rendering; do not recompute previews
+or mismatches from the SKILL.
+
+- `previews.inside`, `previews.sibling`, `previews.central` — sample resolved paths
+  using a sentinel branch (`example-feature`) for each deterministic layout.
+- `claudeIgnored` — boolean; whether the project root `.gitignore` already lists `.claude/`.
+- `mismatchesByLayout.{inside|sibling|central}` — list of existing worktree paths
+  under `git worktree list` that do NOT match the layout being considered. Non-empty
+  values mean picking that layout would leave the listed worktrees orphaned (still
+  usable, but outside the configured location).
+- `existingWorktrees` — full output of `listExistingWorktrees()` for diagnostics.
+
+**Layout field rendering — overrides default 3.G behavior.**
+
+1. **Numbered layout menu, printed as plain chat output (NOT `AskUserQuestion`)
+   before the question.** Use the help text returned by
+   `workspace-fields.js::layoutField.help({ repoRoot, repoName, home, claudeIgnored })`
+   — it already renders previews 1–3 with their resolved paths and emits the
+   `.claude/` gitignore note based on `context.claudeIgnored`. Append a fourth row
+   for `template` with the static description from the field's `options[3]`.
+
+   Example shape (the script supplies the exact strings):
+
+   ```
+   Where should sdlc create git worktrees?
+     1. inside    <preview.inside>
+     2. sibling   <preview.sibling>
+     3. central   <preview.central>
+     4. template  Custom path with placeholders (advanced)
+   ```
+
+2. **Then dispatch the AskUserQuestion for the `layout` field** as in 3.G —
+   `field.label`, helper text from `field.description`, options
+   `inside | sibling | central | template`, default `inside`. Validate via
+   `field.validate(answer)` and re-prompt on failure.
+
+3. **Mismatch warning (R24) — runs after the layout answer arrives, before any
+   follow-up field is prompted.** When the chosen layout L is one of
+   `inside | sibling | central` AND `context.mismatchesByLayout[L]` is non-empty,
+   print one warning line per existing worktree path so the user knows the new
+   layout will not relocate them:
+
+   ```
+   warning: existing worktree at <path> does not match selected layout=<L>.
+   It will remain where it is; only future worktrees will use the new layout.
+   ```
+
+   Do NOT block — the wizard always proceeds. The warning is informational. The
+   check is skipped for `template` layout (custom paths are user-defined and
+   cannot be classified deterministically).
+
+**Conditional follow-up fields per layout.** After the layout answer (and any
+mismatch warning), iterate `WORKSPACE_FIELDS` in array order and dispatch one
+AskUserQuestion per field that is relevant for the chosen layout. Fields use
+the field's `description` from `workspace-fields.js` as helper text (verbatim —
+do not paraphrase). When a field defines `validate(value, layout, repoContext)`,
+re-prompt on failure with the exception message inline.
+
+| Layout | Follow-up fields prompted | Notes |
+|---|---|---|
+| `inside` | `base` (optional), `ensureGitignore` (boolean, default `true`), `nameTemplate` (optional) | `ensureGitignore=true` enables the SessionStart hook to auto-add `.claude/worktrees/` to root `.gitignore`. |
+| `sibling` | `base` (optional), `nameTemplate` (optional) | Path resolves alongside the repo dir. |
+| `central` | `base` (optional), `nameTemplate` (optional) | Default places under `~/.sdlc/worktrees/<repoName>/`. |
+| `template` | `template` (required — must contain `{slug}` or `{branch}`), `nameTemplate` (optional) | Skip `base` and `ensureGitignore`. |
+
+Skip a follow-up field entirely (do NOT prompt) when the chosen layout makes it
+irrelevant (e.g., `template` field for non-`template` layouts; `ensureGitignore`
+for non-`inside` layouts).
+
+**Live preview for `template`.** When the user enters a `template` value, call
+`templateField.preview(value, repoContext)` to render the resolved path using
+the sentinel branch. Print the preview line so the user can confirm before
+moving to the next field:
+
+```
+Template: <user-input>
+Preview with sentinel branch `example-feature`:
+  <resolved-path>
+```
+
+If the preview throws (template missing required placeholders, `..` traversal,
+etc.), surface the exception message and re-prompt for the template field.
+
+**Writing the section to `.sdlc/local.json`.** Assemble the section object,
+omitting any field the user left blank — `lib/config.js::writeLocalConfig` does
+read-merge-write so unspecified fields are preserved:
+
+```json
+{ "workspace": { "worktree": { "layout": "<L>", ...optional fields the user set } } }
+```
+
+Store the assembled object under the `workspace` key for the "Writing config files"
+step. The config lands in `.sdlc/local.json` (gitignored, per-developer) — never in
+`.sdlc/config.json`.
+
 #### 3.S. Scan phase (delegated content sections only)
 
 Before invoking `setup-dimensions` or `setup-pr-template`, run the project signal scan:
@@ -433,6 +540,7 @@ The historical step labels map onto the dispatcher above for anyone updating tes
 | 3d | `review` | 3.G |
 | 3e | `commit` | 3.commit |
 | 3f | `pr` | 3.pr |
+| 3g | `workspace` | 3.workspace (R24) |
 
 
 #### Diff preview (issue #235)

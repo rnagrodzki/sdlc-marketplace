@@ -1,0 +1,142 @@
+# Exec tests for workspace-fields.js validators and workspace-context.js
+# existingWorktrees/computeMismatches (issue #351 T11).
+#
+# Validator cases use tests/promptfoo/scripts/workspace-fields-test.js as the
+# driver so validate() functions (stripped from JSON.stringify in setup.js) can
+# be exercised directly.
+#
+# The existing-worktrees case uses setup.js directly to verify that
+# mismatchesByLayout is populated when a linked worktree exists under a
+# layout that differs from the configured layout.
+
+# ---------------------------------------------------------------------------
+# T11 AC#3 — invalid base (path traversal)
+# ---------------------------------------------------------------------------
+- description: "workspace-fields: base='../etc' rejected with TypeError mentioning '..'"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/workspace-fields-test.js"
+    script_args: "--case base-traversal"
+    project_root: "file://fixtures-fs/project-setup-empty"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"pass":true'
+
+# ---------------------------------------------------------------------------
+# T11 AC#3 — invalid base (relative non-~ path)
+# ---------------------------------------------------------------------------
+- description: "workspace-fields: base='some/relative' rejected (not absolute, not ~)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/workspace-fields-test.js"
+    script_args: "--case base-relative"
+    project_root: "file://fixtures-fs/project-setup-empty"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"pass":true'
+
+# ---------------------------------------------------------------------------
+# T11 AC#4 — template without placeholder
+# ---------------------------------------------------------------------------
+- description: "workspace-fields: template '~/fixed/path' rejected — missing {slug} or {branch}"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/workspace-fields-test.js"
+    script_args: "--case template-no-placeholder"
+    project_root: "file://fixtures-fs/project-setup-empty"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"pass":true'
+
+# ---------------------------------------------------------------------------
+# T11 AC#4 — template with path traversal
+# ---------------------------------------------------------------------------
+- description: "workspace-fields: template '~/../etc/{slug}' rejected — path traversal"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/workspace-fields-test.js"
+    script_args: "--case template-traversal"
+    project_root: "file://fixtures-fs/project-setup-empty"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"pass":true'
+
+# ---------------------------------------------------------------------------
+# T11 AC#4c — nameTemplate with {issue} on digit-less branch
+# ---------------------------------------------------------------------------
+- description: "workspace-fields: nameTemplate '{issue}-{slug}' on digit-less branch rejected"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/workspace-fields-test.js"
+    script_args: "--case nametemplate-issue-no-digits"
+    project_root: "file://fixtures-fs/project-setup-empty"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"pass":true'
+
+# ---------------------------------------------------------------------------
+# T11 AC#4 — nameTemplate with path separator
+# ---------------------------------------------------------------------------
+- description: "workspace-fields: nameTemplate '{slug}/sub' rejected — path separator"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/workspace-fields-test.js"
+    script_args: "--case nametemplate-path-sep"
+    project_root: "file://fixtures-fs/project-setup-empty"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"pass":true'
+
+# ---------------------------------------------------------------------------
+# T11 — valid inputs are accepted without throwing
+# ---------------------------------------------------------------------------
+- description: "workspace-fields: layout='sibling' passes validation"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/workspace-fields-test.js"
+    script_args: "--case layout-valid"
+    project_root: "file://fixtures-fs/project-setup-empty"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"pass":true'
+
+- description: "workspace-fields: base='~/dev/worktrees' passes validation"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/workspace-fields-test.js"
+    script_args: "--case base-valid"
+    project_root: "file://fixtures-fs/project-setup-empty"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"pass":true'
+
+- description: "workspace-fields: template='~/dev/wt/{slug}' passes validation"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/workspace-fields-test.js"
+    script_args: "--case template-valid"
+    project_root: "file://fixtures-fs/project-setup-empty"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"pass":true'
+
+# ---------------------------------------------------------------------------
+# T11 AC#5 — existing-worktrees: mismatchesByLayout populated correctly
+# Fixture has inside-layout worktree, config set to sibling.
+# setup.js should report the inside-layout worktree as a sibling mismatch.
+# ---------------------------------------------------------------------------
+- description: "workspace-setup (#351 T11): mismatchesByLayout.sibling contains inside-layout worktree"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    project_root: "file://fixtures-fs/workspace-setup-existing-worktrees"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const ws = out.sections && out.sections.find(s => s.id === 'workspace');
+        if (!ws || !ws.context) return false;
+        const mm = ws.context.mismatchesByLayout;
+        return Array.isArray(mm.sibling) && mm.sibling.length > 0 &&
+               mm.sibling[0].currentPath.includes('.claude/worktrees') &&
+               Array.isArray(ws.context.existingWorktrees) && ws.context.existingWorktrees.length > 0

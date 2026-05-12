@@ -53,6 +53,7 @@
 
 const { SHIP_FIELDS } = require('./ship-fields');
 const { parseRemoteOwner, detectBaseBranchSafe } = require('./git');
+const { WORKSPACE_FIELDS } = require('./workspace-fields');
 
 // ---------------------------------------------------------------------------
 // Section descriptors
@@ -279,6 +280,20 @@ function summarizeOpenspecBlock(_cfg, detected) {
   return `managed-block v${v}`;
 }
 
+function summarizeWorkspace(cfg) {
+  if (!cfg || !cfg.worktree) return '';
+  const wt = cfg.worktree;
+  const parts = [];
+  if (wt.layout) parts.push(`layout: ${wt.layout}`);
+  if (wt.nameTemplate && wt.nameTemplate !== '{slug}') parts.push(`name: ${wt.nameTemplate}`);
+  if (wt.base) parts.push(`base: ${wt.base}`);
+  if (wt.template) {
+    const t = wt.template.length > 30 ? wt.template.slice(0, 27) + '...' : wt.template;
+    parts.push(`template: ${t}`);
+  }
+  return parts.join('  ');
+}
+
 // ---------------------------------------------------------------------------
 // SETUP_SECTIONS — 13 entries, ordered by typical setup flow
 // ---------------------------------------------------------------------------
@@ -353,6 +368,20 @@ const SETUP_SECTIONS = [
     confirmDetected: false,
     fields: RECEIVED_REVIEW_FIELDS,
     summarize: summarizeReceivedReview,
+  },
+  {
+    id: 'workspace',
+    label: 'workspace',
+    purpose: 'Developer-local worktree placement preferences for /worktree-create, /execute-plan-sdlc, and /ship-sdlc. Configures where git worktrees are placed (inside repo, sibling to repo, central store, or custom template), the name pattern, and whether .claude/worktrees/ is auto-added to .gitignore. Stored in .sdlc/local.json (gitignored) so each developer can choose their own worktree layout without affecting teammates.',
+    configFile: '.sdlc/local.json',
+    configPath: 'workspace',
+    consumedBy: ['worktree-create', 'execute-plan-sdlc', 'ship-sdlc'],
+    filesModified: ['.sdlc/local.json'],
+    optional: true,
+    delegatedTo: null,
+    confirmDetected: false,
+    fields: WORKSPACE_FIELDS,
+    summarize: summarizeWorkspace,
   },
   {
     id: 'commit',

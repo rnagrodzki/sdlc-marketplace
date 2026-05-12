@@ -32,7 +32,7 @@ const fs   = require('fs');
 const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { readSection, writeSection, ensureSdlcGitignore } = require(path.join(LIB, 'config'));
+const { readSection, writeSection, ensureSdlcGitignore, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { VALID_STEPS, CANONICAL_STEPS } = require(path.join(LIB, 'ship-fields'));
 
@@ -129,7 +129,7 @@ function validate(parsed) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const projectRoot = process.cwd();
+  const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
   const parsed = parseArgs(process.argv);
   const { steps, bump, draft, auto, threshold, workspace, rebase, warnings: parseWarnings, parseErrors } = parsed;
 

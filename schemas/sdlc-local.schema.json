@@ -124,6 +124,43 @@
         }
       },
       "additionalProperties": false
+    },
+    "workspaceSection": {
+      "type": "object",
+      "description": "User-local workspace preferences (worktree layout, path, gitignore). Written by /setup-sdlc workspace section and consumed by worktree-create, execute-plan-sdlc, and ship-sdlc.",
+      "properties": {
+        "worktree": {
+          "type": "object",
+          "description": "Controls where git worktrees are created.",
+          "properties": {
+            "layout": {
+              "type": "string",
+              "enum": ["inside", "sibling", "central", "template"],
+              "description": "Worktree placement strategy. `inside` places under .claude/worktrees/ (default); `sibling` places next to the repo; `central` places under ~/.sdlc/worktrees/<repoName>/; `template` uses a custom path template."
+            },
+            "base": {
+              "type": "string",
+              "description": "Override base directory for inside/sibling/central layouts. Accepts absolute paths and ~/paths. Relative paths and .. traversal are rejected."
+            },
+            "template": {
+              "type": "string",
+              "description": "Path template for `template` layout. Must contain at least one of {slug} or {branch}. Available placeholders: {repo}, {slug}, {branch}."
+            },
+            "ensureGitignore": {
+              "type": "boolean",
+              "description": "Auto-add .claude/worktrees/ to root .gitignore managed block. Only relevant for `inside` layout. Default true.",
+              "default": true
+            },
+            "nameTemplate": {
+              "type": "string",
+              "default": "{slug}",
+              "description": "Worktree directory name pattern (final segment only, separate from placement). Placeholders: {slug} (default, branch slugified), {branch} (raw branch with / replaced by -), {date} (YYYY-MM-DD local tz), {issue} (first digit-run in branch name; throws if branch has no digits)."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "properties": {
@@ -144,6 +181,9 @@
     },
     "receivedReview": {
       "$ref": "#/$defs/receivedReviewSection"
+    },
+    "workspace": {
+      "$ref": "#/$defs/workspaceSection"
     }
   },
   "additionalProperties": false

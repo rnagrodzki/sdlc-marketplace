@@ -20,6 +20,7 @@ const { SHIP_FIELDS } = require(path.join(LIB, 'ship-fields'));
 const { SETUP_SECTIONS } = require(path.join(LIB, 'setup-sections'));
 const { detectBaseBranchSafe } = require(path.join(LIB, 'git'));
 const { OPENSPEC_ENRICH_VERSION } = require(path.join(__dirname, '..', 'util', 'openspec-enrich'));
+const { buildAllPreviews, detectConsumerCommitsClaude, listExistingWorktrees, computeMismatches } = require(path.join(LIB, 'workspace-context'));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -347,6 +348,37 @@ function detect(projectRoot) {
     return state === 'legacy';
   }
 
+  // Workspace context — pre-compute once for the workspace section row (issue #351).
+  // Safe to fail: on any error, consumerCommitsClaude defaults to false and
+  // previewPaths returns empty strings.
+  const repoName = path.basename(projectRoot);
+  const homeDir  = process.env.HOME || process.env.USERPROFILE || require('os').homedir();
+  const repoContext = { repoRoot: projectRoot, repoName, home: homeDir };
+  let workspaceContext = null;
+  try {
+    const existing = listExistingWorktrees(projectRoot);
+    // Pre-compute mismatches for the three deterministic layouts so SKILL.md
+    // can show a safety warning without re-running git after layout pick.
+    const mismatchesByLayout = {
+      inside:  computeMismatches(existing, 'inside',  {}, repoContext),
+      sibling: computeMismatches(existing, 'sibling', {}, repoContext),
+      central: computeMismatches(existing, 'central', {}, repoContext),
+    };
+    workspaceContext = {
+      consumerCommitsClaude: detectConsumerCommitsClaude(projectRoot),
+      previewPaths: buildAllPreviews(repoContext),
+      existingWorktrees: existing,
+      mismatchesByLayout,
+    };
+  } catch (_) {
+    workspaceContext = {
+      consumerCommitsClaude: false,
+      previewPaths: { inside: '', sibling: '', central: '', template: '' },
+      existingWorktrees: [],
+      mismatchesByLayout: { inside: [], sibling: [], central: [] },
+    };
+  }
+
   result.sections = SETUP_SECTIONS.map(section => {
     const state = computeState(section);
     const cfg = currentCfgFor(section);
@@ -357,7 +389,7 @@ function detect(projectRoot) {
       process.stderr.write(`[setup.js] summarize() failed for section "${section.id}": ${err.message}\n`);
       summary = '';
     }
-    return {
+    const row = {
       id: section.id,
       label: section.label,
       state,
@@ -373,6 +405,11 @@ function detect(projectRoot) {
       confirmDetected: section.confirmDetected || false,
       fields: section.fields,
     };
+    // Attach workspace context for the workspace section (issue #351).
+    if (section.id === 'workspace') {
+      row.context = workspaceContext;
+    }
+    return row;
   });
 
   return result;

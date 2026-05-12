@@ -8,6 +8,7 @@ const { CURRENT_SCHEMA_VERSION } = require('./config-version.js');
 const {
   PRESET_TO_STEPS: _MIGRATIONS_PRESET_MAP,
 } = require('./config-migrations.js');
+const { resolveMainWorktreeSafe } = require('./worktree');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -121,6 +122,54 @@ function stripMeta(obj, ...keys) {
 }
 
 // ---------------------------------------------------------------------------
+// Verbose config-read tracing (issue #351)
+// ---------------------------------------------------------------------------
+
+/** Tracks absolute paths already traced this process (dedupe). */
+const _tracedPaths = new Set();
+
+/**
+ * Emit a single-line trace to stderr for a config file read or write.
+ * - Deduplicates per absolute path per process.
+ * - Suppressed entirely when SDLC_CONFIG_QUIET=1.
+ * - Never writes to stdout.
+ *
+ * @param {string} absPath   Absolute path to the config file.
+ * @param {'read'|'read-miss'|'write'} status
+ */
+function _traceRead(absPath, status) {
+  if (process.env.SDLC_CONFIG_QUIET === '1') return;
+  if (_tracedPaths.has(absPath)) return;
+  _tracedPaths.add(absPath);
+  process.stderr.write(`[sdlc:config] ${status} ${absPath}\n`);
+}
+
+// ---------------------------------------------------------------------------
+// Main-worktree rooted .sdlc root (issue #351)
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the main worktree root path, anchored via git rather than the
+ * current working directory. When called from inside a linked worktree,
+ * returns the main worktree root so that `.sdlc/config.json` and
+ * `.sdlc/local.json` reads are always rooted at the developer-controlled
+ * config files (not a per-branch shadow copy).
+ *
+ * Callers should pass the result as `projectRoot` to readSection/writeSection
+ * instead of `process.cwd()`.
+ *
+ * Uses resolveMainWorktreeSafe (never throws; falls back to cwd when git is
+ * unavailable — e.g. first-time setup before git init).
+ *
+ * @param {object}  [opts]
+ * @param {string}  [opts.cwd=process.cwd()]  Working directory override.
+ * @returns {string} Absolute path to the main worktree root (parent of `.sdlc/`).
+ */
+function resolveSdlcRoot({ cwd } = {}) {
+  return resolveMainWorktreeSafe(cwd || process.cwd());
+}
+
+// ---------------------------------------------------------------------------
 // readProjectConfig
 // ---------------------------------------------------------------------------
 
@@ -139,8 +188,10 @@ function readProjectConfig(projectRoot) {
   const newPath = path.join(projectRoot, PROJECT_CONFIG_PATH);
   const unifiedNew = readJsonFile(newPath);
   if (unifiedNew) {
+    _traceRead(path.resolve(newPath), 'read');
     return { config: unifiedNew, sources: [PROJECT_CONFIG_PATH] };
   }
+  _traceRead(path.resolve(newPath), 'read-miss');
 
   // 2. Legacy fallback — merge individual config files
   const sources = [];
@@ -186,6 +237,9 @@ function readProjectConfig(projectRoot) {
 function readLocalConfig(projectRoot) {
   const localPath = path.join(projectRoot, LOCAL_CONFIG_PATH);
   const localData = readJsonFile(localPath);
+
+  // Trace the read (issue #351): emits one [sdlc:config] line per unique abs path.
+  _traceRead(path.resolve(localPath), localData ? 'read' : 'read-miss');
 
   // Issue #232: schema-version migration is no longer performed here. It is
   // owned by lib/config-version.js::verifyAndMigrate, called from each
@@ -284,6 +338,15 @@ function readSection(projectRoot, section) {
     const { config } = readLocalConfig(projectRoot);
     return config?.receivedReview ?? null;
   }
+  // issue #351: workspace and state sections live in local config
+  if (section === 'workspace') {
+    const { config } = readLocalConfig(projectRoot);
+    return config?.workspace ?? null;
+  }
+  if (section === 'state') {
+    const { config } = readLocalConfig(projectRoot);
+    return config?.state ?? null;
+  }
   return null;
 }
 
@@ -310,6 +373,7 @@ function writeProjectConfig(projectRoot, config) {
     $schema: PROJECT_SCHEMA_URL,
   };
   writeJsonFile(filePath, merged);
+  _traceRead(path.resolve(filePath), 'write');
 }
 
 // ---------------------------------------------------------------------------
@@ -401,6 +465,7 @@ function writeLocalConfig(projectRoot, config) {
     $schema: LOCAL_SCHEMA_URL,
   };
   writeJsonFile(filePath, merged);
+  _traceRead(path.resolve(filePath), 'write');
 }
 
 // ---------------------------------------------------------------------------
@@ -423,6 +488,12 @@ function writeSection(projectRoot, section, value) {
     writeLocalConfig(projectRoot, { review: value });
   } else if (section === 'receivedReview') {
     writeLocalConfig(projectRoot, { receivedReview: value });
+  } else if (section === 'workspace') {
+    // issue #351: workspace lives in local config
+    writeLocalConfig(projectRoot, { workspace: value });
+  } else if (section === 'state') {
+    // issue #351: state lives in local config
+    writeLocalConfig(projectRoot, { state: value });
   }
 }
 
@@ -848,14 +919,20 @@ const ROOT_GITIGNORE_BEGIN_V1 = '# >>> sdlc-utilities managed (do not edit) — 
  * Existing user content is preserved (merge-style write, not overwrite).
  *
  * @param {string} projectRoot
+ * @param {string[]} [extraPatterns=[]] Additional patterns to include in the
+ *   managed block for this invocation only (issue #351 — used by the
+ *   ensure-worktree-gitignore hook to add `.claude/worktrees/` without
+ *   modifying ROOT_GITIGNORE_PATTERNS). Not persisted beyond this call.
  * @returns {'created'|'updated'|'unchanged'}
  */
-function ensureRootGitignore(projectRoot) {
+function ensureRootGitignore(projectRoot, extraPatterns) {
   const gitignorePath = path.join(projectRoot, '.gitignore');
+  const extraPats     = Array.isArray(extraPatterns) ? extraPatterns : [];
 
   const managedBlock = [
     ROOT_GITIGNORE_BEGIN,
     ...ROOT_GITIGNORE_PATTERNS,
+    ...extraPats,
     ROOT_GITIGNORE_END,
   ].join('\n');
 
@@ -984,6 +1061,7 @@ function ensureSdlcInfrastructure(projectRoot) {
 // ---------------------------------------------------------------------------
 
 module.exports = {
+  resolveSdlcRoot,
   readProjectConfig,
   readLocalConfig,
   readSection,

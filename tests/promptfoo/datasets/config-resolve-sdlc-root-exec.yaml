@@ -1,0 +1,93 @@
+# Script execution tests for resolveSdlcRoot() and verbose tracing in lib/config.js — issue #351.
+# Validates that config reads route to the main worktree's .sdlc/ and that verbose tracing works.
+
+- description: "config-sdlc-root: exports are present"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/config-sdlc-root-test.js"
+    script_args: "--op exports"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"hasResolveSdlcRoot": true'
+    - type: contains
+      value: '"hasReadSection": true'
+
+- description: "config-sdlc-root: resolveSdlcRoot from main cwd returns main worktree root (no .sdlc suffix)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/config-sdlc-root-test.js"
+    script_args: "--op resolveSdlcRoot --cwd {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: not-contains
+      value: '".sdlc"'
+
+- description: "config-sdlc-root: resolveSdlcRoot from linked worktree cwd returns main worktree root (not linked)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/config-sdlc-root-test.js"
+    script_args: "--op resolveSdlcRoot --cwd {{project_root}}/linked-wt"
+    script_cwd: "{{project_root}}/linked-wt"
+    project_root: "file://fixtures-fs/worktree-linked-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: not-contains
+      value: 'linked-wt'
+
+- description: "config-sdlc-root: readSection workspace returns workspace block from local.json"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/config-sdlc-root-test.js"
+    script_args: "--op readSection --project-root {{project_root}} --section workspace"
+    project_root: "file://fixtures-fs/setup-fully-configured"
+  assert:
+    - type: contains
+      value: '"ok": true'
+
+- description: "config-sdlc-root: readSection state returns null when not configured"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/config-sdlc-root-test.js"
+    script_args: "--op readSection --project-root {{project_root}} --section state"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"value": null'
+
+- description: "config-sdlc-root: verbose trace emits [sdlc:config] read on stderr"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/config-sdlc-root-test.js"
+    script_args: "--op traceLocal --project-root {{project_root}}"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+    script_capture_stderr: "true"
+    script_env: '{"SDLC_CONFIG_QUIET": ""}'
+  assert:
+    - type: contains
+      value: '[sdlc:config]'
+    - type: contains
+      value: 'traceLocal:done'
+
+- description: "config-sdlc-root: verbose trace deduplicates — same path traced only once"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/config-sdlc-root-test.js"
+    script_args: "--op traceDedup --project-root {{project_root}}"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+    script_capture_stderr: "true"
+  assert:
+    - type: contains
+      value: 'traceDedup:done'
+
+- description: "config-sdlc-root: SDLC_CONFIG_QUIET=1 suppresses all [sdlc:config] stderr output"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/config-sdlc-root-test.js"
+    script_args: "--op traceLocal --project-root {{project_root}}"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+    script_env: '{"SDLC_CONFIG_QUIET": "1"}'
+    script_capture_stderr: "true"
+  assert:
+    - type: not-contains
+      value: '[sdlc:config]'
+    - type: contains
+      value: 'traceLocal:done'

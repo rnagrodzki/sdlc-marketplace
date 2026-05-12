@@ -44,7 +44,7 @@ const {
   ensureGhAccount,
   splitDiffByFile,
 } = require(path.join(LIB, 'git'));
-const { readSection, writeLocalConfig } = require(path.join(LIB, 'config'));
+const { readSection, writeLocalConfig, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 
@@ -88,7 +88,7 @@ function writeReviewConfig(projectRoot, updates) {
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let projectRoot = process.cwd();
+  let projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/ (overridable via --project-root)
   let baseBranch = null;
   let dimensionFilter = null;
   let scope = null;

@@ -1,0 +1,54 @@
+# Script execution tests for scripts/util/worktree-create.js — issue #351.
+# Validates config-driven layout selection and fallback to inside default.
+
+- description: "worktree-create: no config — creates worktree at .claude/worktrees/<slug>"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/worktree-create.js"
+    script_args: "--name feat/my-feature"
+    project_root: "file://fixtures-fs/worktree-create-default"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"branch":'
+    - type: contains
+      value: '.claude/worktrees/'
+    - type: not-contains
+      value: '"error":'
+
+- description: "worktree-create: inside layout config — path includes .claude/worktrees"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/worktree-create.js"
+    script_args: "--name feat/inside-test"
+    project_root: "file://fixtures-fs/worktree-create-inside-config"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"branch":'
+    - type: contains
+      value: '.claude/worktrees/'
+    - type: not-contains
+      value: '"error":'
+
+- description: "worktree-create: invalid branch name — error JSON output"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/worktree-create.js"
+    script_args: "--name bad..name"
+    project_root: "file://fixtures-fs/worktree-create-default"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"error":'
+    - type: not-contains
+      value: '"branch":'
+
+- description: "worktree-create: missing --name argument — error JSON output"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/worktree-create.js"
+    script_args: ""
+    project_root: "file://fixtures-fs/worktree-create-default"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"error":'
+    - type: not-contains
+      value: '"branch":'
