@@ -47,7 +47,7 @@ const {
   formatAccountMismatch,
 } = require(path.join(LIB, 'git'));
 
-const { readSection } = require(path.join(LIB, 'config'));
+const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
@@ -158,7 +158,7 @@ function detectPrMode(forceUpdate, prMeta) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const projectRoot = process.cwd();
+  const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
   const { isDraft, forceUpdate, baseBranchOverride, isAuto, forcedLabels } = parseArgs(process.argv);
 
   const errors   = [];
@@ -506,7 +506,7 @@ function main() {
  *   2 — usage error
  */
 async function validateBodyMode(argv) {
-  const projectRoot = process.cwd();
+  const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
   const wantJson = argv.includes('--json');
   const fileIdx = argv.indexOf('--file');
   let body = '';

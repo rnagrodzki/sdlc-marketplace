@@ -51,3 +51,10 @@ tests:
   - file://datasets/validate-cost-tiers-exec.yaml
   - file://datasets/verify-pipeline-exec.yaml
   - file://datasets/await-remote-review-exec.yaml
+  - file://datasets/lib-worktree-exec.yaml
+  - file://datasets/worktree-path-exec.yaml
+  - file://datasets/config-resolve-sdlc-root-exec.yaml
+  - file://datasets/worktree-doctor-exec.yaml
+  - file://datasets/ensure-worktree-gitignore-exec.yaml
+  - file://datasets/worktree-create-exec.yaml
+  - file://datasets/workspace-setup-exec.yaml

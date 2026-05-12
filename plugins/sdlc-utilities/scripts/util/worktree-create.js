@@ -7,12 +7,15 @@
  *   node worktree-create.js --name <branch-name>
  *
  * Outputs JSON to stdout:
- *   Success: { "branch": "<final-name>", "path": ".claude/worktrees/<slugified-name>" }
+ *   Success: { "branch": "<final-name>", "path": "<abs-worktree-path>" }
  *   Failure: { "error": "<message>" }
  *
  * Exit codes:
  *   0 = success
  *   1 = failure (JSON error object on stdout)
+ *
+ * Worktree placement is driven by workspace.worktree config (issue #351).
+ * Falls back to inside layout at .claude/worktrees/<slug> when no config exists.
  *
  * Zero npm dependencies — Node.js built-ins only.
  */
@@ -21,9 +24,13 @@
 
 const fs   = require('fs');
 const path = require('path');
-const LIB = path.join(__dirname, '..', 'lib');
+const os   = require('os');
+const LIB  = path.join(__dirname, '..', 'lib');
 
-const { exec } = require(path.join(LIB, 'git'));
+const { exec }                          = require(path.join(LIB, 'git'));
+const { readSection, resolveSdlcRoot }  = require(path.join(LIB, 'config'));
+const { resolvePath }                   = require(path.join(LIB, 'worktree-path'));
+const { resolveMainWorktreeSafe }       = require(path.join(LIB, 'worktree'));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,7 +70,7 @@ function branchExists(branchName) {
 
 /**
  * Check whether a worktree directory already exists on disk.
- * @param {string} worktreePath  Path relative to cwd
+ * @param {string} worktreePath
  * @returns {boolean}
  */
 function worktreePathExists(worktreePath) {
@@ -79,21 +86,63 @@ function shortSuffix() {
 }
 
 /**
- * Given a desired branch name, find a variant that does not collide with
- * any existing branch name or worktree path.
- * @param {string} desiredName
- * @returns {{ finalName: string, sluggedPath: string }}
+ * Load the workspace.worktree config section from the main worktree.
+ * Returns null when no config is available (non-git, no .sdlc, etc.).
+ * @returns {object|null}
  */
-function resolveUniqueName(desiredName) {
+function loadWorktreeConfig() {
+  try {
+    const projectRoot = resolveSdlcRoot();
+    const workspace = readSection(projectRoot, 'workspace');
+    return (workspace && workspace.worktree) ? workspace.worktree : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Given a desired branch name and worktree config, find a path+name variant
+ * that does not collide with any existing branch name or worktree directory.
+ *
+ * @param {string} desiredName   Raw branch name (not yet slugified).
+ * @param {object} wtCfg         workspace.worktree config (may be null).
+ * @returns {{ finalName: string, worktreePath: string }}
+ */
+function resolveUniquePath(desiredName, wtCfg) {
+  const cfg = wtCfg || {};
+  const layout = cfg.layout || 'inside';
+  const mainWorktree = resolveMainWorktreeSafe();
+  const repoName = path.basename(mainWorktree);
+  const home = os.homedir();
+
   let candidate = desiredName;
 
   // Retry up to 10 times (astronomically unlikely to need more than 1-2)
   for (let i = 0; i < 10; i++) {
-    const slugged = slugify(candidate);
-    const worktreePath = path.join('.claude', 'worktrees', slugged);
+    const slug = slugify(candidate);
 
-    if (!branchExists(candidate) && !worktreePathExists(worktreePath)) {
-      return { finalName: candidate, sluggedPath: worktreePath };
+    let resolvedPath;
+    try {
+      const resolved = resolvePath({
+        layout,
+        base:         cfg.base,
+        template:     cfg.template,
+        repoRoot:     mainWorktree,
+        repoName,
+        slug,
+        branch:       candidate,
+        home,
+        nameTemplate: cfg.nameTemplate || '{slug}',
+      });
+      resolvedPath = resolved.path;
+    } catch (_) {
+      // Config is invalid / nameTemplate fails for this branch name.
+      // Fall back to inside layout default.
+      resolvedPath = path.join(mainWorktree, '.claude', 'worktrees', slug);
+    }
+
+    if (!branchExists(candidate) && !worktreePathExists(resolvedPath)) {
+      return { finalName: candidate, worktreePath: resolvedPath };
     }
 
     // Append suffix to the original desired name (not to a previously suffixed one)
@@ -138,17 +187,20 @@ function main() {
     return;
   }
 
+  // Load config-driven layout
+  const wtCfg = loadWorktreeConfig();
+
   // Resolve a unique branch name / worktree path
-  let finalName, sluggedPath;
+  let finalName, worktreePath;
   try {
-    ({ finalName, sluggedPath } = resolveUniqueName(name));
+    ({ finalName, worktreePath } = resolveUniquePath(name, wtCfg));
   } catch (err) {
     fail(err.message);
     return;
   }
 
-  // Ensure the parent directory exists (.claude/worktrees)
-  const parentDir = path.join('.claude', 'worktrees');
+  // Ensure the parent directory exists
+  const parentDir = path.dirname(worktreePath);
   try {
     fs.mkdirSync(parentDir, { recursive: true });
   } catch (err) {
@@ -159,15 +211,15 @@ function main() {
   // Create the worktree (git creates the worktree directory itself)
   try {
     exec(
-      `git worktree add ${sluggedPath} -b ${finalName}`,
+      `git worktree add ${worktreePath} -b ${finalName}`,
       { throwOnError: true }
     );
   } catch (err) {
-    fail(`git worktree add failed for branch "${finalName}" at path "${sluggedPath}": ${err.message}`);
+    fail(`git worktree add failed for branch "${finalName}" at path "${worktreePath}": ${err.message}`);
     return;
   }
 
-  process.stdout.write(JSON.stringify({ branch: finalName, path: sluggedPath }) + '\n');
+  process.stdout.write(JSON.stringify({ branch: finalName, path: worktreePath }) + '\n');
   process.exit(0);
 }
 

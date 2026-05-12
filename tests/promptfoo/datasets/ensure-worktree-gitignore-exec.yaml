@@ -1,0 +1,49 @@
+# Script execution tests for hooks/ensure-worktree-gitignore.js — issue #351.
+# Validates: no-op when no config; adds .claude/worktrees/ for inside layout; idempotent.
+#
+# Uses run-gitignore-hook-and-read.js as a wrapper to capture .gitignore content
+# post-run (promptfoo JS assertions run in ESM context where require() is unavailable).
+
+- description: "ensure-worktree-gitignore: no workspace config — exits 0, no .gitignore created"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-gitignore-hook-and-read.js"
+    project_root: "file://fixtures-fs/gitignore-hook-no-config"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: not-contains
+      value: '"error"'
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        return out.gitignoreExists === false && out.hookExitCode === 0
+
+- description: "ensure-worktree-gitignore: inside layout — adds .claude/worktrees/ to managed block"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-gitignore-hook-and-read.js"
+    project_root: "file://fixtures-fs/gitignore-hook-inside-layout"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: not-contains
+      value: '"error"'
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        return out.gitignoreExists === true &&
+               out.gitignoreContent !== null &&
+               out.gitignoreContent.includes('.claude/worktrees/') &&
+               out.hookExitCode === 0
+
+- description: "ensure-worktree-gitignore: idempotent — pre-seeded .gitignore produces single entry"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-gitignore-hook-and-read.js"
+    project_root: "file://fixtures-fs/gitignore-hook-idempotent"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: not-contains
+      value: '"error"'
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        if (!out.gitignoreContent) return false;
+        const matches = out.gitignoreContent.match(/\.claude\/worktrees\//g);
+        return matches && matches.length === 1 && out.hookExitCode === 0

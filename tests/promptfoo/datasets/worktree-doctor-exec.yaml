@@ -1,0 +1,48 @@
+# Script execution tests for scripts/util/worktree-doctor.js — issue #351.
+# Validates doctor diagnostics: clean, orphan, stale-local-config cases.
+
+- description: "worktree-doctor: clean fixture exits 0 with '0 issues found'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/worktree-doctor.js"
+    script_args: "--json"
+    project_root: "file://fixtures-fs/worktree-doctor-clean"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '0 issues'
+
+- description: "worktree-doctor: orphan fixture reports orphan-worktree issue"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/worktree-doctor.js"
+    script_args: "--json"
+    project_root: "file://fixtures-fs/worktree-doctor-orphan"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: 'orphan'
+
+- description: "worktree-doctor: stale-local fixture reports config-resolution-mismatch"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/worktree-doctor.js"
+    script_args: "--json"
+    project_root: "file://fixtures-fs/worktree-doctor-stale-local"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: 'config-resolution-mismatch'
+
+- description: "worktree-doctor: layout-mismatch fixture emits git worktree move hint in JSON migrations"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/worktree-doctor.js"
+    script_args: "--json"
+    project_root: "file://fixtures-fs/worktree-doctor-layout-mismatch"
+    script_cwd: "{{project_root}}"
+  assert:
+    - type: contains
+      value: 'layout-mismatch'
+    - type: contains
+      value: '"migrations"'
+    - type: contains
+      value: '.claude/worktrees/feat-x'

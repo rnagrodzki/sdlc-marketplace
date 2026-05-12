@@ -11,8 +11,9 @@
 const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
-const { exec }         = require('./git');
-const { readSection }  = require('./config');
+const { exec }                   = require('./git');
+const { readSection, resolveSdlcRoot } = require('./config');
+const { resolveMainWorktree }    = require('./worktree');
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -34,24 +35,8 @@ function atomicWriteSync(filePath, content) {
 }
 
 // ---------------------------------------------------------------------------
-// Worktree helpers
+// Worktree helpers — resolveMainWorktree is imported from ./worktree
 // ---------------------------------------------------------------------------
-
-/**
- * Return the path of the main (primary) worktree by parsing
- * `git worktree list --porcelain`.
- * @returns {string} Absolute path to the main worktree
- */
-function resolveMainWorktree() {
-  const out = exec('git worktree list --porcelain');
-  if (!out) throw new Error('Could not determine main worktree (git worktree list failed)');
-
-  // The first "worktree <path>" entry is always the main worktree.
-  const match = out.match(/^worktree (.+)$/m);
-  if (!match) throw new Error('Could not parse main worktree path from git worktree list output');
-
-  return match[1].trim();
-}
 
 // ---------------------------------------------------------------------------
 // Branch slug helpers
@@ -563,7 +548,9 @@ function listBranches() {
  */
 function readTtlDaysFromConfig() {
   try {
-    const stateCfg = readSection(process.cwd(), 'state');
+    // issue #351: route to main worktree's .sdlc/ so linked-worktree cwds
+    // still pick up the developer-configured ttlDays value.
+    const stateCfg = readSection(resolveSdlcRoot(), 'state');
     const v = stateCfg && stateCfg.gc && stateCfg.gc.ttlDays;
     if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
   } catch (_) {

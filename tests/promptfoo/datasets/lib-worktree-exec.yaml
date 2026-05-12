@@ -1,0 +1,64 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/lib/worktree.js — issue #351.
+# Validates resolveMainWorktree and resolveMainWorktreeSafe helpers.
+# These run real Node.js scripts against fixture directories (no LLM).
+
+- description: "worktree-lib: exports are present"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-lib-test.js"
+    script_args: "--op exports"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"hasResolveMainWorktree": true'
+    - type: contains
+      value: '"hasResolveMainWorktreeSafe": true'
+
+- description: "worktree-lib: resolveMainWorktree from main worktree cwd returns main path"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-lib-test.js"
+    script_args: "--op resolveMain --cwd {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"path":'
+
+- description: "worktree-lib: resolveMainWorktree from linked worktree cwd returns main (not linked) path"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-lib-test.js"
+    script_args: "--op resolveMain --cwd {{project_root}}/linked-wt"
+    script_cwd: "{{project_root}}/linked-wt"
+    project_root: "file://fixtures-fs/worktree-linked-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"path":'
+    - type: not-contains
+      value: 'linked-wt'
+
+- description: "worktree-lib: resolveMainWorktree throws on non-git cwd"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-lib-test.js"
+    script_args: "--op resolveMain --cwd {{project_root}}/not-a-git-dir"
+    script_cwd: "{{project_root}}/not-a-git-dir"
+    project_root: "file://fixtures-fs/worktree-non-git-cwd"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: contains
+      value: '"error":'
+
+- description: "worktree-lib: resolveMainWorktreeSafe returns cwd fallback on non-git dir (silent)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-lib-test.js"
+    script_args: "--op resolveMainSafe --cwd {{project_root}}/not-a-git-dir"
+    script_cwd: "{{project_root}}/not-a-git-dir"
+    project_root: "file://fixtures-fs/worktree-non-git-cwd"
+  assert:
+    - type: contains
+      value: '"path":'
+    - type: not-contains
+      value: '"ok": false'

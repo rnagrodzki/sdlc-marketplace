@@ -28,7 +28,7 @@ const path = require('node:path');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { detectActiveChanges, validateChange } = require(path.join(LIB, 'openspec'));
-const { readSection } = require(path.join(LIB, 'config'));
+const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { initState, findStateFile, readState, writeState, slugifyBranch, pruneStateFiles } = require(path.join(LIB, 'state'));
@@ -138,7 +138,7 @@ function main() {
     return; // runMarkMode calls process.exit(); this is a safeguard
   }
 
-  const projectRoot = process.cwd();
+  const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
   const errors = [];
 
   // Issue #232: verifyAndMigrate gate (CLI > env > default false).

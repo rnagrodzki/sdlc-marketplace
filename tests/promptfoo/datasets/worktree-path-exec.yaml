@@ -1,0 +1,164 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/lib/worktree-path.js — issue #351.
+# Validates resolvePath for all 4 layouts + nameTemplate cases.
+# These run real Node.js scripts (no LLM). No fixture setup needed — resolvePath is pure.
+
+- description: "worktree-path: exports are present"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: "--op exports"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"hasResolvePath": true'
+
+- description: "worktree-path: layout=inside default base places worktree under repoRoot/.claude/worktrees"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"inside","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-login","branch":"feat/login","home":"/home/user"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '.claude/worktrees/feat-login'
+    - type: contains
+      value: '"requiresGitignore": true'
+
+- description: "worktree-path: layout=sibling default base places worktree next to repo"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"sibling","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-login","branch":"feat/login","home":"/home/user"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '/repo/myapp-feat-login'
+    - type: contains
+      value: '"requiresGitignore": false'
+
+- description: "worktree-path: layout=central default base places worktree under ~/.sdlc/worktrees/<repoName>"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"central","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-login","branch":"feat/login","home":"/home/user"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '/home/user/.sdlc/worktrees/myapp/feat-login'
+    - type: contains
+      value: '"requiresGitignore": false'
+
+- description: "worktree-path: layout=template with ~/dev/wt/{slug}"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"template","template":"~/dev/wt/{slug}","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-login","branch":"feat/login","home":"/home/user"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '/home/user/dev/wt/feat-login'
+
+- description: "worktree-path: layout=template requires {slug} or {branch} placeholder"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"template","template":"~/fixed-no-placeholder","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-login","branch":"feat/login","home":"/home/user"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: contains
+      value: 'template must contain {slug} or {branch}'
+
+- description: "worktree-path: base with .. traversal throws TypeError"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"inside","base":"../etc","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-login","branch":"feat/login","home":"/home/user"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: contains
+      value: 'traversal'
+
+- description: "worktree-path: template with .. traversal throws TypeError"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"template","template":"../{slug}","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-login","branch":"feat/login","home":"/home/user"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: contains
+      value: 'traversal'
+
+- description: "worktree-path: nameTemplate {date}-{slug} with fixed date produces date-prefixed leaf"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"inside","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-login","branch":"feat/login","home":"/home/user","nameTemplate":"{date}-{slug}","now":"2026-05-12T00:00:00.000Z"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '2026-05-12-feat-login'
+
+- description: "worktree-path: nameTemplate {issue}-{slug} with branch containing digits produces issue-prefixed leaf"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"inside","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-351-foo","branch":"feat/351-foo","home":"/home/user","nameTemplate":"{issue}-{slug}"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '351-feat-351-foo'
+
+- description: "worktree-path: nameTemplate {issue}-{slug} with no-digit branch throws TypeError"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"inside","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-foo","branch":"feat/foo","home":"/home/user","nameTemplate":"{issue}-{slug}"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: contains
+      value: '{issue}'
+    - type: contains
+      value: "feat/foo"
+
+- description: "worktree-path: nameTemplate with path separator throws TypeError"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"inside","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-login","branch":"feat/login","home":"/home/user","nameTemplate":"{slug}/sub"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: contains
+      value: 'path separator'
+
+- description: "worktree-path: default nameTemplate (omitted) equals {slug} behavior"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/worktree-path-test.js"
+    script_args: >-
+      --op resolvePath --opts-json {"layout":"inside","repoRoot":"/repo/myapp","repoName":"myapp","slug":"feat-login","branch":"feat/login","home":"/home/user"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: 'feat-login'

@@ -265,3 +265,53 @@
       value: |
         const out = JSON.parse(output);
         return out.menuInputContract && out.menuInputContract.defaultToken === 'not-set'
+
+# ---------------------------------------------------------------------------
+# Issue #351 — workspace section in sections array
+# ---------------------------------------------------------------------------
+
+- description: "setup-prepare (#351): workspace section present in sections[] with correct shape"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const ws = out.sections && out.sections.find(s => s.id === 'workspace');
+        return Boolean(ws) && ws.configFile === '.sdlc/local.json' && ws.configPath === 'workspace'
+
+- description: "setup-prepare (#351): workspace section has context with previewPaths, consumerCommitsClaude, existingWorktrees, mismatchesByLayout"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const ws = out.sections && out.sections.find(s => s.id === 'workspace');
+        return ws && ws.context && typeof ws.context.consumerCommitsClaude === 'boolean' &&
+               ws.context.previewPaths && typeof ws.context.previewPaths.inside === 'string' &&
+               typeof ws.context.previewPaths.sibling === 'string' &&
+               Array.isArray(ws.context.existingWorktrees) &&
+               ws.context.mismatchesByLayout &&
+               Array.isArray(ws.context.mismatchesByLayout.inside) &&
+               Array.isArray(ws.context.mismatchesByLayout.sibling) &&
+               Array.isArray(ws.context.mismatchesByLayout.central)
+
+- description: "setup-prepare (#351): workspace section has 5 fields (layout/base/template/ensureGitignore/nameTemplate)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const ws = out.sections && out.sections.find(s => s.id === 'workspace');
+        if (!ws || !ws.fields) return false;
+        const names = ws.fields.map(f => f.name);
+        const expected = ['layout', 'base', 'template', 'ensureGitignore', 'nameTemplate'];
+        return JSON.stringify(names) === JSON.stringify(expected)

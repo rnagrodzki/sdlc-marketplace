@@ -133,6 +133,11 @@
         "id": "flag-semantic-consistency-cross-skill",
         "description": "A CLI flag name used across user-invoked skill prepare scripts (plugins/*/scripts/skill/*.js) must mean the same thing in every script that defines it. Plans that introduce a flag in one skill with semantics that conflict with the same flag name in another user-invoked skill fail this guardrail. Internal helper scripts (scripts/state/*.js, scripts/lib/*.js, scripts/util/*.js) are out of scope — they have private argument vocabularies controlled by their SKILL.md callers, not by users. When adding a new flag to a skill prepare script, the plan must include grep evidence that the flag name is unused, or unused with a conflicting meaning, across other user-invoked skill prepare scripts.",
         "severity": "error"
+      },
+      {
+        "id": "workspace-mode-compatibility",
+        "description": "Tasks delivering new features or modifying skill behavior must be designed to work under BOTH ship.workspace=branch and ship.workspace=worktree. Plans that touch state files, config readers, file paths, cwd-dependent logic, or git operations must explicitly state how the implementation behaves in each mode and include verification coverage for both. State writes must route through resolveStateDir(); config reads must route through resolveSdlcRoot(). Plans that hardcode .claude/, write to cwd directly without main-worktree resolution, or assume a single working tree fail this guardrail.",
+        "severity": "error"
       }
     ]
   },
