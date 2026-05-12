@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.19.14] - 2026-05-12
+
+### Added
+- ship-sdlc + execute-plan-sdlc: wave-level Agent dispatch for context isolation, bounding context pollution to wave-level events (#353)
+
+### Changed
+- wave-runner documentation and spec reference: clarified Agent (not main context) parses per-task results; documented recovery wave-runner budget carryover; added single-Trivial dispatch rule; updated terminology from 'inline-Bash' to 'inline-executed' (#353)
+
 ## [0.19.13] - 2026-05-12
 
 ### Added

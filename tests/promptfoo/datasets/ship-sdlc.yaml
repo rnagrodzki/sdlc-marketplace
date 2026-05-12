@@ -671,3 +671,70 @@
         no AskUserQuestion. On fix-applied verdict, ship-sdlc directly dispatches
         commit-sdlc to commit/push and re-polls verify-pipeline up to
         flags.verifyPipelineMaxIterations (default 3, R47).
+
+# Issue #353 — Wave-level Agent dispatch: dispatchMode branching in Step 5
+# ---------------------------------------------------------------------------
+
+- description: "ship-sdlc (issue #353): execute step with dispatchMode=skill invokes via Skill tool, not Agent"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The prepare script output includes a pipeline step for execute-plan-sdlc with
+      `dispatchMode: 'skill'` and `status: 'will_run'`. Walk through what ship-sdlc
+      does in Step 5 for this step — specifically whether it uses the Skill tool or
+      the Agent tool, and why.
+  assert:
+    - type: icontains
+      value: "Skill"
+    - type: not-regex
+      value: "(Agent tool|dispatch.*Agent)"
+    - type: llm-rubric
+      value: >
+        ship-sdlc Step 5 invokes execute-plan-sdlc via the Skill tool (not the Agent
+        tool) because step.dispatchMode === 'skill'. The response must cite dispatchMode
+        or the dispatch protocol. It must explain that execute is the orchestrator
+        exception — its wave progress, high-risk gates, and tier prompt stream in
+        main context via Skill-tool invocation. It must NOT describe dispatching
+        execute as an Agent.
+
+- description: "ship-sdlc (issue #353): non-execute step with dispatchMode=agent invokes via Agent tool"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The prepare script output includes a `commit-sdlc` step with `dispatchMode: 'agent'`,
+      `model: 'haiku'`, `isolation: null`, and `status: 'will_run'`. Walk through what
+      ship-sdlc does in Step 5 for this step, citing the dispatch protocol.
+  assert:
+    - type: regex
+      value: "(Agent|agent)"
+    - type: icontains
+      value: "model"
+    - type: llm-rubric
+      value: >
+        ship-sdlc Step 5 dispatches the commit-sdlc step as an Agent (Agent tool)
+        with model: step.model ('haiku') and no isolation parameter (since
+        step.isolation is null). The response cites dispatchMode === 'agent' as
+        the reason. It does NOT use the Skill tool for this step.
+
+- description: "ship-sdlc (issue #353): execute resume path uses Skill tool with --resume arg"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The pipeline is resuming (--resume active). The execute step has status
+      `in_progress` in the ship state file, and an execute-plan-sdlc state file
+      exists for the current branch. step.dispatchMode is 'skill'. What does
+      ship-sdlc do to resume the execute step?
+  assert:
+    - type: icontains
+      value: "Skill"
+    - type: icontains
+      value: "--resume"
+    - type: llm-rubric
+      value: >
+        ship-sdlc invokes execute-plan-sdlc via the Skill tool (not Agent) with
+        args from step.invocation plus '--resume'. The response notes that wave
+        progress and gates stream in main context via the Skill-tool path. It
+        does NOT describe dispatching execute as an Agent for the resume path.

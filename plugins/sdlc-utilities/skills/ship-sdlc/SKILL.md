@@ -1,6 +1,6 @@
 ---
 name: ship-sdlc
-description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Chains execute-plan-sdlc, commit-sdlc, review-sdlc, received-review-sdlc, version-sdlc, and pr-sdlc with conditional review-fix loop. Arguments: [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config]. The `<label>` form for --bump (e.g. `--bump rc`) is forwarded to version-sdlc, where it is interpreted as `--bump patch --pre <label>`; labels must match `^[a-z][a-z0-9]*$`. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
+description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Runs execute-plan-sdlc via Skill tool (so wave progress, high-risk gates, and tier prompts stream in main context), then dispatches remaining sub-skills as Agents for context isolation. Arguments: [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config]. The `<label>` form for --bump (e.g. `--bump rc`) is forwarded to version-sdlc, where it is interpreted as `--bump patch --pre <label>`; labels must match `^[a-z][a-z0-9]*$`. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
 argument-hint: "[--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--branch | --tree] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
 model: sonnet
@@ -315,25 +315,53 @@ On **edit**: ask what to change, update flags, rebuild the pipeline table, and r
 ### Pre-step validation
 
 Before dispatching each step, read its `status` from the skill/ship.js output:
-1. `"will_run"` → dispatch as Agent. No exceptions. This is non-negotiable.
-2. `"conditional"` → evaluate the runtime condition (e.g., review verdict). If condition met → dispatch as Agent. If not → print why with the specific condition that was not met.
+1. `"will_run"` → dispatch per `step.dispatchMode` (Skill tool when `'skill'`, Agent tool when `'agent'`). Inline-executed steps (`skill === null`, `dispatchMode: null`) are not dispatched via a tool — they are handled directly in main context (either as Bash commands or as conditional logic such as parsing a JSON verdict, as specified per-step). This is non-negotiable.
+2. `"conditional"` → evaluate the runtime condition (e.g., review verdict). If condition met → dispatch per `step.dispatchMode`. If not → print why with the specific condition that was not met.
 3. `"skipped"` → print "skipped" with the `reason` and `skipSource` from the script output.
 
-A step with `status: "will_run"` MUST be dispatched as an Agent. The LLM does not have authority to override this status. Printing a skip message for a "will_run" step is a pipeline violation.
+A step with `status: "will_run"` MUST be dispatched per its `dispatchMode`. The LLM does not have authority to override `dispatchMode` or skip a `will_run` step. Printing a skip message for a "will_run" step is a pipeline violation.
 
-### Context budget — agent isolation
+### Context budget — dispatch isolation
 
-Each sub-skill's SKILL.md is 200–550 lines. With the Skill tool, every invocation loads the full SKILL.md into the ship pipeline's context — 2000+ lines across a 7-step pipeline. Agent dispatch eliminates this: each Agent loads SKILL.md in its own context and returns only a structured result (5–10 lines). The ship pipeline's context receives structured data, not sub-skill definitions.
+Leaf sub-skills (commit, review, received-review, version, pr, verify-pipeline) are Agent-dispatched for context isolation: each Agent loads its SKILL.md in its own context and returns only a structured result (5–10 lines). The ship pipeline's context receives structured data, not sub-skill definitions.
 
-This is why all sub-skills are dispatched as Agents. Do not fall back to the Skill tool — it defeats the isolation and risks context exhaustion in later steps (version, PR).
+`execute-plan-sdlc` is the exception — it is dispatched via the **Skill tool** (`step.dispatchMode === 'skill'`) because it is an orchestrator. Its Step 5d wave reports, Step 5a high-risk gates, and Step 4 tier-selection prompt have user-visible value that must stream in ship's main context. Without Skill-tool dispatch, these signals are hidden inside an opaque Agent and the user cannot supervise or abort mid-pipeline.
 
-### Agent dispatch protocol
+Note: execute-plan-sdlc itself dispatches one wave-runner Agent per wave (not one per task), so main-context pollution from execute is bounded to wave-level events — not per-task output. Context exhaustion risk is comparable to Agent-dispatch for leaf skills. (Fixes #353.)
 
-All pipeline steps use the same dispatch protocol. No branching between simple and complex steps — uniform pattern for every sub-skill.
+### Dispatch protocol
 
 **Invocation source:** Each step in the skill/ship.js output includes an `invocation` field containing the skill name and computed args. Use `step.invocation` verbatim — do not construct invocations from the examples below.
 
-For each step that will run:
+For each step that will run, apply the dispatch protocol based on `step.dispatchMode`:
+
+---
+
+#### When `step.dispatchMode === 'skill'` — Skill-tool dispatch (execute-plan-sdlc only)
+
+1. **Print verbose progress header** to user:
+   ```
+   ━━━ Ship Pipeline — Step 1/7: Execute ━━━
+     Skill: execute-plan-sdlc
+     Args: (from step.invocation)
+     Dispatch: Skill tool — wave progress and gates stream in main context
+   ```
+
+2. **Record step start** via state/ship.js.
+
+3. **Invoke via Skill tool:** `Skill(skill: step.skill, args: step.args)`. Output streams in main context. The user sees wave-by-wave progress reports, Step 5a high-risk gates, and the Step 4 tier prompt directly. The LLM must not override `step.dispatchMode` — if it is `'skill'`, use Skill tool. No exceptions.
+
+4. **Receive result.** Print result to user:
+   ```
+     [done] Step 1 complete: N tasks across M waves
+     State saved to .sdlc/execution/ship-<branch>-<timestamp>.json
+   ```
+
+5. **Record step completion/failure** via state/ship.js.
+
+---
+
+#### When `step.dispatchMode === 'agent'` — Agent-tool dispatch (all other sub-skills)
 
 1. **Print verbose progress header** to user:
    ```
@@ -368,14 +396,16 @@ For each step that will run:
      Decision: CONTINUING — no critical/high issues found
    ```
 
-Ship-sdlc retains full control of: pipeline table display, validation output, step progress headers, result formatting, state persistence messages, verdict-based flow decisions, and the final summary report. The agent only executes the sub-skill and returns structured data — it does not print pipeline-level output.
+---
+
+Ship-sdlc retains full control of: pipeline table display, validation output, step progress headers, result formatting, state persistence messages, verdict-based flow decisions, and the final summary report. Sub-skills only execute their skill and return structured data — they do not print pipeline-level output.
 
 ### Execution loop
 
 **Execute step resume:** When the pipeline is resuming (`--resume` active) and the execute step's status in the ship state file is `in_progress`:
 1. Check for `<main-worktree>/.sdlc/execution/execute-<branch>-*.json` (an execute-plan-sdlc state file for the current branch). Resolve `<main-worktree>` via `git worktree list --porcelain` (first `worktree` line).
-2. If found, dispatch Agent with args from `step.invocation` plus `--resume` (e.g. `"--quality <X> --resume"` if the user passed `--quality` to ship; `"--resume"` otherwise)
-3. If not found, dispatch Agent normally using `step.invocation` (execute restarts from scratch)
+2. If found, invoke execute-plan-sdlc via Skill tool (per `step.dispatchMode === 'skill'`) with args from `step.invocation` plus `--resume` (e.g. `"--quality <X> --resume"` if the user passed `--quality` to ship; `"--resume"` otherwise). Wave progress and gates stream in main context.
+3. If not found, invoke via Skill tool normally using `step.invocation` (execute restarts from scratch)
 
 ship-sdlc does not manage execute-plan-sdlc's state file — execute-plan-sdlc handles its own creation, updates, and cleanup.
 
@@ -388,7 +418,7 @@ git worktree list --porcelain
 Match the branch from the ship state file against worktree entries. If found and directory exists, `cd <path>` before continuing. If the worktree directory is gone, warn and fall back to running on the current branch.
 
 Example dispatch sequence (use `step.invocation` for actual args):
-- Agent: execute-plan-sdlc, args: from `step.invocation` (e.g. `""` when no `--quality` was forwarded, `"--quality balanced"` when the user passed `--quality balanced` to ship)
+- Skill: execute-plan-sdlc, args: from `step.invocation` (e.g. `""` when no `--quality` was forwarded, `"--quality balanced"` when the user passed `--quality balanced` to ship) — wave-by-wave progress, high-risk gates, and tier prompts stream in main context.
 - Agent: commit-sdlc, args: `"--auto"`
 - Agent: review-sdlc, args: `"--committed"`
 - Agent: received-review-sdlc, args: `"--auto"` (when `flags.auto`; otherwise no args)
@@ -773,7 +803,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 ## DO NOT
 
-- Invoke sub-skills via the Skill tool — all sub-skills are dispatched as Agents. Agent dispatch keeps sub-skill SKILL.md out of the ship pipeline's context.
+- Deviate from `step.dispatchMode`. If `'skill'`, invoke via Skill tool. If `'agent'`, invoke via Agent tool. The LLM must not override this field. (`execute-plan-sdlc` is the only step with `dispatchMode: 'skill'`; all other sub-skills are `'agent'`.)
 - Skip the critique step (Step 3) even when all checks seem obvious
 - Forward `--auto` to sub-skills that do not support it (see audit table)
 - Automatically resolve review findings — received-review-sdlc is always interactive
@@ -827,7 +857,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Auto mode does not auto-resume without --resume.** When `--auto` is set but `--resume` is not, the pipeline starts fresh even if a state file exists for the current branch. This prevents accidental continuation from stale state. The state file is preserved (not deleted) so the user can explicitly `--resume` later.
 
-**Sub-skill loading and agent isolation.** Each sub-skill's SKILL.md is 200–550 lines. Agent dispatch is the primary mitigation: each Agent loads SKILL.md in its own context and returns only a structured result (5–10 lines). The ship pipeline's context receives structured data, not sub-skill definitions. Without agent dispatch, the Skill tool would load all definitions into the pipeline's context (2000+ lines), degrading context quality in later steps (version, PR) and increasing the risk of hallucination or skipped logic.
+**Sub-skill loading and agent isolation.** Each sub-skill's SKILL.md is 200–550 lines. Leaf sub-skills (commit, review, received-review, version, pr, verify-pipeline) are Agent-dispatched so each loads SKILL.md in its own context and returns only a structured result (5–10 lines). `execute-plan-sdlc` is the orchestrator exception — Skill-tool invoked for gate visibility. It bounds its context impact by dispatching one wave-runner Agent per wave rather than per task. Without this architecture, loading all sub-skill definitions into the pipeline's context (2000+ lines) would degrade context quality in later steps (version, PR) and increase the risk of hallucination or skipped logic.
 
 **skipSource tracks provenance.** Each step's `skipSource` field records why a step was skipped: `"none"` (not skipped), `"cli"` (step omitted from CLI `--steps`), `"config"` (omitted from `ship.steps[]` in `.sdlc/local.json`), `"auto"` (auto-skipped by `computeSteps` logic), `"condition"` (conditional step not triggered), `"default"` (built-in defaults excluded the step). The per-step `skipSource` makes the exclusion provenance auditable per step.
 
