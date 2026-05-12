@@ -77,8 +77,12 @@ try {
   // Add .claude/worktrees/ to root .gitignore managed block
   try {
     ensureRootGitignore(mainWorktree, ['.claude/worktrees/']);
-  } catch (_) {
-    // Gitignore write failed — silent, never block session start
+  } catch (err) {
+    // Gitignore write failed — log to stderr but never block session start.
+    // The hook must always exit 0 (see file header).
+    process.stderr.write(
+      `ensure-worktree-gitignore: failed to update root .gitignore at ${mainWorktree}: ${err.message}\n`
+    );
   }
 
   process.exit(0);

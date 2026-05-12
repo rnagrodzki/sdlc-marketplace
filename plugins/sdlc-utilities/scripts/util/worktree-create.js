@@ -25,6 +25,7 @@
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
+const { execFileSync } = require('node:child_process');
 const LIB  = path.join(__dirname, '..', 'lib');
 
 const { exec }                          = require(path.join(LIB, 'git'));
@@ -59,13 +60,22 @@ function isValidBranchName(name) {
 
 /**
  * Check whether a local git branch already exists.
+ * Uses execFileSync (no shell) so the branch name cannot be interpreted as a
+ * shell expression — defense-in-depth alongside isValidBranchName.
  * @param {string} branchName
  * @returns {boolean}
  */
 function branchExists(branchName) {
-  const result = exec(`git show-ref --verify --quiet refs/heads/${branchName}`);
-  // exec returns null on non-zero exit, non-null (even empty string) on success
-  return result !== null;
+  try {
+    execFileSync(
+      'git',
+      ['show-ref', '--verify', '--quiet', `refs/heads/${branchName}`],
+      { stdio: 'ignore' }
+    );
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
@@ -135,9 +145,14 @@ function resolveUniquePath(desiredName, wtCfg) {
         nameTemplate: cfg.nameTemplate || '{slug}',
       });
       resolvedPath = resolved.path;
-    } catch (_) {
+    } catch (err) {
       // Config is invalid / nameTemplate fails for this branch name.
-      // Fall back to inside layout default.
+      // Warn the user so they know their workspace.worktree config did not
+      // apply, then fall back to the inside layout default.
+      process.stderr.write(
+        `warning: workspace.worktree config did not resolve for branch "${candidate}" ` +
+        `(layout=${layout}): ${err.message}. Falling back to inside layout default.\n`
+      );
       resolvedPath = path.join(mainWorktree, '.claude', 'worktrees', slug);
     }
 
