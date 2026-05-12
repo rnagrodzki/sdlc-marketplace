@@ -19,6 +19,8 @@
  *   --dry-run               Print plan without executing
  *   --resume                Resume from last checkpoint
  *   --workspace branch|worktree|prompt  Workspace isolation mode
+ *   --branch                Shortcut for --workspace branch
+ *   --tree                  Shortcut for --workspace worktree
  *
  * Removed (legacy CLI sugar — passing these now produces a hard error):
  *   --preset                Use --steps <csv> instead.
@@ -73,6 +75,7 @@ function parseArgs(argv) {
   let dryRun    = false;
   let resume    = false;
   let workspace       = null;
+  let workspaceShortcut = null;
   let rebase          = null;
   let openspecChange  = null;
   let gc              = false;
@@ -110,6 +113,10 @@ function parseArgs(argv) {
       resume = true;
     } else if (a === '--workspace' && args[i + 1]) {
       workspace = args[++i];
+    } else if (a === '--branch') {
+      workspaceShortcut = workspaceShortcut ? 'conflict' : 'branch';
+    } else if (a === '--tree') {
+      workspaceShortcut = workspaceShortcut ? 'conflict' : 'worktree';
     } else if (a === '--rebase' && args[i + 1]) {
       rebase = args[++i]; // 'auto' | 'skip' | 'prompt'
     } else if (a === '--openspec-change' && args[i + 1]) {
@@ -132,6 +139,14 @@ function parseArgs(argv) {
       // via step membership in ship.steps[] / --steps. Boolean enabler removed.
       errors.push('--await-review is no longer accepted by ship-sdlc. Add `await-remote-review` to --steps <csv> or to ship.steps[] in .sdlc/local.json.');
     }
+  }
+
+  if (workspaceShortcut === 'conflict') {
+    errors.push('Cannot combine --branch and --tree; use only one shortcut.');
+  } else if (workspaceShortcut && workspace) {
+    errors.push(`Cannot combine --workspace with --${workspaceShortcut === 'branch' ? 'branch' : 'tree'}; use one or the other.`);
+  } else if (workspaceShortcut) {
+    workspace = workspaceShortcut;
   }
 
   return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, errors };
@@ -378,6 +393,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           ? 'not in steps[]'
           : 'plan detected in context',
       pause: false,
+      isolation: null,
     },
     {
       name: 'commit',
@@ -388,6 +404,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       args: flags.auto ? '--auto' : '',
       reason: isIn('commit') ? 'pending (will check after execute)' : 'not in steps[]',
       pause: false,
+      isolation: null,
     },
     {
       name: 'review',
@@ -398,6 +415,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       args: '--committed',
       reason: isIn('review') ? 'in steps[]' : 'not in steps[]',
       pause: false,
+      isolation: null,
     },
     {
       name: 'received-review',
@@ -408,6 +426,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       args: flags.auto ? '--auto' : '',
       reason: 'triggered by review verdict (critical/high findings)',
       pause: true,
+      isolation: null,
     },
     {
       name: 'commit-fixes',
@@ -418,6 +437,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       args: flags.auto ? '--auto' : '',
       reason: 'triggered if review fixes applied',
       pause: false,
+      isolation: null,
     },
     {
       name: 'version',
@@ -439,6 +459,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           ? 'auto-skipped — tags are repo-global, not safe from worktrees'
           : 'in steps[]',
       pause: true,
+      isolation: null,
     },
     // archive-openspec: conditional step between version and pr
     (() => {
@@ -456,6 +477,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           args: '',
           reason: 'not in steps[]',
           pause: false,
+          isolation: null,
         };
       }
       if (!archiveActionable) {
@@ -470,6 +492,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
             ? 'no matching openspec change for current branch'
             : 'change already archived',
           pause: false,
+          isolation: null,
         };
       }
       return {
@@ -481,6 +504,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         args: `--change ${changeName}${flags.auto ? ' --auto' : ''}`,
         reason: `openspec change "${changeName}" ready for archive`,
         pause: !flags.auto,
+        isolation: null,
       };
     })(),
     {
@@ -500,6 +524,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           ? 'in steps[]; --label skip-version-check added (version auto-skipped)'
           : 'in steps[]',
       pause: false,
+      isolation: null,
     },
     // R41-R49: verify-pipeline — opt-in inline-execution step (skill: null,
     // dispatched by ship-sdlc/SKILL.md which parses the JSON verdict). Gated
@@ -516,6 +541,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           args: '',
           reason: 'not in steps[]',
           pause: false,
+          isolation: null,
         };
       }
       if (!isIn('pr')) {
@@ -528,6 +554,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           args: '',
           reason: 'pr step excluded — cannot verify CI for a non-existent PR',
           pause: false,
+          isolation: null,
         };
       }
       return {
@@ -539,6 +566,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         args: `--timeout ${flags.verifyPipelineTimeout} --interval ${flags.verifyPipelineInterval}`,
         reason: 'verify CI checks before await-remote-review',
         pause: true,
+        isolation: null,
       };
     })(),
     // R50-R56: await-remote-review — opt-in inline-execution step. Gated by
@@ -555,6 +583,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           args: '',
           reason: 'not in steps[]',
           pause: false,
+          isolation: null,
         };
       }
       if (!isIn('pr')) {
@@ -567,6 +596,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           args: '',
           reason: 'pr step excluded — cannot await review on a non-existent PR',
           pause: false,
+          isolation: null,
         };
       }
       return {
@@ -578,6 +608,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         args: `--timeout ${flags.awaitRemoteReviewTimeout} --interval ${flags.awaitRemoteReviewInterval} --reviewers ${flags.awaitRemoteReviewers.join(',')}`,
         reason: 'await automated reviewer (e.g., Copilot)',
         pause: false,
+        isolation: null,
       };
     })(),
     {
@@ -594,6 +625,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         ? 'final step — appends pipeline learnings and commits if changed'
         : 'not in steps[]',
       pause: false,
+      isolation: null,
     },
   ];
 
@@ -631,6 +663,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       forced: `node "$SCRIPT" cleanup-pipeline --force`,
     },
     reserved: true,
+    isolation: null,
   });
 
   return steps;

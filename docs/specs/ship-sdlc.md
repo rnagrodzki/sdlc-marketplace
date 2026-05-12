@@ -17,6 +17,8 @@
 - A7: `--resume` — resume pipeline from saved state file (default: false)
 - A8: `--workspace branch|worktree|prompt` — workspace isolation mode (default: from config or prompt)
 - A8a: In `--auto` mode, `workspace: "prompt"` is overridden to `"branch"` when the source is not `'cli'`. Explicit CLI `--workspace prompt` with `--auto` is preserved (intentional override).
+- A8b: `--branch` — boolean shortcut for `--workspace branch`. Sets flags.workspace = "branch" and flagSources.workspace = "cli". Mutually exclusive with `--workspace` and with `--tree`.
+- A8c: `--tree` — boolean shortcut for `--workspace worktree`. Sets flags.workspace = "worktree" and flagSources.workspace = "cli". Mutually exclusive with `--workspace` and with `--branch`.
 - A9: `--init-config` — run interactive config wizard, no pipeline execution (default: false)
 - A10: `--openspec-change <name>` — explicitly select the OpenSpec change to archive, overriding branch matching (default: null)
 
@@ -84,6 +86,9 @@
 - R-ship-init-prune (issue #255): At `init` time — before writing the new ship-state file — `state/ship.js cmdInit` MUST remove any pre-existing `ship-<branchSlug>-*.json` files for the same branch in `<mainWorktree>/.sdlc/execution/`. A given branch can only host one active ship pipeline; same-branch state files predating the new init are by definition orphans (e.g., from runs interrupted by context compaction that never reached the terminal `cleanup` step). Pruning is unconditional for same-prefix same-branchSlug files: it does NOT consult the `state.gc.ttlDays` TTL or the branch-existence rule (R39) — those gates apply to cross-branch GC, not to claim-time orphan removal. The prune is implemented via `lib/state.js::pruneStateFiles(prefix, branchSlug)` and runs once per `cmdInit` call before `initState`. The cmdInit JSON output gains a `prunedOrphans: string[]` field (filenames only, not absolute paths) listing every removed file.
   - Acceptance: with one pre-existing `ship-<currentBranchSlug>-*.json` present, `cmdInit` deletes it and the JSON output's `prunedOrphans` array contains exactly that filename; with no pre-existing same-branch file, `prunedOrphans` is empty; pre-existing state files for OTHER branches (e.g., `ship-otherbranch-*.json`) MUST NOT be removed by `cmdInit` — they remain on disk untouched.
 
+- R-agent-isolation-script-driven: ship.js emits an isolation field on every step object in steps[]. Valid values: null (no isolation; default for all current steps) or "worktree" (reserved for future parallel steps needing true isolation via Agent SDK worktrees). SKILL.md Step 5 Agent dispatch passes isolation: step.isolation to the Agent tool when non-null and omits the isolation parameter when null (the Agent tool's isolation schema enum does not accept null). The LLM must not add, remove, or change the isolation parameter from what ship.js computed.
+  - Acceptance: Spec entry exists with this body. Runtime emission and SKILL.md forwarding are verified by Tasks 2/3/5.
+
 - R40: `flags.reviewThreshold` enum `{critical, high, medium, low}` controls minimum severity that dispatches `received-review-sdlc`:
   - `critical` → trigger on any critical finding
   - `high` → trigger on any critical OR high finding
@@ -115,7 +120,7 @@
 
 1. CONSUME — load config, parse flags, run `skill/ship.js` for context detection and step computation
    - **Script:** `skill/ship.js`
-   - **Params:** A1-A8 forwarded (`--auto`, `--steps <csv>`, `--quality`, `--bump`, `--draft`, `--resume`, `--workspace`); internal: `--has-plan` (from plan context detection). `--quality` is forwarded to execute-plan-sdlc only when explicitly passed; cross-reference: see `execute-plan-sdlc.md` A2.
+   - **Params:** A1-A8 forwarded (`--auto`, `--steps <csv>`, `--quality`, `--bump`, `--draft`, `--resume`, `--workspace` and shortcuts `--branch`/`--tree`); internal: `--has-plan` (from plan context detection). `--quality` is forwarded to execute-plan-sdlc only when explicitly passed; cross-reference: see `execute-plan-sdlc.md` A2.
    - **Output:** JSON → P1-P6 (flags with per-flag provenance sources, resume detection, context with branch/auth/openspec/worktree, pipeline steps with status/reason/skipSource/invocation, config)
 2. PLAN — build pipeline table from `skill/ship.js` steps array; display flag resolution and auto-skip decisions
 3. CRITIQUE — validate pipeline: gh auth, branch safety, skip values, flag coherence
@@ -150,6 +155,7 @@
 - P6: `config` (object | null) — ship config from `.sdlc/local.json` or null if absent
 - P7: `steps[].model` (string) — model for Agent dispatch per step, computed from skill specs (e.g., `"sonnet"` for review-sdlc, `"haiku"` for commit-sdlc)
 - P8 (issue #232): `migration` (object | null) — `{ project: { schemaVersion, migrated, backupPath, stepsApplied }, local: { ... } }` after `verifyAndMigrate` runs at pipeline entry. Null only when both calls were short-circuited by `SDLC_SKIP_CONFIG_CHECK=1` or `--skip-config-check`. On migration failure, `migration` is null AND `errors[]` carries the failing step identifier.
+- P9: steps[].isolation (string | null) — Agent SDK isolation parameter forwarded verbatim by SKILL.md Step 5. null for non-isolated dispatch (default); "worktree" reserved for future parallel-isolated steps. Never derived by the LLM.
 
 ## Error Handling
 
@@ -179,6 +185,8 @@
 - C12: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives
 - C13: Must not independently compute, infer, or fabricate values for any field the prepare script is contracted to provide — if the script fails or a field is absent, the skill must stop rather than fill in data
 - C14: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
+- C15: The LLM must not add, remove, or change the steps[].isolation field when dispatching Agents in Step 5. Isolation comes verbatim from ship.js prepare output, or is omitted when ship.js emits null (Agent tool schema enum forbids passing null).
+- C16: Combining `--workspace` with `--branch` or `--tree`, or combining `--branch` and `--tree` together, is an error. ship.js exits non-zero with a clear message naming the conflicting flags.
 
 ## Step-Emitter Contract
 
