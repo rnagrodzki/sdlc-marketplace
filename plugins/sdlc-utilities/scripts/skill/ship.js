@@ -402,7 +402,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
           : 'plan detected in context',
       pause: false,
       isolation: null,
-      dispatchMode: 'skill',
+      dispatchMode: 'agent',
     },
     {
       name: 'commit',
