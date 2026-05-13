@@ -11,12 +11,15 @@
  *                        [--scope <name-only|stat|content|cached>] [--no-throw-check]
  *
  * Operations:
- *   exports        — prints which helpers are exported (presence-only check)
- *   fetchBaseRef   — invokes fetchBaseRef(base, projectRoot); prints {ok:true} when no exception
- *                    (best-effort by contract — never throws, even when origin missing/unreachable)
- *   buildDiffCmd   — invokes buildBranchContribDiffCmd(scope, base) and prints the resulting
- *                    git command string. Used to assert 3-dot semantics for branch-contribution
- *                    scopes (committed/stat/content) — issue #239.
+ *   exports             — prints which helpers are exported (presence-only check)
+ *   fetchBaseRef        — invokes fetchBaseRef(base, projectRoot); prints {ok:true} when no exception
+ *                         (best-effort by contract — never throws, even when origin missing/unreachable)
+ *   buildDiffCmd        — invokes buildBranchContribDiffCmd(scope, base) and prints the resulting
+ *                         git command string. Used to assert 3-dot semantics for branch-contribution
+ *                         scopes (committed/stat/content) — issue #239.
+ *   getChangedFilesScope — invokes getChangedFiles(base, projectRoot, scope) against a fixture repo
+ *                         and prints {scope, base, files}. Used to assert default 'all' scope routes
+ *                         through buildBranchContribDiffCmd (three-dot) — issue #364.
  */
 'use strict';
 
@@ -85,6 +88,24 @@ switch (op) {
     }
     const cmd = lib.buildBranchContribDiffCmd(scope, base);
     console.log(JSON.stringify({ scope, base, cmd }, null, 2));
+    break;
+  }
+
+  case 'getChangedFilesScope': {
+    if (!projectRoot) {
+      console.error('--project-root required for getChangedFilesScope');
+      process.exit(1);
+    }
+    if (!scope) {
+      console.error('--scope required for getChangedFilesScope (all|committed|staged|working|worktree)');
+      process.exit(1);
+    }
+    if (typeof lib.getChangedFiles !== 'function') {
+      console.error('getChangedFiles is not exported');
+      process.exit(1);
+    }
+    const files = lib.getChangedFiles(base, projectRoot, scope);
+    console.log(JSON.stringify({ scope, base, files }, null, 2));
     break;
   }
 

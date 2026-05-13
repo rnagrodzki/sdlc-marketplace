@@ -65,3 +65,37 @@
   assert:
     - type: contains
       value: 'git diff main...HEAD'
+
+- description: "git-lib: getChangedFiles 'all' scope excludes base-only files in reverse-merge fixture (issue #364)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op getChangedFilesScope --project-root {{project_root}} --base main --scope all"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/git-lib-reverse-merge"
+  assert:
+    - type: contains
+      value: '"feature.js"'
+    - type: not-contains
+      value: '"base-only.js"'
+
+- description: "git-lib: getChangedFiles 'all' scope matches 'committed' scope output (issue #364)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op getChangedFilesScope --project-root {{project_root}} --base main --scope committed"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/git-lib-reverse-merge"
+  assert:
+    - type: contains
+      value: '"feature.js"'
+    - type: not-contains
+      value: '"base-only.js"'
+
+- description: "git-lib: getChangedFiles 'worktree' scope still works against reverse-merge fixture (regression guard)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op getChangedFilesScope --project-root {{project_root}} --base main --scope worktree"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/git-lib-reverse-merge"
+  assert:
+    - type: contains
+      value: '"feature.js"'

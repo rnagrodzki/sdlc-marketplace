@@ -168,10 +168,13 @@ function fetchBaseRef(base, projectRoot) {
  *   'stat'      — `git diff --stat <base>...HEAD`      (used by getDiffStat)
  *   'content'   — `git diff <base>...HEAD`             (used by getDiffContent)
  *
- * Other scopes (staged, working, worktree, all) intentionally do NOT use 3-dot:
+ * Other scopes (staged, working, worktree) intentionally do NOT use 3-dot:
  *   - 'staged'/'working': do not involve a base ref
  *   - 'worktree': symmetric (full working tree vs. base) by design
- *   - 'all'    : `--cached` does not accept a commit range, so stays two-arg
+ *
+ * The 'all' scope (default) now also routes through this helper via
+ * buildBranchContribDiffCmd('committed'|'content', base) — issue #364
+ * completes #239 by removing the two-dot leak in the default review path.
  *
  * @param {'committed'|'stat'|'content'} scope
  * @param {string} base
@@ -201,7 +204,7 @@ function getChangedFiles(base, projectRoot, scope = 'all') {
     case 'staged':    cmd = 'git diff --cached --name-only';                   break;
     case 'working':   cmd = 'git diff HEAD --name-only';                       break;
     case 'worktree':  cmd = `git diff --name-only ${base}`;                    break;
-    default:          cmd = `git diff --cached --name-only ${base}`;           break; // 'all'
+    default:          cmd = buildBranchContribDiffCmd('committed', base);      break; // 'all' (issue #364)
   }
   const out = exec(cmd, { cwd: projectRoot });
   return out ? out.split('\n').filter(Boolean) : [];
