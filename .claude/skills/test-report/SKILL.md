@@ -317,4 +317,4 @@ When invoking `error-report-sdlc`, provide:
 
 If analysis reveals patterns (e.g., "Cat-A failures correlate with concurrency > N",
 "specific skill consistently produces false-positive assertion failures"), append
-entries to `.claude/learnings/log.md`.
+entries to `.sdlc/learnings/log.md`.

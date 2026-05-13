@@ -1,12 +1,12 @@
 ---
-description: Triage .claude/learnings/log.md into GitHub issues
+description: Triage .sdlc/learnings/log.md into GitHub issues
 allowed-tools: [Bash, Read, AskUserQuestion]
 argument-hint: "[--dry-run] [--since YYYY-MM-DD]"
 ---
 
 # /harvest-learnings Command
 
-Triage `.claude/learnings/log.md` entries into discrete GitHub issues for this
+Triage `.sdlc/learnings/log.md` entries into discrete GitHub issues for this
 repository. Heuristic clustering + LLM-driven approve/skip/edit loop. Dedup
 keys off the `Source: learnings/log.md (lines N–M, ...)` footer, with a fuzzy
 title fallback for `possibly-tracked` candidates.

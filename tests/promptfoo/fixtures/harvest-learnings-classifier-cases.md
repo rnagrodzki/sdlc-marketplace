@@ -5,7 +5,7 @@ and returned the following JSON (path captured from stdout, content read):
 
 ```json
 {
-  "logPath": "/project/.claude/learnings/log.md",
+  "logPath": "/project/.sdlc/learnings/log.md",
   "harvestDate": "2026-05-09",
   "totalEntries": 5,
   "dryRun": false,

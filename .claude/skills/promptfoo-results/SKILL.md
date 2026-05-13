@@ -235,4 +235,4 @@ Before presenting results to the user:
 
 If analysis reveals patterns (e.g. "llm-rubric assertions flaky on skill X",
 "latency spikes correlate with fixture size"), append entries to
-`.claude/learnings/log.md`.
+`.sdlc/learnings/log.md`.

@@ -2,7 +2,7 @@
 
 ## Project state
 - Repo: rnagrodzki/sdlc-marketplace
-- `.claude/learnings/log.md` exists but contains only the header and the
+- `.sdlc/learnings/log.md` exists but contains only the header and the
   `## Tracked in GH Issues` trailer.
 - No harvestable entries above the trailer.
 
@@ -15,7 +15,7 @@ Helper stdout (simulated): `/tmp/harvest-learnings-XXXXX.json`
 Drafts JSON contents (simulated):
 ```json
 {
-  "logPath": "<repo>/.claude/learnings/log.md",
+  "logPath": "<repo>/.sdlc/learnings/log.md",
   "harvestDate": "2026-05-06",
   "totalEntries": 0,
   "dryRun": false,

@@ -2,7 +2,7 @@
 
 ## Project state
 - Repo: rnagrodzki/sdlc-marketplace
-- `.claude/learnings/log.md` contains two harvestable entries:
+- `.sdlc/learnings/log.md` contains two harvestable entries:
   - `## 2026-05-01 — skill-alpha: tracked lesson about alpha behavior` (lines 5–7)
   - `## 2026-05-02 — skill-beta: untracked lesson about beta behavior` (lines 9–10)
 

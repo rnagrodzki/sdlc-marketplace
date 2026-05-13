@@ -2,7 +2,7 @@
 
 ## Project state
 - Repo: rnagrodzki/sdlc-marketplace
-- `.claude/learnings/log.md` contains three harvestable entries above the trailer:
+- `.sdlc/learnings/log.md` contains three harvestable entries above the trailer:
   - `## 2026-05-01 — skill-alpha: first lesson about alpha behavior`
   - `## 2026-05-02 — skill-beta: second lesson about beta behavior`
   - `## 2026-04-15 — skill-gamma: older lesson about gamma behavior`
@@ -14,7 +14,7 @@ The user runs `/harvest-learnings`. The helper at
 Drafts JSON contents (simulated):
 ```json
 {
-  "logPath": "<repo>/.claude/learnings/log.md",
+  "logPath": "<repo>/.sdlc/learnings/log.md",
   "harvestDate": "2026-05-06",
   "totalEntries": 3,
   "dryRun": false,
