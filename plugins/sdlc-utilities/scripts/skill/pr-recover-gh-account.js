@@ -45,12 +45,14 @@ const path = require('path');
 
 const { recoverGhAccountForRepo } = require('../lib/git');
 const { writeJsonLine } = require('../lib/output');
+const { resolveSdlcRoot } = require('../lib/config');
 
 function parseArgs(argv) {
   const args = {
     errorFile: null,
     errorInline: null,
-    projectRoot: process.cwd(),
+    // C-projectroot (#360): default to the main-worktree .sdlc/ root, not cwd.
+    projectRoot: resolveSdlcRoot(),
     dryRun: false,
     accountsFile: null,
     fallbackAccountsFile: null,

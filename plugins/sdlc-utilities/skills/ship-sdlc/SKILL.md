@@ -100,6 +100,15 @@ PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --bump patc
 # pass `--quality <full|balanced|minimal>` — only forwarded when explicitly passed.
 # Legacy `--preset` and `--skip` are hard-removed (#190) and produce errors.
 # The config-level field is `steps[]` (top-level `schemaVersion: 4`); preset/skip are no longer persisted.
+#
+# Hook signal — R-implicit-resume (#359):
+# If the session-start system-reminder contains a line matching
+# `/^Active pipeline: ship-sdlc/`, ALSO append `--hook-active-pipeline` to the
+# invocation above. The prepare script then inspects the ship state file for the
+# current branch and, when found+fresh, sets flags.implicitResume=true AND
+# flags.resume=true so subsequent steps treat this run as a resume without
+# requiring the user to type --resume. When no state file is found, prepare
+# emits errors[*].id === "implicitResumeNoState" (handled in Step 1e).
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -135,9 +144,28 @@ Flag resolution (from skill/ship.js):
 
 ### 1e. Resume check
 
-**Hook context fast-path:** If the session-start system-reminder contains an `Active pipeline:` line, note the state file path and resume point. When the user does not pass `--resume` explicitly but the hook reported an active pipeline, use this to inform the resume prompt — skip the filesystem scan since the hook already found the state file. The hook context is a session-start snapshot.
+**Hook context fast-path:** If the session-start system-reminder contains an `Active pipeline:` line, note the state file path and resume point. When the user does not pass `--resume` explicitly but the hook reported an active pipeline, the Step 1c invocation already appended `--hook-active-pipeline` (see comment above). The prepare script then either sets `flags.implicitResume === true` (state file found and fresh) or returns `errors[*].id === "implicitResumeNoState"` (state file missing). The LLM does NOT scan the filesystem — `skill/ship.js` is authoritative.
 
 Print `resume.found` and `resume.stateFile` from the `skill/ship.js` output. If `resume.found` is `true`, print the state file path and resume point. If `false`, print that no state file was found and the pipeline will start fresh.
+
+**Implicit-resume banner (R-implicit-resume, #359):** When `flags.implicitResume === true` in the prepare output, print the following banner verbatim BEFORE the pipeline table (Step 2). Source `<nextPendingStep>` from `resume.nextPendingStep` (provided by `detectResumeState()` in lib/state.js) and source the step lists from the state file at `resume.stateFile`:
+
+```
+Resuming after compaction from step <nextPendingStep>.
+Completed: <comma-separated step names where status === "completed">.
+Pending:   <comma-separated step names where status !== "completed" && status !== "skipped">.
+```
+
+Note: the banner check gates on `flags.implicitResume`, NOT `flags.resume`. The prepare script auto-sets `flags.resume = true` when `flags.implicitResume === true` so the rest of the pipeline (e.g. Step 5's execute resume forwarding) sees a unified `flags.resume` regardless of whether the user typed `--resume` or the hook triggered it.
+
+**Missing-state prompt (R-implicit-resume):** If the prepare output's `errors` array contains an entry with `id === "implicitResumeNoState"`, use AskUserQuestion:
+
+> Active pipeline reminder found but no state file for current branch. Start fresh, or specify a state path?
+
+Options:
+- **fresh** — re-invoke `skill/ship.js` without `--hook-active-pipeline` so the pipeline starts cleanly
+- **path** — ask the user for an explicit state file path, then re-invoke with `--state-file <path>`
+- **abort** — exit cleanly without dispatching any step
 
 Read `./state-format.md` when resuming from a state file.
 
@@ -402,9 +430,9 @@ Ship-sdlc retains full control of: pipeline table display, validation output, st
 
 ### Execution loop
 
-**Execute step resume:** When the pipeline is resuming (`--resume` active) and the execute step's status in the ship state file is `in_progress`:
+**Execute step resume:** When the pipeline is resuming (gate on `flags.resume === true` from the prepare output — this is `true` whether the user typed `--resume` or the hook triggered implicit resume; do NOT re-parse `$ARGUMENTS`) and the execute step's status in the ship state file is `in_progress`:
 1. Check for `<main-worktree>/.sdlc/execution/execute-<branch>-*.json` (an execute-plan-sdlc state file for the current branch). Resolve `<main-worktree>` via `git worktree list --porcelain` (first `worktree` line).
-2. If found, invoke execute-plan-sdlc via Skill tool (per `step.dispatchMode === 'skill'`) with args from `step.invocation` plus `--resume` (e.g. `"--quality <X> --resume"` if the user passed `--quality` to ship; `"--resume"` otherwise). Wave progress and gates stream in main context.
+2. If found, invoke execute-plan-sdlc via Skill tool (per `step.dispatchMode === 'skill'`) with args from `step.invocation` plus `--resume` (e.g. `"--quality <X> --resume"` if the user passed `--quality` to ship; `"--resume"` otherwise). Wave progress and gates stream in main context. (Implements R-implicit-resume — `flags.resume` is the single resume signal regardless of source.)
 3. If not found, invoke via Skill tool normally using `step.invocation` (execute restarts from scratch)
 
 ship-sdlc does not manage execute-plan-sdlc's state file — execute-plan-sdlc handles its own creation, updates, and cleanup.

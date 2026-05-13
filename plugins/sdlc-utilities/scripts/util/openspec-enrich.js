@@ -21,6 +21,8 @@ const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
 
+const { resolveSdlcRoot } = require(path.join(__dirname, '..', 'lib', 'config'));
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -51,7 +53,8 @@ context: |
 function parseArgs(argv) {
   const args = argv.slice(2);
   let remove      = false;
-  let projectRoot = process.cwd();
+  // C-projectroot (#360): default to main-worktree .sdlc/ root, not cwd.
+  let projectRoot = resolveSdlcRoot();
   let outputFile  = false;
 
   for (let i = 0; i < args.length; i++) {

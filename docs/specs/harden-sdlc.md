@@ -103,6 +103,8 @@
 - C8: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 - C9: Must not propose relaxing or removing existing rules in v1 (strengthen-only invariant)
 - C10: Must not auto-dispatch from caller skills — every caller integration is opt-in via menu selection only
+- C-projectroot: Scripts that use `process.cwd()` as the project root silently break when invoked from a sub-directory or a git worktree. All projectRoot resolutions in this skill's scripts MUST route through `resolveSdlcRoot()` (lib/config.js); `process.cwd()` is forbidden except in documented bootstrap entry points.
+  - Acceptance: `resolveSdlcRoot()` is called to establish `projectRoot` in `skill/harden-prepare.js`; no bare `process.cwd()` usage contributes to any path resolved against the project root; invoking the script from a repo sub-directory yields the correct root.
 
 ## Integration
 

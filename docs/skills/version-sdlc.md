@@ -19,6 +19,7 @@ Manages the full semantic release workflow: detects the version source, bumps th
 | Flag | Description | Default |
 |------|-------------|---------|
 | `major` / `minor` / `patch` / `<label>` | Bump type (positional). If omitted, auto-detected from conventional commits. The `<label>` form (e.g. `version-sdlc rc`) is sugar for `--bump patch --pre <label>` and accepts any pre-release label matching `^[a-z][a-z0-9]*$`. | auto |
+| `--bump <value>` | Explicitly set the bump type (`major`, `minor`, `patch`, or a pre-release `<label>`). Takes precedence over the positional argument and any auto-detected suggestion. Passing both a positional bump and `--bump` is an error. | `patch` (positional default) |
 | `--init` | Run the setup wizard and write `.claude/version.json`. Safe to re-run. | — |
 | `--pre <label>` | Create a pre-release version (e.g. `beta`, `rc`). Label must match `^[a-z][a-z0-9]*$`. Auto-increments the counter on repeated runs. | — |
 | `--no-push` | Commit and tag locally, skip `git push`. | — |
@@ -27,6 +28,19 @@ Manages the full semantic release workflow: detects the version source, bumps th
 | `--auto` | Skip interactive approval prompts. Release plan is still displayed for visibility; critique gates and pre-condition checks still run. | off |
 
 > **Auto-upstream:** When releasing from a branch with no remote upstream configured, the push step automatically uses `git push --set-upstream origin <branch>` instead of bare `git push`. This avoids first-push failures on fresh feature branches. The subsequent `git push --tags` is unaffected.
+
+---
+
+## Bump Precedence
+
+When multiple bump sources are present, the following priority order applies (highest to lowest):
+
+1. `--bump <value>` flag — authoritative; overrides everything else.
+2. Positional bump argument (e.g., `minor`) — used when `--bump` is absent.
+3. Pre-release config auto-injects `patch` — when `version.preRelease` is set in `.sdlc/config.json` and no positional bump is given, a `patch` base is injected automatically.
+4. Default `patch` — fallback when no bump source is specified.
+
+> **Commits suggest a higher bump?** A warning is printed, but the requested bump wins. The conventional-commit suggestion (`suggestedBump`) is informational only and never overrides an explicit choice.
 
 ---
 

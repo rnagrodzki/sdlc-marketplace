@@ -58,3 +58,4 @@ tests:
   - file://datasets/ensure-worktree-gitignore-exec.yaml
   - file://datasets/worktree-create-exec.yaml
   - file://datasets/workspace-setup-exec.yaml
+  - file://datasets/cwd-drift-exec.yaml

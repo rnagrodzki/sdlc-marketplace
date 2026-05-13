@@ -35,6 +35,22 @@ function atomicWriteSync(filePath, content) {
 }
 
 // ---------------------------------------------------------------------------
+// Compact recovery TTL
+// ---------------------------------------------------------------------------
+
+/**
+ * Freshness window for `.compact-recovery-<slug>.json` and for implicit
+ * resume of ship state files after a /compact (issue #359). A state file
+ * younger than this is considered "fresh enough" to auto-resume; older
+ * files are treated as stale and ignored.
+ *
+ * 1 hour matches `hooks/session-start.js`'s prior in-line constant.
+ *
+ * @type {number} milliseconds
+ */
+const COMPACT_RECOVERY_TTL_MS = 60 * 60 * 1000;
+
+// ---------------------------------------------------------------------------
 // Worktree helpers — resolveMainWorktree is imported from ./worktree
 // ---------------------------------------------------------------------------
 
@@ -141,24 +157,35 @@ function findStateFile(prefix, branchSlug) {
  * root (e.g. `.sdlc/execution/ship-foo-20260101T000000Z.json`); `fullPath`
  * is the absolute path for callers that want to read the file.
  *
+ * Issue #359 — additional fields returned for ship-prepare's implicit-resume
+ * gate:
+ *   - `fresh` — true when the selected file's mtime is within
+ *     `COMPACT_RECOVERY_TTL_MS` of now. Stale state files are still reported
+ *     (`found: true`) so callers can render a "stale, run --resume <path>"
+ *     hint, but implicit resume should require `fresh === true`.
+ *   - `nextPendingStep` — the `name` of the first step in `data.steps[]` whose
+ *     `status` is neither `"completed"` nor `"skipped"` (the canonical
+ *     terminal statuses per state-format.md). `null` when all steps are
+ *     resolved, or when the state file is unreadable / has no `steps[]`.
+ *
  * @param {object} opts
  * @param {string}  opts.prefix      "ship" | "execute" | "plan"
  * @param {string} [opts.branch]     If provided, restricts to this branch's slug.
- * @returns {{stateFile: string|null, fullPath: string|null, found: boolean}}
+ * @returns {{stateFile: string|null, fullPath: string|null, found: boolean,
+ *           fresh: boolean, nextPendingStep: string|null}}
  */
 function detectResumeState({ prefix, branch } = {}) {
-  if (!prefix) return { stateFile: null, fullPath: null, found: false };
+  const empty = { stateFile: null, fullPath: null, found: false, fresh: false, nextPendingStep: null };
+  if (!prefix) return empty;
 
   const stateDir = resolveStateDir();
-  if (!fs.existsSync(stateDir)) {
-    return { stateFile: null, fullPath: null, found: false };
-  }
+  if (!fs.existsSync(stateDir)) return empty;
 
   let entries;
   try {
     entries = fs.readdirSync(stateDir);
   } catch (_) {
-    return { stateFile: null, fullPath: null, found: false };
+    return empty;
   }
 
   const branchSlug = branch ? slugifyBranch(branch) : null;
@@ -182,14 +209,34 @@ function detectResumeState({ prefix, branch } = {}) {
     .filter(Boolean)
     .sort((a, b) => b.mtime - a.mtime);
 
-  if (matching.length === 0) {
-    return { stateFile: null, fullPath: null, found: false };
+  if (matching.length === 0) return empty;
+
+  const winner = matching[0];
+  const fresh = (Date.now() - winner.mtime) <= COMPACT_RECOVERY_TTL_MS;
+
+  // R-step-result-fields (#359): derive nextPendingStep by parsing the
+  // selected state file. Defensive — corrupt/unreadable file yields null
+  // (caller treats null as "no resumable step name surfaced").
+  let nextPendingStep = null;
+  try {
+    const raw = fs.readFileSync(winner.fullPath, 'utf8');
+    const data = JSON.parse(raw);
+    if (data && Array.isArray(data.steps)) {
+      const pending = data.steps.find(s => s && s.status !== 'completed' && s.status !== 'skipped');
+      if (pending && typeof pending.name === 'string') {
+        nextPendingStep = pending.name;
+      }
+    }
+  } catch (_) {
+    // Leave nextPendingStep as null.
   }
 
   return {
-    stateFile: matching[0].file,
-    fullPath: matching[0].fullPath,
+    stateFile: winner.file,
+    fullPath: winner.fullPath,
     found: true,
+    fresh,
+    nextPendingStep,
   };
 }
 
@@ -580,4 +627,5 @@ module.exports = {
   migrateBranchSlug,
   listBranches,
   readTtlDaysFromConfig,
+  COMPACT_RECOVERY_TTL_MS,
 };

@@ -343,7 +343,8 @@ function resolveTemplateStatus(projectKey, cachePath, templatesDir) {
     } catch (_) { /* ignore parse errors */ }
   }
 
-  const customDir = path.join(process.cwd(), '.claude', 'jira-templates');
+  // R-projectroot: main-worktree-rooted resolution (#360).
+  const customDir = path.join(resolveSdlcRoot(), '.claude', 'jira-templates');
 
   // Collect all available default template names (without .md)
   let defaultTemplateNames = [];
@@ -459,7 +460,8 @@ function validateProjectMembership(projectKey, jiraConfig) {
 // ---------------------------------------------------------------------------
 
 function checkCache({ projectKey, cacheDir, site, skipWorkflowDiscovery, templatesDir }) {
-  const jiraConfig = loadJiraConfig(process.cwd());
+  // R-projectroot: main-worktree-rooted resolution (#360).
+  const jiraConfig = loadJiraConfig(resolveSdlcRoot());
   const membershipError = validateProjectMembership(projectKey, jiraConfig);
   if (membershipError) {
     writeOutput({ errors: [membershipError] }, 'jira-context', 1);
@@ -769,7 +771,8 @@ function initTemplates({ projectKey, cacheDir, site }, templatesDir) {
     } catch (_) { /* ignore */ }
   }
 
-  const customDir    = path.join(process.cwd(), '.claude', 'jira-templates');
+  // R-projectroot: main-worktree-rooted resolution (#360).
+  const customDir    = path.join(resolveSdlcRoot(), '.claude', 'jira-templates');
   const initialized  = [];
   const skipped      = [];
   const unavailable  = [];
@@ -827,7 +830,8 @@ function copyTemplate(copyType, copyFrom, templatesDir) {
     return;
   }
 
-  const dst = path.join(process.cwd(), '.claude', 'jira-templates', copyType + '.md');
+  // R-projectroot: main-worktree-rooted resolution (#360).
+  const dst = path.join(resolveSdlcRoot(), '.claude', 'jira-templates', copyType + '.md');
   fs.mkdirSync(path.dirname(dst), { recursive: true });
 
   if (fs.existsSync(dst)) {

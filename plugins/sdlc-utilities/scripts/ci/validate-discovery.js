@@ -25,6 +25,7 @@ const path = require('node:path');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { validateAll } = require(path.join(LIB, 'discovery'));
+const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // CLI parsing
@@ -32,7 +33,8 @@ const { validateAll } = require(path.join(LIB, 'discovery'));
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let projectRoot = process.cwd();
+  // C-projectroot (#360): default to main-worktree .sdlc/ root, not cwd.
+  let projectRoot = resolveSdlcRoot();
   let outputFormat = 'json';
 
   for (let i = 0; i < args.length; i++) {

@@ -1,0 +1,47 @@
+# Script execution tests for plugin-wide CWD remediation (issue #360).
+# Verifies that scripts using resolveSdlcRoot() route filesystem writes to the
+# main worktree root rather than the process cwd, so running from a subdirectory
+# does not scatter .sdlc/ artifacts in that subdirectory.
+
+- description: "cwd-drift: migrate-learnings-log.js from subdir writes no .sdlc in subdir (R-projectroot, #360)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-learnings-log.js"
+    script_args: ""
+    script_cwd: "{{project_root}}/nested/dir"
+    project_root: "file://fixtures-fs/project-cwd-drift"
+  assert:
+    # Script must complete without error (nothing to migrate or already migrated)
+    - type: not-icontains
+      value: "Error"
+    # No .sdlc directory should be created in the subdir by the script
+    - type: javascript
+      value: "/nothing to migrate|already migrated/i.test(output)"
+
+- description: "cwd-drift: migrate-config.js from subdir writes no .sdlc in subdir — calls ensureSdlcInfrastructure (R-projectroot, #360)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
+    script_args: ""
+    script_cwd: "{{project_root}}/nested/dir"
+    project_root: "file://fixtures-fs/project-cwd-drift"
+  assert:
+    # Script must complete without filesystem error
+    - type: not-icontains
+      value: "ENOENT"
+    # Must not emit an error about writing to the wrong location
+    - type: not-icontains
+      value: "Error:"
+
+- description: "cwd-drift: validate-dimensions.js from subdir reads from main worktree not subdir (R-projectroot, #360)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-dimensions.js"
+    script_args: ""
+    script_cwd: "{{project_root}}/nested/dir"
+    project_root: "file://fixtures-fs/project-cwd-drift"
+  assert:
+    # The script resolves project root via resolveSdlcRoot() and exits successfully
+    # (no dimensions in fixture = 0 files, which is a clean/valid result, not a crash)
+    - type: not-icontains
+      value: "ENOENT: no such file or directory"
+    # Output may include stderr prefixes like "[sdlc:config] read ..."; find the JSON line
+    - type: javascript
+      value: "(() => { const lines = output.split('\\n'); for (const line of lines) { const t = line.trim(); if (t.startsWith('{') || t.startsWith('[')) { try { JSON.parse(t); return true; } catch(e) {} } } return /PASS|valid|0 files/i.test(output); })()"

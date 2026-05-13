@@ -80,6 +80,12 @@ function parseArgs(argv) {
   let openspecChange  = null;
   let gc              = false;
   let ttlDays         = null;
+  // R-implicit-resume (#359): set by session-start.js when re-injecting the
+  // "Active pipeline" reminder after /compact. ship-prepare uses this to
+  // distinguish a hook-driven resume probe from a direct user invocation —
+  // when no state file is found, the hook variant surfaces a structured
+  // `implicitResumeNoState` error rather than silently starting fresh.
+  let hookActivePipeline = false;
   const errors = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -130,6 +136,8 @@ function parseArgs(argv) {
       } else {
         ttlDays = v;
       }
+    } else if (a === '--hook-active-pipeline') {
+      hookActivePipeline = true;
     } else if (a === '--verify-pipeline') {
       // Hard-removed (issue #130): the verify-pipeline phase is now opt-in via
       // step membership in ship.steps[] / --steps. Boolean enabler removed.
@@ -149,7 +157,7 @@ function parseArgs(argv) {
     workspace = workspaceShortcut;
   }
 
-  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, errors };
+  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, hookActivePipeline, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -454,8 +462,12 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         : flags.workspace === 'worktree'
           ? 'auto'
           : 'none',
+      // R-bump-forward (#358): forward bump as the named `--bump <value>`
+      // flag (NOT a positional). version-sdlc treats --bump as authoritative
+      // over the positional, so this wire shape prevents silent promotion
+      // when the version skill consults conventional-commit suggestions.
       args: [
-        flags.bump || 'patch',
+        `--bump ${flags.bump || 'patch'}`,
         flags.auto ? '--auto' : '',
       ].filter(Boolean).join(' '),
       reason: !isIn('version')
@@ -829,11 +841,12 @@ function runValidation(flags, flagSources, steps, context) {
  * @returns {{ stateFile: string|null, found: boolean }}
  */
 function detectResumeState(_projectRoot, currentBranch) {
-  const { stateFile, found } = detectResumeStateLib({
+  const { stateFile, found, fresh, nextPendingStep, fullPath } = detectResumeStateLib({
     prefix: 'ship',
     branch: currentBranch,
   });
-  return { stateFile, found };
+  // Forward fresh / nextPendingStep / fullPath for R-implicit-resume (#359).
+  return { stateFile, found, fresh, nextPendingStep, fullPath };
 }
 
 // ---------------------------------------------------------------------------
@@ -1037,6 +1050,32 @@ function main() {
   // Detect resume state
   const resume = detectResumeState(projectRoot, gitState.currentBranch);
 
+  // R-implicit-resume (#359): when a fresh state file exists for the current
+  // branch AND the user did NOT explicitly pass --resume, flip the resume
+  // flag implicitly so a post-/compact session continues the same pipeline.
+  // The implicitResume marker lets SKILL.md / state lifecycle distinguish
+  // this from an explicit --resume request.
+  let implicitResume = false;
+  if (resume && resume.found && resume.fresh && !cli.resume) {
+    implicitResume = true;
+    flags.resume = true;
+    flagSources.resume = 'implicit';
+  }
+  flags.implicitResume = implicitResume;
+
+  // R-implicit-resume (#359): when session-start.js dispatches ship with
+  // --hook-active-pipeline (it rendered an "Active pipeline" reminder) but
+  // no state file is present for the current branch, surface a structured
+  // error so the orchestrator can prompt rather than silently start fresh.
+  if (cli.hookActivePipeline && (!resume || !resume.found)) {
+    errors.push({
+      id: 'implicitResumeNoState',
+      message:
+        'Active pipeline reminder found but no state file for current branch. ' +
+        'Run with --resume <path> or start fresh.',
+    });
+  }
+
   // Context-heaviness advisory (implements R35) — sourced from the sidecar
   // written by hooks/context-stats.js on UserPromptSubmit. Returns null when
   // the sidecar is missing, malformed, or transcript is below the heavy
@@ -1068,6 +1107,10 @@ function main() {
       draft: flags.draft,
       dryRun: flags.dryRun,
       resume: flags.resume,
+      // R-implicit-resume (#359): true when the resume flag was flipped on
+      // by ship-prepare because a fresh state file existed for the current
+      // branch and the user did not pass --resume explicitly.
+      implicitResume: flags.implicitResume === true,
       hasPlan: flags.hasPlan,
       workspace: flags.workspace,
       rebase: flags.rebase,

@@ -222,6 +222,7 @@ function retagOnHead(tag, repoRoot) {
 // ---------------------------------------------------------------------------
 
 function main() {
+  // KEEP: CI script invoked at repo root — do not change to resolveSdlcRoot()
   const repoRoot = process.cwd();
 
   const config = readVersionConfig(repoRoot);
