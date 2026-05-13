@@ -287,7 +287,7 @@ The `AmbiguousOffer` line records the Step 5c outcome:
   `skip`.
 
 Mirror the append pattern used by `commit-sdlc` and `execute-plan-sdlc`. Create
-the `.claude/learnings/` directory and `log.md` file if they don't exist.
+the `.sdlc/learnings/` directory and `log.md` file if they don't exist.
 
 ---
 
