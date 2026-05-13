@@ -16,10 +16,30 @@
  * `findPlaceholdersInAdf` which walks parsed ADF `text` nodes only — the
  * bracket-form regex never runs against the stringified ADF blob,
  * eliminating C13 false positives on JSON-serialized arrays.
+ *
+ * The bracket-form arm is additionally suppressed for the `summary` field
+ * across all content formats — Jira `[CATEGORY]` title prefixes (e.g.
+ * `[OIDC/SSO]`, `[IDS]`, `[FEAT]`) produce false positives; brace-form
+ * detection on `summary` is retained (C13 carve-out, issue #365).
  */
 
 // Global /g flag required for exec() looping. Callers MUST reset .lastIndex = 0 before each use.
 const PLACEHOLDER_REGEX = /\{[a-zA-Z_][a-zA-Z0-9_-]*\}|\[(?![{"\d])[^\]\n]{3,}\]/g;
+// Brace-form only — used to retain {name} detection on the summary field while suppressing bracket-form.
+const BRACE_ONLY = /^\{[a-zA-Z_][a-zA-Z0-9_-]*\}$/;
+
+/**
+ * C13 summary carve-out: drop bracket-form findings on the `summary` field
+ * while keeping brace-form findings. Applied unconditionally across every
+ * dispatch return path in `findPlaceholdersForToolInput` so the rule holds
+ * for markdown, default, and ADF content formats alike.
+ *
+ * @param {Array<{path: string, marker: string}>} results
+ * @returns {Array<{path: string, marker: string}>}
+ */
+function filterSummaryBrackets(results) {
+  return results.filter(r => r.path !== 'summary' || BRACE_ONLY.test(r.marker));
+}
 
 /**
  * @param {*} payload
@@ -96,13 +116,13 @@ function findPlaceholdersForToolInput(toolInput) {
   const warnings = [];
   if (toolInput === null || typeof toolInput !== 'object') {
     walk(toolInput, '', results);
-    return { results, warnings };
+    return { results: filterSummaryBrackets(results), warnings };
   }
 
   const contentFormat = toolInput.contentFormat;
   if (contentFormat !== 'adf') {
     walk(toolInput, '', results);
-    return { results, warnings };
+    return { results: filterSummaryBrackets(results), warnings };
   }
 
   // ADF dispatch: walk every field except `commentBody` with the default walker.
@@ -113,7 +133,7 @@ function findPlaceholdersForToolInput(toolInput) {
 
   // Route commentBody through the ADF walker, parsing if stringified.
   const cb = toolInput.commentBody;
-  if (cb === null || cb === undefined) return { results, warnings };
+  if (cb === null || cb === undefined) return { results: filterSummaryBrackets(results), warnings };
 
   let adfRoot = cb;
   if (typeof cb === 'string') {
@@ -124,12 +144,12 @@ function findPlaceholdersForToolInput(toolInput) {
         `commentBody declared contentFormat='adf' but JSON.parse failed: ${err.message}; falling back to whole-payload string walk.`
       );
       walk(cb, 'commentBody', results);
-      return { results, warnings };
+      return { results: filterSummaryBrackets(results), warnings };
     }
   }
 
   findPlaceholdersInAdf(adfRoot, 'commentBody', results);
-  return { results, warnings };
+  return { results: filterSummaryBrackets(results), warnings };
 }
 
 module.exports = {
