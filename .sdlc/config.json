@@ -138,6 +138,11 @@
         "id": "workspace-mode-compatibility",
         "description": "Tasks delivering new features or modifying skill behavior must be designed to work under BOTH ship.workspace=branch and ship.workspace=worktree. Plans that touch state files, config readers, file paths, cwd-dependent logic, or git operations must explicitly state how the implementation behaves in each mode and include verification coverage for both. State writes must route through resolveStateDir(); config reads must route through resolveSdlcRoot(). Plans that hardcode .claude/, write to cwd directly without main-worktree resolution, or assume a single working tree fail this guardrail.",
         "severity": "error"
+      },
+      {
+        "id": "prompt-cache-hit-ratio",
+        "description": "Any task modifying a skill (SKILL.md), prepare script (scripts/skill/*-prepare.js), or orchestrator/workflow (agents/sdlc/*, scripts/skill/ship.js) must not introduce volatile bytes (Date.now, new Date(), toISOString, process.cwd, branch names, run IDs, random values) above the static/dynamic cache breakpoint in any dispatched prompt. Static content (system prompt, tool schemas, project context, SKILL.md body) must remain prefix-stable and byte-identical across sibling and sequential Agent dispatches. New dynamic content belongs in the tail (after cache_control: ephemeral) — not inline in the static region.",
+        "severity": "warning"
       }
     ]
   },
