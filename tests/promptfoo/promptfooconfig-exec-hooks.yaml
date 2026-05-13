@@ -18,3 +18,4 @@ tests:
   - file://datasets/hook-error-report-exec.yaml
   - file://datasets/jira-sdlc-hook-exec.yaml
   - file://datasets/hook-stop-plan-integrity-exec.yaml
+  - file://datasets/agent-isolation-guard-exec.yaml

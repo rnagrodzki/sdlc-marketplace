@@ -494,6 +494,9 @@ function writeSection(projectRoot, section, value) {
   } else if (section === 'state') {
     // issue #351: state lives in local config
     writeLocalConfig(projectRoot, { state: value });
+  } else if (section === 'hooks') {
+    // issue #370/#372: hooks lives in local config (per-developer override)
+    writeLocalConfig(projectRoot, { hooks: value });
   }
 }
 

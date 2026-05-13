@@ -68,6 +68,7 @@ Send all Agent dispatches in one message:
 - One batch Agent for the trivial group (if 2+ Trivials), using `batchedTrivialTemplate`. Include ordering constraints if any trivials touch the same file.
 - A single Trivial task (no batch) is dispatched as an individual per-task Agent using `perTaskTemplate`, same as a Standard task.
 - Pass `mode: bypassPermissions` and `model: <task.assignedModel>` on every sub-Agent dispatch. **`model:` is required on every dispatch — no exceptions.**
+- **DO NOT pass `isolation: "worktree"` (or any other `isolation` value) on any sub-Agent dispatch.** The SDLC `--workspace worktree` flag controls a separate concept (a sibling git worktree created via `util/worktree-create.js`). Adding `isolation` here creates ephemeral `.claude/worktrees/agent-<id>` paths that are not the intended SDLC worktree. Implements R-no-agent-sdk-isolation from spec. See issues #370 #372. (Mirrors ship-sdlc/SKILL.md anti-pattern section.)
 
 ### 3. Collect per-task results
 
@@ -173,6 +174,7 @@ The following are main-context responsibilities. Wave-runner MUST NOT perform th
 
 - `mode: bypassPermissions` — required on every sub-Agent dispatch.
 - `model: <assignedModel>` — required on every sub-Agent dispatch. Omitting it inherits the parent model and defeats the quality-tier system.
+- **DO NOT pass `isolation: "worktree"` (or any other `isolation` value) on any sub-Agent dispatch.** The SDLC `--workspace worktree` flag controls a separate concept (a sibling git worktree created via `util/worktree-create.js`). Adding `isolation` here creates ephemeral `.claude/worktrees/agent-<id>` paths that are not the intended SDLC worktree. Implements R-no-agent-sdk-isolation. See issues #370 #372.
 - **Edit tool only for all file modifications** in sub-Agent contexts. Never use bash `sed`, `awk`, Python scripts, or any indirect patching method. These approaches fail silently.
 - Do not read the plan file inside sub-Agent contexts — all task information is pasted inline by main context.
 - Do not modify files outside each task's stated file list.

@@ -281,6 +281,12 @@ function summarizeOpenspecBlock(_cfg, detected) {
   return `managed-block v${v}`;
 }
 
+function summarizeHooks(cfg) {
+  if (!cfg || cfg.agentIsolationGuard == null) return '';
+  const enabled = cfg.agentIsolationGuard?.enabled ?? true;
+  return `agentIsolationGuard: ${enabled ? 'enabled' : 'disabled'}`;
+}
+
 function summarizeWorkspace(cfg) {
   if (!cfg || !cfg.worktree) return '';
   const wt = cfg.worktree;
@@ -518,6 +524,29 @@ const SETUP_SECTIONS = [
     confirmDetected: false,
     fields: [],
     summarize: summarizeOpenspecBlock,
+  },
+  {
+    id: 'hooks',
+    label: 'hooks',
+    purpose: 'Developer-local plugin hook configuration. Controls whether the pre-tool-agent-isolation-guard.js PreToolUse hook blocks Agent SDK isolation: "worktree" dispatches (issues #370 #372). Stored in .sdlc/local.json (gitignored) so each developer can opt out independently without affecting teammates.',
+    configFile: '.sdlc/local.json',
+    configPath: 'hooks',
+    consumedBy: ['execute-plan-sdlc', 'ship-sdlc'],
+    filesModified: ['.sdlc/local.json'],
+    optional: true,
+    delegatedTo: null,
+    confirmDetected: false,
+    fields: [
+      {
+        name: 'agentIsolationGuard.enabled',
+        label: 'Block Agent SDK isolation: "worktree"?',
+        type: 'boolean',
+        options: [true, false],
+        default: true,
+        description: 'When true (default, recommended), the plugin\'s pre-tool-agent-isolation-guard.js hook blocks Agent dispatches with isolation: "worktree" — prevents commits from landing in ephemeral .claude/worktrees/agent-<id> paths instead of the intended SDLC worktree. Set to false to opt out per-developer. See issues #370 #372.',
+      },
+    ],
+    summarize: summarizeHooks,
   },
 ];
 

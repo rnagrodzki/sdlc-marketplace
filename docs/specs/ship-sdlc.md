@@ -19,6 +19,8 @@
 - A8a: In `--auto` mode, `workspace: "prompt"` is overridden to `"branch"` when the source is not `'cli'`. Explicit CLI `--workspace prompt` with `--auto` is preserved (intentional override).
 - A8b: `--branch` — boolean shortcut for `--workspace branch`. Sets flags.workspace = "branch" and flagSources.workspace = "cli". Mutually exclusive with `--workspace` and with `--tree`.
 - A8c: `--tree` — boolean shortcut for `--workspace worktree`. Sets flags.workspace = "worktree" and flagSources.workspace = "cli". Mutually exclusive with `--workspace` and with `--branch`.
+- A8d (issue #371): The SKILL.md prepare-invocation example bash block (the `node "$SCRIPT" ...` line that invokes `skill/ship.js`) MUST NOT include `--workspace <value>` literally. LLMs follow the example's argument list, not surrounding prose; a hardcoded `--workspace branch` in the example overrides the user's `ship.workspace` config. Workspace must come from config fallback via `mergeFlags` in `ship.js`. Only pass `--workspace`, `--branch`, or `--tree` in the example when demonstrating a single-run override that the user explicitly requested.
+  - Acceptance: The SKILL.md prepare bash invocation example does not contain `--workspace branch` (or any other hardcoded `--workspace` value). The `mergeFlags` config fallback in ship.js is the sole source of the workspace value when no CLI override is passed.
 - A9: `--init-config` — run interactive config wizard, no pipeline execution (default: false)
 - A10: `--openspec-change <name>` — explicitly select the OpenSpec change to archive, overriding branch matching (default: null)
 

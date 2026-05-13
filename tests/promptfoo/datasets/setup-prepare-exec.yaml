@@ -315,3 +315,41 @@
         const names = ws.fields.map(f => f.name);
         const expected = ['layout', 'base', 'template', 'ensureGitignore', 'nameTemplate'];
         return JSON.stringify(names) === JSON.stringify(expected)
+
+- description: "setup-prepare (#370 #372): hooks section appears in sections list with correct configPath"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const hooks = out.sections && out.sections.find(s => s.id === 'hooks');
+        return Boolean(hooks) && hooks.configFile === '.sdlc/local.json' && hooks.configPath === 'hooks'
+
+- description: "setup-prepare (#370 #372): hooks section has agentIsolationGuard.enabled field with default true"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-setup-empty"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const hooks = out.sections && out.sections.find(s => s.id === 'hooks');
+        if (!hooks || !hooks.fields) return false;
+        const field = hooks.fields.find(f => f.name === 'agentIsolationGuard.enabled');
+        return Boolean(field) && field.default === true
+
+- description: "setup-prepare (#370 #372): hooks section summary reflects enabled:false when local.json has opt-out"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/setup-hooks-opt-out"
+  assert:
+    - type: javascript
+      value: |
+        const out = JSON.parse(output);
+        const hooks = out.sections && out.sections.find(s => s.id === 'hooks');
+        return Boolean(hooks) && typeof hooks.summary === 'string' && hooks.summary.includes('disabled')

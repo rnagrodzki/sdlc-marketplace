@@ -738,3 +738,22 @@
         with args from step.invocation plus '--resume'. The response cites
         dispatchMode === 'agent' as the dispatch channel. It does NOT describe
         invoking execute via the Skill tool for the resume path.
+
+- description: "ship-sdlc (#371): SKILL.md prepare invocation must not hardcode --workspace"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The project has ship.workspace: "worktree" set in .sdlc/local.json.
+      Show the exact bash command that Step 1 runs to invoke skill/ship.js
+      for the prepare phase. Does it include --workspace branch or any
+      hardcoded --workspace value?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must show the prepare bash invocation WITHOUT a hardcoded
+        --workspace flag. The workspace mode should come from config fallback
+        (ship.workspace in .sdlc/local.json via mergeFlags in ship.js), not from
+        a literal --workspace branch in the prepare command. The response must
+        not include --workspace branch in the node "$SCRIPT" invocation example.
+        If it mentions workspace at all, it should note the config-driven approach.
