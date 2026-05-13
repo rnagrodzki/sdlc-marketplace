@@ -1,7 +1,7 @@
 version: "3"
 
 tasks:
-  test:
+  test:behavioral:
     desc: Run all promptfoo behavioral skill tests (LLM)
     silent: true
     dir: tests/promptfoo
@@ -58,5 +58,16 @@ tasks:
     silent: true
     cmds:
       - task: test:unit
-      - task: test
+      - task: test:behavioral
       - task: test:exec
+
+  dbranches:
+    desc: Delete all local git branches except main
+    silent: true
+    cmds:
+      - |
+        branches=$(git branch | grep -v '^\* main$' || true)
+        [ -z "$branches" ] && { echo "no branches to delete"; exit 0; }
+        echo "Deleting:"
+        echo "$branches"
+        echo "$branches" | xargs git branch -D
