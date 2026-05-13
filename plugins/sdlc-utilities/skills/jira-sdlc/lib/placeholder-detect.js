@@ -29,6 +29,19 @@ const PLACEHOLDER_REGEX = /\{[a-zA-Z_][a-zA-Z0-9_-]*\}|\[(?![{"\d])[^\]\n]{3,}\]
 const BRACE_ONLY = /^\{[a-zA-Z_][a-zA-Z0-9_-]*\}$/;
 
 /**
+ * C13 summary carve-out: drop bracket-form findings on the `summary` field
+ * while keeping brace-form findings. Applied unconditionally across every
+ * dispatch return path in `findPlaceholdersForToolInput` so the rule holds
+ * for markdown, default, and ADF content formats alike.
+ *
+ * @param {Array<{path: string, marker: string}>} results
+ * @returns {Array<{path: string, marker: string}>}
+ */
+function filterSummaryBrackets(results) {
+  return results.filter(r => r.path !== 'summary' || BRACE_ONLY.test(r.marker));
+}
+
+/**
  * @param {*} payload
  * @returns {Array<{path: string, marker: string}>}
  */
@@ -103,13 +116,13 @@ function findPlaceholdersForToolInput(toolInput) {
   const warnings = [];
   if (toolInput === null || typeof toolInput !== 'object') {
     walk(toolInput, '', results);
-    return { results: results.filter(r => r.path !== 'summary' || BRACE_ONLY.test(r.marker)), warnings };
+    return { results: filterSummaryBrackets(results), warnings };
   }
 
   const contentFormat = toolInput.contentFormat;
   if (contentFormat !== 'adf') {
     walk(toolInput, '', results);
-    return { results: results.filter(r => r.path !== 'summary' || BRACE_ONLY.test(r.marker)), warnings };
+    return { results: filterSummaryBrackets(results), warnings };
   }
 
   // ADF dispatch: walk every field except `commentBody` with the default walker.
@@ -120,7 +133,7 @@ function findPlaceholdersForToolInput(toolInput) {
 
   // Route commentBody through the ADF walker, parsing if stringified.
   const cb = toolInput.commentBody;
-  if (cb === null || cb === undefined) return { results, warnings };
+  if (cb === null || cb === undefined) return { results: filterSummaryBrackets(results), warnings };
 
   let adfRoot = cb;
   if (typeof cb === 'string') {
@@ -131,12 +144,12 @@ function findPlaceholdersForToolInput(toolInput) {
         `commentBody declared contentFormat='adf' but JSON.parse failed: ${err.message}; falling back to whole-payload string walk.`
       );
       walk(cb, 'commentBody', results);
-      return { results: results.filter(r => r.path !== 'summary' || BRACE_ONLY.test(r.marker)), warnings };
+      return { results: filterSummaryBrackets(results), warnings };
     }
   }
 
   findPlaceholdersInAdf(adfRoot, 'commentBody', results);
-  return { results, warnings };
+  return { results: filterSummaryBrackets(results), warnings };
 }
 
 module.exports = {

@@ -211,6 +211,16 @@ function helperPlaceholder() {
   if (r10.results.length !== 1 || r10.results[0].path !== 'description') {
     return emit(false, `combined payload: expected 1 description result, got: ${JSON.stringify(r10.results)}`);
   }
+  // (11) ADF dispatch path: bracket-form in summary must NOT fire on the ADF return paths
+  // (cb===null/undefined path and ADF happy-path after findPlaceholdersInAdf).
+  const r11 = findPlaceholdersForToolInput({
+    summary: '[OIDC/SSO] Token exchange',
+    contentFormat: 'adf',
+    commentBody: JSON.stringify({ type: 'doc', version: 1, content: [] }),
+  });
+  if (r11.results.length !== 0) {
+    return emit(false, `ADF summary bracket false-positive: ${JSON.stringify(r11.results)}`);
+  }
 
   emit(true, `markers=${m.length} adf-dispatch=ok summary-carve-out=ok`);
 }
