@@ -168,7 +168,51 @@ function helperPlaceholder() {
     return emit(false, `malformed-adf warning missing: ${JSON.stringify(r4.warnings)}`);
   }
 
-  emit(true, `markers=${m.length} adf-dispatch=ok`);
+  // Issue #365: summary field bracket-form carve-out.
+  // (5) Common [CATEGORY] prefix must NOT be flagged as a placeholder.
+  const r5 = findPlaceholdersForToolInput({
+    summary: '[OIDC/SSO] Add token exchange',
+    description: '## Objective\n\nBody.',
+    contentFormat: 'markdown',
+  });
+  if (r5.results.length !== 0) {
+    return emit(false, `summary bracket-form false-positive [OIDC/SSO]: ${JSON.stringify(r5.results)}`);
+  }
+  // (6) Minimum-length bracket prefix [IDS] (3 chars — exactly at regex threshold).
+  const r6 = findPlaceholdersForToolInput({ summary: '[IDS] Title' });
+  if (r6.results.length !== 0) {
+    return emit(false, `summary bracket-form false-positive [IDS]: ${JSON.stringify(r6.results)}`);
+  }
+  // (7) [FEAT] and [BUG] prefix variants.
+  const r7a = findPlaceholdersForToolInput({ summary: '[FEAT] X' });
+  if (r7a.results.length !== 0) {
+    return emit(false, `summary bracket-form false-positive [FEAT]: ${JSON.stringify(r7a.results)}`);
+  }
+  const r7b = findPlaceholdersForToolInput({ summary: '[BUG] Y' });
+  if (r7b.results.length !== 0) {
+    return emit(false, `summary bracket-form false-positive [BUG]: ${JSON.stringify(r7b.results)}`);
+  }
+  // (8) Brace-form in summary still detected — carve-out must not suppress {name} markers.
+  const r8 = findPlaceholdersForToolInput({ summary: '{placeholder_name} Title' });
+  if (r8.results.length !== 1 || r8.results[0].path !== 'summary' || r8.results[0].marker !== '{placeholder_name}') {
+    return emit(false, `brace-form in summary not detected: ${JSON.stringify(r8.results)}`);
+  }
+  // (9) Bracket-form in description still detected (regression guard).
+  const r9 = findPlaceholdersForToolInput({ summary: 'Clean title', description: '[Enter description here]' });
+  if (r9.results.length !== 1 || r9.results[0].path !== 'description') {
+    return emit(false, `bracket-form in description regression: ${JSON.stringify(r9.results)}`);
+  }
+  // (10) Combined: summary bracket suppressed, description bracket detected — exactly one result.
+  const r10 = findPlaceholdersForToolInput({
+    summary: '[OIDC/SSO] X',
+    description: '[State the question...]',
+    contentFormat: 'markdown',
+  });
+  if (r10.results.length !== 1 || r10.results[0].path !== 'description') {
+    return emit(false, `combined payload: expected 1 description result, got: ${JSON.stringify(r10.results)}`);
+  }
+
+  emit(true, `markers=${m.length} adf-dispatch=ok summary-carve-out=ok`);
 }
 
 function helperTemplateFallback() {
