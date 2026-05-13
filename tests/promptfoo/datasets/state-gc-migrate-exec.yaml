@@ -64,6 +64,21 @@
     - type: contains
       value: 'no-state-file'
 
+# R37 idempotency (issue #366): second migrate call is a no-op when state file already renamed
+# Simulates post-migration state (no ship-main-* file present) — confirms R37 does not
+# double-migrate on retry after execute-plan-sdlc returns control via Agent dispatch.
+- description: "state/ship.js migrate is idempotent: no-op when state file already migrated (issue #366, R37)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/ship.js"
+    script_args: "migrate --from main --to fix/366-agent-dispatch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-state-stale"
+  assert:
+    - type: contains
+      value: '"migrated": false'
+    - type: contains
+      value: 'no-state-file'
+
 # ---------------------------------------------------------------------------
 # state/execute.js gc: prunes execute-* files using same TTL semantics
 # ---------------------------------------------------------------------------

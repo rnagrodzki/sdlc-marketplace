@@ -690,10 +690,11 @@
     - type: icontains
       value: '"errors"'
 
-# Issue #353 — Wave-level Agent dispatch: dispatchMode field on every step
+# Issue #366 — execute-plan-sdlc Agent dispatch: all sub-skill steps use dispatchMode=agent
+# (Fixes #366; reverts #353 Skill-tool exception for execute)
 # ---------------------------------------------------------------------------
 
-- description: "ship-prepare (issue #353): execute step has dispatchMode=skill"
+- description: "ship-prepare (issue #366): execute step has dispatchMode=agent"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan"
@@ -704,9 +705,9 @@
       value: |
         const o = JSON.parse(output);
         const execute = (o.steps || []).find(s => s.name === 'execute');
-        return execute !== undefined && execute.dispatchMode === 'skill';
+        return execute !== undefined && execute.dispatchMode === 'agent';
 
-- description: "ship-prepare (issue #353): sub-skill steps (commit, review, received-review, commit-fixes, version, pr) all have dispatchMode=agent"
+- description: "ship-prepare (issue #366): all sub-skill steps (execute, commit, review, received-review, commit-fixes, version, pr) have dispatchMode=agent"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan"
@@ -716,7 +717,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const agentSteps = ['commit', 'review', 'received-review', 'commit-fixes', 'version', 'pr'];
+        const agentSteps = ['execute', 'commit', 'review', 'received-review', 'commit-fixes', 'version', 'pr'];
         return agentSteps.every(name => {
           const step = (o.steps || []).find(s => s.name === name);
           return step !== undefined && step.dispatchMode === 'agent';
