@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/scripts/block-isolation-worktree.js",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

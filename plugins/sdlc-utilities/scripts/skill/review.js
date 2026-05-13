@@ -236,14 +236,15 @@ function fetchAndSplitDiff(base, projectRoot, scope = 'all') {
   let cmd;
   switch (scope) {
     // Three-dot for branch-contribution scope so files only present on the base
-    // branch after divergence don't appear in the per-dimension diff (issue #239).
+    // branch after divergence don't appear in the per-dimension diff
+    // (issue #239 for 'committed', issue #364 for default 'all').
     // Routed through lib/git.js::buildBranchContribDiffCmd so review and pr stay
     // in sync — DRY, no per-call divergence.
     case 'committed': cmd = buildBranchContribDiffCmd('content', base); break;
     case 'staged':    cmd = 'git diff --cached';                        break;
     case 'working':   cmd = 'git diff HEAD';                            break;
     case 'worktree':  cmd = `git diff ${base}`;                         break;
-    default:          cmd = `git diff --cached ${base}`;                break; // 'all'
+    default:          cmd = buildBranchContribDiffCmd('content', base); break; // 'all' (issue #364)
   }
   const raw = exec(cmd, { cwd: projectRoot });
   if (!raw) return new Map();
