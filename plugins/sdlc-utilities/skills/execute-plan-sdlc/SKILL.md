@@ -266,6 +266,12 @@ This dispatch is NOT a wave-runner Agent — it is a direct batch-haiku dispatch
 
 **For each wave:**
 
+**Progress signal — wave start (mandatory, always first).** Before any gate or dispatch, update TodoWrite:
+- Mark tasks from the previous wave as `completed` (skip on wave 1).
+- Add one todo per task in this wave with `status: "in_progress"` and `activeForm: "Wave N — <task name>"`.
+
+This runs unconditionally — even if the wave is skipped or blocked. The TodoWrite call is the parent-visible checkpoint when execute-plan-sdlc runs inside ship-sdlc's Agent dispatch.
+
 **5a-pre. Pre-wave guardrail check (error-severity only)** — Skip if `activeGuardrails` is empty.
 
 Before dispatching any agents in this wave, evaluate each error-severity guardrail against the wave's task descriptions. For each guardrail with `severity: "error"` (or no severity, defaulting to error):
@@ -414,6 +420,11 @@ Update context: `node "$STATE_SCRIPT" context --data '<json>'`
 The `state/execute.js` CLI surface is unchanged — only the SKILL.md call-site shape shifts (writes happen after wave-runner returns, driven by `WAVE_SUMMARY` data, but with the same arguments).
 
 On successful completion: `node "$STATE_SCRIPT" cleanup`
+
+**Progress signal — wave complete (mandatory, always last).** After state persistence, update TodoWrite:
+- Mark this wave's tasks as `completed`.
+
+On the final wave, also mark any remaining `in_progress` todos as `completed`. This closes the parent-visible progress trail and ensures TodoWrite reflects terminal state when the skill returns its Step 9 result.
 On failure: preserve the state file for `--resume`.
 
 **5e. Inter-wave critique** — Before next wave:
