@@ -176,7 +176,7 @@
       A 2-task plan has just finished executing. A guardrail was overridden by the
       user during Wave 1 (so a learning entry should be appended). Walk through
       Step 8-ter (Learning Capture) and Step 9 (REPORT) in order, narrating exactly
-      what gets written to `.claude/learnings/log.md` and confirming the working
+      what gets written to `.sdlc/learnings/log.md` and confirming the working
       tree contains that change BEFORE the final summary is emitted.
   assert:
     - type: icontains

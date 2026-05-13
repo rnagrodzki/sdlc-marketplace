@@ -385,3 +385,117 @@
   assert:
     - type: javascript
       value: file://assertions/harvest-learnings-commit-processed.js
+
+# ── resolveLogPath resolution cases (issue #356) ────────────────────────────
+
+# AC-RP1 — new path only: resolveLogPath reads .sdlc/learnings/log.md, no deprecation on stderr.
+- description: "harvest-learnings: resolveLogPath reads .sdlc/learnings/log.md when present (no deprecation)"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-new-only"
+    script_env: '{"GH_HARVEST_FAKE_LIST":"/dev/null"}'
+    script_capture_stderr: true
+  assert:
+    - type: javascript
+      value: |
+        const lines = output.split('\n');
+        const hasDeprecation = lines.some(l => l.includes('DEPRECATED'));
+        let parsed = null;
+        try { parsed = JSON.parse(output); } catch (_) {}
+        if (!parsed) {
+          // output is stderr + stdout; try to find JSON portion
+          const jsonLine = lines.find(l => l.trim().startsWith('{'));
+          if (jsonLine) try { parsed = JSON.parse(jsonLine); } catch (_) {}
+        }
+        return !hasDeprecation && parsed !== null && typeof parsed.totalEntries === 'number';
+
+# AC-RP2 — legacy only: resolveLogPath falls back to .claude/learnings/log.md with stderr deprecation.
+- description: "harvest-learnings: resolveLogPath falls back to .claude/learnings/log.md with DEPRECATED warning"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-legacy-only"
+    script_env: '{"GH_HARVEST_FAKE_LIST":"/dev/null"}'
+    script_capture_stderr: true
+  assert:
+    - type: javascript
+      value: |
+        const hasDeprecation = output.includes('DEPRECATED');
+        const hasLegacyPath = output.includes('.claude/learnings/log.md');
+        return hasDeprecation && hasLegacyPath;
+
+# AC-RP3 — both exist: new path wins, no deprecation on stderr.
+- description: "harvest-learnings: resolveLogPath uses .sdlc path when both exist (no deprecation)"
+  vars:
+    script_path: "repo://.claude/scripts/harvest-learnings.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-both-exist"
+    script_env: '{"GH_HARVEST_FAKE_LIST":"/dev/null"}'
+    script_capture_stderr: true
+  assert:
+    - type: javascript
+      value: |
+        const noDeprecation = !output.includes('DEPRECATED');
+        return noDeprecation;
+
+# ── migrate-learnings-log.js cases (issue #356) ─────────────────────────────
+
+# AC-ML1 — already migrated: target exists, no legacy → stdout "already migrated".
+- description: "migrate-learnings-log: target present, no legacy → 'already migrated'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-learnings-log.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-migrate-new-only"
+  assert:
+    - type: javascript
+      value: |
+        const trimmedML1 = output.trim();
+        return trimmedML1.includes('already migrated');
+
+# AC-ML2 — legacy to new: legacy exists, no target → file moved, stdout "moved".
+- description: "migrate-learnings-log: legacy present, no target → moves file and prints 'moved'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-learnings-log.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-migrate-legacy-only"
+  assert:
+    - type: javascript
+      value: |
+        // Script only prints "moved X → Y" after fs.renameSync succeeds;
+        // an error would produce stderr + exit 1, not this stdout message.
+        const hasMoved = output.trim().includes('moved');
+        const hasArrow = output.includes(' → ');
+        return hasMoved && hasArrow;
+
+# AC-ML3 — both exist: stderr contains "both paths present".
+- description: "migrate-learnings-log: both paths present → stderr warning 'both paths present'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-learnings-log.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-migrate-both-exist"
+    script_capture_stderr: true
+  assert:
+    - type: javascript
+      value: |
+        const hasBothPaths = output.includes('both paths present');
+        return hasBothPaths;
+
+# AC-ML4 — nothing to migrate: neither path exists → stdout "nothing to migrate".
+- description: "migrate-learnings-log: neither path present → 'nothing to migrate'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-learnings-log.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-learnings-migrate-nothing"
+  assert:
+    - type: javascript
+      value: |
+        const trimmedML4 = output.trim();
+        return trimmedML4.includes('nothing to migrate');

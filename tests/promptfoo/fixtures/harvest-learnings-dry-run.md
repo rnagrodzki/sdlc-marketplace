@@ -2,7 +2,7 @@
 
 ## Project state
 - Repo: rnagrodzki/sdlc-marketplace
-- `.claude/learnings/log.md` contains three harvestable draft entries (same shape
+- `.sdlc/learnings/log.md` contains three harvestable draft entries (same shape
   as `harvest-learnings-three-drafts.md`).
 
 ## Helper invocation simulation

@@ -267,7 +267,7 @@ The trap from Step 1 cleans up the manifest on every exit path.
 
 ## Step 7 — Learning Capture
 
-Append a single line to `.claude/learnings/log.md` summarizing the hardening
+Append a single line to `.sdlc/learnings/log.md` summarizing the hardening
 action:
 
 ```
@@ -287,7 +287,7 @@ The `AmbiguousOffer` line records the Step 5c outcome:
   `skip`.
 
 Mirror the append pattern used by `commit-sdlc` and `execute-plan-sdlc`. Create
-the `.claude/learnings/` directory and `log.md` file if they don't exist.
+the `.sdlc/learnings/` directory and `log.md` file if they don't exist.
 
 ---
 

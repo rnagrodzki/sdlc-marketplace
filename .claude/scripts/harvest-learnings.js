@@ -9,7 +9,7 @@
  *
  * Modes:
  *   --output-file [--dry-run] [--since YYYY-MM-DD]
- *     Parses <cwd>/.claude/learnings/log.md, calls
+ *     Parses <cwd>/.sdlc/learnings/log.md, calls
  *       gh issue list --state all --limit 200 \
  *         --search "Source: learnings/log.md" \
  *         --json number,title,body,state,closedAt
@@ -91,6 +91,37 @@ const { spawnSync } = require('child_process');
 // ─────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Resolves the path to learnings/log.md with a legacy-read fallback.
+ *
+ * Priority:
+ *   1. <cwd>/.sdlc/learnings/log.md   (canonical; returned when it exists)
+ *   2. <cwd>/.claude/learnings/log.md (legacy; emits one stderr deprecation
+ *      warning and is returned when the canonical path does not exist but this
+ *      one does)
+ *   3. <cwd>/.sdlc/learnings/log.md   (canonical; returned when neither
+ *      exists so that downstream missing-file handling fires on the new path)
+ *
+ * NOTE: This function governs the READ path only. Write targets are handled
+ * separately and always use the canonical .sdlc path.
+ */
+function resolveLogPath(cwd) {
+  const newPath = path.join(cwd, '.sdlc', 'learnings', 'log.md');
+  if (fs.existsSync(newPath)) {
+    return newPath;
+  }
+  const legacyPath = path.join(cwd, '.claude', 'learnings', 'log.md');
+  if (fs.existsSync(legacyPath)) {
+    process.stderr.write(
+      '[harvest-learnings] DEPRECATED: reading legacy .claude/learnings/log.md;' +
+        ' run `node plugins/sdlc-utilities/scripts/skill/migrate-learnings-log.js`' +
+        ' to migrate. This fallback will be removed in the next minor release.\n'
+    );
+    return legacyPath;
+  }
+  return newPath;
+}
 
 function writeOutput(jsonValue) {
   const dir = os.tmpdir();
@@ -472,7 +503,7 @@ function modeOutputFile(args) {
   }
 
   const cwd = process.cwd();
-  const logPath = path.join(cwd, '.claude', 'learnings', 'log.md');
+  const logPath = resolveLogPath(cwd);
   if (!fs.existsSync(logPath)) {
     process.stderr.write(`harvest-learnings: log not found at ${logPath}\n`);
     process.exit(1);
@@ -548,7 +579,7 @@ function modeCommit(args) {
   }
 
   const cwd = process.cwd();
-  const logPath = path.join(cwd, '.claude', 'learnings', 'log.md');
+  const logPath = resolveLogPath(cwd);
   if (!fs.existsSync(logPath)) {
     process.stderr.write(`harvest-learnings: log not found at ${logPath}\n`);
     process.exit(1);

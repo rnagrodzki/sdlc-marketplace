@@ -538,7 +538,7 @@
         The pipeline table shows `learnings-commit` as the final step, ordered AFTER
         `pr-sdlc`. The step is described as an inline shell operation (no Agent
         dispatched, no sub-skill invoked) that appends Learning Capture entries to
-        `.claude/learnings/log.md` and creates a trailing
+        `.sdlc/learnings/log.md` and creates a trailing
         `chore(ship-sdlc): capture pipeline learnings` commit if the diff is
         non-empty. The response notes the step is a no-op when no learnings were
         captured this run. The response makes clear that post-pipeline `git status`
