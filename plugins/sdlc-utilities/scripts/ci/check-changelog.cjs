@@ -137,6 +137,7 @@ function resolveVersionFromTags(repoRoot) {
 // ---------------------------------------------------------------------------
 
 function main() {
+  // KEEP: CI script invoked at repo root — do not change to resolveSdlcRoot()
   const repoRoot = process.cwd();
 
   // Step 1: Read config — exit 0 silently if not present or unparseable

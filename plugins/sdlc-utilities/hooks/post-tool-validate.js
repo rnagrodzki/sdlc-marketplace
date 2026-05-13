@@ -89,6 +89,7 @@ if (isDimension) {
 }
 
 // Use the project root from cwd (where Claude runs the hook)
+// KEEP: hook entry point — do not change to resolveSdlcRoot()
 const projectRoot = process.cwd();
 
 // ---------------------------------------------------------------------------

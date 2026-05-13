@@ -29,13 +29,16 @@
 const fs   = require('node:fs');
 const path = require('node:path');
 
+const { resolveSdlcRoot } = require(path.join(__dirname, '..', 'lib', 'config'));
+
 // ---------------------------------------------------------------------------
 // CLI parsing
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let projectRoot  = process.cwd();
+  // C-projectroot (#360): default to main-worktree .sdlc/ root, not cwd.
+  let projectRoot  = resolveSdlcRoot();
   let filePath     = null;
   let outputFormat = 'json';
 

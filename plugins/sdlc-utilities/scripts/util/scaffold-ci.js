@@ -27,6 +27,7 @@ const path = require('path');
 const LIB  = path.join(__dirname, '..', 'lib');
 
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -99,7 +100,8 @@ function parseArgs(argv) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const projectRoot = process.cwd();
+  // C-projectroot (#360): route to the main worktree's .sdlc/ root.
+  const projectRoot = resolveSdlcRoot();
   const cli = parseArgs(process.argv);
 
   const errors   = [];

@@ -54,6 +54,7 @@
 const { SHIP_FIELDS } = require('./ship-fields');
 const { parseRemoteOwner, detectBaseBranchSafe } = require('./git');
 const { WORKSPACE_FIELDS } = require('./workspace-fields');
+const { resolveSdlcRoot } = require('./config');
 
 // ---------------------------------------------------------------------------
 // Section descriptors
@@ -420,7 +421,7 @@ const SETUP_SECTIONS = [
         label: 'Target branch for PRs',
         type: 'string',
         options: null,
-        default: detectBaseBranchSafe(process.cwd()),
+        default: detectBaseBranchSafe(resolveSdlcRoot()),
         description: 'Branch PRs are merged into. Auto-detected from the remote default branch; override for repos using develop, release/*, etc. When set, /pr-sdlc uses this value before falling back to runtime git detection (issue #339).',
       },
       {
@@ -428,7 +429,7 @@ const SETUP_SECTIONS = [
         label: 'Expected gh account',
         type: 'string',
         options: null,
-        default: (parseRemoteOwner(process.cwd()) || {}).owner || '',
+        default: (parseRemoteOwner(resolveSdlcRoot()) || {}).owner || '',
         description: 'GitHub login expected to be active when /pr-sdlc creates a PR. /pr-sdlc halts hard if the active gh account differs from this value, preventing wrong-account PRs in multi-account setups. Default is the origin remote owner; leave blank to skip the active-account check (fall through to email-mapping or origin-owner cascade).',
       },
     ],

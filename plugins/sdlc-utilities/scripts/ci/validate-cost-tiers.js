@@ -29,6 +29,7 @@ const path = require('node:path');
 
 const LIB = path.join(__dirname, '..', 'lib');
 const { extractFrontmatter, parseSimpleYaml } = require(path.join(LIB, 'dimensions'));
+const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // CLI parsing
@@ -36,7 +37,8 @@ const { extractFrontmatter, parseSimpleYaml } = require(path.join(LIB, 'dimensio
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let root = process.cwd();
+  // C-projectroot (#360): default to main-worktree .sdlc/ root, not cwd.
+  let root = resolveSdlcRoot();
   let strict = false;
   let json = false;
 

@@ -12,12 +12,15 @@ const fs = require('fs');
 const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
+const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
+
 /**
  * Parse command-line flags
  */
 function parseArgs(args) {
   const result = {
-    projectRoot: process.cwd(),
+    // C-projectroot (#360): default to main-worktree .sdlc/ root, not cwd.
+    projectRoot: resolveSdlcRoot(),
     json: false,
     section: 'plan',
   };

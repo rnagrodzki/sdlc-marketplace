@@ -42,6 +42,7 @@ const {
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { truncateText } = require(path.join(LIB, 'diff-truncate'));
+const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -86,6 +87,13 @@ function parseArgs(argv) {
   // skill layer (version-sdlc) consults this to skip the breaking-change
   // warning (R3 reworded — pre-release source coverage).
   let bumpFromLabel       = false;
+  // R-bump-flag (#358): track whether bump came from the --bump named flag.
+  // Used to distinguish flag-sourced bump from positional bump for downstream
+  // promotion-detection and conflict reporting.
+  let bumpFromFlag        = false;
+  // R-bump-flag (#358): track that a positional bump was set, so a subsequent
+  // --bump flag (or vice-versa) can raise bumpFlagConflict.
+  let bumpFromPositional  = false;
   let noPush              = false;
   let changelog           = false;
   let hotfix              = false;
@@ -96,11 +104,67 @@ function parseArgs(argv) {
 
   const BUMP_VALUES = new Set(['major', 'minor', 'patch']);
 
+  // Helper: validate a --bump flag value (matches positional value space:
+  // major|minor|patch OR a pre-release label).
+  function applyBumpFlagValue(value) {
+    if (BUMP_VALUES.has(value)) {
+      requestedBump = value;
+      bumpFromFlag  = true;
+      // Flag-sourced semver bump is NOT a label form.
+      bumpFromLabel = false;
+    } else if (PRE_RELEASE_LABEL_RE.test(value)) {
+      // Label-form via flag: sugar for patch + --pre <label>.
+      requestedBump = 'patch';
+      bumpFromFlag  = true;
+      bumpFromLabel = true;
+      if (!preLabelExplicit) {
+        preLabel = value;
+      }
+    } else {
+      errors.push(`Invalid --bump value '${value}'. Expected one of: major|minor|patch, or a pre-release label matching ${PRE_RELEASE_LABEL_RE.toString()}.`);
+    }
+  }
+
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
 
+    // R-bump-flag (#358): --bump flag (named, authoritative over positional).
+    // Accept both `--bump <value>` and `--bump=<value>` shapes.
+    let bumpFlagValue = null;
+    if (a === '--bump' && args[i + 1]) {
+      bumpFlagValue = args[++i];
+    } else if (a.startsWith('--bump=')) {
+      bumpFlagValue = a.slice('--bump='.length);
+    }
+    if (bumpFlagValue !== null) {
+      if (bumpFromPositional) {
+        errors.push({
+          id: 'bumpFlagConflict',
+          message: `Cannot combine positional bump '${requestedBump}' with --bump '${bumpFlagValue}'. Pass one or the other.`,
+        });
+        continue;
+      }
+      if (bumpFromFlag) {
+        errors.push({
+          id: 'bumpFlagConflict',
+          message: `--bump specified more than once. Pass --bump only once.`,
+        });
+        continue;
+      }
+      applyBumpFlagValue(bumpFlagValue);
+      continue;
+    }
+
     if (BUMP_VALUES.has(a)) {
-      requestedBump = a;
+      if (bumpFromFlag) {
+        errors.push({
+          id: 'bumpFlagConflict',
+          message: `Cannot combine --bump '${requestedBump}' with positional bump '${a}'. Pass one or the other.`,
+        });
+        continue;
+      }
+      requestedBump      = a;
+      bumpFromPositional = true;
     } else if (a === '--init') {
       init = true;
     } else if (a === '--pre' && args[i + 1]) {
@@ -127,9 +191,17 @@ function parseArgs(argv) {
       warnings.push(`Unknown flag: ${a}`);
     } else if (PRE_RELEASE_LABEL_RE.test(a)) {
       // Label-form bump (e.g. `version-sdlc rc`). Sugar for patch + --pre <label>.
+      if (bumpFromFlag) {
+        errors.push({
+          id: 'bumpFlagConflict',
+          message: `Cannot combine --bump '${requestedBump}' with positional label '${a}'. Pass one or the other.`,
+        });
+        continue;
+      }
       if (requestedBump === null) {
-        requestedBump = 'patch';
-        bumpFromLabel = true;
+        requestedBump      = 'patch';
+        bumpFromLabel      = true;
+        bumpFromPositional = true;
       }
       if (!preLabelExplicit) {
         preLabel = a;
@@ -143,6 +215,7 @@ function parseArgs(argv) {
   return {
     init, requestedBump, preLabel, noPush, changelog, hotfix, auto,
     fileOverride, warnings, errors, bumpFromLabel, preLabelExplicit,
+    bumpFromFlag,
   };
 }
 
@@ -178,7 +251,10 @@ function fileTypeFromPath(filePath) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const projectRoot = process.cwd();
+  // R-projectroot (#360): route to the main worktree's .sdlc/ root, never cwd.
+  // Lets version-sdlc be invoked from subdirectories or linked worktrees
+  // without writing to the wrong directory.
+  const projectRoot = resolveSdlcRoot();
   const args        = parseArgs(process.argv);
 
   // Issue #232: verifyAndMigrate gate (CLI > env > default false).
@@ -696,6 +772,23 @@ async function main() {
 
   const conventionalSummary = { ...typeCounts, hasBreakingChanges, suggestedBump };
 
+  // R-bump-promote (#358): detect silent promotion — the user requested a
+  // semver bump that is LOWER than what the commits suggest. Only the three
+  // semver levels participate; label-form / pre-release branches are excluded
+  // (those paths express explicit pre-release intent, not a base bump).
+  const BUMP_RANK = { patch: 1, minor: 2, major: 3 };
+  let bumpPromotionDetected = false;
+  if (
+    !preLabelFromConfig &&
+    !args.bumpFromLabel &&
+    typeof args.requestedBump === 'string' &&
+    Object.prototype.hasOwnProperty.call(BUMP_RANK, args.requestedBump) &&
+    typeof suggestedBump === 'string' &&
+    Object.prototype.hasOwnProperty.call(BUMP_RANK, suggestedBump)
+  ) {
+    bumpPromotionDetected = BUMP_RANK[suggestedBump] > BUMP_RANK[args.requestedBump];
+  }
+
   // 12. Changelog
   const changelogEnabled = config.changelog === true || args.changelog === true;
   let changelogOutput    = null;
@@ -747,10 +840,16 @@ async function main() {
       bumpFromLabel:      args.bumpFromLabel,
       preLabelExplicit:   args.preLabelExplicit,
       preLabelFromConfig,
+      // R-bump-flag (#358): true when bump came from the --bump named flag.
+      // Skill layer consults this when deciding how to surface promotion.
+      bumpFromFlag:       args.bumpFromFlag,
     },
     tags:               tagsOutput,
     commits,
     conventionalSummary,
+    // R-bump-promote (#358): true when the requested bump is strictly lower
+    // than the commits' suggestedBump (silent promotion candidate).
+    bumpPromotionDetected,
     changelog:          changelogOutput,
     remoteState,
   }, 'version-context', 0);

@@ -20,6 +20,10 @@
 
 - R1: Three distinct workflow branches determined by `flow` field: init, release, changelog-update
 - R2: Determine bump type from explicit argument, or auto-detect from conventional commit summary; inform user of auto-selection rationale
+- R-bump-flag: `--bump` is sometimes forwarded from ship-sdlc without being honored — the flag value must be the authoritative source. version-sdlc MUST parse `--bump <major|minor|patch|<label>>`; when present, the flag value is authoritative over the positional argument and over `conventionalSummary.suggestedBump`. The resolved bump is recorded in `flags.bump` in the prepare output.
+  - Acceptance: passing `--bump minor` to `skill/version.js` when `suggestedBump` is `patch` yields `requestedBump: "minor"` in the output and the skill selects `minor` without warning the user; positional arg is ignored when `--bump` is also present.
+- R-bump-promote: Users passing a lower-ranked bump than the auto-detected `suggestedBump` may silently get a weaker release — this must surface as a warning rather than a silent override. The prepare output MUST set `bumpPromotionDetected: true` when `requestedBump` (from `--bump` or positional) is lower-ranked than `conventionalSummary.suggestedBump` (e.g., `patch` requested when `suggestedBump` is `minor`); SKILL.md MUST surface this as a visible warning ("Requested bump X is lower than suggested Y — proceeding with X") and MUST NOT auto-upgrade the bump to the higher rank.
+  - Acceptance: `bumpPromotionDetected` is `true` when `requestedBump=patch` and `suggestedBump=minor`; `false` when `requestedBump=minor` and `suggestedBump=patch`; `false` when `requestedBump` is `null` (auto mode). SKILL.md displays the warning when the field is `true`; it does not change the bump type.
 - R3: When `hasBreakingChanges` is true and chosen bump is not major, warn the user and suggest major bump — UNLESS the resolved bump is a pre-release from any source (`--pre <label>`, label-form `--bump <label>`, or `config.preRelease`); pre-release trains skip the warning to avoid nagging on every RC iteration
 - R4: Pre-release handling: `--pre` with bump type computes from base version; `--pre` alone increments existing pre-release counter
 - R5: CHANGELOG entry uses Keep a Changelog format with today's date, mapping commit types to sections (feat→Added, fix→Fixed, refactor/perf→Changed)
@@ -76,6 +80,7 @@
 - P3: `config.changelog` (boolean) — whether changelog is enabled by default
 - P4: `config.ticketPrefix` (string | null) — Jira/project key prefix for ticket ID extraction
 - P5: `requestedBump` (string | null: "major" | "minor" | "patch" | label matching `^[a-z][a-z0-9]*$`) — explicitly requested bump type; a label-form value indicates the user passed `--bump <label>` (sugar for patch + `--pre <label>`), and the script-resolved `flags.preLabel` will reflect this
+- P-bumpPromotionDetected: `bumpPromotionDetected` (boolean) — `true` when `requestedBump` is lower-ranked than `conventionalSummary.suggestedBump`; `false` otherwise (including when `requestedBump` is `null`). See R-bump-promote.
 - P6: `conventionalSummary.suggestedBump` (string) — auto-detected bump type from commits
 - P7: `conventionalSummary.hasBreakingChanges` (boolean) — whether any commit is a breaking change
 - P8: `bumpOptions` (object: `{ major, minor, patch, preRelease }`) — pre-computed next versions
@@ -103,6 +108,8 @@
 - C3: Must not skip the critique step
 - C4: Must not push to remote when `--no-push` is set
 - C5: Must not modify the version file when `config.mode === "tag"` (version lives in git only)
+- R-projectroot: Scripts that run relative to `process.cwd()` can silently operate on the wrong project root when invoked from a sub-directory, a git worktree, or by a parent skill with a different CWD. `skill/version.js` MUST resolve `projectRoot` via `resolveSdlcRoot()` (from `lib/config.js`); `process.cwd()` is forbidden as a project-root source.
+  - Acceptance: `resolveSdlcRoot` is called at the top of `skill/version.js`; no bare `process.cwd()` usage appears in any path that contributes to `projectRoot`; calling the script from a subdirectory of the repo yields the same `projectRoot` as calling it from the repo root.
 - C6: Must not omit pre-condition verification before execution
 - C7: Must not skip, bypass, or defer prepare script execution — the script must run and exit successfully before any skill phase begins
 - C8: Must not override, reinterpret, or discard prepare script output — for every P-field, the script return value is authoritative and final; the skill must not substitute LLM-generated alternatives

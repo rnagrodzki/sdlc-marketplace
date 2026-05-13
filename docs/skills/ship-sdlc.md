@@ -596,6 +596,19 @@ To resume:
 
 **If multiple state files exist** for the same branch (from multiple failed attempts), the one with the most recent timestamp is used.
 
+### Auto-resume after `/compact`
+
+When a Claude Code `/compact` occurs mid-pipeline, the `SessionStart` hook emits an **Active pipeline:** reminder. On the next invocation of `/ship-sdlc`, the prepare script detects this reminder and automatically resumes from the last completed step — no `--resume` flag required.
+
+A banner is shown before the pipeline table:
+```
+Resuming after compaction from step <step-name>.
+Completed: <list>.
+Pending:   <list>.
+```
+
+If the pipeline state file is missing or expired (older than 1 hour), you are prompted to start fresh or provide a state path.
+
 **Manual cleanup:** If a state file is corrupt or you want to start fresh, delete it manually:
 
 ```bash

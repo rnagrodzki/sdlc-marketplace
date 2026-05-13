@@ -286,6 +286,7 @@ function checkPD6(plugins) {
   if (!plugins || plugins.length === 0) return skip('PD6', 'plugin-required-fields', 'PD4 failed — cannot check');
   const details = [];
   for (const { pluginData, manifestPath } of plugins) {
+    // KEEP: display string — do not change to resolveSdlcRoot()
     const rel = path.relative(process.cwd(), manifestPath);
     if (!pluginData.name) details.push(`${rel}: missing required field "name"`);
     if (!pluginData.description) details.push(`${rel}: missing required field "description"`);
@@ -305,6 +306,7 @@ function checkPD7(plugins) {
   if (!plugins || plugins.length === 0) return skip('PD7', 'semver-format', 'PD4 failed — cannot check');
   const details = [];
   for (const { pluginData, manifestPath } of plugins) {
+    // KEEP: display string — do not change to resolveSdlcRoot()
     const rel = path.relative(process.cwd(), manifestPath);
     if (pluginData.version && !RE_SEMVER.test(pluginData.version)) {
       details.push(`${rel}: version "${pluginData.version}" is not valid semver (expected X.Y.Z or X.Y.Z-pre)`);

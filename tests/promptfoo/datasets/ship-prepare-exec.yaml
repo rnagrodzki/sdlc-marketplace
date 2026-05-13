@@ -762,3 +762,43 @@
       value: |
         const o = JSON.parse(output);
         return (o.steps || []).every(s => Object.prototype.hasOwnProperty.call(s, 'dispatchMode'));
+
+# R-bump-forward, R-implicit-resume (#358, #359): the version step args carry the
+# --bump named flag forwarded verbatim from ship --bump (was: positional). The
+# implicit-resume path lifts flags.resume when a fresh ship state file exists
+# for the current branch and --hook-active-pipeline was passed.
+
+- description: "ship-prepare: version step forwards --bump as named flag (R-bump-forward, #358)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --bump patch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const version = (o.steps || []).find(s => s.name === 'version');
+        return version !== undefined && typeof version.args === 'string' && version.args.includes('--bump patch');
+
+- description: "ship-prepare: --hook-active-pipeline with fresh state file sets flags.implicitResume=true (R-implicit-resume, #359)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --hook-active-pipeline"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-state-resume"
+  assert:
+    - type: icontains
+      value: '"implicitResume": true'
+    - type: icontains
+      value: '"resume": true'
+
+- description: "ship-prepare: --hook-active-pipeline without state file emits implicitResumeNoState error (R-implicit-resume, #359)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --hook-active-pipeline"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: "implicitResumeNoState"

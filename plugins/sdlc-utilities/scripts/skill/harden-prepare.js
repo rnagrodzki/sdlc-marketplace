@@ -19,6 +19,7 @@ const { writeOutput } = require(path.join(LIB, 'output'));
 const surfaces = require(path.join(LIB, 'harden-surfaces'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { detectResumeState } = require(path.join(LIB, 'state'));
+const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
 
 // Plugin repo URL (issue #288). Hardcoded inline by design — do NOT extract to
 // lib/harden-surfaces.js, do NOT share with error-report-prepare.js::TARGET_REPO.
@@ -139,7 +140,8 @@ function main() {
   const errors = [];
 
   // Issue #232: verifyAndMigrate gate (CLI > env > default false).
-  const cwdForVerify = process.cwd();
+  // R-projectroot: main-worktree-rooted resolution (#360).
+  const cwdForVerify = resolveSdlcRoot();
   const skipConfigCheck = resolveSkipConfigCheck(process.argv);
   const cv = ensureConfigVersion(cwdForVerify, { skip: skipConfigCheck, roles: ['project'] });
   if (cv.errors.length > 0) {
@@ -161,7 +163,8 @@ function main() {
     return;
   }
 
-  const projectRoot = process.cwd();
+  // R-projectroot: main-worktree-rooted resolution (#360).
+  const projectRoot = resolveSdlcRoot();
   const surfaceLoadErrors = [];
 
   // Load all five surfaces deterministically (R4).

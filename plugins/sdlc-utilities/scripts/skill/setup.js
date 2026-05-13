@@ -14,7 +14,7 @@ const { execSync } = require('child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { detectVersionFile } = require(path.join(LIB, 'version'));
-const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH, PROJECT_SECTIONS } = require(path.join(LIB, 'config'));
+const { LEGACY, PROJECT_CONFIG_PATH, LOCAL_CONFIG_PATH, PROJECT_SECTIONS, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { SHIP_FIELDS } = require(path.join(LIB, 'ship-fields'));
 const { SETUP_SECTIONS } = require(path.join(LIB, 'setup-sections'));
@@ -489,7 +489,8 @@ function applyWhenGates(fields, activeSteps) {
 
 if (require.main === module) {
   try {
-    const projectRoot = process.cwd();
+    // C-projectroot (#360): route to the main worktree's .sdlc/ root.
+    const projectRoot = resolveSdlcRoot();
     const result = detect(projectRoot);
     const parsed = parseArgs(process.argv);
     result.flags = parsed.flags;

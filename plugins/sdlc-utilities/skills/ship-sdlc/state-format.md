@@ -40,6 +40,7 @@ Example: `.sdlc/execution/ship-feat-my-feature-20260327T143000Z.json`
 | `steps`           | array  | Ordered list of pipeline step records (see below).           |
 | `decisions`       | array  | Key decisions recorded for transparency (see below).         |
 | `deferredFindings`| array  | Review findings deferred to a follow-up (see below).        |
+| `nextPendingStep` | string \| null | Derived at read time by `lib/state.js::detectResumeState`. Name of the first step in `steps[]` whose `status` is neither `completed` nor `skipped`, or `null` when every step is resolved. Not written into the on-disk file; recomputed on every read so a resumed run picks the correct re-entry point. Example: `"review"`. |
 
 ---
 
@@ -74,27 +75,31 @@ Each element represents one pipeline step in execution order.
 ```json
 [
   { "name": "execute",         "status": "completed",   "result": "8 tasks, 3 waves", "completedAt": "2026-03-27T14:35:00Z" },
-  { "name": "commit",          "status": "completed",   "result": "a1b2c3d",           "completedAt": "2026-03-27T14:36:00Z" },
-  { "name": "review",          "status": "in_progress", "startedAt": "2026-03-27T14:36:05Z" },
+  { "name": "commit",          "status": "completed",   "result": "a1b2c3d", "commitSha": "a1b2c3d", "completedAt": "2026-03-27T14:36:00Z" },
+  { "name": "review",          "status": "completed",   "result": "APPROVED_WITH_NOTES", "reviewVerdict": "APPROVED_WITH_NOTES", "completedAt": "2026-03-27T14:38:00Z" },
   { "name": "received-review", "status": "pending",     "condition": "if critical/high findings" },
   { "name": "commit-fixes",    "status": "pending",     "condition": "if received-review made changes" },
-  { "name": "version",         "status": "skipped",     "reason": "in skip set" },
-  { "name": "pr",              "status": "pending" }
+  { "name": "version",         "status": "completed",   "result": "v1.2.3", "versionTag": "v1.2.3", "completedAt": "2026-03-27T14:39:00Z" },
+  { "name": "pr",              "status": "in_progress", "prUrl": "https://github.com/owner/repo/pull/42", "startedAt": "2026-03-27T14:40:00Z" }
 ]
 ```
 
 ### Step Fields
 
-| Field         | Type   | Present when                        | Description                                                   |
-|---------------|--------|-------------------------------------|---------------------------------------------------------------|
-| `name`        | string | always                              | Step identifier (see step names below).                       |
-| `status`      | string | always                              | Current execution status (see status values below).           |
-| `startedAt`   | string | status is `in_progress`             | ISO 8601 UTC timestamp when the step began.                   |
-| `completedAt` | string | status is `completed` or `skipped`  | ISO 8601 UTC timestamp when the step finished.                |
-| `result`      | string | status is `completed`               | Human-readable summary of what the step produced.             |
-| `condition`   | string | step is conditional                 | Natural-language condition that gates this step's execution.  |
-| `reason`      | string | status is `skipped`                 | Why the step was skipped.                                     |
-| `error`       | string | status is `failed`                  | Error message or description of the failure.                  |
+| Field            | Type   | Present when                                | Description                                                   |
+|------------------|--------|---------------------------------------------|---------------------------------------------------------------|
+| `name`           | string | always                                      | Step identifier (see step names below).                       |
+| `status`         | string | always                                      | Current execution status (see status values below).           |
+| `startedAt`      | string | status is `in_progress`                     | ISO 8601 UTC timestamp when the step began.                   |
+| `completedAt`    | string | status is `completed` or `skipped`          | ISO 8601 UTC timestamp when the step finished.                |
+| `result`         | string | status is `completed`                       | Human-readable summary of what the step produced.             |
+| `condition`      | string | step is conditional                         | Natural-language condition that gates this step's execution.  |
+| `reason`         | string | status is `skipped`                         | Why the step was skipped.                                     |
+| `error`          | string | status is `failed`                          | Error message or description of the failure.                  |
+| `reviewVerdict`  | string | optional — set by the `review` step         | Review outcome label (e.g. `"APPROVED"`, `"APPROVED_WITH_NOTES"`, `"CHANGES_REQUESTED"`). Used by post-compact reminders. |
+| `prUrl`          | string | optional — set by the `pr` step             | Absolute URL of the created or updated pull request.          |
+| `commitSha`      | string | optional — set by the `commit` / `commit-fixes` step | Short SHA (e.g. `"a1b2c3d"`) of the commit produced by the step. |
+| `versionTag`     | string | optional — set by the `version` step        | Git tag produced by the version step (e.g. `"v1.2.3"`).      |
 
 ### Step Names
 

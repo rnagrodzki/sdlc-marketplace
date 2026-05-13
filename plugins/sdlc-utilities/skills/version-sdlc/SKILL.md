@@ -96,13 +96,14 @@ Read `VERSION_CONTEXT_JSON`. Key fields to extract:
 | `versionSource.currentVersion` | Current version string |
 | `config.mode` | `"file"` or `"tag"` |
 | `config.changelog` | Whether changelog is enabled by default |
-| `requestedBump` | `"major"`, `"minor"`, `"patch"`, or `null`. May be auto-set to `"patch"` by the script when `flags.bumpFromLabel === true` (positional `<label>` sugar) or when `flags.preLabelFromConfig === true` (config-driven default) |
-| `conventionalSummary.suggestedBump` | Auto-detected bump type from commits |
+| `requestedBump` | `"major"`, `"minor"`, `"patch"`, or `null`. May be auto-set to `"patch"` by the script when `flags.bumpFromLabel === true` (positional `<label>` sugar) or when `flags.preLabelFromConfig === true` (config-driven default). Authoritative bump source when `flags.bumpFromFlag === true` (R-bump-flag). |
+| `conventionalSummary.suggestedBump` | Auto-detected bump type from commits — **informational only**, never a bump source (R-bump-promote). |
 | `conventionalSummary.hasBreakingChanges` | Whether any commit is a breaking change |
+| `bumpPromotionDetected` | Boolean — `true` when `conventionalSummary.suggestedBump` outranks `requestedBump` (commits hint at a larger bump than was requested). Drives the Step 2 diagnostic line; does NOT change the resolved bump. (R-bump-promote) |
 | `bumpOptions` | `{ major, minor, patch, preRelease }` — pre-computed next versions. `preRelease` is populated whenever any pre-release source is active (`--pre`, label-form `<bump>`, or `config.preRelease`). |
 | `tags.latest` | Most recent tag |
 | `commits` | Array of commits since last tag |
-| `flags` | `{ preLabel, noPush, changelog, hotfix, auto, bumpFromLabel, preLabelExplicit, preLabelFromConfig }` — parsed CLI flags plus pre-release provenance fields. The provenance flags are mutually exclusive: at most one of `bumpFromLabel`, `preLabelExplicit`, `preLabelFromConfig` is `true`. |
+| `flags` | `{ preLabel, noPush, changelog, hotfix, auto, bumpFromFlag, bumpFromLabel, preLabelExplicit, preLabelFromConfig }` — parsed CLI flags plus bump and pre-release provenance fields. `bumpFromFlag` is `true` when the bump came from the named `--bump <value>` flag (R-bump-flag). The pre-release provenance flags are mutually exclusive: at most one of `bumpFromLabel`, `preLabelExplicit`, `preLabelFromConfig` is `true`. |
 | `flags.hotfix` | Whether this release is a hotfix (for DORA metrics tracking) |
 | `flags.auto` | Whether `--auto` was passed — skip interactive approval prompts |
 | `config.ticketPrefix` | Optional Jira/project key prefix (e.g. `"PROJ"`). When set, ticket IDs matching this prefix are extracted from commits. |
@@ -111,31 +112,41 @@ Read `VERSION_CONTEXT_JSON`. Key fields to extract:
 
 ### Step 2 (PLAN): Determine Bump Type and Draft CHANGELOG
 
+**Implements R-bump-flag, R-bump-promote (docs/specs/version-sdlc.md).**
+
 **Determine new version:**
 
-The script (`skill/version.js`) does all label validation and precedence resolution before this step runs. Read the resolved values from `VERSION_CONTEXT_JSON` and select the version verbatim — do not re-derive bump type or label from the original CLI string.
+The script (`skill/version.js`) does all label validation and bump-source resolution before this step runs. Read the resolved values from `VERSION_CONTEXT_JSON` and select the version verbatim — do not re-derive bump type from the original CLI string and do not consult `config.bump` after Step 1.
 
-Pre-release intent can come from four sources, with this precedence (top wins):
+**Bump precedence (single source of truth — highest to lowest):**
 
-1. Explicit base bump (`major|minor|patch`) plus optional `--pre <label>`
-2. Explicit label-form positional (e.g. `version-sdlc rc`, equivalent to `--bump patch --pre rc`) OR explicit `--pre <label>`
-3. `config.preRelease` from `.sdlc/config.json` (active when no explicit bump and no `--pre`)
-4. Auto-detection from conventional commits (no pre-release applied)
+| # | Condition (from prepare output) | Bump source |
+| - | ------------------------------- | ----------- |
+| 1 | `flags.bumpFromFlag === true` | `requestedBump` (from `--bump` named flag — authoritative) |
+| 2 | `requestedBump` set AND `flags.bumpFromFlag === false` | `requestedBump` (positional bump — `major`/`minor`/`patch` or label-form) |
+| 3 | `config.preRelease` active AND no bump | `requestedBump` auto-injected as `"patch"` (script-set; signalled by `flags.preLabelFromConfig === true`) |
+| 4 | otherwise | `requestedBump = "patch"` default |
 
-The script signals which source fired via `flags.bumpFromLabel`, `flags.preLabelExplicit`, and `flags.preLabelFromConfig`. Use those provenance flags when explaining the choice to the user — do not infer it from raw CLI args.
+`conventionalSummary.suggestedBump` is **informational only** — it never participates in this precedence. It exists solely to drive the `bumpPromotionDetected` diagnostic below; never treat it as a bump source.
 
-Decision table:
+**Bump-promotion diagnostic (R-bump-promote):**
+When `bumpPromotionDetected === true` in the prepare output, print this line verbatim before proceeding:
+```
+Commits suggest <suggestedBump> bump but <requestedBump> requested — staying with <requestedBump>. Override with `--bump <suggestedBump>` if intentional.
+```
+Substitute `<suggestedBump>` with `conventionalSummary.suggestedBump` and `<requestedBump>` with the resolved bump from the precedence above. This is informational only — do not change the bump and do not pause for approval here.
 
-| `flags.preLabel` | `requestedBump` | Source signal | Use |
-| ---- | ---- | ---- | ---- |
-| set | set (`major`/`minor`/`patch`) | explicit `--pre` plus base bump | `bumpOptions.preRelease` (label on top of bumped base, e.g. `--minor --pre beta` on `1.2.3` → `1.3.0-beta.1`) |
-| set | `"patch"` with `bumpFromLabel: true` | positional label-form (`version-sdlc rc`) | `bumpOptions.preRelease` (script applies same-base same-label increment, label-reset, or fresh patch+label depending on current version state) |
-| set | `"patch"` with `preLabelFromConfig: true` | `config.preRelease` default | `bumpOptions.preRelease` (same semantics as label-form above) |
-| set | `null` | `--pre <label>` alone | `bumpOptions.preRelease` (script computes counter increment / label reset on current version, no base bump) |
-| unset | set (`major`/`minor`/`patch`) | explicit base bump | `bumpOptions[requestedBump]` |
-| unset | `null` | no explicit intent and no `config.preRelease` | `bumpOptions[conventionalSummary.suggestedBump]` (auto-detect) — inform the user of the auto-selection rationale |
+**Pre-release label resolution (orthogonal to bump):**
 
-**Implements R3 (breaking-change gate, reworded):** if `conventionalSummary.hasBreakingChanges` is `true` AND the chosen bump is not `major`, suggest `major` UNLESS the resolved bump is a pre-release from any source. Detect "is a pre-release" by checking that `flags.preLabel` is non-null (covers all three pre-release sources: explicit `--pre`, label-form positional, and `config.preRelease`). Pre-release trains skip this warning to avoid nagging on every RC iteration.
+Pre-release intent comes from three mutually-exclusive sources, signalled by the provenance flags `flags.bumpFromLabel`, `flags.preLabelExplicit`, and `flags.preLabelFromConfig` (at most one is `true`):
+
+1. Explicit `--pre <label>` (`flags.preLabelExplicit === true`) — combines with whichever bump was resolved above
+2. Positional label-form (e.g. `version-sdlc rc`, `flags.bumpFromLabel === true`) — script auto-set `requestedBump = "patch"`
+3. `config.preRelease` default (`flags.preLabelFromConfig === true`) — script auto-set `requestedBump = "patch"`
+
+When `flags.preLabel` is set, use `bumpOptions.preRelease`. Otherwise use `bumpOptions[requestedBump]`. The script has already computed both pre-release semantics (counter increment, label reset, label switch) and the next-version values.
+
+**Implements R3 (breaking-change gate):** if `conventionalSummary.hasBreakingChanges` is `true` AND the resolved bump is not `major`, suggest `major` UNLESS the resolved bump is a pre-release from any source. Detect "is a pre-release" by checking that `flags.preLabel` is non-null. Pre-release trains skip this warning to avoid nagging on every RC iteration.
 
 **Draft CHANGELOG entry** (only if `flags.changelog === true`) — `flags.changelog` is the resolved value (`config.changelog` OR `--changelog`) emitted by `skill/version.js`:
 

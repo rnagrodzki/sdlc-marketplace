@@ -117,17 +117,25 @@ try {
 try {
   let recoveryDir;
   let branchSlug = null;
+  let maxAgeMs;
   try {
-    const { resolveStateDir, slugifyBranch } = require('../scripts/lib/state');
+    const stateLib = require('../scripts/lib/state');
     const { exec } = require('../scripts/lib/git');
-    recoveryDir = resolveStateDir();
+    recoveryDir = stateLib.resolveStateDir();
     const branch = exec('git branch --show-current');
-    if (branch) branchSlug = slugifyBranch(branch);
+    if (branch) branchSlug = stateLib.slugifyBranch(branch);
+    maxAgeMs = stateLib.COMPACT_RECOVERY_TTL_MS;
   } catch {
-    recoveryDir = path.join(process.cwd(), '.sdlc', 'execution');
+    // R-projectroot: main-worktree-rooted resolution (#360).
+    const { resolveSdlcRoot } = require('../scripts/lib/config');
+    recoveryDir = path.join(resolveSdlcRoot(), '.sdlc', 'execution');
+    // Fallback when state lib is unreachable — match the canonical TTL.
+    maxAgeMs = 60 * 60 * 1000;
   }
-
-  const maxAgeMs = 60 * 60 * 1000; // 1 hour freshness gate (issue #256)
+  // Defensive: if the lib returned something unexpected, fall back to 1h.
+  if (typeof maxAgeMs !== 'number' || !Number.isFinite(maxAgeMs) || maxAgeMs <= 0) {
+    maxAgeMs = 60 * 60 * 1000;
+  }
 
   // Per-branch recovery file (issue #256). Read only the file matching the
   // current branch — never scan-and-filter across branches. branchSlug is null
@@ -219,7 +227,9 @@ try {
 // ---------------------------------------------------------------------------
 
 try {
-  const projectRoot = process.cwd();
+  // R-projectroot: main-worktree-rooted resolution (#360).
+  const { resolveSdlcRoot } = require('../scripts/lib/config');
+  const projectRoot = resolveSdlcRoot();
   const { detectActiveChanges, STAGE_LABELS } = require('../scripts/lib/openspec');
   const openspec = detectActiveChanges(projectRoot);
 
@@ -284,6 +294,7 @@ try {
 
 try {
   const { checkGitState, detectBaseBranch, exec } = require('../scripts/lib/git');
+  // KEEP: pure git op — do not change to resolveSdlcRoot()
   const projectRoot = process.cwd();
   const gitState = checkGitState(projectRoot);
   const { currentBranch, dirtyFiles } = gitState;
@@ -390,8 +401,9 @@ try {
 // ---------------------------------------------------------------------------
 
 try {
-  const { readSection, normalizePreset } = require(path.join(__dirname, '..', 'scripts', 'lib', 'config.js'));
-  const projectRoot = process.cwd();
+  const { readSection, normalizePreset, resolveSdlcRoot } = require(path.join(__dirname, '..', 'scripts', 'lib', 'config.js'));
+  // R-projectroot: main-worktree-rooted resolution (#360).
+  const projectRoot = resolveSdlcRoot();
   const shipConfig = readSection(projectRoot, 'ship');
   if (shipConfig) {
     // Note: steps[] is the v2 canonical field. preset/skip are legacy v1

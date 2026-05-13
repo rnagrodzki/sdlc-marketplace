@@ -27,7 +27,7 @@ const {
   verifyAndMigrate,
   ConfigVersionError,
 } = require(path.resolve(__dirname, '..', 'lib', 'config-version.js'));
-const { ensureSdlcInfrastructure } = require(path.resolve(__dirname, '..', 'lib', 'config.js'));
+const { ensureSdlcInfrastructure, resolveSdlcRoot } = require(path.resolve(__dirname, '..', 'lib', 'config.js'));
 const { writeJsonLine } = require(path.resolve(__dirname, '..', 'lib', 'output.js'));
 
 function parseArgs(argv) {
@@ -48,7 +48,9 @@ function parseArgs(argv) {
 
 function main() {
   const flags = parseArgs(process.argv);
-  const projectRoot = process.cwd();
+  // R-projectroot: main-worktree-rooted resolution (#360). High-severity site —
+  // passes directly to ensureSdlcInfrastructure(projectRoot).
+  const projectRoot = resolveSdlcRoot();
 
   const manifest = {
     project: null,

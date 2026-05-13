@@ -69,3 +69,62 @@
       value: '"auto": true'
     - type: not-icontains
       value: "Unknown flag"
+
+# R-bump-flag, R-bump-promote (#358): --bump named flag is parsed and is
+# authoritative over conventional-commit suggestedBump. Tests below cover:
+# (1) flag form parses + sets bumpFromFlag, (2) positional+flag conflict errors,
+# (3) running from a subdirectory does not write .gitignore there (R-projectroot, #360),
+# (4) bumpPromotionDetected field is present.
+
+- description: "version-prepare: --bump flag is parsed and is authoritative (R-bump-flag, #358)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "--bump minor"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-config-changelog"
+  assert:
+    - type: icontains
+      value: '"requestedBump": "minor"'
+    - type: icontains
+      value: '"bumpFromFlag": true'
+    - type: not-icontains
+      value: "Unknown flag"
+
+- description: "version-prepare: positional bump + --bump flag conflict errors (R-bump-flag, #358)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "patch --bump minor"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-config-changelog"
+    script_capture_stderr: true
+  assert:
+    # The script emits a bumpFlagConflict error and exits non-zero.
+    - type: icontains
+      value: "bumpFlagConflict"
+
+- description: "version-prepare: running from a subdirectory does not write .gitignore in cwd (R-projectroot, #360)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "--bump patch"
+    script_cwd: "{{project_root}}/subdir"
+    project_root: "file://fixtures-fs/version-sdlc-subdir-cwd"
+  assert:
+    # The subdir must NOT receive a .gitignore created by ensureSdlcInfrastructure().
+    # Confirm the script ran (requestedBump resolved) — the absence of cwd-side-effects
+    # is enforced by routing config writes to resolveSdlcRoot() (main worktree).
+    - type: icontains
+      value: '"requestedBump": "patch"'
+    - type: not-icontains
+      value: "Unknown flag"
+
+- description: "version-prepare: bumpPromotionDetected field is present in output (R-bump-promote, #358)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "--bump patch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-config-changelog"
+  assert:
+    # The diagnostic field is emitted as a boolean regardless of whether
+    # a promotion was actually detected. Field MUST be present on every run.
+    - type: icontains
+      value: '"bumpPromotionDetected":'

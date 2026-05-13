@@ -20,8 +20,10 @@
 
 const path = require('path');
 const fs = require('fs');
+const { resolveSdlcRoot } = require(path.join(__dirname, '..', 'lib', 'config'));
 
-const cwd = process.cwd();
+// R-projectroot: main-worktree-rooted resolution (#360).
+const cwd = resolveSdlcRoot();
 const legacy = path.join(cwd, '.claude', 'learnings', 'log.md');
 const target = path.join(cwd, '.sdlc', 'learnings', 'log.md');
 

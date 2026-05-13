@@ -137,6 +137,7 @@ function isSubset(payloadSet, templateSet) {
 function projectRoot() {
   // Hooks run with cwd at the user's repo root in normal use. Allow override
   // via env for tests.
+  // KEEP: hook entry point — do not change to resolveSdlcRoot()
   return process.env.JIRA_GUARD_PROJECT_ROOT || process.cwd();
 }
 

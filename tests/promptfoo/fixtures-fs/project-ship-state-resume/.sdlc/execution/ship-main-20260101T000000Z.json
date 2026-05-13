@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "startedAt": "2026-01-01T00:00:00.000Z",
+  "branch": "main",
+  "flags": {
+    "auto": false,
+    "draft": false,
+    "bump": "patch"
+  },
+  "steps": [
+    { "name": "execute", "status": "completed", "completedAt": "2026-01-01T00:01:00.000Z" },
+    { "name": "commit", "status": "completed", "completedAt": "2026-01-01T00:02:00.000Z" },
+    { "name": "review", "status": "in_progress" },
+    { "name": "received-review", "status": "pending" },
+    { "name": "commit-fixes", "status": "pending" },
+    { "name": "version", "status": "skipped", "reason": "in skip set" },
+    { "name": "pr", "status": "pending" }
+  ],
+  "decisions": [],
+  "deferredFindings": []
+}
