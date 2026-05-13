@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.20.4] - 2026-05-14
+
+### Fixed
+- execute-plan-sdlc: agent-isolation-guard promoted to plugin-level PreToolUse hook, blocking `isolation: worktree` on Agent dispatch at harness level; configurable per-developer opt-out via `hooks.agentIsolationGuard.enabled` in `.sdlc/local.json` (#370 #371 #372)
+- execute-plan-sdlc / ship-sdlc: stale cross-reference in SKILL.md corrected (R-no-agent-sdk-isolation); spec-traceability comment added in ship-sdlc to clarify intentional workspace mode omission from ship.js invocation example (#370 #371 #372)
+
 ## [0.20.3] - 2026-05-13
 
 ### Fixed
