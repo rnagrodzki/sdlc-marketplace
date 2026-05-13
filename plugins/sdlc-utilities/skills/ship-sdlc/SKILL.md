@@ -91,6 +91,7 @@ SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/shi
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
+<!-- Implements A8d. Fixes #371. Workspace mode is intentionally omitted from this example so it falls back to `ship.workspace` config via `mergeFlags`; literal `--workspace <value>` here would override user config. -->
 PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --bump patch)
 # Workspace mode comes from `.sdlc/local.json` (`ship.workspace`) via config fallback.
 # Only pass `--workspace`, `--branch`, or `--tree` to override for a single run.

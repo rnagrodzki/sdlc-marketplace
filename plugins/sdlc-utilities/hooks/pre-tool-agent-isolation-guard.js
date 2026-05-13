@@ -98,13 +98,9 @@ async function main() {
   }
 
   // Config opt-out: read .sdlc/local.json hooks.agentIsolationGuard.enabled.
-  // Default = true (block). Falls back to {} (enabled) on any error — fails closed.
-  let localCfg;
-  try {
-    localCfg = readLocalGuardConfig();
-  } catch (_) {
-    localCfg = {};
-  }
+  // Default = true (block). readLocalGuardConfig() catches all errors internally
+  // and returns {} — no outer try/catch needed (fails closed by construction).
+  const localCfg = readLocalGuardConfig();
   const enabled = localCfg?.hooks?.agentIsolationGuard?.enabled ?? true;
   if (!enabled) {
     return emitContinue();

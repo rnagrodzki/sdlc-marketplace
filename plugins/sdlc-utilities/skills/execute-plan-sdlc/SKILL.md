@@ -321,7 +321,7 @@ Dispatch with:
 - `model: <highest model among wave tasks>` — haiku if all tasks are Trivial; sonnet if any Standard; opus if any Complex.
 - `mode: bypassPermissions`
 - **`model:` is REQUIRED — no exceptions.** Omitting it causes the wave-runner to inherit the parent model (opus), defeating the quality-tier system.
-- **DO NOT pass `isolation: "worktree"` (or any other `isolation` value) to the Agent tool.** The SDLC `--workspace worktree` flag controls a separate concept (a sibling git worktree created via `util/worktree-create.js`). Adding `isolation` here creates ephemeral `.claude/worktrees/agent-<id>` paths that are not the intended SDLC worktree. Implements R-no-agent-sdk-isolation from spec. See issues #370 #372. (Mirrors ship-sdlc/SKILL.md anti-pattern section.)
+- **DO NOT pass `isolation: "worktree"` (or any other `isolation` value) to the Agent tool.** The SDLC `--workspace worktree` flag controls a separate concept (a sibling git worktree created via `util/worktree-create.js`). Adding `isolation` here creates ephemeral `.claude/worktrees/agent-<id>` paths that are not the intended SDLC worktree. Implements R-no-agent-sdk-isolation from spec. See issues #370 #372. (Mirrors the R-agent-isolation-script-driven constraint in ship-sdlc/SKILL.md.)
 
 The wave-runner Agent handles in-wave per-task fan-out internally — it dispatches one per-task Agent per Standard/Complex task and one batch-haiku Agent for any 2+ Trivials, all within its own context. A single Trivial in a wave is dispatched by the wave-runner as an inline single-agent, not a batch. Per-task retries (haiku→sonnet→opus, budget 2) are the wave-runner's responsibility.
 
