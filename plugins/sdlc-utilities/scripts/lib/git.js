@@ -531,6 +531,20 @@ function formatAccessDenied({ activeAccount, owner, repo, suggestedAccounts }) {
 function probeRepoAccess({ owner, repo, host, execFn } = {}) {
   const hostname = host || 'github.com';
 
+  // Input validation at the boundary (defense against shell injection / SSRF
+  // when `owner`/`repo`/`hostname` come from an attacker-controlled git remote URL).
+  // GitHub owner/repo names are constrained to [A-Za-z0-9._-]; hostnames to [A-Za-z0-9.-].
+  // A null guard on owner/repo also prevents `repos/undefined/undefined` API calls
+  // when callers forget required params.
+  const OWNER_REPO_RE = /^[A-Za-z0-9._-]+$/;
+  const HOST_RE = /^[A-Za-z0-9.-]+$/;
+  if (!owner || !repo || !OWNER_REPO_RE.test(String(owner)) || !OWNER_REPO_RE.test(String(repo))) {
+    return { accessible: null, statusCode: null, errorMessage: 'invalid owner/repo', suggestedAccounts: [] };
+  }
+  if (!HOST_RE.test(String(hostname))) {
+    return { accessible: null, statusCode: null, errorMessage: 'invalid hostname', suggestedAccounts: [] };
+  }
+
   // Test-injection hook — bypasses the real gh api call for hermetic testing.
   const stub = process.env.SDLC_PROBE_REPO_ACCESS;
   const { accounts: suggestedAccounts } = stub !== 'error' ? getGhAccounts(hostname) : { accounts: [] };

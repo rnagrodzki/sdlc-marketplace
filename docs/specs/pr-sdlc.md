@@ -42,7 +42,7 @@
   - Acceptance: with `origin` unreachable or absent, `skill/pr.js` still exits successfully and produces a complete prepare output.
 - R-gh-auth-preflight (issue #234, fixes #380): The prepare script `skill/pr.js` MUST run a gh-auth preflight before any GitHub API call:
   1. Verify `gh auth status --hostname github.com` succeeds. On no-auth or expired-token, halt with the no-auth or expired-token message verbatim.
-  2. Resolve `expectedAccount` via the cascade: `prConfig.expectedAccount` → (when unset) skip identity match and instead probe repo access via `lib/git.js::probeRepoAccess` against `parseRemoteOwner(cwd)`. Probe halts on definitive access denial (404/403) with a `formatAccessDenied` message that names the active account and lists local `gh` accounts with confirmed access (from `getGhAccounts`). Probe network-failure (null result) warns and proceeds. When `remoteForAuth` is null (no origin), skip the probe entirely.
+  2. Resolve `expectedAccount` via the cascade: `prConfig.expectedAccount` → (when unset) skip identity match and instead probe repo access via `lib/git.js::probeRepoAccess` against `parseRemoteOwner(cwd)`. Probe halts on definitive access denial (404/403) with a `formatAccessDenied` message that names the active account and lists local `gh` accounts authenticated for the host (from `getGhAccounts`; the list is name-only — no per-account access probe is performed). Probe network-failure (null result) warns and proceeds. When `remoteForAuth` is null (no origin), skip the probe entirely.
   3. When `expectedAccount` is set (identity-mode): compare it against the active account from `gh api user --jq .login`.
   4. On identity mismatch, halt with the EXACT 3-line message:
      ```
