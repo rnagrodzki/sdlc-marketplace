@@ -40,7 +40,7 @@ const fs   = require('fs');
 const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { exec, checkGitState, detectBaseBranch, parseRemoteOwner, probeGhAuth, formatAccountMismatch } = require(path.join(LIB, 'git'));
+const { exec, checkGitState, detectBaseBranch, parseRemoteOwner, probeGhAuth, formatAccountMismatch, probeRepoAccess, formatAccessDenied } = require(path.join(LIB, 'git'));
 const { resolveMainWorktree, detectResumeState: detectResumeStateLib } = require(path.join(LIB, 'state'));
 const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
@@ -748,9 +748,14 @@ function runValidation(flags, flagSources, steps, context) {
     );
   }
 
-  // Active-account preflight — halt on mismatch with the canonical 3-line message.
+  // Active-account preflight — halt on identity mismatch with the canonical 3-line message.
   if (context.accountMismatch && context.accountMismatchMessage) {
     errors.push(context.accountMismatchMessage);
+  }
+
+  // Access-mode preflight — halt when the active account is definitively denied (404/403).
+  if (context.accessDeniedMessage) {
+    errors.push(context.accessDeniedMessage);
   }
 
   // Current branch should not equal base branch
@@ -964,21 +969,29 @@ function main() {
     return;
   }
 
-  // Check gh auth + active-account preflight (issue #234, shared with pr.js).
-  // Source of truth: lib/git.js::probeGhAuth + formatAccountMismatch.
+  // Check gh auth + active-account preflight (issue #234, fixes #380, shared with pr.js).
+  // Two-mode cascade:
+  //   Identity mode  (prConfig.expectedAccount set): strict login comparison.
+  //   Access mode    (prConfig.expectedAccount unset): probe repo accessibility via gh api.
+  // Halt on no-auth, expired-token, identity mismatch, or definitive probe denial (404/403).
+  // Network failure in probe warns and proceeds (non-blocking).
   const ghAuthState = probeGhAuth();
   const ghAuthenticated = ghAuthState.authenticated;
   const ghUser = ghAuthState.activeAccount;
   const ghAuthExpired = ghAuthState.expired;
   const ghAuthErrorMessage = ghAuthState.errorMessage;
 
-  // Resolve expectedAccount: prConfig.expectedAccount → origin owner.
+  // Resolve expectedAccount: prConfig.expectedAccount only (no origin-owner fallback).
   const prConfigForAuth = readSection(projectRoot, 'pr') || {};
   const remoteForAuth = parseRemoteOwner(projectRoot);
   const expectedAccount =
     (typeof prConfigForAuth.expectedAccount === 'string' && prConfigForAuth.expectedAccount.trim()) ||
-    (remoteForAuth && remoteForAuth.owner) ||
     null;
+
+  // Default values for the new probe-output fields — overwritten below when the probe runs.
+  let repoAccessProbed = false;
+  let repoAccessible = null;
+  let repoAccessStatus = null;
 
   // Mismatch detection — only when authenticated + we resolved an expected account.
   const accountMismatch = Boolean(
@@ -987,6 +1000,32 @@ function main() {
   const accountMismatchMessage = accountMismatch
     ? formatAccountMismatch(expectedAccount, ghUser)
     : null;
+
+  // Access-mode: no explicit expectedAccount — probe repo accessibility instead.
+  let accessDeniedMessage = null;
+  if (ghAuthenticated && !expectedAccount && remoteForAuth) {
+    const probeResult = probeRepoAccess({
+      owner: remoteForAuth.owner,
+      repo: remoteForAuth.repo,
+      host: remoteForAuth.host,
+    });
+    repoAccessProbed = true;
+    repoAccessible = probeResult.accessible;
+    repoAccessStatus = probeResult.statusCode;
+
+    if (probeResult.accessible === false) {
+      accessDeniedMessage = formatAccessDenied({
+        activeAccount: ghUser,
+        owner: remoteForAuth.owner,
+        repo: remoteForAuth.repo,
+        suggestedAccounts: probeResult.suggestedAccounts,
+      });
+    } else if (probeResult.accessible === null) {
+      warnings.push(
+        `Repo access probe failed (${probeResult.errorMessage || 'network error'}) — proceeding without access verification.`
+      );
+    }
+  }
 
   // Check OpenSpec (use shared lib for consistent detection)
   const openspecResult = detectActiveChanges(projectRoot);
@@ -1025,6 +1064,10 @@ function main() {
     expectedAccount,
     accountMismatch,
     accountMismatchMessage,
+    repoAccessProbed,
+    repoAccessible,
+    repoAccessStatus,
+    accessDeniedMessage,
     openspecDetected,
     openspecAuthoritative,
     openspecBranchMatch,

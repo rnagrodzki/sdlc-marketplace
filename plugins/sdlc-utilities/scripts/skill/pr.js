@@ -45,6 +45,8 @@ const {
   parseRemoteOwner,
   probeGhAuth,
   formatAccountMismatch,
+  probeRepoAccess,
+  formatAccessDenied,
 } = require(path.join(LIB, 'git'));
 
 const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
@@ -173,10 +175,12 @@ function main() {
     return;
   }
 
-  // Issue #234: gh-auth + active-account preflight (shared with ship.js).
-  // Resolve expectedAccount via cascade: prConfig.expectedAccount → origin owner.
-  // Halt on no-auth, expired-token, and mismatch — never on unresolvable expected
-  // account (best-effort cascade).
+  // Issue #234, fixes #380: gh-auth + active-account preflight (shared with ship.js).
+  // Two-mode cascade:
+  //   Identity mode  (prConfig.expectedAccount set): strict login comparison.
+  //   Access mode    (prConfig.expectedAccount unset): probe repo accessibility via gh api.
+  // Halt on no-auth, expired-token, identity mismatch, or definitive probe denial (404/403).
+  // Network failure in probe warns and proceeds (non-blocking).
   const ghAuthState = probeGhAuth();
   const ghAuthenticated = ghAuthState.authenticated;
   const activeAccount = ghAuthState.activeAccount;
@@ -186,8 +190,12 @@ function main() {
   const remoteForAuth = parseRemoteOwner(projectRoot);
   const expectedAccount =
     (typeof prConfigForAuth.expectedAccount === 'string' && prConfigForAuth.expectedAccount.trim()) ||
-    (remoteForAuth && remoteForAuth.owner) ||
     null;
+
+  // Default values for the new probe-output fields — overwritten below when the probe runs.
+  let repoAccessProbed = false;
+  let repoAccessible = null;
+  let repoAccessStatus = null;
 
   if (!ghAuthenticated) {
     errors.push(ghAuthState.errorMessage);
@@ -200,6 +208,9 @@ function main() {
         expectedAccount,
         accountMismatch: false,
         tokenExpired,
+        repoAccessProbed,
+        repoAccessible,
+        repoAccessStatus,
       },
       'pr-context',
       1
@@ -222,6 +233,9 @@ function main() {
         expectedAccount,
         accountMismatch: true,
         tokenExpired: false,
+        repoAccessProbed,
+        repoAccessible,
+        repoAccessStatus,
       },
       'pr-context',
       1
@@ -229,9 +243,53 @@ function main() {
     return;
   }
 
-  if (!expectedAccount) {
+  // Access-mode: no explicit expectedAccount — probe repo accessibility instead.
+  if (!expectedAccount && remoteForAuth) {
+    const probeResult = probeRepoAccess({
+      owner: remoteForAuth.owner,
+      repo: remoteForAuth.repo,
+      host: remoteForAuth.host,
+    });
+    repoAccessProbed = true;
+    repoAccessible = probeResult.accessible;
+    repoAccessStatus = probeResult.statusCode;
+
+    if (probeResult.accessible === false) {
+      errors.push(
+        formatAccessDenied({
+          activeAccount,
+          owner: remoteForAuth.owner,
+          repo: remoteForAuth.repo,
+          suggestedAccounts: probeResult.suggestedAccounts,
+        })
+      );
+      writeOutput(
+        {
+          errors,
+          warnings,
+          ghAuthenticated,
+          activeAccount,
+          expectedAccount,
+          accountMismatch: false,
+          tokenExpired: false,
+          repoAccessProbed,
+          repoAccessible,
+          repoAccessStatus,
+        },
+        'pr-context',
+        1
+      );
+      return;
+    }
+
+    if (probeResult.accessible === null) {
+      warnings.push(
+        `Repo access probe failed (${probeResult.errorMessage || 'network error'}) — proceeding without access verification.`
+      );
+    }
+  } else if (!expectedAccount && !remoteForAuth) {
     warnings.push(
-      'Could not resolve expected gh account (no pr.expectedAccount, no email mapping, no origin remote). Skipping active-account check.'
+      'Could not resolve expected gh account (no pr.expectedAccount, no origin remote). Skipping active-account check.'
     );
   }
 
@@ -461,13 +519,16 @@ function main() {
     currentBranch,
     isDraft,
     isAuto,
-    // Issue #234: gh-auth + active-account preflight result. SKILL.md gates on
-    // these field names (per `flag-coherence-cross-skill`).
+    // Issue #234, fixes #380: gh-auth + active-account preflight result. SKILL.md gates
+    // on these field names (per `flag-coherence-cross-skill`).
     ghAuthenticated,
     activeAccount,
     expectedAccount,
     accountMismatch: false,
     tokenExpired: false,
+    repoAccessProbed,
+    repoAccessible,
+    repoAccessStatus,
     ghAuth: ghAuth.switched
       ? { switched: true, account: ghAuth.account, previousAccount: ghAuth.previousAccount }
       : null,

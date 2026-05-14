@@ -263,3 +263,69 @@
       value: 'is not a valid branch name'
     - type: icontains
       value: 'config.pr.defaultBranch'
+
+# ---------------------------------------------------------------------------
+# Issue #380: active-account access probe (replaces origin-owner string match)
+# All four cases use SDLC_PROBE_REPO_ACCESS to stub the gh api call — no real
+# network call reaches GitHub in any test.
+# ---------------------------------------------------------------------------
+
+- description: "pr-prepare: active-account-access — accessible probe passes (env=accessible)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-origin-stubbed"
+    script_env: '{"SDLC_PROBE_REPO_ACCESS":"accessible"}'
+  assert:
+    - type: icontains
+      value: '"repoAccessProbed": true'
+    - type: icontains
+      value: '"repoAccessible": true'
+    - type: not-icontains
+      value: 'Cannot access'
+
+- description: "pr-prepare: active-account-access — not-found halts (env=not-found)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-origin-stubbed"
+    script_env: '{"SDLC_PROBE_REPO_ACCESS":"not-found"}'
+  assert:
+    - type: icontains
+      value: '"repoAccessible": false'
+    - type: icontains
+      value: '"repoAccessStatus": 404'
+    - type: icontains
+      value: 'Cannot access'
+
+- description: "pr-prepare: active-account-access — forbidden halts (env=forbidden)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-origin-stubbed"
+    script_env: '{"SDLC_PROBE_REPO_ACCESS":"forbidden"}'
+  assert:
+    - type: icontains
+      value: '"repoAccessible": false'
+    - type: icontains
+      value: '"repoAccessStatus": 403'
+    - type: icontains
+      value: 'Cannot access'
+
+- description: "pr-prepare: active-account-access — explicit expectedAccount skips probe entirely"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-expected-account-explicit"
+  assert:
+    - type: icontains
+      value: '"repoAccessProbed": false'
+
+- description: "pr-prepare: active-account-access — no origin remote skips probe (env unset)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-no-config"
+  assert:
+    - type: icontains
+      value: '"repoAccessProbed": false'
