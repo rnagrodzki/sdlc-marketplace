@@ -100,13 +100,13 @@ suppressed entirely — the skill proceeds with only the user-side proposals.
 
 ## Guardrails are not set-and-forget
 
-Every red pipeline is a signal. The question is which kind: user-code (the implementation or plan violated a project rule) or process (the rule doesn't exist yet, or is too loose to catch this class of failure). `/harden-sdlc` is the routing tool that classifies which — and proposes the surface edit that would have caught it earlier.
+Every red pipeline is a signal. The question is which kind: `user-code` (the implementation or plan violated a project rule), `plugin-defect` (the failure originates inside plugin code), or `ambiguous` (evidence doesn't cleanly separate the two). `/harden-sdlc` is the routing tool that classifies which — and proposes the surface edit that would have caught it earlier.
 
 The set-and-forget anti-pattern looks like this: guardrails and dimensions are authored once during `/setup-sdlc`, the team ships for a few months, and 20 failures later the same class of problem keeps slipping through because the rules were written for a simpler codebase than the one that exists now. If you recognize this — the pattern has a name, and `/harden-sdlc` is how you break it.
 
 The recommended cadence is to run `/harden-sdlc` after every red pipeline that produced new information, not only after catastrophic failures. Small failures teach small lessons. Skipping them means the next pipeline inherits all the same gaps, and the lesson compounds.
 
-Guardrails, review dimensions, and copilot instructions co-evolve with the project. The configuration produced by `/setup-sdlc` is a starting point, not a finished state. As the codebase grows, add dimensions for newly introduced tech (e.g., a new `**/*.yaml` dimension when YAML config files become load-bearing), tighten guardrail descriptions when they produce false negatives, and retire rules that no longer apply. See guardrail authoring guidance in [`plan-sdlc.md`](plan-sdlc.md), execution-guardrail patterns in [`execute-plan-sdlc.md`](execute-plan-sdlc.md), and dimension scoping in [`review-sdlc.md`](review-sdlc.md).
+Guardrails, review dimensions, and copilot instructions co-evolve with the project. The configuration produced by `/setup-sdlc` is a starting point, not a finished state. As the codebase grows, add dimensions for newly introduced tech (e.g., a new `**/*.yaml` dimension when YAML config files become load-bearing) and tighten guardrail descriptions when they produce false negatives. See guardrail authoring guidance in [`plan-sdlc.md`](plan-sdlc.md), execution-guardrail patterns in [`execute-plan-sdlc.md`](execute-plan-sdlc.md), and dimension scoping in [`review-sdlc.md`](review-sdlc.md).
 
 Failure → harden classifies → proposes surface edits → user approves → next pipeline catches earlier → repeat until coverage is satisfactory.
 
