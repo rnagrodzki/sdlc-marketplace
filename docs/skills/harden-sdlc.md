@@ -98,6 +98,74 @@ suppressed entirely — the skill proceeds with only the user-side proposals.
 
 ---
 
+## Guardrails are not set-and-forget
+
+Every red pipeline is a signal. The question is which kind: `user-code` (the implementation or plan violated a project rule), `plugin-defect` (the failure originates inside plugin code), or `ambiguous` (evidence doesn't cleanly separate the two). `/harden-sdlc` is the routing tool that classifies which — and proposes the surface edit that would have caught it earlier.
+
+The set-and-forget anti-pattern looks like this: guardrails and dimensions are authored once during `/setup-sdlc`, the team ships for a few months, and 20 failures later the same class of problem keeps slipping through because the rules were written for a simpler codebase than the one that exists now. If you recognize this — the pattern has a name, and `/harden-sdlc` is how you break it.
+
+The recommended cadence is to run `/harden-sdlc` after every red pipeline that produced new information, not only after catastrophic failures. Small failures teach small lessons. Skipping them means the next pipeline inherits all the same gaps, and the lesson compounds.
+
+Guardrails, review dimensions, and copilot instructions co-evolve with the project. The configuration produced by `/setup-sdlc` is a starting point, not a finished state. As the codebase grows, add dimensions for newly introduced tech (e.g., a new `**/*.yaml` dimension when YAML config files become load-bearing) and tighten guardrail descriptions when they produce false negatives. See guardrail authoring guidance in [`plan-sdlc.md`](plan-sdlc.md), execution-guardrail patterns in [`execute-plan-sdlc.md`](execute-plan-sdlc.md), and dimension scoping in [`review-sdlc.md`](review-sdlc.md).
+
+Failure → harden classifies → proposes surface edits → user approves → next pipeline catches earlier → repeat until coverage is satisfactory.
+
+---
+
+## Scenario walkthroughs
+
+### Scenario 1 — Plan drift caught late
+
+**Symptom:** The plan reviewed clean, but execution touched files outside the intended scope — changes landed in packages that weren't mentioned in the plan.
+
+**Classification:** `user-code` — plan guardrails are too loose. No rule prevented out-of-scope file references from appearing in the plan or passing the Step 3 critique gate.
+
+**Proposed change:** A new `plan.guardrails[]` entry restricting file scope to the named package — for example: "Plan tasks must not reference files outside `packages/payments/`."
+
+**Outcome:** Future plans with out-of-scope file references are blocked at plan-sdlc's Step 3 critique gate before any code is written.
+
+---
+
+### Scenario 2 — Review dimension blind spot
+
+**Symptom:** The review passed with no blockers, but a regression appeared in YAML config files — no dimension was scoped to cover them.
+
+**Classification:** `user-code` — no review dimension covers `**/*.yaml`. The gap wasn't visible until a failure exposed it.
+
+**Proposed change:** A new review dimension scoped to `**/*.yaml`, validated via `lib/dimensions.js::validateDimensionFile` before write. The dimension describes what a correct YAML config review looks for: schema validity, no hardcoded secrets, environment parity.
+
+**Outcome:** YAML config files receive dedicated review coverage on every future change. The same blind spot cannot recur silently.
+
+---
+
+### Scenario 3 — Plugin defect (route to error-report-sdlc)
+
+**Symptom:** The skill itself misbehaved — `harden-prepare.js` crashed with exit code 2, or the orchestrator received malformed JSON from a sibling agent. The failure is not traceable to user config or plan content.
+
+**Classification:** `plugin-defect` — the failure originates inside plugin code, not user-controlled surfaces.
+
+**Proposed change:** None. harden-sdlc does not patch plugin code. Instead, it hands off to `/error-report-sdlc` with the full failure payload, sourcing the target repository URL from `MANIFEST.pluginRepoUrl`.
+
+**Outcome:** A GitHub issue is filed against the plugin repository. The user's config surfaces are left unchanged. The boundary between "strengthen config" and "report a bug" is enforced by classification.
+
+---
+
+### Scenario 4 — Ambiguous classification
+
+**Symptom:** The failure could be either user config or plugin behavior — for example, a guardrail triggered on edge-case output the plugin shouldn't have emitted, or a review dimension that produced unexpected results on a code pattern not anticipated during setup.
+
+**Classification:** `ambiguous` — the evidence doesn't cleanly separate user-side from plugin-side causation.
+
+**Proposed change:** harden-sdlc surfaces user-side proposals (tighten the relevant guardrail or dimension) AND an opt-in upstream-report offer (Step 5c), letting the user pick either, both, or neither.
+
+**Outcome:** Normal — not every failure has a clean classification, and dual-routing is intended behavior. The user retains control over which path to take. Approving user-side proposals and filing a plugin issue are not mutually exclusive.
+
+---
+
+> **Boundary.** harden-sdlc strengthens config surfaces only: `.sdlc/config.json` guardrails, `.sdlc/review-dimensions/*.md`, and `.github/instructions/*.instructions.md`. It does not patch plugin code. Plugin defects route to [`/error-report-sdlc`](error-report-sdlc.md).
+
+---
+
 ## Prerequisites
 
 - **`.sdlc/config.json`** — optional. When present, plan and execute guardrails are loaded from `plan.guardrails[]` and `execute.guardrails[]`. When absent, those surface arrays are empty and the orchestrator simply skips them.
