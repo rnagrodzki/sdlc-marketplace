@@ -739,6 +739,163 @@
         dispatchMode === 'agent' as the dispatch channel. It does NOT describe
         invoking execute via the Skill tool for the resume path.
 
+- description: "ship-sdlc (#378): worktree-mode creates worktree+branch in ship main shell before execute dispatch"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The user runs `/ship-sdlc --workspace worktree` from the `main` branch.
+      Describe what happens in ship-sdlc's main context BEFORE execute-plan-sdlc
+      is dispatched: does ship-sdlc itself call `util/worktree-create.js`?
+      Does it `cd` into the worktree? Does it derive a branch name?
+      Or does it delegate workspace creation to execute-plan-sdlc?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state that ship-sdlc's main context runs the pre-execute
+        workspace isolation block itself — NOT execute-plan-sdlc. It calls
+        `util/worktree-create.js --name <derived>` to create the worktree+branch,
+        then `cd "$WORKTREE_PATH"` in the main shell. The response must NOT say
+        ship-sdlc delegates workspace creation to execute-plan-sdlc.
+        Reference R60 or spec I8 (ship owns workspace lifecycle). Fixes #378.
+
+- description: "ship-sdlc (#379): branch-mode creates branch in ship main shell before execute dispatch"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The user runs `/ship-sdlc --workspace branch` from the `main` branch.
+      Describe what happens in ship-sdlc's main context BEFORE execute is dispatched.
+      Does ship-sdlc run `git checkout -b <branch>` itself? Is the branch name
+      derived by ship-sdlc? What flag is then passed to execute-plan-sdlc?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state that ship-sdlc's main context derives the branch
+        name (via lib/branch-name.js), runs `git checkout -b <derived>` in the
+        main shell, and then dispatches execute-plan-sdlc with `--branch <derived>`.
+        There is no `cd` in branch mode. Reference R60 (fixes #379, parity with worktree mode).
+
+- description: "ship-sdlc (#378): --branch flag is passed to execute-plan-sdlc in both workspace modes"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Under both `--workspace branch` and `--workspace worktree`, what flag does
+      ship-sdlc include in the execute-plan-sdlc Agent dispatch invocation?
+      Is `--branch <derivedName>` included? If so, what effect does this have
+      on execute-plan-sdlc's Step 1?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state that ship-sdlc passes `--branch "$EXECUTE_BRANCH"`
+        to execute-plan-sdlc in both `branch` and `worktree` workspace modes.
+        It must also state that execute-plan-sdlc short-circuits its own Step 1
+        workspace-isolation block in response (implements R30). Reference R60 step 5.
+        Fixes #378.
+
+- description: "ship-sdlc (#379): pre-execute state migration runs before branch/worktree creation in both modes"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Under both `--workspace branch` and `--workspace worktree`, in what ORDER
+      does ship-sdlc run: (a) derive branch name, (b) migrate ship state file,
+      (c) create the branch or worktree? Why is the ordering of (b) before (c)
+      load-bearing (important for correctness)?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state the order is: (1) derive branch name, (2) migrate
+        state file, (3) create branch/worktree. It must explain that migration runs
+        BEFORE creation because `state/ship.js read` resolves the OLD slug filename
+        while still on the original branch — after creation, the cwd/HEAD changes
+        and the old filename is no longer easily resolvable.
+        This ordering is load-bearing and identical in both modes. Reference R37, fixes #379.
+
+- description: "ship-sdlc (#378): --workspace continue from non-default branch skips isolation block"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The user is on branch `feat/existing-work` (a non-default branch) and runs
+      `/ship-sdlc --workspace continue`. What happens to the pre-execute workspace
+      isolation block? Is branch derivation run? Is state migration run? Is
+      `git checkout -b` called? Is `--branch` passed to execute-plan-sdlc?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state that `--workspace continue` skips the entire
+        pre-execute workspace isolation block — no branch derivation, no state
+        migration, no branch/worktree creation, no `--branch` flag passed to
+        execute-plan-sdlc. Execute runs on the existing branch as-is.
+
+- description: "ship-sdlc (#378): default-branch guard rejects --workspace continue on main"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The user is on the `main` branch (the repo default) and runs
+      `/ship-sdlc --workspace continue`. What happens? Does ship-sdlc proceed?
+      Does it emit an error? What is the error message?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state that ship-sdlc fails fast with an error message
+        along the lines of "cannot ship on default branch 'main'. Pass
+        --workspace branch or --workspace worktree." Execute is NOT dispatched.
+        Reference R62 (fixes #378, #379). The response must not say ship-sdlc
+        proceeds normally when on the default branch with --workspace continue.
+
+- description: "ship-sdlc (#378): default-branch guard allows --workspace branch/worktree from main"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The user is on the `main` branch and runs `/ship-sdlc --workspace branch`.
+      Does the default-branch guard block this? Or does ship-sdlc proceed and
+      create a new branch? What happens next?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state that `--workspace branch` (and `--workspace worktree`)
+        proceed normally from the default branch — the guard only rejects
+        `--workspace continue`. ship-sdlc derives a branch name, creates it,
+        and continues the pipeline. Reference R62 (fixes #378, #379).
+
+- description: "ship-sdlc (#378): no-prompt workspace mode resolution fails fast without AskUserQuestion"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The user runs `/ship-sdlc` with no `--workspace` flag and no `workspace.mode`
+      set in `.sdlc/local.json`. Does ship-sdlc use AskUserQuestion to ask for the
+      workspace mode? Or does it fail fast with an error?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state that ship-sdlc fails fast with an error:
+        "workspace mode not set. Pass --workspace branch|worktree|continue or set
+        workspace.mode in .sdlc/local.json." It must NOT say ship-sdlc calls
+        AskUserQuestion for workspace mode — interactive prompts are forbidden
+        mid-pipeline (R61, fixes #378 context pollution).
+
+- description: "ship-sdlc (#378): config-driven workspace mode resolves from workspace.mode in local.json"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The project has `workspace.mode: "worktree"` set in `.sdlc/local.json` and
+      the user runs `/ship-sdlc` with NO `--workspace` flag. What workspace mode
+      does ship-sdlc use? What is the resolution order for workspace mode?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state that ship-sdlc resolves mode to `worktree` from
+        the `workspace.mode` config in `.sdlc/local.json`. The resolution order is:
+        `--workspace` flag first, then `workspace.mode` config, then fail-fast error.
+        No interactive prompt is used. Reference R61 (fixes #378).
+
 - description: "ship-sdlc (#371): SKILL.md prepare invocation must not hardcode --workspace"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"

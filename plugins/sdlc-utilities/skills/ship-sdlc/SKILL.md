@@ -404,6 +404,93 @@ For each step that will run, apply the dispatch protocol based on `step.dispatch
 
 Ship-sdlc retains full control of: pipeline table display, validation output, step progress headers, result formatting, state persistence messages, verdict-based flow decisions, and the final summary report. Sub-skills only execute their skill and return structured data — they do not print pipeline-level output.
 
+### Workspace-mode resolution and default-branch guard (R61, R62 — fixes #378)
+
+**Skip on resume re-entry** (`flags.resume === true`) — the resume block below already handled mode/cwd.
+
+When NOT resuming, resolve workspace mode and enforce the default-branch guard before any workspace creation:
+
+```bash
+# R61: Resolve workspace mode — flag → config → fail-fast. No interactive prompt.
+if [ -z "$WORKSPACE_MODE_FLAG" ]; then
+  WORKSPACE_MODE=$(node -e "
+    const {readSection,resolveSdlcRoot}=require('$SDLC_LIB/config');
+    const ws=readSection(resolveSdlcRoot(),'workspace')||{};
+    process.stdout.write(ws.mode||'');
+  ")
+else
+  WORKSPACE_MODE="$WORKSPACE_MODE_FLAG"
+fi
+if [ -z "$WORKSPACE_MODE" ]; then
+  echo "Error: workspace mode not set. Pass --workspace branch|worktree|continue or set workspace.mode in .sdlc/local.json." >&2
+  exit 1
+fi
+
+# R62: Default-branch guard — reject --workspace continue on the repo default branch.
+DEFAULT_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+[ -z "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH="main"
+CURRENT_BRANCH=$(git branch --show-current)
+if [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ] && [ "$WORKSPACE_MODE" = "continue" ]; then
+  echo "Error: cannot ship on default branch '$DEFAULT_BRANCH'. Pass --workspace branch or --workspace worktree." >&2
+  exit 1
+fi
+```
+
+`WORKSPACE_MODE_FLAG` is set from the `--workspace` CLI flag parsed by the prepare script. `SDLC_LIB` resolves via the standard plugin path search (`find ~/.claude/plugins -name "config.js" -path "*/sdlc*/scripts/lib/config.js"`).
+
+### Pre-execute workspace isolation (R60, R37 — fixes #378, #379)
+
+**Skip when `WORKSPACE_MODE = continue` or when resuming** — no isolation setup needed.
+
+When not resuming and `WORKSPACE_MODE` is `branch` or `worktree`, run the five-step skeleton before dispatching execute-plan-sdlc. This is the single workspace-creation site for the entire pipeline (implements spec I8, R60):
+
+```bash
+# Step 1: Derive branch name from plan title via lib/branch-name.js (config-driven).
+#   Reads workspace.branch config (template, slugMaxLength, typeMap) via readSection.
+#   Same helper used by execute-plan-sdlc standalone path — no duplication.
+EXECUTE_BRANCH=$(node -e "
+  const {resolveBranchName}=require('$SDLC_LIB/branch-name');
+  const {readSection,resolveSdlcRoot}=require('$SDLC_LIB/config');
+  const cfg=(readSection(resolveSdlcRoot(),'workspace')||{}).branch||{};
+  // Logical type and slug derived from plan title (feature/bugfix/chore/docs/refactor).
+  // typeMap in config maps logical → branch prefix (defaults: feat/fix/chore/docs/refactor).
+  process.stdout.write(resolveBranchName({type:'<logical-type>',slug:'<derived-slug>',config:cfg}));
+")
+
+# Step 2: Pre-execute ship state migration (R37).
+#   Runs in main worktree cwd — state/ship.js read still resolves OLD slug filename here.
+#   BEFORE any branch creation (fixing #379: old post-execute block ran after cwd changed).
+STATE_BRANCH=$(node "$SCRIPT" read 2>/dev/null | node -e "process.stdin.on('data',d=>{try{process.stdout.write(JSON.parse(d).branch||'')}catch(_){}})")
+if [ -n "$STATE_BRANCH" ] && [ "$EXECUTE_BRANCH" != "$STATE_BRANCH" ]; then
+  FROM_SLUG=$(echo "$STATE_BRANCH" | sed 's|[^a-zA-Z0-9-]|-|g')
+  result=$(node "$SCRIPT" migrate --from "$FROM_SLUG" --to "$EXECUTE_BRANCH" 2>&1)
+  echo "State migrated: $FROM_SLUG → $EXECUTE_BRANCH"
+fi
+
+# Step 3a: --workspace branch — simple git checkout, no cd needed (HEAD shared with main worktree).
+if [ "$WORKSPACE_MODE" = "branch" ]; then
+  git checkout -b "$EXECUTE_BRANCH"
+fi
+
+# Step 3b: --workspace worktree — create worktree+branch, cd in main shell.
+if [ "$WORKSPACE_MODE" = "worktree" ]; then
+  WORKTREE_CREATE_SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/util/worktree-create.js" 2>/dev/null | sort -V | tail -1)
+  [ -z "$WORKTREE_CREATE_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/worktree-create.js" ] && WORKTREE_CREATE_SCRIPT="plugins/sdlc-utilities/scripts/util/worktree-create.js"
+  result=$(node "$WORKTREE_CREATE_SCRIPT" --name "$EXECUTE_BRANCH")
+  WORKTREE_PATH=$(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
+  # worktree-create.js may collision-suffix; use the resolved branch name.
+  EXECUTE_BRANCH=$(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).branch)")
+  # Step 4: cd in main shell — Bash cwd persists; all subsequent dispatches inherit this path.
+  cd "$WORKTREE_PATH"
+fi
+```
+
+**Cwd propagation contract:** The single `cd "$WORKTREE_PATH"` above sets the main-context shell cwd. Bash cwd persists across subsequent Bash invocations in the same agent context. Agent-tool dispatches inherit the parent's cwd — so commit-sdlc, review-sdlc, pr-sdlc, verify-pipeline-sdlc, version-sdlc, received-review-sdlc, learnings-commit, and archive-openspec all start in the new worktree automatically. No per-prompt `cd` prepend is needed. In branch mode there is nothing to cd into (HEAD shared with main worktree) — same cwd propagation applies trivially.
+
+**Step 5:** Pass `--branch "$EXECUTE_BRANCH"` to execute-plan-sdlc in the execute dispatch (see "Execute step" section below). execute-plan-sdlc will short-circuit its own Step 1 isolation block (implements R30 from execute-plan-sdlc spec).
+
+The `migrate` subcommand renames `ship-<oldSlug>-<ts>.json` → `ship-<newSlug>-<ts>.json` and updates `data.branch`. On `migrated: false` (e.g. no state file yet, slug already correct), warn and continue — do not abort; the orphaned file (if any) will be cleaned by the terminal `cleanup` step or by `--gc`.
+
 ### Execution loop
 
 **Execute step resume:** When the pipeline is resuming (gate on `flags.resume === true` from the prepare output — this is `true` whether the user typed `--resume` or the hook triggered implicit resume; do NOT re-parse `$ARGUMENTS`) and the execute step's status in the ship state file is `in_progress`:
@@ -422,27 +509,16 @@ git worktree list --porcelain
 Match the branch from the ship state file against worktree entries. If found and directory exists, `cd <path>` before continuing. If the worktree directory is gone, warn and fall back to running on the current branch.
 
 Example dispatch sequence (use `step.invocation` for actual args):
-- Agent: execute-plan-sdlc, args: from `step.invocation` (e.g. `""` when no `--quality` was forwarded, `"--quality balanced"` when the user passed `--quality balanced` to ship).
+- Agent: execute-plan-sdlc, args: from `step.invocation` PLUS `--branch "$EXECUTE_BRANCH"` when `EXECUTE_BRANCH` is set (i.e. `WORKSPACE_MODE` is `branch` or `worktree`). When `WORKSPACE_MODE` is `continue`, omit `--branch` (execute handles its own isolation or runs on existing branch). Example: `"--quality balanced --branch feat/my-feature"`. This implements R60 step 5 — execute-plan-sdlc short-circuits its own Step 1 isolation in response (R30).
 - Agent: commit-sdlc, args: `"--auto"`
 - Agent: review-sdlc, args: `"--committed"`
 - Agent: received-review-sdlc, args: `"--auto"` (when `flags.auto`; otherwise no args)
 - Agent: version-sdlc, args: `"patch"`
 - Agent: pr-sdlc, args: `"--auto --draft"`
 
-### Post-execute branch migration (R37)
+### Post-execute note (R37 migration moved pre-execute)
 
-After execute-plan-sdlc's Agent returns success but **before** the next step's record-start, detect whether execute-plan-sdlc created a new branch (the common case when `/ship-sdlc` was invoked from `main` with `--workspace branch`).
-
-```bash
-CURRENT_BRANCH=$(git branch --show-current)
-STATE_BRANCH=$(node "$SCRIPT" read | node -e "process.stdin.on('data',d=>{try{console.log(JSON.parse(d).branch)}catch(_){}})")
-if [ -n "$CURRENT_BRANCH" ] && [ -n "$STATE_BRANCH" ] && [ "$CURRENT_BRANCH" != "$STATE_BRANCH" ]; then
-  FROM_SLUG=$(echo "$STATE_BRANCH" | sed 's|[^a-zA-Z0-9-]|-|g')
-  node "$SCRIPT" migrate --from "$FROM_SLUG" --to "$CURRENT_BRANCH"
-fi
-```
-
-The `migrate` subcommand renames `ship-<oldSlug>-<ts>.json` → `ship-<newSlug>-<ts>.json` and updates `data.branch`. On `migrated: false` (e.g. file already cleaned, slug already correct), warn and continue — do not abort the pipeline; the orphaned file will be cleaned by the terminal `cleanup` step or by `--gc`.
+Branch migration (R37) now runs **before** the execute dispatch — inside the pre-execute workspace isolation block (see "Pre-execute workspace isolation" section above). The old post-execute migration block has been removed (fixes #379 — it ran after cwd changed, so `git branch --show-current` always returned the wrong value).
 
 Subsequent state operations (`start`, `complete`, `read`) automatically pick up the renamed file because `state/ship.js` resolves by current branch.
 

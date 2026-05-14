@@ -33,6 +33,7 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 | `--resume` | Resume from the most recent execution state file for the current branch. Completed waves are skipped; in-progress waves are retried. If the plan has changed since execution started, you are prompted to resume or restart. | Off |
 | `--workspace <branch\|worktree\|prompt>` | Workspace isolation mode when on the default branch. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. | `prompt` |
 | `--rebase <auto\|skip\|prompt>` | Rebase onto the default branch before execution. `auto` rebases silently (aborts on conflict), `skip` skips, `prompt` asks. | Skip |
+| `--branch <name>` | **INTERNAL** — set by ship-sdlc in pipeline mode. Passes the pre-created branch name so execute-plan-sdlc skips its own Step 1 workspace-isolation logic and trusts the caller's branch/cwd. Do not pass this directly. (Implements R30, fixes #378, #379.) | unset |
 
 ---
 
@@ -143,13 +144,28 @@ After each wave completes, execution state is written to `.sdlc/execution/execut
 
 **Inter-wave abort:** Pressing Ctrl-C between waves (after a wave-runner Agent has returned and before the next wave starts) leaves the state file populated with completed waves. The next invocation with `--resume` picks up at the first non-completed wave. Mid-wave abort is not supported — waves run to completion or failure before control returns to main context.
 
-**Abort/resume from ship-sdlc:** When execute-plan-sdlc is invoked via Skill tool from ship-sdlc (fixes #353), inter-wave gates and wave reports stream in ship's main context. Ctrl-C between waves stops the ship pipeline; `/ship-sdlc --resume` or `/execute-plan-sdlc --resume` resumes from the first pending wave.
+**Abort/resume from ship-sdlc:** When execute-plan-sdlc is invoked via Agent tool from ship-sdlc (fixes #366), inter-wave gates and wave reports run in execute's sub-context and a structured result is returned to ship's main context. Ctrl-C between waves stops the ship pipeline; `/ship-sdlc --resume` or `/execute-plan-sdlc --resume` resumes from the first pending wave.
 
 **Automatic detection:** Even without `--resume`, if a state file exists for the current branch, the skill offers to resume in interactive mode. In `--auto` mode, it starts a fresh run instead (pass `--resume` explicitly to auto-resume).
 
 **Cleanup:** The state file is deleted on successful completion and preserved on failure or interruption.
 
 Plans with 3 or fewer simple tasks (small-plan direct execution) do not write state files.
+
+**Step 9 structured output (R31, fixes #378, #379):** When a new branch was created during execution, Step 9's summary report includes additional lines for downstream consumers (e.g., ship-sdlc):
+
+```
+Branch:   feat/my-feature
+```
+
+When a worktree was self-created (standalone `--workspace worktree` mode, no `--branch` flag), both lines appear:
+
+```
+Worktree: /path/to/worktree
+Branch:   feat/my-feature
+```
+
+These lines are omitted when the user selected "Continue on current branch" or when the branch was already non-default and no creation occurred. In pipeline mode (`--branch` was passed by ship-sdlc), the `Worktree:` line is not emitted — ship-sdlc already knows the path.
 
 ---
 

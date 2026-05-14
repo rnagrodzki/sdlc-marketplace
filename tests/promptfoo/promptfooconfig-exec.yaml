@@ -59,3 +59,4 @@ tests:
   - file://datasets/worktree-create-exec.yaml
   - file://datasets/workspace-setup-exec.yaml
   - file://datasets/cwd-drift-exec.yaml
+  - file://datasets/branch-name-exec.yaml
