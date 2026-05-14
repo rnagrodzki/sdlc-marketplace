@@ -305,7 +305,7 @@ When execution guardrails are configured in `.sdlc/config.json` under `execute.g
 
 **Report:** The final summary includes a guardrail pass/warn/override breakdown when guardrails are configured.
 
-Configure execution guardrails via `/setup-sdlc --execution-guardrails`. See [plan-sdlc](plan-sdlc.md) for how plan guardrails are evaluated during planning.
+Configure execution guardrails via `/setup-sdlc --execution-guardrails`. See [plan-sdlc](plan-sdlc.md) for how plan guardrails are evaluated during planning. For authoring guidance — when to use execute vs plan guardrails, how `git diff --stat` constrains phrasing, and worked examples — see [Execute Guardrails Best Practices](execute-guardrails-best-practices.md).
 
 ---
 
