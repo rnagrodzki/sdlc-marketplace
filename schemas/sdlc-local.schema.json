@@ -158,6 +158,36 @@
             }
           },
           "additionalProperties": false
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["branch", "worktree", "continue"],
+          "description": "Default workspace isolation mode for ship-sdlc. Resolution order: --workspace flag → workspace.mode config → fail-fast error. When neither flag nor config sets a value, ship-sdlc exits non-zero with a clear error. No default — an explicit choice is required (fixes #378)."
+        },
+        "branch": {
+          "type": "object",
+          "description": "Branch-name derivation knobs consumed by lib/branch-name.js. Mirrors workspace.worktree shape. Drives config-driven branch naming in both ship-sdlc pre-execute block and execute-plan-sdlc standalone Step 1 (fixes #378, #379).",
+          "additionalProperties": false,
+          "properties": {
+            "template": {
+              "type": "string",
+              "default": "{type}/{slug}",
+              "description": "Branch name template. Supported placeholders: {type} (mapped via typeMap), {slug} (truncated to slugMaxLength), {issue} (optional ticket key, empty string when not provided), {date} (YYYYMMDD in local tz). Unknown placeholders throw."
+            },
+            "slugMaxLength": {
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 100,
+              "default": 50,
+              "description": "Maximum length of the slug segment before substitution into the template."
+            },
+            "typeMap": {
+              "type": "object",
+              "description": "Maps logical plan type to branch prefix. Merged with defaults: {feature:'feat', bugfix:'fix', chore:'chore', docs:'docs', refactor:'refactor'}. Override specific keys to customise prefixes.",
+              "default": { "feature": "feat", "bugfix": "fix", "chore": "chore", "docs": "docs", "refactor": "refactor" },
+              "additionalProperties": { "type": "string" }
+            }
+          }
         }
       },
       "additionalProperties": false

@@ -1,0 +1,90 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/lib/branch-name.js.
+# Validates resolveBranchName across default config, custom template, slug truncation,
+# typeMap override, unknown placeholder throw, and empty slug throw.
+# These run real Node.js scripts (no LLM). No fixture setup needed — resolveBranchName is pure.
+# Fixes #378, #379.
+
+- description: "branch-name: exports are present"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-name-test.js"
+    script_args: "--op exports"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"hasResolveBranchName": true'
+
+- description: "branch-name: default template and config produces feat/add-auth"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-name-test.js"
+    script_args: >-
+      --op resolveBranchName --opts-json {"type":"feature","slug":"add-auth"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"result": "feat/add-auth"'
+
+- description: "branch-name: custom template with {issue} placeholder produces feat/378-add-auth"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-name-test.js"
+    script_args: >-
+      --op resolveBranchName --opts-json {"type":"feature","slug":"add-auth","issue":"378","config":{"template":"{type}/{issue}-{slug}"}}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"result": "feat/378-add-auth"'
+
+- description: "branch-name: slug longer than 50 chars is truncated to 50"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-name-test.js"
+    script_args: >-
+      --op resolveBranchName --opts-json {"type":"feature","slug":"this-is-a-very-long-slug-that-exceeds-fifty-characters-by-far"}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: javascript
+      value: |
+        const parsed = JSON.parse(output);
+        const result = parsed.result;
+        const slug = result.replace(/^feat\//, '');
+        return slug.length <= 50;
+
+- description: "branch-name: typeMap override {feature: 'feature'} produces feature/add-auth"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-name-test.js"
+    script_args: >-
+      --op resolveBranchName --opts-json {"type":"feature","slug":"add-auth","config":{"typeMap":{"feature":"feature"}}}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"result": "feature/add-auth"'
+
+- description: "branch-name: unknown placeholder in template throws"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-name-test.js"
+    script_args: >-
+      --op resolveBranchName --opts-json {"type":"feature","slug":"add-auth","config":{"template":"{type}/{unknown}"}}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: icontains
+      value: "unknown placeholder"
+
+- description: "branch-name: empty slug throws"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-name-test.js"
+    script_args: >-
+      --op resolveBranchName --opts-json {"type":"feature","slug":""}
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: icontains
+      value: "slug"

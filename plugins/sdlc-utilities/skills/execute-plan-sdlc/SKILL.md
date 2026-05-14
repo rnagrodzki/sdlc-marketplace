@@ -2,7 +2,7 @@
 name: execute-plan-sdlc
 description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan. Also auto-triggered when the user accepts a plan from plan-sdlc (plan content is already in conversation context)."
 user-invocable: true
-argument-hint: "[plan-file-path] [--quality full|balanced|minimal] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto]"
+argument-hint: "[plan-file-path] [--quality full|balanced|minimal] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto] [--branch <name>]"
 model: sonnet
 ---
 
@@ -97,50 +97,68 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
 
 **Parse `--auto`:** If `--auto` was passed, store the flag. Auto mode suppresses interactive prompts: resume detection auto-resumes if state exists, high-risk gates auto-approve, and quality-tier selection uses the value from `--quality` (required when `--auto` is set).
 
+**Parse `--branch`:** If `--branch <name>` was passed as an argument, capture it as `EXECUTE_NEW_BRANCH` immediately. This is an **INTERNAL flag set by ship-sdlc in pipeline mode**. When present, skip the entire Workspace isolation check below — the caller's branch/cwd are trusted as authoritative. Users do not pass this directly. Implements R30 (fixes #378, #379).
+
+When ship-sdlc invokes execute-plan-sdlc inside the ship pipeline, `--branch` is always set unless the user selected "Continue on current branch" — Step 1's isolation logic does not fire in that case. Standalone `/execute-plan-sdlc` invocations have no `--branch` flag and use the standalone derivation path below.
+
 **Parse `--workspace`:** If `--workspace branch|worktree|prompt` was passed as an argument, store the mode. If absent, default to `prompt`. When `--workspace` is explicitly set to `branch` or `worktree`, the corresponding action is taken automatically without prompting (steps 3a-3c below).
 
 **Workspace isolation check:** After plan validation, check whether execution should happen on a separate branch or in a worktree.
+
+**If `--branch <name>` was passed:** `EXECUTE_NEW_BRANCH` is already captured above — skip this entire section. Proceed directly to Pre-execution rebase.
+
+**If `--branch` was NOT passed (standalone invocation):**
 
 1. Detect the current branch: `git branch --show-current`
 2. Determine the default branch: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'`. Fallback to `main` if the symbolic ref is not set.
 
    **Do NOT use the `gitStatus` snapshot from conversation context.** The `gitStatus` block in system-reminder tags is captured once at conversation start and is not updated during the session. If the user switched branches after the conversation began, `gitStatus` will report the old branch. Always run the `git branch --show-current` command above via Bash at execution time.
 3. If the current branch matches the default branch:
-   - Derive a suggested branch name:
-     - **Type prefix** from plan nature:
+   - Derive a branch name using `lib/branch-name.js` driven by `workspace.branch` config (config-driven; no hardcoded type-map in SKILL.md prose):
 
-       | Plan nature | Prefix |
-       |---|---|
-       | New feature / capability | `feat/` |
-       | Bug fix | `fix/` |
-       | Refactor, cleanup, tooling, config | `chore/` |
-       | Documentation | `docs/` |
+     ```bash
+     SDLC_LIB=$(find ~/.claude/plugins -name "branch-name.js" -path "*/sdlc*/scripts/lib/branch-name.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
+     [ -z "$SDLC_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/branch-name.js" ] && SDLC_LIB="plugins/sdlc-utilities/scripts/lib"
+     SDLC_LIB_CONFIG=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/scripts/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
+     [ -z "$SDLC_LIB_CONFIG" ] && SDLC_LIB_CONFIG="$SDLC_LIB"
+     EXECUTE_NEW_BRANCH=$(node -e "
+       const {resolveBranchName}=require('$SDLC_LIB/branch-name');
+       const {readSection,resolveSdlcRoot}=require('$SDLC_LIB_CONFIG/config');
+       const cfg=(readSection(resolveSdlcRoot(),'workspace')||{}).branch||{};
+       // Map plan nature to logical type (feature/bugfix/chore/docs/refactor).
+       // typeMap in config translates logical type to branch prefix (defaults: feat/fix/chore/docs/refactor).
+       process.stdout.write(resolveBranchName({type:'<logical-type>',slug:'<derived-slug>',config:cfg}));
+     ")
+     ```
 
-     - **Slug** from plan title: lowercase, hyphenated, max 50 chars (e.g., "Add JWT Authentication" → `feat/add-jwt-authentication`)
+     Branch name is derived by `lib/branch-name.js` from `workspace.branch` config. Defaults: `template={type}/{slug}`, `slugMaxLength=50`, `typeMap={feature:'feat', bugfix:'fix', chore:'chore', docs:'docs', refactor:'refactor'}`. Override in `.sdlc/local.json` under `workspace.branch`. The logical type and slug are inferred from the plan title as before (feature/bugfix/chore/docs/refactor). Implements R30.
 
-   - **If `--workspace branch`:** Run `git checkout -b <derived-name>` directly without prompting. Print the branch name.
+   - **If `--workspace branch`:** Run `git checkout -b "$EXECUTE_NEW_BRANCH"` directly without prompting. Print the branch name. Set `WORKTREE_PATH` to unset (branch mode: no worktree).
 
    - **If `--workspace worktree`:** Create worktree without prompting:
      ```bash
      SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/util/worktree-create.js" 2>/dev/null | sort -V | tail -1)
      [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/worktree-create.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/worktree-create.js"
-     result=$(node "$SCRIPT" --name <derived-name>)
-     cd $(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
+     result=$(node "$SCRIPT" --name "$EXECUTE_NEW_BRANCH")
+     WORKTREE_PATH=$(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
+     # worktree-create.js may collision-suffix; refresh EXECUTE_NEW_BRANCH with resolved name.
+     EXECUTE_NEW_BRANCH=$(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).branch)")
+     cd "$WORKTREE_PATH"
      ```
      Print the branch and path from the script output. The branch may differ from the derived name if a collision suffix was added.
 
    - **If `--workspace prompt` or absent:** Use AskUserQuestion:
      > You're on the default branch (`<branch>`). Working directly on it is not recommended.
      >
-     > Suggested: `<type>/<slug>`
+     > Suggested: `<EXECUTE_NEW_BRANCH>`
      >
-     > 1. Create branch `<type>/<slug>` (or provide a custom name)
+     > 1. Create branch `<EXECUTE_NEW_BRANCH>` (or provide a custom name)
      > 2. Create a worktree for isolated execution
      > 3. Continue on `<branch>` anyway
-   - **Option 1:** Run `git checkout -b <name>`. If the user provides a custom name, use it instead of the suggestion.
-   - **Option 2:** Create worktree using `util/worktree-create.js` as shown above.
-   - **Option 3:** Proceed without changes.
-4. If the current branch is NOT the default branch, skip this check entirely — no warning, no prompt.
+   - **Option 1:** Run `git checkout -b <name>`. If the user provides a custom name, use it instead of the suggestion. Set `EXECUTE_NEW_BRANCH` to the chosen name.
+   - **Option 2:** Create worktree using `util/worktree-create.js` as shown above. Set `WORKTREE_PATH` and update `EXECUTE_NEW_BRANCH` from JSON output.
+   - **Option 3:** Proceed without changes. `EXECUTE_NEW_BRANCH` remains unset.
+4. If the current branch is NOT the default branch, skip this check entirely — no warning, no prompt. `EXECUTE_NEW_BRANCH` and `WORKTREE_PATH` remain unset.
 
 **Pre-execution rebase:** If `--rebase auto` was passed, rebase onto the default branch before executing the plan. This ensures tasks run against the latest code.
 
@@ -540,6 +558,17 @@ If `openspecSpecs` was loaded in Step 1, append to the report:
 OpenSpec:         openspec/changes/<name>/ — run /opsx:verify to validate
 ```
 
+**Branch/worktree emission (R31, fixes #378, #379):** When `EXECUTE_NEW_BRANCH` is set (either from `--branch` flag or from Step 1 self-creation), append to the report:
+```
+Branch:   <EXECUTE_NEW_BRANCH>
+```
+Additionally, when Step 1 self-created a worktree (`WORKTREE_PATH` is set — i.e. `--branch` was NOT passed AND `--workspace worktree` was selected in standalone path), prepend the worktree path line:
+```
+Worktree: <WORKTREE_PATH>
+Branch:   <EXECUTE_NEW_BRANCH>
+```
+When `EXECUTE_NEW_BRANCH` is unset (user selected "Continue on current branch", or current branch was already non-default and no creation occurred), emit neither line.
+
 **State file cleanup:** On successful completion (all tasks completed), delete the execution state file. Print:
 `State file cleaned up.`
 
@@ -594,6 +623,7 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 - Auto-override error-severity guardrail violations in `--auto` mode — guardrails exist to prevent drift; always block
 - Evaluate warning-severity guardrails pre-wave — warnings are assessed post-wave against actual changes, not intent
 - Dispatch agents without the `model:` parameter — every agent dispatch must include `model: "<X>"` per the quality-tier table. Omitting it defaults to opus, defeating the cost optimization of the quality-tier system.
+- Touch `ship-*` state files or invoke `state/ship.js` — ship-sdlc owns the entire ship-state lifecycle (implements R32, addresses #379). Use `state/execute.js` for execute-state operations only.
 
 ## Gotchas
 
