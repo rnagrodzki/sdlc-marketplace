@@ -98,14 +98,14 @@ This version works cleanly against `git diff --stat` because it only checks file
 ```json
 {
   "id": "migrations-append-only",
-  "description": "Files under migrations/ must appear in the diff as added (A) entries, not modified (M) entries. Existing migration files must not be changed.",
+  "description": "Diff must not show any pre-existing file under migrations/ as having lines removed. New migration files may be added; existing ones must remain untouched.",
   "severity": "error"
 }
 ```
 
-**Why this works:** `git diff --stat` distinguishes between added and modified paths when evaluated alongside `git diff --name-status`. The LLM evaluating this guardrail can reason about whether the diff shows any existing `migrations/` file as modified vs. only new files being added. For extra precision, pair this guardrail with a pre-wave check — tasks should state they are adding new migration files, not editing existing ones.
+**Why this works:** `git diff --stat` reports per-file insertion and deletion counts. A pre-existing migration file being edited will surface as deletions (or mixed insertions and deletions) against an existing path, whereas a newly added migration file shows only insertions on a path the evaluator has not seen before. The LLM can reason about that signal directly from `--stat`. For extra precision, pair this guardrail with a pre-wave check — tasks should state they are adding new migration files, not editing existing ones.
 
-**Surface:** pre-wave (task description intent) + post-wave (filename paths under `migrations/`)
+**Surface:** pre-wave (task description intent) + post-wave (line-count shape under `migrations/`)
 
 ---
 
@@ -131,4 +131,4 @@ Only `warning`-severity guardrails are non-blocking under `--auto`. They are rep
 
 - [execute-plan-sdlc](execute-plan-sdlc.md) — Guardrail Enforcement section documents the loading, pre-wave, and post-wave evaluation stages
 - [plan-sdlc](plan-sdlc.md) — plan guardrails (`plan.guardrails[]`) evaluated at planning time
-- `/setup-sdlc --execution-guardrails` — interactive configuration entry point for `execute.guardrails[]`
+- [setup-sdlc](setup-sdlc.md) — run with `--execution-guardrails` for interactive configuration of `execute.guardrails[]`
