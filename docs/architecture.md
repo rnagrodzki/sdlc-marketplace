@@ -137,6 +137,12 @@ Hooks are defined in `plugins/<plugin>/hooks/hooks.json`. Available hook points:
 
 See [adding-hooks.md](adding-hooks.md) for the complete list of hook events.
 
+#### PreToolUse Agent Guard
+
+The `pre-tool-agent-isolation-guard.js` hook (registered with `matcher: "Agent"`) blocks Agent SDK `isolation: "worktree"` dispatches. SDLC manages its own worktrees via `util/worktree-create.js` (git CLI); the Agent SDK's `isolation: "worktree"` creates ephemeral `.claude/worktrees/agent-<id>` paths that are not the intended SDLC worktree, causing commits to land in the wrong location (fixes #370, #372).
+
+Per-developer opt-out: set `hooks.agentIsolationGuard.enabled: false` in `.sdlc/local.json` (gitignored). This key is surfaced during `/setup-sdlc` initialization with a recommended default of `true` (blocking enabled). When the key is absent or the file is unreadable, the hook defaults to enabled (fails closed).
+
 ### Cost Tiers
 
 Each skill and orchestrator agent pins a `model:` in its frontmatter to control which Claude tier executes it. Mechanical surfaces (commit messages, version bumps) run on Haiku; reasoning-heavy surfaces (plan decomposition, review-comment triage) run on Opus; the rest run on Sonnet. Per-call overrides at dispatch sites (e.g., `ship.js`, `execute.js`, `review.js`) take precedence over frontmatter at runtime.

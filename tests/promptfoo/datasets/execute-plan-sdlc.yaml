@@ -279,3 +279,22 @@
         context dispatch the wave-runner Agent for Wave 3. The wave-runner
         Agent itself does NOT fire the high-risk gate — that is a main-context
         responsibility.
+
+- description: "execute-plan-sdlc (#370): wave-runner Agent dispatch must omit isolation parameter"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-execution-complete.md"
+    user_request: >
+      The project has ship.workspace: "worktree" configured in .sdlc/local.json.
+      When execute-plan-sdlc dispatches the wave-runner Agent in Step 5b,
+      describe the exact Agent tool call parameters — specifically, which
+      parameters are included and whether isolation: "worktree" appears.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state that the Agent dispatch in Step 5b includes
+        `model:` and `mode: bypassPermissions` but does NOT include an
+        `isolation` parameter (not `isolation: "worktree"` nor any other
+        isolation value). The SDLC workspace worktree flag is handled via
+        util/worktree-create.js, not the Agent SDK isolation parameter.
+        The response must reference the DO NOT note in Step 5b or R-no-agent-sdk-isolation.

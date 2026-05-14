@@ -161,6 +161,25 @@
         }
       },
       "additionalProperties": false
+    },
+    "hooksSection": {
+      "type": "object",
+      "description": "User-local hook configuration. Written by /setup-sdlc hooks section and consumed by plugin PreToolUse hooks.",
+      "properties": {
+        "agentIsolationGuard": {
+          "type": "object",
+          "description": "Controls the pre-tool-agent-isolation-guard.js PreToolUse hook.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true (default), blocks Agent SDK isolation: \"worktree\" dispatches. Set to false to opt out per-developer. See issues #370 #372."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "properties": {
@@ -184,6 +203,9 @@
     },
     "workspace": {
       "$ref": "#/$defs/workspaceSection"
+    },
+    "hooks": {
+      "$ref": "#/$defs/hooksSection"
     }
   },
   "additionalProperties": false

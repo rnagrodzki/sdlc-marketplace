@@ -73,6 +73,8 @@ Pass `--workspace branch` or `--workspace worktree` to bypass the interactive pr
 
 **Note:** Branch detection always runs `git branch --show-current` at execution time. It does not use the session-level `gitStatus` snapshot, which may be stale if you switched branches after starting the conversation.
 
+**Note on Agent SDK `isolation` parameter:** The SDLC `--workspace worktree` flag creates a sibling git worktree via `util/worktree-create.js` (git CLI). This is distinct from the Agent SDK's `isolation: "worktree"` parameter. The plugin's `pre-tool-agent-isolation-guard.js` PreToolUse hook blocks Agent SDK `isolation: "worktree"` dispatches by default, preventing commits from landing in ephemeral `.claude/worktrees/agent-<id>` paths instead of the intended SDLC worktree (fixes #370, #372). To opt out per-developer, set `hooks.agentIsolationGuard.enabled: false` in `.sdlc/local.json`.
+
 ---
 
 ## Model Selection

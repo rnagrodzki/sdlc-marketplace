@@ -503,6 +503,23 @@ Store the assembled object under the `workspace` key for the "Writing config fil
 step. The config lands in `.sdlc/local.json` (gitignored, per-developer) — never in
 `.sdlc/config.json`.
 
+#### 3.hooks. Hook guard configuration (hooks section in 3.G)
+
+<!-- Implements R25. Fixes #370, #372. -->
+
+The `hooks` section uses the generic 3.G field-loop dispatcher (`delegatedTo: null`,
+`fields` from `lib/setup-sections.js`). One field is surfaced:
+
+**`agentIsolationGuard.enabled`** (boolean, default `true`):
+> Block Agent SDK `isolation: "worktree"` parameter? (Recommended: yes — prevents wrong-worktree commits per #370 #372)
+
+Use `AskUserQuestion` with options **yes** (default) / **no**:
+
+- On **yes** (default): omit the key from `.sdlc/local.json` (default behavior, KISS) — OR write `{"hooks":{"agentIsolationGuard":{"enabled":true}}}` if an explicit value is preferred.
+- On **no**: write `{"hooks":{"agentIsolationGuard":{"enabled":false}}}` to `.sdlc/local.json`.
+
+The config lands in `.sdlc/local.json` (gitignored, per-developer) — never in `.sdlc/config.json`.
+
 #### 3.S. Scan phase (delegated content sections only)
 
 Before invoking `setup-dimensions` or `setup-pr-template`, run the project signal scan:
@@ -541,6 +558,7 @@ The historical step labels map onto the dispatcher above for anyone updating tes
 | 3e | `commit` | 3.commit |
 | 3f | `pr` | 3.pr |
 | 3g | `workspace` | 3.workspace (R24) |
+| 3h | `hooks` | 3.hooks (R25) |
 
 
 #### Diff preview (issue #235)

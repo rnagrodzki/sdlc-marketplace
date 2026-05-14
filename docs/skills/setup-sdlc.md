@@ -209,6 +209,7 @@ Every section the menu can configure. The label, purpose, files modified, and co
 | `execution-guardrails` | Runtime guardrails at `.sdlc/config.json#execute.guardrails` evaluated by `/execute-plan-sdlc` and `/ship-sdlc` before/after each wave. | `.sdlc/config.json` | `/execute-plan-sdlc`, `/ship-sdlc` |
 | `openspec-block` | Managed block in `openspec/config.yaml` providing sdlc-utilities workflow guidance to OpenSpec-aware skills. Idempotent across plugin versions. | `openspec/config.yaml` | `/plan-sdlc`, `/execute-plan-sdlc`, `/ship-sdlc` |
 | `workspace` | Developer-local worktree layout preference (`inside`/`sibling`/`central`/`template`), path overrides, name template, and gitignore automation. Stored in gitignored `.sdlc/local.json`. See R24. | `.sdlc/local.json` | `/execute-plan-sdlc`, `/ship-sdlc`, `worktree-create` |
+| `hooks` | Developer-local plugin hook configuration. Controls whether the `pre-tool-agent-isolation-guard.js` PreToolUse hook blocks Agent SDK `isolation: "worktree"` dispatches. Default: enabled (blocking). Set `hooks.agentIsolationGuard.enabled: false` to opt out per-developer (fixes #370, #372). Stored in gitignored `.sdlc/local.json`. | `.sdlc/local.json` | `/execute-plan-sdlc`, `/ship-sdlc` |
 
 ### Field reference (selected sections)
 

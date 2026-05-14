@@ -91,9 +91,11 @@ SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/shi
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --bump patch --workspace branch)
-# Example with shorthand:
-# PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --bump patch --branch)
+<!-- Implements A8d. Fixes #371. Workspace mode is intentionally omitted from this example so it falls back to `ship.workspace` config via `mergeFlags`; literal `--workspace <value>` here would override user config. -->
+PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto --bump patch)
+# Workspace mode comes from `.sdlc/local.json` (`ship.workspace`) via config fallback.
+# Only pass `--workspace`, `--branch`, or `--tree` to override for a single run.
+# Example override: node "$SCRIPT" --output-file --has-plan --auto --bump patch --tree
 # Pipeline composition (which steps run) comes from config `ship.steps[]`. To override
 # the resolved step list for a single run, pass `--steps <csv>` (e.g.
 # `--steps execute,commit,pr`). To set the model tier forwarded to execute-plan-sdlc,
