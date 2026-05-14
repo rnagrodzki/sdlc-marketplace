@@ -481,6 +481,102 @@ function formatAccountMismatch(expected, actual) {
 }
 
 /**
+ * Format the canonical halt message when the access probe denies the active account
+ * (issue #380). Mirrors `formatAccountMismatch` style — 3-line block. The
+ * `suggestedAccounts` list is local-account-name-only (logins from `getGhAccounts`);
+ * no cross-account probing is attempted.
+ *
+ * @param {{ activeAccount: string, owner: string, repo: string, suggestedAccounts: string[] }} opts
+ * @returns {string}
+ */
+function formatAccessDenied({ activeAccount, owner, repo, suggestedAccounts }) {
+  const lines = [
+    `Active gh account: ${activeAccount}`,
+    `Cannot access: ${owner}/${repo}`,
+  ];
+  if (Array.isArray(suggestedAccounts) && suggestedAccounts.length > 0) {
+    suggestedAccounts.forEach(login => {
+      lines.push(`Try: gh auth switch --user ${login}`);
+    });
+  } else {
+    lines.push(`Run: gh auth login --hostname github.com`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Probe whether the active `gh` account can access a given repository (issue #380).
+ * Answers "can this account see this repo?" — not "does this login match the owner?".
+ * This is the correct tool for org-owned repos where a developer's personal login
+ * never equals the org slug.
+ *
+ * Returns:
+ *   - accessible: true (200 OK), false (404/403), or null (network failure / parse error)
+ *   - statusCode: HTTP status code from gh api -i, or null on failure
+ *   - errorMessage: human-readable summary when accessible === false, else null
+ *   - suggestedAccounts: list of local gh account logins (name-only; no cross-account probing)
+ *
+ * Test injection: set `process.env.SDLC_PROBE_REPO_ACCESS` to one of:
+ *   "accessible" → { accessible: true, statusCode: 200, errorMessage: null, suggestedAccounts: [...] }
+ *   "not-found"  → { accessible: false, statusCode: 404, errorMessage: null, suggestedAccounts: [...] }
+ *   "forbidden"  → { accessible: false, statusCode: 403, errorMessage: null, suggestedAccounts: [...] }
+ *   "error"      → { accessible: null,  statusCode: null, errorMessage: 'probe-error', suggestedAccounts: [] }
+ * When set, the real `gh api` call is skipped entirely — no network call leaves the process.
+ * (SDLC_PROBE_REPO_ACCESS is intentionally undocumented in user-facing docs; it exists for test hermeticism only.)
+ *
+ * @param {{ owner: string, repo: string, host?: string, execFn?: function }} opts
+ *   `owner` and `repo` are required — callers derive them from `parseRemoteOwner(projectRoot)`.
+ * @returns {{ accessible: boolean|null, statusCode: number|null, errorMessage: string|null, suggestedAccounts: string[] }}
+ */
+function probeRepoAccess({ owner, repo, host, execFn } = {}) {
+  const hostname = host || 'github.com';
+
+  // Test-injection hook — bypasses the real gh api call for hermetic testing.
+  const stub = process.env.SDLC_PROBE_REPO_ACCESS;
+  const { accounts: suggestedAccounts } = stub !== 'error' ? getGhAccounts(hostname) : { accounts: [] };
+  const logins = suggestedAccounts.map(a => a.login);
+
+  if (stub) {
+    switch (stub) {
+      case 'accessible':
+        return { accessible: true, statusCode: 200, errorMessage: null, suggestedAccounts: logins };
+      case 'not-found':
+        return { accessible: false, statusCode: 404, errorMessage: null, suggestedAccounts: logins };
+      case 'forbidden':
+        return { accessible: false, statusCode: 403, errorMessage: null, suggestedAccounts: logins };
+      case 'error':
+      default:
+        return { accessible: null, statusCode: null, errorMessage: 'probe-error', suggestedAccounts: [] };
+    }
+  }
+
+  const run = execFn || ((cmd) => exec(cmd, { shell: true }));
+
+  // Use -i (include HTTP headers) and --silent (discard body) to capture the status line only.
+  const raw = run(`gh api repos/${owner}/${repo} --hostname ${hostname} -i --silent 2>&1`);
+  if (!raw) {
+    return { accessible: null, statusCode: null, errorMessage: 'gh api returned no output', suggestedAccounts: logins };
+  }
+
+  // First line: "HTTP/2 <code>" or "HTTP/1.1 <code> <reason>"
+  const firstLine = raw.split('\n')[0] || '';
+  const match = firstLine.match(/HTTP\/[\d.]+ (\d{3})/);
+  if (!match) {
+    return { accessible: null, statusCode: null, errorMessage: `Unexpected gh api output: ${firstLine}`, suggestedAccounts: logins };
+  }
+
+  const statusCode = parseInt(match[1], 10);
+  if (statusCode === 200) {
+    return { accessible: true, statusCode: 200, errorMessage: null, suggestedAccounts: logins };
+  }
+  if (statusCode === 404 || statusCode === 403) {
+    return { accessible: false, statusCode, errorMessage: null, suggestedAccounts: logins };
+  }
+  // Any other status (5xx, etc.) — treat as network failure, warn and proceed.
+  return { accessible: null, statusCode, errorMessage: `Unexpected status ${statusCode}`, suggestedAccounts: logins };
+}
+
+/**
  * Probe `gh auth status` for a host and return a normalized auth state
  * (issue #234). One source of truth for the gh-auth + active-account preflight,
  * consumed by both `skill/ship.js` (pipeline preflight) and `skill/pr.js` (per-PR
@@ -1194,6 +1290,8 @@ module.exports = {
   recoverGhAccountForRepo,
   probeGhAuth,
   formatAccountMismatch,
+  probeRepoAccess,
+  formatAccessDenied,
   // PR-specific
   getRemoteState,
   pushToRemote,

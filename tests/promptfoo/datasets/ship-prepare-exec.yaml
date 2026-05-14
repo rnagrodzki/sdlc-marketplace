@@ -803,3 +803,50 @@
   assert:
     - type: icontains
       value: "implicitResumeNoState"
+
+# ---------------------------------------------------------------------------
+# Issue #380: active-account access probe mirrored for ship-prepare
+# Cases 1, 2, 4 from pr-prepare. Case 3 omitted (identical structure).
+# All cases use SDLC_PROBE_REPO_ACCESS to stub the gh api call — no real
+# network call reaches GitHub in any test.
+# ---------------------------------------------------------------------------
+
+- description: "ship-prepare: active-account-access — accessible probe passes (env=accessible)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-origin-stubbed"
+    script_env: '{"SDLC_PROBE_REPO_ACCESS":"accessible"}'
+  assert:
+    - type: icontains
+      value: '"repoAccessProbed": true'
+    - type: icontains
+      value: '"repoAccessible": true'
+    - type: not-icontains
+      value: 'Cannot access'
+
+- description: "ship-prepare: active-account-access — not-found halts (env=not-found)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-pr-origin-stubbed"
+    script_env: '{"SDLC_PROBE_REPO_ACCESS":"not-found"}'
+  assert:
+    - type: icontains
+      value: '"repoAccessible": false'
+    - type: icontains
+      value: '"repoAccessStatus": 404'
+    - type: icontains
+      value: 'Cannot access'
+
+- description: "ship-prepare: active-account-access — no origin remote skips probe (env unset)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: icontains
+      value: '"repoAccessProbed": false'
