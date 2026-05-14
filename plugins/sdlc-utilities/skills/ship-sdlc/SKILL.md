@@ -411,6 +411,11 @@ Ship-sdlc retains full control of: pipeline table display, validation output, st
 When NOT resuming, resolve workspace mode and enforce the default-branch guard before any workspace creation:
 
 ```bash
+# Resolve SDLC_LIB once — used by all subsequent node -e heredocs in this section.
+SDLC_LIB=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/scripts/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs -I {} dirname {})
+[ -z "$SDLC_LIB" ] && [ -d "plugins/sdlc-utilities/scripts/lib" ] && SDLC_LIB="plugins/sdlc-utilities/scripts/lib"
+[ -z "$SDLC_LIB" ] && { echo "ERROR: Could not locate scripts/lib (config.js). Is the sdlc plugin installed?" >&2; exit 2; }
+
 # R61: Resolve workspace mode — flag → config → fail-fast. No interactive prompt.
 if [ -z "$WORKSPACE_MODE_FLAG" ]; then
   WORKSPACE_MODE=$(node -e "
@@ -436,7 +441,7 @@ if [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ] && [ "$WORKSPACE_MODE" = "continue"
 fi
 ```
 
-`WORKSPACE_MODE_FLAG` is set from the `--workspace` CLI flag parsed by the prepare script. `SDLC_LIB` resolves via the standard plugin path search (`find ~/.claude/plugins -name "config.js" -path "*/sdlc*/scripts/lib/config.js"`).
+`WORKSPACE_MODE_FLAG` is set from the `--workspace` CLI flag parsed by the prepare script. `SDLC_LIB` is the directory containing `config.js` and `branch-name.js`, resolved via the standard plugin path search above (or the in-repo fallback when developing this plugin). The variable persists across all subsequent Bash invocations in this section.
 
 ### Pre-execute workspace isolation (R60, R37 — fixes #378, #379)
 
@@ -476,6 +481,7 @@ fi
 if [ "$WORKSPACE_MODE" = "worktree" ]; then
   WORKTREE_CREATE_SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/util/worktree-create.js" 2>/dev/null | sort -V | tail -1)
   [ -z "$WORKTREE_CREATE_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/worktree-create.js" ] && WORKTREE_CREATE_SCRIPT="plugins/sdlc-utilities/scripts/util/worktree-create.js"
+  [ -z "$WORKTREE_CREATE_SCRIPT" ] && { echo "ERROR: Could not locate scripts/util/worktree-create.js. Is the sdlc plugin installed?" >&2; exit 2; }
   result=$(node "$WORKTREE_CREATE_SCRIPT" --name "$EXECUTE_BRANCH")
   WORKTREE_PATH=$(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
   # worktree-create.js may collision-suffix; use the resolved branch name.

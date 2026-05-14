@@ -82,7 +82,7 @@ function validateTemplate(template) {
  * @param {Date}   [opts.now]    Current date (defaults to new Date()). Used for {date} placeholder.
  * @param {object} [opts.config] workspace.branch config object (all fields optional).
  * @param {string} [opts.config.template]       Branch name template. Default: "{type}/{slug}".
- * @param {number} [opts.config.slugMaxLength]  Max slug length before truncation. Default: 50. Min: 1.
+ * @param {number} [opts.config.slugMaxLength]  Max slug length before truncation. Default: 50. Min: 8 (matches schema).
  * @param {object} [opts.config.typeMap]        Mapping from logical type to branch prefix. Merged with defaults.
  *
  * @returns {string} Resolved branch name.
@@ -104,7 +104,7 @@ function resolveBranchName(opts) {
 
   // Resolve config with defaults
   const template      = (typeof config.template === 'string' && config.template) ? config.template : DEFAULT_TEMPLATE;
-  const slugMaxLength = (typeof config.slugMaxLength === 'number' && config.slugMaxLength >= 1) ? config.slugMaxLength : DEFAULT_SLUG_MAX_LENGTH;
+  const slugMaxLength = (typeof config.slugMaxLength === 'number' && config.slugMaxLength >= 8) ? config.slugMaxLength : DEFAULT_SLUG_MAX_LENGTH;
   const typeMap       = Object.assign({}, DEFAULT_TYPE_MAP, config.typeMap || {});
 
   // Validate template placeholders
