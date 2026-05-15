@@ -199,6 +199,16 @@ Selecting "yes" posts in-thread replies and resolves addressed threads automatic
 | Source code changes | Edits implementing accepted review feedback, in priority order |
 | Resolved review threads | Threads for addressed comments are resolved via GraphQL mutation |
 
+## Reply Version Footer (issue #363)
+
+Every reply posted by this skill ends with a version footer on its own line:
+
+```
+_via `received-review-sdlc` v0.20.7_
+```
+
+The footer is composed by the prepare script (`skill/received-review.js`) from `manifest.plugin_version` and emitted as `manifest.reply_footer`. The skill appends it verbatim to every reply body — no modification. This lets reviewers correlate responses with the skill version that produced them. Falls back to `'unknown'` when the plugin version cannot be read.
+
 ## Link Verification (issue #198)
 
 Before any `gh api` reply is posted (Step 12), the skill pipes the concatenated reply bodies through `scripts/lib/links.js` as a hard gate (Step 11.5). The validator auto-derives `expectedRepo` from `git remote origin` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill never constructs the validator context. URL classes checked: GitHub issues/PRs (owner/repo identity + existence), Atlassian `*.atlassian.net/browse/<KEY>` (host match), and any other `http(s)://` URL (HEAD reachability, 5s timeout). Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability while keeping context-aware checks. On non-zero exit, no replies are posted and the violation list is surfaced verbatim. No flag toggles this gate — it is hard.

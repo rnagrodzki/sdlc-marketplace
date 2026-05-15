@@ -260,6 +260,8 @@ gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies \
   -f body="<response text>"
 ```
 
+**Version footer:** Append `manifest.reply_footer` verbatim to the end of every reply body before posting. Do not modify the footer string. Do not insert it elsewhere. The footer is a single string with a leading blank-line separator already included — append it directly to the reply body with no additional separator.
+
 ---
 
 ## Step 8 — CRITIQUE #2: Self-Critique the Responses
@@ -458,6 +460,8 @@ Options:
 - **selective** — let me choose which threads to reply to
 
 3. **If yes, selective, or auto mode:** For each comment in the action plan:
+
+   **Footer rule (applies to all reply types below):** Append `manifest.reply_footer` verbatim to the end of every reply body before posting. Do not modify the footer string. Do not insert it elsewhere. The footer already contains a leading blank-line separator.
 
    **For addressed comments (agree, will fix):**
    - Post a reply describing what was changed:

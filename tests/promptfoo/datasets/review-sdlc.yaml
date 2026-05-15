@@ -788,3 +788,25 @@
         The response surfaces a security-review finding for the removal of the URL allowlist check
         on a server-side fetch driven by user input. The finding is tagged **OWASP:** A10 (SSRF)
         and **Severity:** high.
+
+- description: "review-sdlc (#363): orchestrator includes plugin_version in attribution line"
+  vars:
+    skill_path: "plugins/sdlc-utilities/agents/review-orchestrator.md"
+    project_context: "file://fixtures/project-with-dimensions.md"
+    user_request: >
+      You are the review-orchestrator. The manifest in the project context includes
+      plugin_version: "0.20.7". Complete Step 5 — build and persist the consolidated
+      comment. Show the comment body you would write to review-comment.md.
+  assert:
+    # Attribution line must include the version in the correct format.
+    - type: regex
+      value: '^> Automated review by `review-sdlc` v[^ ]+ · '
+    # Specifically, must include the version from the manifest.
+    - type: icontains
+      value: "v0.20.7"
+    - type: llm-rubric
+      value: >
+        The response includes the consolidated comment body. The attribution line reads
+        "> Automated review by `review-sdlc` v0.20.7 · <date>" where <date> is a
+        YYYY-MM-DD formatted date. The version value comes from manifest.plugin_version
+        (0.20.7), not hardcoded. The `v` prefix is rendered from the template, not duplicated.

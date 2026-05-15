@@ -144,6 +144,14 @@ Apply fixes from the critique:
 
 Format the comment using the template from REFERENCE.md section 3.
 
+**Template variable substitution:**
+
+- `{date}` ← today's date in `YYYY-MM-DD` format
+- `{plugin_version}` ← `manifest.plugin_version` (verbatim, no extra `v` prefix — the `v` is in the template)
+- `{N}` ← number of active dimensions
+- `{M}` ← total finding count
+- All other `{...}` placeholders ← computed from dimension subagent results
+
 **Compute verdict:**
 
 - `CHANGES REQUESTED` — any `critical` finding, OR ≥ 3 `high` findings

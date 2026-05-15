@@ -64,6 +64,7 @@ triggers:
 {
   "scope": "all",
   "base_branch": "main",
+  "plugin_version": "0.20.7",
   "git": {
     "changed_files": [
       "src/routes/search.ts",
