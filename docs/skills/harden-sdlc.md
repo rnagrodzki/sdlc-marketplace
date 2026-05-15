@@ -164,6 +164,8 @@ Failure → harden classifies → proposes surface edits → user approves → n
 
 > **Boundary.** harden-sdlc strengthens config surfaces only: `.sdlc/config.json` guardrails, `.sdlc/review-dimensions/*.md`, and `.github/instructions/*.instructions.md`. It does not patch plugin code. Plugin defects route to [`/error-report-sdlc`](error-report-sdlc.md).
 
+> **Per-iteration persistence (issue #387).** Each approved proposal is written to disk immediately before the next proposal is presented — changes are never accumulated across proposals. At the start of each iteration `targetFile` is re-read from disk, ensuring a prior write's state is always the base for the next change.
+
 ---
 
 ## Prerequisites

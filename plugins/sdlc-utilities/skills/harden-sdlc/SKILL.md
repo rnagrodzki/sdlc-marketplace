@@ -146,7 +146,13 @@ failure signal does not point at any of the loaded surfaces.` and exit cleanly
 
 ---
 
-## Step 5 — PRESENT and APPLY (R7, R8, R10, R12, C9, C10)
+## Step 5 — PRESENT and APPLY (R7, R8, R10, R12, C9, C10, R-iteration-write)
+
+**Per-iteration contract (R-iteration-write, issue #387) — applies to every pass through the proposal loop:**
+1. **Re-read before acting:** At the start of each iteration, re-read `targetFile` from disk. Never rely on an in-memory copy from a previous write.
+2. **Write before advancing:** Persist the approved change to disk (via Edit/Write) before presenting the next proposal. Do not accumulate approved changes across proposals and write them together.
+3. **No cross-proposal accumulation:** Hold only the current proposal's patch in memory. Clear per-proposal state after each write.
+4. **Halt on failure:** If validation or the write itself fails for a proposal, do not silently advance to the next proposal — halt iteration for this proposal and surface the error per 5a.
 
 For each proposal in `RESULT.proposals`, present the full patch preview to the
 user. Then use `AskUserQuestion`:
@@ -169,7 +175,9 @@ Options: **apply** | **skip** | **cancel**
 - **cancel** — abort the entire skill (no further proposals processed); the
   trap cleans up the manifest
 
-### 5a. Validate Before Write (R12)
+### 5a. Validate Before Write (R12, R-iteration-write)
+
+**Re-read `targetFile` from disk now** (implements R-iteration-write rule 1) — do not use any in-memory state from a prior iteration.
 
 When the user selects **apply**, validate the proposed change BEFORE writing:
 
@@ -196,7 +204,9 @@ When the user selects **apply**, validate the proposed change BEFORE writing:
 - For `surface == "copilot-instructions"`: no schema — apply the edit directly
   after the user's `apply` answer.
 
-### 5b. Write After Validation Passes
+### 5b. Write After Validation Passes (R-iteration-write)
+
+**Write to disk now, before advancing to the next proposal** (implements R-iteration-write rule 2). Do not proceed to the next AskUserQuestion until this proposal's change has been persisted.
 
 Use Edit (preferred) or Write to apply the approved, validated change to
 `proposal.targetFile`. Display a one-line confirmation:
@@ -295,6 +305,9 @@ the `.sdlc/learnings/` directory and `log.md` file if they don't exist.
 
 - Edit any surface without an `apply` AskUserQuestion answer recorded for that
   specific proposal — the no-silent-write invariant is non-negotiable.
+- Accumulate approved changes across multiple proposals and write them together
+  — each approved proposal MUST be written to disk immediately before advancing
+  to the next proposal (R-iteration-write, issue #387).
 - Propose relaxing or removing existing rules — v1 is strengthen-only.
 - Run full-suite or wide-subset `promptfoo eval` automatically — single targeted test scoped to the change is allowed; tight-loop retries are not.
 - Invoke `error-report-sdlc` for `user-code` classifications — only the

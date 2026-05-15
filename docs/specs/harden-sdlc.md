@@ -44,6 +44,8 @@
   - Acceptance: SKILL.md Step 5 contains a `5c` sub-step gated on `RESULT.classification === 'ambiguous' && RESULT.errorReportPayload != null` that surfaces an `AskUserQuestion` with options `dispatch error-report-sdlc | skip`; on dispatch, the canonical Glob-then-follow path from Step 6 is reused.
 - R-orchestrator-ambig (issue #288): `harden-orchestrator` MUST populate `errorReportPayload` on `ambiguous` classification only when the rationale cites plugin evidence (script crash inside `plugins/sdlc-utilities/`, agent malformed JSON, prepare-script exit 2). Pure user-code ambiguity emits `errorReportPayload: null`.
   - Acceptance: orchestrator response-shape rules in `agents/harden-orchestrator.md` document that `ambiguous + errorReportPayload != null` is a valid combination and provide a JSON example; `ambiguous + errorReportPayload == null` remains valid for user-code ambiguity.
+- R-iteration-write (issue #387): For each proposal the user approves in Step 5, SKILL.md MUST persist the change to disk before presenting the next proposal. It MUST re-read `targetFile` from disk at the start of each iteration (not hold an in-memory copy from the previous write), and MUST NOT accumulate approved changes across proposals before writing. On validation or write failure for a proposal, iteration halts for that proposal — SKILL.md does not silently advance to the next proposal.
+  - Acceptance: SKILL.md Step 5 contains an explicit per-iteration preamble stating the four rules (re-read, write-before-advance, no-accumulation, halt-on-failure); 5a explicitly re-reads `targetFile` from disk; 5b explicitly writes before advancing; no code path exists where two approved proposals are held in memory simultaneously before writing.
 
 ## Workflow Phases
 
@@ -63,7 +65,7 @@
 - G1: Proposal coherence — every emitted proposal MUST cite a specific failure-signal element (a guardrail id, a dimension name, a copilot pattern, or a verbatim phrase from `failure.text`) in its `rationale`
 - G2: Surface coverage — when failure signal is non-empty, the orchestrator MUST evaluate every loaded surface (skip is acceptable but must be intentional, not omission)
 - G3: Classification accuracy — `classification` MUST match observable evidence; `plugin-defect` requires the failure to point at plugin code (script crash inside `plugins/sdlc-utilities/`, agent malformed JSON, prepare-script exit 2), not user-code or config. An `ambiguous` classification MAY carry a non-null `errorReportPayload` when the rationale cites plugin evidence (R-orchestrator-ambig); pure user-code ambiguity emits `errorReportPayload: null`.
-- G4: No-silent-write invariant — across all paths (success, cancel, agent crash, validation fail) the count of files written without an `apply` AskUserQuestion answer MUST be zero
+- G4: No-silent-write and no-silent-drop invariant — across all paths (success, cancel, agent crash, validation fail) the count of files written without an `apply` AskUserQuestion answer MUST be zero; additionally, the count of approved proposals that were not immediately persisted to disk (dropped silently by accumulation or cross-iteration merge) MUST also be zero
 
 ## Prepare Script Contract
 
