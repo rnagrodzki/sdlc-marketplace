@@ -42,6 +42,9 @@
         gates each proposal behind AskUserQuestion (apply | skip | cancel) and
         validates schema before write via ci/validate-guardrails.js. It does NOT
         propose relaxing or removing any existing rule.
+    # Per-iteration persistence: structural check for write-before-advancing wording
+    - type: regex
+      value: "(write.*before.*advanc|before.*next.*proposal|re.read.*disk|disk.*before.*advanc|persist.*before.*next|not.*batch|no.*batch.*accum)"
     # Per-iteration persistence: each approved proposal must be written immediately
     - type: llm-rubric
       value: >
@@ -230,6 +233,34 @@
       value: "(\\.claude/sdlc\\.json|sdlc\\.json.*write|apply.*proposal 1)"
     - type: not-regex
       value: "(both.*written|all.*proposals.*applied|skip.*also.*written)"
+
+- description: "harden-sdlc: two proposals both applied → write-before-advancing and no accumulation (R-iteration-write rules 2 and 3)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plan-guardrail-failure-context.md"
+    user_request: >
+      Two proposals are presented and the user selects "apply" for both.
+      Describe the order of operations Step 5 follows: when is each approved
+      change written to disk relative to presenting the next proposal? Does the
+      skill accumulate both approved patches and write them together at the end,
+      or does it write each one individually before moving on?
+  assert:
+    # Must write each proposal before advancing to the next (rule 2)
+    - type: regex
+      value: "(write.*before.*next|persist.*before.*advanc|written.*before.*present|disk.*before.*next|after.*write.*proposal.*1.*present.*proposal.*2)"
+    # Must NOT accumulate and batch-write
+    - type: not-regex
+      value: "(accum.*both|batch.*write|collect.*then.*write|write.*together.*end|all.*at.*once)"
+    # Behavioral: correct two-proposal iteration sequence
+    - type: llm-rubric
+      value: >
+        The response describes a per-iteration sequence: present proposal 1,
+        user applies, validate, write to disk immediately, THEN present proposal 2.
+        It does NOT describe collecting both approvals and writing them together
+        after the loop. It explicitly states (or clearly implies) that proposal 1
+        is persisted to disk before proposal 2 is presented to the user,
+        satisfying R-iteration-write rules 2 (write-before-advancing) and
+        3 (no cross-proposal accumulation).
 
 - description: "harden-sdlc: strengthen-only invariant — no relax/remove proposals"
   vars:
