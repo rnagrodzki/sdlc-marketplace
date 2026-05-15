@@ -42,6 +42,14 @@
         gates each proposal behind AskUserQuestion (apply | skip | cancel) and
         validates schema before write via ci/validate-guardrails.js. It does NOT
         propose relaxing or removing any existing rule.
+    # Per-iteration persistence: each approved proposal must be written immediately
+    - type: llm-rubric
+      value: >
+        The response describes Step 5 re-reading targetFile from disk at the start
+        of each proposal iteration (not using an in-memory copy from a prior write)
+        and writing the approved change to disk before advancing to the next
+        proposal. It does NOT describe accumulating multiple approved changes and
+        writing them together in a batch at the end.
 
 - description: "harden-sdlc: dimension-blocker rationale → proposes review-dimensions strengthening with dimension severity vocabulary"
   vars:
