@@ -44,6 +44,8 @@ if (!field) {
 }
 
 const pluginVersion = getPluginVersion();
+// Format mirrors the production source: plugins/sdlc-utilities/scripts/skill/received-review.js
+// (the `reply_footer` field in the manifest). If the format changes there, update here too.
 const replyFooter = '\n\n_via `received-review-sdlc` v' + pluginVersion + '_';
 
 if (field === 'plugin_version') {

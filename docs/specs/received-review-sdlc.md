@@ -83,6 +83,8 @@ Critique #2 (responses):
 - P7: `pr.repo` (string) — repository name
 - P8 (issue #233): `flags.alwaysFixSeverities` (string[]) — severities whose "will fix" findings bypass the per-finding consent gate. Resolved exclusively from `.sdlc/local.json` `receivedReview.alwaysFixSeverities`. Allowed values: `low | medium | high | critical`. Default `[]`. The script MUST emit a stderr warning and ignore the field if it appears in `.sdlc/config.json` (R19).
 - P9 (issue #233): `threads[].severity` (string|null) — per-thread severity parsed from the comment body using the review-sdlc severity tag format. `null` when absent or unparseable; such threads NEVER bypass the consent gate per R18.
+- P10 (issue #363): `plugin_version` (string) — sdlc-utilities plugin version resolved via `getPluginVersion()`. Falls back to `'unknown'`.
+- P11 (issue #363): `reply_footer` (string) — pre-composed footer string for verbatim append to all reply bodies. Format: `'\n\n_via \`received-review-sdlc\` v{plugin_version}_'`.
 
 ## Error Handling
 
