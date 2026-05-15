@@ -1,6 +1,7 @@
 # Fixture appropriateness:
 #   jira-ticket-created            -- CORRECT: simulates a created Jira ticket, triggers workflow continuation
 #   jira-create-task               -- CORRECT: simulates Jira cache with project metadata for create operation
+#   jira-create-test-types         -- CORRECT: simulates Jira cache with Test Case / Test Plan issue types for template rendering
 #   jira-comment-adf               -- CORRECT: simulates Jira cache for comment operation with ADF conversion
 #   jira-multi-project-closed-list -- CORRECT: simulates jira.projects in config to trigger closed-list prompt
 #   jira-unsampled-transition      -- CORRECT: simulates cache with workflows[Type].unsampled=true to force live fallback
@@ -66,6 +67,76 @@
         contentFormat: "markdown" and the cloudId from cache. It does NOT fabricate
         fields not present in the cache (no components, no custom fields unless the
         user asked). The summary matches what the user requested exactly.
+
+- description: "jira-sdlc: renders Test Case template (Gherkin steps) on createJiraIssue"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-test-types.md"
+    user_request: >
+      Run /jira-sdlc. Create a Test Case in PROJ with summary "Verify login with
+      valid credentials". The Jira cache is loaded in the project context and the
+      shipped Test Case template applies (no override). Walk through the
+      createJiraIssue payload you would dispatch — show the resolved description
+      that will be sent.
+  assert:
+    # Must resolve the Test Case template (R18) — section anchors from templates/Test Case.md
+    - type: icontains
+      value: "Preconditions"
+    - type: icontains
+      value: "Steps"
+    - type: icontains
+      value: "Expected Results"
+    # Must include the Gherkin block from the shipped template
+    - type: regex
+      value: "(gherkin|Given|When|Then)"
+    # Must not fabricate a free-form description that ignores the template
+    - type: not-regex
+      value: "free.?form|free.?text|unstructured description"
+    # Behavioral: shipped Test Case template is read and applied verbatim
+    - type: llm-rubric
+      value: >
+        The response resolves the shipped `Test Case.md` template (no project override)
+        and renders its structural sections — Preconditions, Steps (with a Gherkin
+        Given/When/Then block), Expected Results, Test Data, Notes — into the
+        createJiraIssue description payload. The template content is treated as
+        the source of structure (R18); the skill does NOT invent a free-form
+        description or omit shipped sections. Placeholders left unresolved are
+        flagged or filled, never silently dropped.
+
+- description: "jira-sdlc: renders Test Plan template (Objective / Entry / Exit Criteria) on createJiraIssue"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-test-types.md"
+    user_request: >
+      Run /jira-sdlc. Create a Test Plan in PROJ with summary "Q2 release
+      regression plan". The Jira cache is loaded in the project context and the
+      shipped Test Plan template applies (no override). Walk through the
+      createJiraIssue payload you would dispatch — show the resolved description
+      that will be sent.
+  assert:
+    # Must resolve the Test Plan template (R18) — section anchors from templates/Test Plan.md
+    - type: icontains
+      value: "Objective"
+    - type: icontains
+      value: "Entry Criteria"
+    - type: icontains
+      value: "Exit Criteria"
+    # Must include scope partitioning from the shipped template
+    - type: regex
+      value: "(In Scope|Out of Scope|Scope)"
+    # Must not fabricate a free-form description that ignores the template
+    - type: not-regex
+      value: "free.?form|free.?text|unstructured description"
+    # Behavioral: shipped Test Plan template is read and applied verbatim
+    - type: llm-rubric
+      value: >
+        The response resolves the shipped `Test Plan.md` template (no project override)
+        and renders its structural sections — Objective, Scope (In Scope / Out of
+        Scope), Test Types, Entry Criteria, Exit Criteria, Risks and Mitigations,
+        Notes — into the createJiraIssue description payload. The template content
+        is treated as the source of structure (R18); the skill does NOT invent a
+        free-form description or omit shipped sections. Placeholders left
+        unresolved are flagged or filled, never silently dropped.
 
 - description: "jira-sdlc: converts comment to ADF before posting via addCommentToJiraIssue"
   vars:
