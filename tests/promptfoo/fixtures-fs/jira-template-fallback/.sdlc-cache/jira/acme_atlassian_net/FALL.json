@@ -12,7 +12,9 @@
     "Sub-bug": { "id": "10003", "subtask": true, "hierarchyLevel": -1 },
     "Sub-task": { "id": "10004", "subtask": true, "hierarchyLevel": -1 },
     "Subtask": { "id": "10005", "subtask": true, "hierarchyLevel": -1 },
-    "Whim": { "id": "10006", "subtask": false, "hierarchyLevel": 0 }
+    "Whim": { "id": "10006", "subtask": false, "hierarchyLevel": 0 },
+    "Test Case": { "id": "10007", "subtask": false, "hierarchyLevel": 0 },
+    "Test Plan": { "id": "10008", "subtask": false, "hierarchyLevel": 0 }
   },
   "fieldSchemas": {
     "Bug": { "summary": { "required": true, "type": "string" } },
@@ -20,7 +22,9 @@
     "Sub-bug": { "summary": { "required": true, "type": "string" } },
     "Sub-task": { "summary": { "required": true, "type": "string" } },
     "Subtask": { "summary": { "required": true, "type": "string" } },
-    "Whim": { "summary": { "required": true, "type": "string" } }
+    "Whim": { "summary": { "required": true, "type": "string" } },
+    "Test Case": { "summary": { "required": true, "type": "string" } },
+    "Test Plan": { "summary": { "required": true, "type": "string" } }
   },
   "workflows": {
     "Bug": { "transitions": {} },

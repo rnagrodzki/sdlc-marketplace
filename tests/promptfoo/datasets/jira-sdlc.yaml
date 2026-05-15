@@ -204,10 +204,10 @@
     project_context: "file://fixtures/jira-create-task.md"
     user_request: >
       Run /jira-sdlc. Create a Subtask in PROJ: "refactor cache layer". Note that
-      this skill ships templates only for Bug, Story, Task, Spike, and Epic — there
-      is no Subtask.md template, and no override is configured at
-      .claude/jira-templates/Subtask.md. Walk through how the skill resolves the
-      description template.
+      this skill ships templates only for Bug, Story, Task, Spike, Epic, Sub-task,
+      Test Case, and Test Plan — there is no Subtask.md template, and no override
+      is configured at .claude/jira-templates/Subtask.md. Walk through how the
+      skill resolves the description template.
   assert:
     # Must ask which template to use rather than fabricating a description
     - type: regex
@@ -220,7 +220,7 @@
       value: >
         The response recognizes that no Subtask template ships and no override
         exists, then prompts the user via AskUserQuestion with a closed list of
-        available templates (Bug, Story, Task, Spike, Epic) — never inventing a
+        available templates (Bug, Story, Task, Spike, Epic, Sub-task, Test Case, Test Plan) — never inventing a
         description and never proceeding with a free-form description. The skill
         treats the absence of a template as a user-resolution event (R18), not a
         silent fallback.

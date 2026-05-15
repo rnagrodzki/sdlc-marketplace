@@ -110,6 +110,8 @@ Default templates ship in `plugins/sdlc-utilities/skills/jira-sdlc/templates/` â
 - `Epic.md`
 - `Sub-task.md`
 - `Spike.md`
+- `Test Case.md`
+- `Test Plan.md`
 
 Project-level overrides live at `.claude/jira-templates/<IssueTypeName>.md`. File names must match Jira issue type names exactly (case-sensitive).
 
