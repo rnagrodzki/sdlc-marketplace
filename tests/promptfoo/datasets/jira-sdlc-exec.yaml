@@ -226,6 +226,10 @@
       value: '"Whim"'
     - type: icontains
       value: '"Sub-task": "default"'
+    - type: icontains
+      value: '"Test Case": "default"'
+    - type: icontains
+      value: '"Test Plan": "default"'
 
 - description: "jira-prepare: --check surfaces templates.fallbacks for unmapped subtask variants"
   vars:
