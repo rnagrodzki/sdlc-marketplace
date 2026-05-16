@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.20.9] - 2026-05-17
+
+### Fixed
+- plan-sdlc: removed autonomous critique session-recovery prompt (Step 0) and approval gate (Step 4); single touchpoint at Step 7 handoff (#388)
+- execute-plan-sdlc: guardrail injection, expectedFiles cross-check, --commit-waves WIP commits, post-compact implicit resume; ship-sdlc commitWaves config; commit-sdlc wip-squash path (#392)
+
 ## [0.20.8] - 2026-05-16
 
 ### Added
