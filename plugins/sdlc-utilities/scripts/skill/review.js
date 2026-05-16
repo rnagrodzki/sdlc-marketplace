@@ -47,6 +47,7 @@ const {
 const { readSection, writeLocalConfig, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
+const { getPluginVersion } = require(path.join(LIB, 'config-version'));
 
 // ---------------------------------------------------------------------------
 // Review config (.sdlc/review.json)
@@ -564,6 +565,7 @@ function main() {
     version:        1,
     timestamp:      new Date().toISOString(),
     subagent_model: 'sonnet',
+    plugin_version: getPluginVersion(),
     scope,
     base_branch:    base || null,
     current_branch: gitState.currentBranch,

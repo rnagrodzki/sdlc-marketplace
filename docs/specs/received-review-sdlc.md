@@ -34,6 +34,7 @@
   - Acceptance: prepare output includes `flags.skipConfigCheck` and a `migration` block (or null when skipped); SKILL.md gates further work on `errors.length === 0`.
 - R18 (issue #233): When `flags.alwaysFixSeverities` is non-empty, findings whose verdict is "agree, will fix" AND whose parsed severity is in the list bypass the Step 10 / Step 12 per-finding consent gate. Bypassed findings are auto-applied and emit a one-line `fixed: ...` log entry instead of a consent prompt. Findings with verdict "agree, will fix" but severity NOT in the list, findings with any other verdict, and findings whose severity could not be parsed (`severity: null`) all continue to require explicit user approval per R9. The default value when `alwaysFixSeverities` is unset is `[]`, which preserves the original R9 behavior across all findings. The setting applies uniformly to in-band review findings and ultrareview-driven findings.
 - R19 (issue #233): The `alwaysFixSeverities` field is read EXCLUSIVELY from `.sdlc/local.json` (the per-user, gitignored config). The prepare script MUST NOT consume the field from `.sdlc/config.json`. If the field is encountered in `.sdlc/config.json`, the prepare script emits exactly one warning line to stderr and ignores the value (treating it as if absent). The single resolution site for the field is the prepare script; SKILL.md decision sites cite `flags.alwaysFixSeverities` only and never re-read configuration.
+- R20 (issue #363): Every reply body posted by this skill MUST end with `_via \`received-review-sdlc\` v{plugin_version}_` on its own line, separated from the preceding body by a blank line. The footer is composed by the prepare script (`skill/received-review.js`) using `getPluginVersion()` and emitted as `manifest.reply_footer`; SKILL.md instructs verbatim append — the LLM MUST NOT compose, reformat, or modify the footer string. Falls back to `'unknown'` when `plugin.json` is unreadable. Applies to all four reply sites: Step 7 generic reply, Step 12 agree+fix reply, Step 12 pushback reply, and Step 12 won't-fix reply.
 
 ## Workflow Phases
 
@@ -82,6 +83,8 @@ Critique #2 (responses):
 - P7: `pr.repo` (string) — repository name
 - P8 (issue #233): `flags.alwaysFixSeverities` (string[]) — severities whose "will fix" findings bypass the per-finding consent gate. Resolved exclusively from `.sdlc/local.json` `receivedReview.alwaysFixSeverities`. Allowed values: `low | medium | high | critical`. Default `[]`. The script MUST emit a stderr warning and ignore the field if it appears in `.sdlc/config.json` (R19).
 - P9 (issue #233): `threads[].severity` (string|null) — per-thread severity parsed from the comment body using the review-sdlc severity tag format. `null` when absent or unparseable; such threads NEVER bypass the consent gate per R18.
+- P10 (issue #363): `plugin_version` (string) — sdlc-utilities plugin version resolved via `getPluginVersion()`. Falls back to `'unknown'`.
+- P11 (issue #363): `reply_footer` (string) — pre-composed footer string for verbatim append to all reply bodies. Format: `'\n\n_via \`received-review-sdlc\` v{plugin_version}_'`.
 
 ## Error Handling
 

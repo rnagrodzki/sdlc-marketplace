@@ -155,7 +155,7 @@ The command posts a single PR comment:
 ```markdown
 ## Code Review — 3 dimension(s), 7 finding(s)
 
-> Automated review by `sdlc:sdlc-reviewing-changes` · 2026-02-25
+> Automated review by `review-sdlc` v0.20.7 · 2026-02-25
 
 ### Summary
 
@@ -183,6 +183,8 @@ User-supplied `command` parameter is passed directly to `child_process.exec()` w
 
 </details>
 ```
+
+The attribution line includes the sdlc-utilities plugin version (e.g., `v0.20.7`) so reviewers can correlate findings with the skill version that produced them. The version is resolved by the prepare script and embedded in the comment footer — it does not change between runs of the same plugin version.
 
 ---
 

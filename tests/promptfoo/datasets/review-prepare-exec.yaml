@@ -1,0 +1,15 @@
+# Script execution tests for review.js plugin_version resolution (issue #363).
+# These run the harness scripts directly against fixture directories (no LLM).
+
+- description: "review-prepare (#363): manifest includes plugin_version matching semver or 'unknown'"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-review-plugin-version.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-current-v3"
+  assert:
+    # plugin_version must be present in the emitted manifest fragment.
+    - type: javascript
+      value: |
+        const semverOrUnknown = /^"plugin_version":"([0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?|unknown)"$/;
+        semverOrUnknown.test(output.replace(/\s/g, '').replace(/^\{/, '').replace(/\}$/, ''))

@@ -217,7 +217,7 @@ After all subagents complete and findings are deduplicated, post this as a singl
 ```markdown
 ## Code Review — {N} dimension(s), {M} finding(s)
 
-> Automated review by `review-sdlc` · {date}
+> Automated review by `review-sdlc` v{plugin_version} · {date}
 
 ### Summary
 
@@ -246,6 +246,8 @@ After all subagents complete and findings are deduplicated, post this as a singl
 
 ---
 ```
+
+**Template variable `{plugin_version}`:** Resolved by the prepare script (`review.js`) and emitted as `manifest.plugin_version`. The orchestrator reads it from the manifest and substitutes it verbatim — the `v` prefix is part of the template, not the value.
 
 **OWASP rendering rule:** When the finding contains an `**OWASP:**` value, append ` · OWASP {code}` to the File line (e.g., ``**File:** `src/auth/login.ts:42` · OWASP A07``). Omit the suffix entirely when the field is absent. The OWASP slot is opt-in per dimension — only dimensions whose body explicitly instructs OWASP tagging will populate it.
 

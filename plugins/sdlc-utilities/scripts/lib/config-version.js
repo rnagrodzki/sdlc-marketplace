@@ -481,4 +481,5 @@ module.exports = {
   resolveConfigPaths,
   detectCurrentVersion,
   fsSafeIsoTimestamp,
+  getPluginVersion,
 };

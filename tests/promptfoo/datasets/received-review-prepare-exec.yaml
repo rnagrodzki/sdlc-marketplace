@@ -46,6 +46,30 @@
     - type: not-icontains
       value: '"alwaysFixSeverities":["critical"]'
 
+- description: "received-review-prepare (#363): manifest includes plugin_version matching semver or 'unknown'"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-received-review-manifest-fields.js"
+    script_args: "--field plugin_version"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-current-v3"
+  assert:
+    # plugin_version must match semver or 'unknown'.
+    - type: javascript
+      value: |
+        /^([0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?|unknown)$/.test(output.trim())
+
+- description: "received-review-prepare (#363): manifest includes reply_footer matching expected format"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-received-review-manifest-fields.js"
+    script_args: "--field reply_footer"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-config-current-v3"
+  assert:
+    # reply_footer must match: newline + newline + _via `received-review-sdlc` v<version>_
+    - type: javascript
+      value: |
+        /^\n\n_via `received-review-sdlc` v\S+_$/.test(output)
+
 - description: "received-review-prepare (#233): schema rejection — sdlc-config.schema.json does NOT declare receivedReview at top level"
   vars:
     script_path: "repo://tests/promptfoo/scripts/run-schema-rejection-receivedreview.js"

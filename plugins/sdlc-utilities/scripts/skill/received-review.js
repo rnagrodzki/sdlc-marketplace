@@ -41,6 +41,7 @@ const {
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { readSection, readProjectConfig, resolveSdlcRoot } = require(path.join(LIB, 'config'));
+const { getPluginVersion } = require(path.join(LIB, 'config-version'));
 
 // ---------------------------------------------------------------------------
 // Severity parsing (issue #233)
@@ -267,6 +268,7 @@ function main() {
     stale: threads.filter(t => t.status === 'stale').length,
   };
 
+  const pluginVersion = getPluginVersion();
   const manifest = {
     version: 1,
     timestamp: new Date().toISOString(),
@@ -275,6 +277,8 @@ function main() {
     flags: { auto, alwaysFixSeverities },
     threads,
     summary,
+    plugin_version: pluginVersion,
+    reply_footer: '\n\n_via `received-review-sdlc` v' + pluginVersion + '_',
   };
 
   writeOutput(manifest, 'received-review-manifest');

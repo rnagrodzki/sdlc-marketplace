@@ -359,6 +359,76 @@
         flags.alwaysFixSeverities and notes that "medium" is NOT in the configured
         allowlist (which contains only "critical"), so the R18 bypass does not apply.
 
+- description: "received-review-sdlc (#363): agree+fix reply body ends with reply_footer"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-footer-context.md"
+    user_request: >
+      Run /received-review-sdlc --pr 42. The manifest has reply_footer: "\n\n_via `received-review-sdlc` v0.20.7_".
+      The user has agreed to fix Thread 1 (null check bug, comment ID 1001) and the fix has been applied.
+      Now post the reply for Thread 1. Show the exact body that will be passed to gh api.
+  assert:
+    - type: regex
+      value: '_via `received-review-sdlc` v\S+_'
+    - type: llm-rubric
+      value: >
+        The response posts a reply to Thread 1 (comment ID 1001) via gh api. The reply body ends
+        with the line "_via `received-review-sdlc` v0.20.7_" preceded by a blank line. The footer
+        is appended verbatim from manifest.reply_footer — it is not paraphrased or reformatted.
+        The main body of the reply describes what was fixed (the null check).
+
+- description: "received-review-sdlc (#363): pushback reply body ends with reply_footer"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-footer-context.md"
+    user_request: >
+      Run /received-review-sdlc --pr 42. The manifest has reply_footer: "\n\n_via `received-review-sdlc` v0.20.7_".
+      The user disagrees with Thread 2 (tokenize unused claim, comment ID 1002) — the function is
+      imported in two files. Post the pushback reply for Thread 2. Show the exact body.
+  assert:
+    - type: regex
+      value: '_via `received-review-sdlc` v\S+_'
+    - type: llm-rubric
+      value: >
+        The response posts a pushback reply to Thread 2 (comment ID 1002) via gh api. The reply body
+        ends with "_via `received-review-sdlc` v0.20.7_" preceded by a blank line. The footer is
+        appended verbatim from manifest.reply_footer. The pushback cites evidence (imports in
+        src/routes/search.ts and src/services/indexer.ts).
+
+- description: "received-review-sdlc (#363): won't-fix reply body ends with reply_footer"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-footer-context.md"
+    user_request: >
+      Run /received-review-sdlc --pr 42. The manifest has reply_footer: "\n\n_via `received-review-sdlc` v0.20.7_".
+      The user acknowledges Thread 2 (tokenize unused claim, comment ID 1002) but decides not to fix it this PR.
+      Post the "won't fix" reply. Show the exact body.
+  assert:
+    - type: regex
+      value: '_via `received-review-sdlc` v\S+_'
+    - type: llm-rubric
+      value: >
+        The response posts an "acknowledge, won't fix" reply to Thread 2 (comment ID 1002) via gh api.
+        The reply body ends with "_via `received-review-sdlc` v0.20.7_" preceded by a blank line.
+        The footer is appended verbatim from manifest.reply_footer.
+
+- description: "received-review-sdlc (#363): generic Step 7 reply body ends with reply_footer"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/pr-review-footer-context.md"
+    user_request: >
+      Run /received-review-sdlc --pr 42. The manifest has reply_footer: "\n\n_via `received-review-sdlc` v0.20.7_".
+      Draft a generic reply for Thread 1 (comment ID 1001) at Step 7 — before any agree/disagree
+      decision. Show the complete reply body that would be posted.
+  assert:
+    - type: regex
+      value: '_via `received-review-sdlc` v\S+_'
+    - type: llm-rubric
+      value: >
+        The response drafts a reply body for Thread 1. The body ends with the line
+        "_via `received-review-sdlc` v0.20.7_" preceded by a blank line. The footer is
+        appended verbatim from manifest.reply_footer — not rephrased or constructed inline.
+
 - description: "received-review-sdlc (#233): unset alwaysFixSeverities preserves R9 consent behavior across all findings"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
