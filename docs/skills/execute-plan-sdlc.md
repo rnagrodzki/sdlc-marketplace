@@ -34,6 +34,72 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 | `--workspace <branch\|worktree\|prompt>` | Workspace isolation mode when on the default branch. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. | `prompt` |
 | `--rebase <auto\|skip\|prompt>` | Rebase onto the default branch before execution. `auto` rebases silently (aborts on conflict), `skip` skips, `prompt` asks. | Skip |
 | `--branch <name>` | **INTERNAL** — set by ship-sdlc in pipeline mode. Passes the pre-created branch name so execute-plan-sdlc skips its own Step 1 workspace-isolation logic and trusts the caller's branch/cwd. Do not pass this directly. (Implements R30, fixes #378, #379.) | unset |
+| `--commit-waves` | After each wave passes G9 (mechanical/filesystem verify) and G11 (post-wave guardrail check), commit the wave as `wip(execute): wave N — <task titles>` (subject truncated to 72 chars). Hooks always run — `--no-verify` is never passed. The small-plan direct-execution path (R5) NEVER triggers per-wave commits regardless of this flag. Pairs with commit-sdlc's WIP-squash path so the final feature commit subsumes WIP commits via soft-reset. (Fixes #392 / R35.) | Off |
+
+---
+
+## Per-Wave WIP Commits (`--commit-waves`)
+
+When `--commit-waves` is set (CLI flag, or ship config `execute.commitWaves: true`), execute-plan-sdlc runs `git add -A && git commit -m "wip(execute): wave N — <titles>"` after each wave passes both G9 and G11. The commit subject is deterministic and truncated to 72 characters (with `…` appended on truncation). Hooks always run — `--no-verify` is never passed; a pre-commit hook failure escalates as a hard wave-level failure via Step 6 RECOVER.
+
+**Soft-success path:** when a wave produces no diff (every change was reverted by a hook, or the wave was a no-op), `git commit` returns "nothing to commit" — execute persists `committedSha: null` in the state file and surfaces a single notice `Wave N produced no diff — no WIP commit recorded.` Execution continues to the next wave.
+
+**Small-plan exception:** the small-plan direct-execution path (`Step 2b`, ≤3 tasks, all Trivial/Standard, no high-risk) NEVER triggers per-wave commits regardless of `--commit-waves`. Small plans complete inline in a single context and have no per-wave commit boundary.
+
+**Resume idempotency:** on `--resume`, execute iterates `waves[].committedSha`. Reachable shas (via `git merge-base --is-ancestor <sha> HEAD`) advance the resume pointer past the wave (skip reapply) and surface `Wave N already committed (<short-sha>) — skipping reapply.` Unreachable shas (force-pushed/branch reset) WARN with an explicit state-mismatch message and stop — there is no auto-recovery; the user resolves manually.
+
+The expected workflow with ship-sdlc: `execute.commitWaves: true` produces multiple `wip(execute):` commits across the branch, then commit-sdlc detects them at fork-point and squashes them into a single conventional-commit message via soft-reset. The final PR history shows one feature commit, not the per-wave WIPs.
+
+---
+
+## Post-Compact Implicit Resume
+
+`hooks/session-start.js` emits a distinct `Active execution (post-compact): execute-plan-sdlc on <branch> (wave N of M complete)` line into the SessionStart system-reminder context when the matcher source is `compact` AND execute state exists for the current branch. The legacy `Active execution:` line is preserved byte-stable for `startup`/`clear` matchers (prompt-cache protection).
+
+Step 0 of execute-plan-sdlc scans the system-reminder for this signal:
+
+| Signal combination | Behavior |
+|---|---|
+| `Active execution (post-compact):` present AND `Active pipeline: ship-sdlc` absent | Implicit `--resume`. Under `--auto`: silent resume. Interactive: one-line confirmation `Resuming execution from wave N — continue? (yes / no)` |
+| `Active execution (post-compact):` present AND `Active pipeline: ship-sdlc` ALSO present | Do NOT self-resume. Print `ship-sdlc owns recovery for this session; deferring.` and stop. ship-sdlc's own implicit-resume logic re-dispatches execute with `--resume`. |
+| Neither signal present and no `--resume` on CLI | Step 0 routing unchanged. |
+
+Implementation: `hooks/session-start.js` is layer-agnostic (it surfaces facts); the discriminator above is the consumer-side decision in `execute-plan-sdlc/SKILL.md` Step 0. (Fixes #392 / R36.)
+
+---
+
+## Guardrail Injection (per-task Agent prompts)
+
+Execution guardrails loaded in Step 1 (LOAD) from `.sdlc/config.json` → `execute.guardrails` are propagated through the wave manifest into every per-task and batched-trivial Agent prompt the wave-runner constructs. The injected block:
+
+```
+## Project Guardrails
+
+You MUST respect these constraints while implementing. Violations will fail post-wave verification.
+
+- **<id>** (<severity>): <description>
+- ...
+```
+
+When `activeGuardrails` is empty (`[]`), the entire `## Project Guardrails` section is omitted from agent prompts — no header, no stub. The manifest still carries the empty array for shape stability.
+
+The block is byte-stable within a single execute-plan-sdlc invocation (`activeGuardrails` is loaded once and treated as immutable) — this preserves the prompt-cache prefix across sibling per-task dispatches and survives retry dispatches at every escalation tier (haiku → sonnet → opus). Wave-runner MUST NOT add, remove, or modify entries in the manifest's `guardrails` array.
+
+Defense-in-depth: the existing pre-wave (G10) and post-wave (G11) guardrail checks in main context remain in force — guardrail injection into agent prompts is additive, not a replacement. (Fixes #392 / R33.)
+
+---
+
+## Expected-Files Cross-Check (Step 5c sub-step 1a)
+
+Each wave manifest carries `expectedFiles: string[]` — the deterministic union of every `Files: Create:` / `Files: Modify:` / `Files: Test:` path declared across the wave's tasks (computed by main context at wave build time; no LLM inference). After the wave-runner Agent returns, Step 5c's filesystem verification runs an additional cross-check at sub-step 1a:
+
+| Diff vs `expectedFiles` | Verdict | Action |
+|---|---|---|
+| `expectedFiles ≠ ∅` AND `diffFiles ∩ expectedFiles === ∅` | **HARD FAILURE** (wave-level phantom success — agent reported done but touched zero expected files) | Trigger existing failure flow (escalation budget / retry / Step 6 RECOVER / user surface) |
+| `diffFiles \ expectedFiles ≠ ∅` (diff touches files outside expected) | **SOFT WARNING** | Surface `Wave N touched files outside expectedFiles: <list>` and continue to step 2 |
+| `expectedFiles === ∅` (rare — wave tasks lack `Files:` declarations) | Skip sub-step 1a entirely | Existing per-task `filesChanged` check still runs |
+
+The 1a check augments — never replaces — the existing per-task `filesChanged` check. They guard different invariants: step 1 catches per-task agent drift; step 1a catches wave-level scope drift. (Fixes #392 / R34.)
 
 ---
 

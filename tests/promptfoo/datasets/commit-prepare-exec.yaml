@@ -211,3 +211,58 @@
     # Sanity: payload absent from stdout
     - type: not-icontains
       value: '"flags":'
+
+# ---------------------------------------------------------------------------
+# Fixes #392 / R35 — wip(execute): squash detection
+# ---------------------------------------------------------------------------
+
+- description: "commit-prepare: --no-squash-wip flag parses correctly"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_args: "--no-squash-wip"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: '"noSquashWip": true'
+
+- description: "commit-prepare: wipSquash.commits populated when wip(execute) commits exist since fork-point (#392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-wip-squash-clean"
+  assert:
+    - type: icontains
+      value: '"wipSquash"'
+    - type: icontains
+      value: '"commits"'
+    # Two wip(execute): wave N commits exist on the feature branch
+    - type: regex
+      value: '"commits":\s*\[\s*"[0-9a-f]{40}",\s*"[0-9a-f]{40}"\s*\]'
+    - type: icontains
+      value: '"stagedClean": true'
+
+- description: "commit-prepare: wipSquash.stagedClean=false when user staged hand-edits on top (#392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-wip-squash-with-staged"
+  assert:
+    - type: icontains
+      value: '"wipSquash"'
+    # One wip(execute) commit on the branch
+    - type: regex
+      value: '"commits":\s*\[\s*"[0-9a-f]{40}"\s*\]'
+    - type: icontains
+      value: '"stagedClean": false'
+
+- description: "commit-prepare: wipSquash.commits empty when only normal commits exist (#392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-wip"
+  assert:
+    - type: icontains
+      value: '"wipSquash"'
+    - type: regex
+      value: '"commits":\s*\[\s*\]'

@@ -850,3 +850,32 @@
   assert:
     - type: icontains
       value: '"repoAccessProbed": false'
+
+# ---------------------------------------------------------------------------
+# Fixes #392 / R35 — ship.execute.commitWaves forwarding to execute step
+# ---------------------------------------------------------------------------
+
+- description: "ship-prepare: execute.commitWaves=true forwards --commit-waves to execute step (#392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-commit-waves-on"
+  assert:
+    - type: icontains
+      value: "--commit-waves"
+    # Resolution provenance recorded on the merged flags
+    - type: icontains
+      value: '"executeCommitWaves": true'
+
+- description: "ship-prepare: execute.commitWaves=false omits --commit-waves from execute step (#392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-commit-waves-off"
+  assert:
+    - type: not-icontains
+      value: "--commit-waves"
+    - type: icontains
+      value: '"executeCommitWaves": false'

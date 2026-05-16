@@ -344,6 +344,26 @@ function mergeFlags(cli, config) {
     sources.awaitRemoteReviewers = 'default';
   }
 
+  // execute.commitWaves (boolean, default false) — Fixes #392 / R35.
+  // Forwarded to execute-plan-sdlc as `--commit-waves` when true. Resolved
+  // here (scripts-over-llm-logic guardrail) so SKILL.md only cites
+  // `step.invocation`, never raw `config.execute.commitWaves`.
+  const execCfg = (cfg && cfg.execute && typeof cfg.execute === 'object') ? cfg.execute : {};
+  if (execCfg.commitWaves === true) {
+    merged.executeCommitWaves  = true;
+    sources.executeCommitWaves = 'config';
+  } else if (execCfg.commitWaves === false) {
+    merged.executeCommitWaves  = false;
+    sources.executeCommitWaves = 'config';
+  } else {
+    merged.executeCommitWaves  = false;
+    sources.executeCommitWaves = 'default';
+    // Track non-boolean values so runValidation can emit a warning.
+    if (execCfg.commitWaves !== undefined) {
+      merged.commitWavesInvalidType = true;
+    }
+  }
+
   // Pass-through flags that don't come from config.
   merged.hasPlan        = cli.hasPlan;
   merged.dryRun         = cli.dryRun;
@@ -394,6 +414,11 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         flags.quality ? `--quality ${flags.quality}` : '',
         flags.workspace !== 'prompt' ? `--workspace ${flags.workspace}` : '',
         flags.rebase !== 'prompt' ? `--rebase ${flags.rebase}` : '',
+        // Forward --commit-waves when ship config sets execute.commitWaves:
+        // true. Pairs with commit-sdlc's wip(execute): squash path so the
+        // final feature commit subsumes per-wave WIP commits cleanly
+        // (Fixes #392 / R35).
+        flags.executeCommitWaves ? '--commit-waves' : '',
       ].filter(Boolean).join(' '),
       reason: !flags.hasPlan
         ? 'no plan in context'
@@ -811,6 +836,12 @@ function runValidation(flags, flagSources, steps, context) {
     coherentFlags = false;
   }
 
+  // execute.commitWaves must be a boolean; non-boolean values are silently
+  // treated as false — warn the user so they can correct the config.
+  if (flags.commitWavesInvalidType) {
+    warnings.push('execute.commitWaves in ship config is not a boolean — value ignored, defaulting to false. Set it to true or false explicitly.');
+  }
+
   // Always note conditional pause
   warnings.push('If review finds critical/high issues, pipeline will pause for fix approval');
 
@@ -1166,6 +1197,11 @@ function main() {
       awaitRemoteReviewTimeout: flags.awaitRemoteReviewTimeout,
       awaitRemoteReviewInterval: flags.awaitRemoteReviewInterval,
       awaitRemoteReviewers: flags.awaitRemoteReviewers,
+      // Fixes #392 / R35: execute.commitWaves resolved at config-merge time;
+      // forwarded as --commit-waves to the execute step's invocation (see
+      // computeSteps). Surfaced here so downstream consumers can introspect
+      // the resolution without parsing step args.
+      executeCommitWaves: flags.executeCommitWaves === true,
       skipConfigCheck,
       sources: flagSources,
     },

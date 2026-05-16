@@ -74,3 +74,63 @@
       value: "Pipeline state recovered after compaction"
     - type: not-icontains
       value: "otherbranch"
+
+# ---------------------------------------------------------------------------
+# Fixes #392 / R36 — post-compact execute-state line discriminator
+# ---------------------------------------------------------------------------
+
+- description: "session-start: matcher=compact + execute state emits 'Active execution (post-compact):'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-post-compact-no-ship"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "compact"
+  assert:
+    - type: icontains
+      value: "Active execution (post-compact): execute-plan-sdlc on feat/execute-only"
+    - type: not-icontains
+      value: "Active pipeline: ship-sdlc"
+
+- description: "session-start: matcher=startup + execute state emits legacy 'Active execution:' (byte-stable for prompt-cache)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-post-compact-no-ship"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "startup"
+  assert:
+    - type: icontains
+      value: "Active execution: execute-plan-sdlc on feat/execute-only"
+    - type: not-icontains
+      value: "(post-compact)"
+
+- description: "session-start: matcher=clear + execute state emits legacy 'Active execution:' (no post-compact suffix)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-post-compact-no-ship"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "clear"
+  assert:
+    - type: icontains
+      value: "Active execution: execute-plan-sdlc on feat/execute-only"
+    - type: not-icontains
+      value: "(post-compact)"
+
+- description: "session-start: matcher=compact + BOTH ship and execute states emits both lines (consumer-side discrimination, #392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-post-compact-with-ship"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "compact"
+  assert:
+    - type: icontains
+      value: "Active pipeline: ship-sdlc on feat/execute-and-ship"
+    - type: icontains
+      value: "Active execution (post-compact): execute-plan-sdlc on feat/execute-and-ship"

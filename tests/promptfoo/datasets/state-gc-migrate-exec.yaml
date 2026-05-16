@@ -281,3 +281,61 @@
   assert:
     - type: contains
       value: '"prunedOrphans":[]'
+
+# ---------------------------------------------------------------------------
+# Fixes #392 / R35 — state/execute.js wave-committed subcommand
+# ---------------------------------------------------------------------------
+
+- description: "state/execute.js wave-committed sets committedSha on a completed wave (#392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-committed --branch feat/commit-waves-state --wave 1 --sha abc1234567890abc1234567890abc1234567890a"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-commit-waves"
+  assert:
+    # Success path emits nothing on stdout/stderr — any "Error:" line means failure.
+    - type: not-icontains
+      value: "Error:"
+
+- description: "state/execute.js read returns committedSha when persisted in state file (#392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "read"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-commit-waves-already-committed"
+  assert:
+    - type: icontains
+      value: '"committedSha": "abc1234567890abc1234567890abc1234567890a"'
+
+- description: "state/execute.js wave-committed is idempotent on identical sha — re-running is a no-op (#392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-committed --branch feat/commit-waves-already --wave 1 --sha abc1234567890abc1234567890abc1234567890a"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-commit-waves-already-committed"
+  assert:
+    # No-op success — neither "Error:" nor any output
+    - type: not-icontains
+      value: "Error:"
+
+- description: "state/execute.js wave-committed errors on conflicting sha (#392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-committed --branch feat/commit-waves-already --wave 1 --sha deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-commit-waves-already-committed"
+  assert:
+    - type: icontains
+      value: "already has committedSha"
+    - type: icontains
+      value: "refusing to overwrite"
+
+- description: "state/execute.js wave-committed errors when wave not completed (#392)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-committed --branch feat/commit-waves-state --wave 2 --sha abc1234567890abc1234567890abc1234567890a"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-commit-waves"
+  assert:
+    - type: icontains
+      value: 'expected "completed"'
