@@ -89,6 +89,27 @@ The `model:` parameter is REQUIRED on every Agent tool dispatch — no exception
 
 6. **Apply risk spreading:** If a wave contains > 1 high-risk task, move the excess to the next wave
 
+6a. **Verification-boundary affinity (advisory tiebreaker — Fixes #392 / R34):** when two candidate orderings satisfy all dependency, same-file, wave-size-cap, and risk-spreading constraints equally, prefer the ordering that keeps tasks sharing a verification target (same `Verify:` value AND overlapping `Files:` directory prefixes) in the same wave. **Never sacrifice dependency correctness or any constraint above to honor this — it is a tiebreaker only.** This heuristic helps Step 5c-bis (expectedFiles cross-check) and the spec-compliance reviewer run against a coherent surface per wave.
+
+6b. **Compute per-wave `expectedFiles` (Fixes #392 / R34):** for every wave entry in the manifest, set `expectedFiles: string[]` to the deterministic union of every `Files: Create:` / `Files: Modify:` / `Files: Test:` path declared across the wave's tasks. No LLM inference; the plan-sdlc G10 "File existence" gate guarantees exact paths. Set `verificationHint: string` only when every task in the wave shares the same `Verify:` value (verbatim); otherwise omit the field.
+
+   Example wave manifest entry:
+
+   ```json
+   {
+     "wave": 2,
+     "tasks": [
+       { "id": "T7", "files": { "modify": ["src/auth/token.ts"], "test": ["src/auth/token.test.ts"] }, "verify": "npm test -- token" },
+       { "id": "T8", "files": { "modify": ["src/auth/token.ts", "src/auth/index.ts"] }, "verify": "npm test -- token" }
+     ],
+     "expectedFiles": ["src/auth/token.ts", "src/auth/token.test.ts", "src/auth/index.ts"],
+     "verificationHint": "npm test -- token",
+     "guardrails": [
+       { "id": "no-direct-db-access", "description": "Do not import db client outside repo layer", "severity": "error" }
+     ]
+   }
+   ```
+
 7. **Identify pre-wave trivials:** Trivial tasks that have downstream dependents in Wave 1 should run in the pre-wave. If there is only 1 pre-wave trivial, execute it inline. If there are 2+, dispatch them as a single batch agent (see Batched Trivial Tasks Prompt Template below).
 
 8. **Identify in-wave trivial batches:** Within each wave, if 2 or more tasks are classified Trivial, dispatch them together as a single haiku batch agent rather than executing each inline. A single trivial task in a wave is still executed inline. Same-file ordering rules apply within the batch (see Batched Trivial Tasks Prompt Template below).
@@ -115,8 +136,27 @@ Use this template for every per-task agent dispatch inside wave-runner. Fill all
 ```
 You are implementing a single task from a larger plan. Focus only on your assigned task.
 
+<!--
+Cache-stability note (Fixes #392 / R33): Within a single execute-plan-sdlc invocation,
+`activeGuardrails` is loaded once in Step 1 LOAD and treated as immutable. The rendered
+"## Project Guardrails" block below is therefore byte-identical across every per-task and
+sibling Agent prompt in the run — keep this section above any task-variable content to
+preserve the prompt-cache prefix.
+-->
+
+## Project Guardrails
+{Render this entire `## Project Guardrails` section ONLY when the wave manifest's `guardrails` array is non-empty. When empty (`[]`), OMIT this section entirely — no header, no stub.}
+
+You MUST respect these constraints while implementing. Violations will fail post-wave verification.
+
+{{#each guardrails}}
+- **{{id}}** ({{severity}}): {{description}}
+{{/each}}
+
 ## Your Task
 {PASTE FULL TASK TEXT HERE — include title, description, acceptance criteria, and any notes from the plan. Never summarize or paraphrase.}
+
+After implementation, list every file you actually modified — Step 5c-bis verifies your diff against the wave's `expectedFiles` manifest. Do not modify files outside the listed `Files You May Touch` set.
 
 ## Files You May Touch
 {List every file the agent is allowed to create or modify. The agent must not modify files outside this list. If you are unsure of a file name, give the directory and a description.}
@@ -196,6 +236,22 @@ Use this template when dispatching 2+ trivial tasks as a single batch agent insi
 
 ~~~
 You are implementing a batch of trivial tasks from a larger plan. Complete all tasks in the order listed. Each task is small and self-contained.
+
+<!--
+Cache-stability note (Fixes #392 / R33): same byte-stability requirement as the per-task
+template — guardrails section is static within a run; keep it above task-variable content.
+-->
+
+## Project Guardrails
+{Render this entire `## Project Guardrails` section ONLY when the wave manifest's `guardrails` array is non-empty. When empty (`[]`), OMIT this section entirely — no header, no stub.}
+
+You MUST respect these constraints while implementing. Violations will fail post-wave verification.
+
+{{#each guardrails}}
+- **{{id}}** ({{severity}}): {{description}}
+{{/each}}
+
+After completing each task, list every file you actually modified — Step 5c-bis verifies your diff against the wave's `expectedFiles` manifest. Do not modify files outside each task's `Files you may touch` list.
 
 ## Tasks (complete in order)
 

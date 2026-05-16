@@ -9,6 +9,7 @@
  *   node execute-state.js wave-start  --wave <n>
  *   node execute-state.js wave-done   --wave <n>
  *   node execute-state.js wave-fail   --wave <n>
+ *   node execute-state.js wave-committed --branch <b> --wave <n> --sha <sha>
  *   node execute-state.js task-done   --wave <n> --task <id> --name <name> --complexity <c> --risk <r> --files-changed <json>
  *   node execute-state.js task-fail   --wave <n> --task <id> --name <name> --complexity <c> --risk <r> --error <text>
  *   node execute-state.js context     --data <json>
@@ -81,6 +82,8 @@ function parseArgs(argv) {
       result.error = args[++i];
     } else if (a === '--data' && args[i + 1]) {
       result.data = args[++i];
+    } else if (a === '--sha' && args[i + 1]) {
+      result.sha = args[++i];
     } else if (a === '--ttl-days' && args[i + 1]) {
       const val = parseInt(args[++i], 10);
       if (isNaN(val)) { process.stderr.write(`Error: --ttl-days requires a number, got "${args[i]}"\n`); process.exit(2); }
@@ -275,6 +278,61 @@ function cmdWaveFail(opts) {
   wave.status = 'failed';
   wave.completedAt = new Date().toISOString();
 
+  writeState(filePath, data);
+  process.exit(0);
+}
+
+/**
+ * `wave-committed` — record the per-wave WIP commit sha on a completed wave.
+ * Implements Fixes #392 / R35 (`--commit-waves` state persistence).
+ *
+ * Idempotent on identical sha (re-running with the same sha is a no-op).
+ * Errors when the wave already has a different committedSha (conflict).
+ * Accepts `--sha ""` or omitted `--sha` as the explicit "no diff produced
+ * a commit" soft-success path: persists `committedSha: null`.
+ */
+function cmdWaveCommitted(opts) {
+  if (opts.wave == null || isNaN(opts.wave)) {
+    process.stderr.write('Error: --wave is required\n');
+    process.exit(2);
+  }
+
+  const branch = resolveBranchOrExit(opts.branch);
+  const slug = slugifyBranch(branch);
+  const found = readState('execute', slug);
+  if (!found) {
+    process.stderr.write(`Error: no state file found for branch "${branch}"\n`);
+    process.exit(1);
+  }
+
+  const { data, filePath } = found;
+  if (!Array.isArray(data.waves)) data.waves = [];
+
+  const wave = data.waves.find(w => w.number === opts.wave);
+  if (!wave) {
+    process.stderr.write(`Error: wave ${opts.wave} not found in state\n`);
+    process.exit(2);
+  }
+
+  if (wave.status !== 'completed') {
+    process.stderr.write(`Error: wave ${opts.wave} status is "${wave.status}", expected "completed"\n`);
+    process.exit(2);
+  }
+
+  // Normalize sha: empty string or undefined → null (soft-success "no diff")
+  const newSha = (typeof opts.sha === 'string' && opts.sha.length > 0) ? opts.sha : null;
+
+  // Idempotency / conflict check
+  if ('committedSha' in wave) {
+    if (wave.committedSha === newSha) {
+      // No-op: identical sha (or both null)
+      process.exit(0);
+    }
+    process.stderr.write(`Error: wave ${opts.wave} already has committedSha "${wave.committedSha}" — refusing to overwrite with "${newSha}"\n`);
+    process.exit(2);
+  }
+
+  wave.committedSha = newSha;
   writeState(filePath, data);
   process.exit(0);
 }
@@ -491,6 +549,7 @@ try {
     case 'wave-start':  cmdWaveStart(opts);  break;
     case 'wave-done':   cmdWaveDone(opts);   break;
     case 'wave-fail':   cmdWaveFail(opts);   break;
+    case 'wave-committed': cmdWaveCommitted(opts); break;
     case 'task-done':   cmdTaskDone(opts);   break;
     case 'task-fail':   cmdTaskFail(opts);   break;
     case 'context':     cmdContext(opts);    break;
@@ -499,7 +558,7 @@ try {
     case 'gc':          cmdGc(opts);         break;
     default:
       process.stderr.write(`Error: unknown subcommand "${opts.subcommand}"\n`);
-      process.stderr.write('Usage: node execute-state.js <init|wave-start|wave-done|wave-fail|task-done|task-fail|context|read|cleanup|gc> [options]\n');
+      process.stderr.write('Usage: node execute-state.js <init|wave-start|wave-done|wave-fail|wave-committed|task-done|task-fail|context|read|cleanup|gc> [options]\n');
       process.exit(2);
   }
 } catch (e) {

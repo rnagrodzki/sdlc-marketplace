@@ -21,6 +21,29 @@ const path = require('node:path');
 const pluginRoot = path.resolve(__dirname, '..');
 
 // ---------------------------------------------------------------------------
+// SessionStart matcher source (Fixes #392 / R36)
+// Stdin payload shape (Claude Code SessionStart hook): { hook_event_name: 'SessionStart', source: 'startup' | 'clear' | 'compact' | 'resume', ... }
+// Source determines whether the execute-state line is emitted as the legacy
+// `Active execution:` (byte-stable for startup/clear; protects prompt-cache)
+// or as the new `Active execution (post-compact):` signal that execute-plan-sdlc
+// Step 0 treats as implicit --resume.
+// ---------------------------------------------------------------------------
+
+let matcherSource = 'startup';
+try {
+  const stdinRaw = fs.readFileSync(0, 'utf8');
+  if (stdinRaw) {
+    const envelope = JSON.parse(stdinRaw);
+    if (envelope && typeof envelope.source === 'string') {
+      matcherSource = envelope.source;
+    }
+  }
+} catch {
+  // Stdin unreadable or non-JSON — keep default 'startup' (byte-stable
+  // legacy emission); graceful degradation per advisory-only contract.
+}
+
+// ---------------------------------------------------------------------------
 // Read plugin version
 // ---------------------------------------------------------------------------
 
@@ -101,7 +124,19 @@ try {
         const waves = executeState.data.waves;
         const completedWaves = waves.filter(w => w.status === 'completed').length;
         const totalWaves = waves.length;
-        resumeLines.push(`Active execution: execute-plan-sdlc on ${branch} (wave ${completedWaves} of ${totalWaves} complete)`);
+        // Fixes #392 / R36: emit a distinct `Active execution (post-compact):`
+        // line on compact matcher so execute-plan-sdlc Step 0 can treat it as
+        // implicit --resume. The legacy `Active execution:` line is preserved
+        // byte-stable for startup/clear matchers — protects prompt-cache and
+        // avoids breaking existing fast-path consumers (prompt-cache-hit-ratio
+        // guardrail). The hook is layer-agnostic: when both ship and execute
+        // states exist on compact, both lines are emitted; the consumer
+        // (SKILL.md Step 0) discriminates (ship-sdlc owns recovery).
+        if (matcherSource === 'compact') {
+          resumeLines.push(`Active execution (post-compact): execute-plan-sdlc on ${branch} (wave ${completedWaves} of ${totalWaves} complete)`);
+        } else {
+          resumeLines.push(`Active execution: execute-plan-sdlc on ${branch} (wave ${completedWaves} of ${totalWaves} complete)`);
+        }
         resumeLines.push('  Resume with: /execute-plan-sdlc --resume');
       }
     }

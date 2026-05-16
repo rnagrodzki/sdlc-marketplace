@@ -64,10 +64,7 @@ Write an implementation plan from requirements, a spec, or a user description. P
 
 **TodoWrite setup (full pipeline only):** Create TodoWrite items for Steps 1–7. Skip TodoWrite for lightweight plans.
 
-**Session recovery (full pipeline only):** Check if the plan file already has content. If yes, use AskUserQuestion:
-> Found existing plan draft with N tasks. Resume from critique (Step 3), or restart?
-
-Wait for explicit response. If "resume", re-read the plan file and skip to Step 3. If "restart", clear the file and begin fresh.
+**Session recovery (full pipeline only):** When the designated plan file already has content, restart and overwrite — do NOT prompt (implements R23 single-touchpoint default for Step 0). Clear the file in-place and begin fresh. If the user wants to preserve the prior draft, they can `cp` the file before invoking the skill.
 
 **Initialize plan file:** Write the skeleton header immediately:
 
@@ -317,21 +314,7 @@ If `activeGuardrails` is non-empty, append a `## Guardrail Compliance` section t
 | prefer-composition | warning | PASS | No class hierarchies proposed |
 ```
 
-Present to user via AskUserQuestion:
-
-1. **Requirements-to-task mapping:**
-   - Requirement 1 → Task 2, Task 3
-   - Requirement 2 → Task 4
-
-2. **Full task list summary:**
-   | Task | Name | Complexity | Risk |
-   |---|---|---|---|
-   | 1 | [name] | Standard | Low |
-   | ... | ... | ... | ... |
-
-3. **Options:** approve / change (describe what) / question (ask anything)
-
-Approval loop is unbounded. Do not proceed without explicit approval.
+Step 4 is autonomous (implements R22 single-touchpoint handoff). After fixes are applied (and the Guardrail Compliance section written when `activeGuardrails` is non-empty), proceed directly to Step 5. The user does NOT see the plan at Step 4; the single user touchpoint for the finalized plan is Step 7 (Handoff). The Step 4 error-severity guardrail-block harden offer above remains a genuine decision gate and is preserved (R19).
 
 ## Step 5 (CRITIQUE): Plan Review Loop
 
@@ -426,6 +409,7 @@ Then call ExitPlanMode. Do NOT invoke execute-plan-sdlc or ship-sdlc in this tur
 - Put plans in plugin-branded directories (no `docs/superpowers/plans/`)
 - Ignore plan mode's designated file path when plan mode is active — always write to it
 - Use TodoWrite for lightweight plans — it adds overhead without value
+- Prompt the user at Step 0 session-recovery or Step 4 — those steps are autonomous (single-touchpoint at Step 7, implements R22/R23)
 
 ## Gotchas
 

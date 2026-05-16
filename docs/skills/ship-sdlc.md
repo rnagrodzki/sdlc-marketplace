@@ -460,6 +460,13 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 | `awaitRemoteReviewTimeout` | `integer` (≥30) | `600` | Maximum seconds await-remote-review polls before giving up with a warning. (R57) |
 | `awaitRemoteReviewInterval` | `integer` (≥10) | `60` | Seconds between await-remote-review poll attempts. (R57) |
 | `awaitRemoteReviewers` | `string[]` (minItems 1) | `["copilot"]` | Logins (case-insensitive) whose reviews satisfy await-remote-review. When the login is `copilot`, the reviewer must also be a Bot. (R56, R57) |
+| `execute.commitWaves` | `boolean` | `false` | Forwards `--commit-waves` to the execute step. When `true`, execute-plan-sdlc commits each wave as `wip(execute): wave N — <titles>` after G9+G11 pass; commit-sdlc then squashes those WIP commits via soft-reset into the final feature commit. User-facing pipeline behavior is unchanged — WIPs accumulate, then squash. (Fixes #392 / R35.) |
+
+### `execute.commitWaves` Forwarding
+
+When `execute.commitWaves: true` in `.sdlc/local.json` → `ship` section, `scripts/skill/ship.js` appends `--commit-waves` to the execute step's `step.invocation`. Resolution is centralized in the prepare script (per `scripts-over-llm-logic` and `flag-coherence-cross-skill` guardrails); SKILL.md cites `step.invocation` verbatim and never reads `config.execute.commitWaves` directly. The execute step then commits per-wave WIPs; the subsequent commit step (commit-sdlc) auto-detects them and squashes via soft-reset to fork-point — the final PR history shows a single feature commit, not the per-wave WIPs.
+
+To opt out for a single run without editing config, the user can omit the field (or set it to `false`). There is no CLI override for ship-sdlc; the user-facing knob is `execute.commitWaves` in `.sdlc/local.json`.
 
 ### Migrating legacy configs
 

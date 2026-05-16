@@ -54,8 +54,8 @@ For plans with 5+ tasks, the skill also writes a `## Key Decisions` section — 
 When Claude Code's [plan mode](https://docs.anthropic.com/en/docs/claude-code/plan-mode) is active, the skill adapts automatically:
 
 - **Incremental plan file building:** The plan evolves in the designated file across the pipeline. Step 0 writes a skeleton header immediately and loads plan guardrails from project config. Step 1 fills in the header fields and appends a Requirements section. Step 2 appends tasks. Steps 4 and 6 rewrite the file with critique fixes applied.
-- **Session recovery:** If the plan file already has content when the skill starts, it uses `AskUserQuestion` to ask whether to resume from critique or restart — no scratchpad needed, the plan file itself is the checkpoint.
-- **All interaction via AskUserQuestion:** Requirements gathering, scope clarification, and approval prompts all go through `AskUserQuestion`, which is compatible with plan mode constraints.
+- **Session recovery (autonomous default):** If a draft plan file already exists when the skill starts, it is overwritten — pre-existing drafts are discarded. Save a copy before invoking if you want to preserve it. (Fixes #388 — Step 0 is autonomous; the single user touchpoint for the finalized plan is Step 7 Handoff.)
+- **User interactions (genuine decision gates only):** `AskUserQuestion` is used for requirements gathering when the spec is missing/ambiguous, scope-split prompts, OpenSpec routing, the Step 6 reviewer-loop max-iterations escalation, the Step 4 error-severity guardrail-block harden offer, and the Step 7 handoff menu. The Step 0 session-recovery prompt and Step 4 plan-approval prompt have been removed — those steps now run autonomously.
 - **TodoWrite for progress tracking:** In full-pipeline runs, `TodoWrite` items are created for Steps 1–7 so you can see planning progress.
 - **Handoff:** The skill calls `ExitPlanMode` at the end — Claude Code presents the plan for your review. No manual exit needed.
 - **After approval:** Once you approve the plan in Claude Code's review UI, invoke `/ship-sdlc` for the full pipeline (execute, commit, review, version, PR), or `/execute-plan-sdlc` for execution only.
@@ -172,7 +172,7 @@ Invoke `/plan-sdlc` while Claude Code plan mode is active:
 1. The skill detects plan mode and writes a skeleton header to the designated plan file immediately — the file is initialized before any exploration begins
 2. After requirements discovery and codebase exploration, the plan file is updated: header fields (Goal, Architecture, Verification) are filled in and a Requirements section is appended
 3. After task decomposition, task blocks (and a Key Decisions section, if applicable) are appended to the plan file
-4. After self-critique (Step 3) — which includes a guardrail compliance gate checking every task against the loaded guardrails — and user approval (Step 4), the plan file is rewritten with all fixes applied; a `## Guardrail Compliance` section is appended listing each guardrail and its pass/fail status
+4. After self-critique (Step 3) — which includes a guardrail compliance gate checking every task against the loaded guardrails — the plan file is rewritten with all fixes applied autonomously in Step 4; a `## Guardrail Compliance` section is appended listing each guardrail and its pass/fail status. Step 4 does NOT prompt for plan approval (Fixes #388); the user sees the plan only at the Step 7 handoff. The Step 4 error-severity guardrail-block harden offer remains the only user touchpoint at this stage
 5. The skill calls `ExitPlanMode` — Claude Code presents the finalized plan for your review; the cross-model reviewer also receives the guardrails as a `{GUARDRAILS}` template variable so the second model can verify compliance independently
 6. After you approve, execution begins automatically — `/execute-plan-sdlc` is auto-invoked with the plan already in context
 

@@ -190,3 +190,51 @@
         mechanism (those are removed). It explicitly notes that even if a failure path skips the
         explicit cleanup branches that previously existed, the trap still removes the manifest, so
         no `commit-context-*.json` file remains in `$TMPDIR` (or anywhere) after exit.
+
+# ---------------------------------------------------------------------------
+# Fixes #392 / R35 — wip(execute): squash behavioral cases
+# ---------------------------------------------------------------------------
+
+- description: "commit-sdlc: squashes wip(execute): commits via soft-reset when stagedClean=true (#392)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-wip-squash.md"
+    user_request: >
+      Walk through Step 1c of commit-sdlc. Show the bash commands you would run to soft-reset
+      to fork-point, then describe what happens to the WIP commits and to the working tree.
+      Confirm whether the orchestrator's generated subject can start with `wip:`.
+  assert:
+    - type: icontains
+      value: "git reset --soft"
+    - type: icontains
+      value: "git add -A"
+    - type: not-icontains
+      value: "--no-verify"
+    - type: llm-rubric
+      value: >
+        The response describes Step 1c soft-reset: resolves fork-point (via merge-base with
+        upstream or default branch), runs `git reset --soft <fork-point>`, then `git add -A`
+        to re-stage. The WIP commits are dropped from history; the working tree is unchanged.
+        The response confirms the final commit subject MUST NOT start with `wip:` or
+        `wip(execute):` — enforced both by an LLM-side reminder in Step 2 and a deterministic
+        post-generation regex check in scripts/skill/commit.js (the load-bearing layer per
+        scripts-over-llm-logic guardrail).
+
+- description: "commit-sdlc: --no-squash-wip preserves wip(execute) commits in branch history (#392)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-wip-squash.md"
+    user_request: >
+      Same branch state as the fixture, but the user passed --no-squash-wip. Walk through
+      Step 1c. What does commit-sdlc print, and does it run git reset --soft?
+  assert:
+    - type: icontains
+      value: "--no-squash-wip"
+    - type: not-icontains
+      value: "git reset --soft"
+    - type: llm-rubric
+      value: >
+        The response notes that --no-squash-wip is set, so Step 1c prints a notice along
+        the lines of "Detected N wip(execute): commit(s) ... preserving (--no-squash-wip)"
+        and SKIPS the soft-reset. The WIP commits remain in branch history. Step 2 PLAN
+        proceeds with the existing staged diff unchanged.

@@ -356,3 +356,75 @@
         isolation value). The SDLC workspace worktree flag is handled via
         util/worktree-create.js, not the Agent SDK isolation parameter.
         The response must reference the DO NOT note in Step 5b or R-no-agent-sdk-isolation.
+
+# ---------------------------------------------------------------------------
+# Fixes #392 — Track B behavioral cases
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc: per-task Agent prompt contains '## Project Guardrails' section when guardrails non-empty (#392 / R33)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-guardrail-injection.md"
+    user_request: >
+      Show the per-task Agent prompt the wave-runner would dispatch for Task T1 in Wave 1.
+      Include the full "## Project Guardrails" section verbatim. activeGuardrails has 2 entries
+      (one error, one warning).
+  assert:
+    - type: icontains
+      value: "## Project Guardrails"
+    - type: icontains
+      value: "no-direct-db-access"
+    - type: icontains
+      value: "no-axios"
+    - type: icontains
+      value: "You MUST respect these constraints"
+    - type: llm-rubric
+      value: >
+        The response renders a per-task Agent prompt that contains a "## Project Guardrails"
+        section near the top with prescriptive framing ("You MUST respect these constraints").
+        Both guardrails (no-direct-db-access at error severity, no-axios at warning severity)
+        are listed with their id, severity, and description. The section is placed BEFORE
+        "Files You May Touch" or task-variable content to preserve prompt-cache prefix
+        stability across sibling per-task dispatches.
+
+- description: "execute-plan-sdlc: Step 5c sub-step 1a flags HARD failure when expectedFiles ∩ diff is empty (#392 / R34)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-expected-files-hard-fail.md"
+    user_request: >
+      Walk through Step 5c sub-step 1a (expectedFiles cross-check) for Wave 2. The wave-runner
+      returned WAVE_SUMMARY with filesChanged=[docs/notes.md] but the wave manifest's
+      expectedFiles is [src/auth/token.ts, src/auth/token.test.ts]. What is the verdict and
+      next action?
+  assert:
+    - type: icontains
+      value: "HARD"
+    - type: icontains
+      value: "phantom"
+    - type: llm-rubric
+      value: >
+        The response identifies this as a HARD FAILURE (wave-level phantom success): the
+        intersection of expectedFiles and the actual diff is empty, and expectedFiles is
+        non-empty. The next action is to trigger the existing failure flow (escalation budget
+        / retry / Step 6 RECOVER / user surface). The response does NOT proceed to subsequent
+        sub-steps in 5c after the failure verdict.
+
+- description: "execute-plan-sdlc: Step 5c sub-step 1a surfaces SOFT warning when diff touches files outside expected (#392 / R34)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-expected-files-soft-warning.md"
+    user_request: >
+      Walk through Step 5c sub-step 1a (expectedFiles cross-check) for Wave 1. The diff
+      touches src/auth/token.ts (in expectedFiles) AND src/auth/index.ts (NOT in
+      expectedFiles). What is the verdict and what is surfaced to the user?
+  assert:
+    - type: icontains
+      value: "SOFT"
+    - type: icontains
+      value: "outside expectedFiles"
+    - type: llm-rubric
+      value: >
+        The response identifies this as a SOFT WARNING — the diff touches one or more files
+        outside expectedFiles. The response surfaces a single line of the form
+        "Wave N touched files outside expectedFiles: <list>" naming src/auth/index.ts. Execution
+        CONTINUES to step 2 (canary check) — the soft warning does NOT block.

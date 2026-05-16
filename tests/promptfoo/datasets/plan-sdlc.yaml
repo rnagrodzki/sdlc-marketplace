@@ -206,6 +206,45 @@
         remain forbidden. The response does NOT classify the plan as PASS.
 
 
+- description: "plan-sdlc: step-0-and-4-run-autonomously (Fixes #388)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-388-autonomous-flow.md"
+    user_request: >
+      Run /plan-sdlc. The designated plan file at ~/.claude/plans/2026-05-16-data-export-dry-run.md
+      already exists with a stale partial draft (see fixture). Walk through how the new R22/R23
+      flow handles Step 0 session recovery and Step 4 plan approval. Show what the user sees from
+      the FIRST interaction (Step 0) through the LAST interaction (Step 7 handoff). Be explicit
+      about which AskUserQuestion calls fire and which do NOT fire under the new defaults.
+  assert:
+    # MUST NOT show the removed Step 0 session-recovery prompt
+    - type: not-icontains
+      value: "Found existing plan draft"
+    - type: not-icontains
+      value: "Resume from critique"
+    # MUST NOT show the removed Step 4 approval prompt
+    - type: not-icontains
+      value: "Requirements-to-task mapping"
+    - type: not-icontains
+      value: "Approval loop is unbounded"
+    # MUST show Step 7 handoff menu items (the SOLE user touchpoint)
+    - type: icontains
+      value: "ship"
+    - type: icontains
+      value: "execute"
+    - type: icontains
+      value: "done"
+    - type: llm-rubric
+      value: >
+        The response demonstrates the new autonomous Step 0 + Step 4 flow (Fixes #388 R22/R23):
+        Step 0 silently overwrites the pre-existing draft plan file without prompting; Step 4
+        applies critique fixes and proceeds DIRECTLY to Step 5 without showing a
+        "Requirements-to-task mapping" or "approve/change/question" prompt. The response
+        explicitly notes that the user sees the plan for the first time at the Step 7
+        Handoff menu (ship / execute / done). The response preserves the genuine remaining
+        user gates (requirements gathering when ambiguous, OpenSpec routing, reviewer-loop
+        escalation, Step 4 error-severity guardrail harden offer, Step 7 menu).
+
 - description: "plan-sdlc: link verification (R18, #198) — invokes script gate at Step 6.5 before handoff"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"

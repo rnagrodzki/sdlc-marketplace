@@ -87,11 +87,22 @@ class ScriptRunnerProvider {
       env.PATH = stubBin + path.delimiter + (env.PATH || '');
     }
 
+    // Optional stdin payload (string passed as-is, or object JSON-serialized).
+    // Supports testing hooks that read JSON envelopes on stdin (e.g.,
+    // SessionStart hook's matcher source per Fixes #392).
+    let scriptStdin;
+    if (vars.script_stdin !== undefined && vars.script_stdin !== null) {
+      scriptStdin = (typeof vars.script_stdin === 'string')
+        ? vars.script_stdin
+        : JSON.stringify(vars.script_stdin);
+    }
+
     const result = spawnSync('node', [scriptPath, ...scriptArgs], {
       timeout: 30_000,
       encoding: 'utf8',
       cwd,
       env,
+      input: scriptStdin,
     });
 
     const rawStdout = result.stdout ?? '';

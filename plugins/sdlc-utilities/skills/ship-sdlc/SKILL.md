@@ -78,7 +78,10 @@ Check for ship config via skill/ship.js output (reads from `.sdlc/local.json` �
 Ship config loaded from .sdlc/local.json (schema v2)
   steps: [execute, commit, review, archive-openspec, pr], draft: false, bump: patch
   reviewThreshold: high
+  execute.commitWaves: false
 ```
+
+The `execute.commitWaves` field (Fixes #392 / R35) controls per-wave WIP commits during the execute step. Default `false`. When set to `true` in ship config, `--commit-waves` is appended to the execute step's invocation; the execute-plan-sdlc skill then runs `git add -A && git commit -m "wip(execute): wave N — <titles>"` after each wave's G9 + G11 pass. The subsequent commit step (commit-sdlc) detects the `wip(execute):` commits since fork-point and squashes them via soft-reset into the final feature commit, so the user-facing PR history is unchanged. Resolution is centralized in `scripts/skill/ship.js` (per `scripts-over-llm-logic` and `flag-coherence-cross-skill` guardrails) — SKILL.md cites `step.invocation`, never raw `config.execute.commitWaves`.
 If not found: `No ship config found — using built-in defaults. Run /setup-sdlc to configure.`
 
 **Legacy v1 auto-migration:** If the loader detects a v1 config (no top-level `version`, with `ship.preset` or `ship.skip`), it migrates in place to schema v2 and emits a single stderr deprecation notice. The migrated shape (`ship.steps[]`) is what subsequent steps consume.

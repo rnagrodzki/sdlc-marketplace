@@ -2,7 +2,7 @@
 name: execute-plan-sdlc
 description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan. Also auto-triggered when the user accepts a plan from plan-sdlc (plan content is already in conversation context)."
 user-invocable: true
-argument-hint: "[plan-file-path] [--quality full|balanced|minimal] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto] [--branch <name>]"
+argument-hint: "[plan-file-path] [--quality full|balanced|minimal] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto] [--branch <name>] [--commit-waves]"
 model: sonnet
 ---
 
@@ -86,7 +86,15 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
      If "restart", delete the state file and proceed to plan loading below.
   5. Load the `context` object: use `completedTaskIds` to identify remaining tasks, `filesAdded`/`filesModified` for filesystem awareness, `interfacesCreated` and `decisionsFromPriorWaves` for agent prompt context.
   6. Load the `quality` from the state file (CLI `--quality` overrides if provided).
-  7. Skip to Step 5, resuming from the first wave with status `in_progress` or `pending`. Use the context object to construct inter-wave context for the next wave's agent prompts.
+  7. **`committedSha` idempotency check (Fixes #392 / R35).** Iterate `waves[]`. For each wave with `committedSha` set to a non-null string:
+     - Reachability: `git merge-base --is-ancestor <committedSha> HEAD`.
+       - Exit 0 (reachable): mark the wave as "already committed; skip reapply" and advance the resume pointer past it as if `status === 'completed'`. Surface a one-line notice `Wave N already committed (<short-sha>) — skipping reapply.`
+       - Exit non-zero (sha not reachable — branch was force-pushed, reset, or commit dropped): WARN with the explicit state-mismatch message `Wave N state mismatch: committed sha <sha> is not reachable from HEAD. Refusing to auto-recover — resolve manually (e.g., reset to that sha or restart execution).` Do NOT auto-recover; stop. This is an idempotency check, not an auto-recovery mechanism.
+     - `committedSha: null` (recorded soft-success "no diff produced a commit"): treat exactly like `status === 'completed'`, no reachability check needed — the wave had nothing to commit, so re-running it would do nothing.
+     - `committedSha` absent: pre-existing waves from runs where `--commit-waves` was off — fall through to the normal `status`-based resume pointer logic.
+  8. Skip to Step 5, resuming from the first wave with status `in_progress` or `pending`. Use the context object to construct inter-wave context for the next wave's agent prompts.
+
+  > The small-plan direct-execution path (R5, Step 2b) NEVER triggers per-wave commits regardless of `--commit-waves`. Resume of a small-plan run therefore never encounters a `committedSha` field.
 
 - If `--resume` was NOT passed but a state file exists for the current branch:
   - If `--auto` is set: **skip the stale state file and start a fresh run** (do not prompt, do not auto-resume). Print: "Existing state file found for branch `<branch>` but --resume not passed. Starting fresh."
@@ -95,7 +103,33 @@ Note: this reads `execute.guardrails` (runtime enforcement), not `plan.guardrail
     Options: **yes** — resume | **restart** — discard state file and start fresh
     If "yes", follow the resume flow above (steps 2-7). If "restart", delete the state file and proceed normally.
 
+### Post-compact recovery (Fixes #392 / R36)
+
+In addition to the explicit `--resume` flag, Step 0 MUST scan the SessionStart `<system-reminder>` context for the literal string `Active execution (post-compact):` (emitted by `hooks/session-start.js` when the matcher source is `compact` and execute state exists for the current branch):
+
+1. **`Active execution (post-compact):` present AND `Active pipeline: ship-sdlc` ABSENT** in the same system-reminder block:
+   - Set `implicitResume = true`. This is functionally equivalent to `--resume` being passed on the CLI — the rest of Step 0 takes the resume codepath above (resume detection step 1: locate the most recent state file for the current branch, then steps 2–8 including the `committedSha` idempotency check).
+   - When `--auto` is also active: proceed without any user prompt; jump straight to resume execution. The implicit-resume action is silent.
+   - When `--auto` is NOT active: emit ONE `AskUserQuestion`:
+     > Resuming execution from wave N — continue? (yes / no)
+     Where `N` is the wave number reported in the `Active execution (post-compact):` line. On `yes`: proceed to resume codepath. On `no`: stop without modifying state (user can re-invoke explicitly later with `--resume` or restart fresh).
+
+2. **`Active execution (post-compact):` present AND `Active pipeline: ship-sdlc` ALSO present**:
+   - Do NOT self-resume. Print a single line:
+     > ship-sdlc owns recovery for this session; deferring.
+   - Stop. The discriminator preserves ship-sdlc's ownership of pipeline-level recovery — ship-sdlc's own implicit-resume logic re-dispatches execute-plan-sdlc with `--resume` as the next pipeline step (R-implicit-resume). Running both recoveries concurrently would double-dispatch the same wave.
+
+3. **Neither signal present AND no `--resume` on CLI**: Step 0 routing is unchanged from prior behavior.
+
+The hook is layer-agnostic (it surfaces facts); this discriminator is the consumer-side decision. Implementation: see `hooks/session-start.js` for the source-aware emission.
+
 **Parse `--auto`:** If `--auto` was passed, store the flag. Auto mode suppresses interactive prompts: resume detection auto-resumes if state exists, high-risk gates auto-approve, and quality-tier selection uses the value from `--quality` (required when `--auto` is set).
+
+**Parse `--commit-waves` (Fixes #392 / R35):** If `--commit-waves` was passed, store `commitWaves = true`. Default `false`. When set, Step 5d gates a per-wave WIP commit after G9+G11 pass (see "5d (per-wave commit)" below). The small-plan direct-execution path (R5, Step 2b) NEVER triggers per-wave commits regardless of this flag. Inline help summary:
+
+| Flag | Description | Default |
+|---|---|---|
+| `--commit-waves` | Commit each completed wave as `wip(execute): wave N — <titles>` after G9 + G11 pass. Skipped for small-plan path (R5). | false |
 
 **Parse `--branch`:** If `--branch <name>` was passed as an argument, capture it as `EXECUTE_NEW_BRANCH` immediately. This is an **INTERNAL flag set by ship-sdlc in pipeline mode**. When present, skip the entire Workspace isolation check below — the caller's branch/cwd are trusted as authoritative. Users do not pass this directly. Implements R30 (fixes #378, #379).
 
@@ -333,6 +367,29 @@ Options:
 2. Inline the full content of the per-task template from `./classifying-and-waving-tasks.md` (lines 109–187) as the `perTaskTemplate` input.
 3. When the wave contains 2+ Trivial tasks, also inline the batched-trivial template from `./classifying-and-waving-tasks.md` (lines 189–257) as the `batchedTrivialTemplate` input.
 4. Provide the complete wave manifest: `waveNumber`, `totalWaves`, `qualityTier`, `escalationBudget: 2`, and the full task array with `id`, `name`, `complexity`, `risk`, `files`, `description`, `acceptanceCriteria`, `assignedModel`, and `verifyToken` for each task.
+
+   **Manifest extensions (Fixes #392 — R33/R34):** every wave manifest MUST additionally carry:
+   - `guardrails: [{id, description, severity}]` — sourced verbatim from `activeGuardrails` loaded in Step 1 (Guardrail loading block above). When `activeGuardrails` is empty, the field is still present as `[]` (stable shape across waves — never omitted). Wave-runner threads this into the conditional `## Project Guardrails` block of every per-task and batched-trivial Agent prompt; when empty the block renders nothing.
+   - `expectedFiles: string[]` — deterministic union of every `Files: Create:` / `Files: Modify:` / `Files: Test:` path declared across the wave's tasks (computed by main context during wave build per `classifying-and-waving-tasks.md` step 6b). Used by Step 5c-bis to cross-check `git diff --stat` output.
+   - `verificationHint?: string` — optional; populated only when every task in the wave shares the same `Verify:` value verbatim.
+
+   Concrete example:
+
+   ```json
+   {
+     "waveNumber": 2,
+     "totalWaves": 4,
+     "qualityTier": "balanced",
+     "escalationBudget": 2,
+     "tasks": [ /* … per-task entries with id/name/complexity/risk/files/description/acceptanceCriteria/assignedModel/verifyToken … */ ],
+     "guardrails": [
+       { "id": "no-direct-db-access", "description": "Do not import db client outside repo layer", "severity": "error" }
+     ],
+     "expectedFiles": ["src/auth/token.ts", "src/auth/token.test.ts", "src/auth/index.ts"],
+     "verificationHint": "npm test -- token"
+   }
+   ```
+
 5. Provide `priorWaveContext` from the state: `planSummary`, `completedTaskIds`, `filesAdded`, `filesModified`, `interfacesCreated`, `decisionsFromPriorWaves`.
 
 Dispatch with:
@@ -348,6 +405,13 @@ The wave-runner Agent handles in-wave per-task fan-out internally — it dispatc
 0. **Parse `WAVE_SUMMARY`:** Extract the `WAVE_SUMMARY: <json>` token from the wave-runner's final line. This provides per-task `filesChanged`, `verifyToken`, `status`, and `attempts`. If the token is missing or malformed, re-dispatch the wave-runner once with a format reminder (counts as a wave-level retry).
 
 1. **Filesystem verification (mandatory, always first):** Run `git diff --stat` in the main context. For each task in `WAVE_SUMMARY.tasks`, confirm that the files in `filesChanged` actually appear in the diff. If the wave-runner reported success for a task but `git diff --stat` shows no changes to its expected files, classify this as a **phantom success** (see Step 6).
+
+   **1a. `expectedFiles` cross-check (Fixes #392 / R34) — IN ADDITION to step 1, not a replacement.** Compute `diffFiles` from the same `git diff --stat` output (the file set with non-zero `+/-` lines). Compute `expectedSet = wave.expectedFiles` from the wave manifest.
+   - If `expectedSet ≠ ∅` AND `diffFiles ∩ expectedSet === ∅`: **HARD FAILURE** — phantom success at the wave level (wave-runner reported done but touched zero expected files). Trigger the existing failure flow (escalation budget / retry / Step 6 recovery / user surface) — do NOT proceed to subsequent sub-steps.
+   - If `diffFiles \ expectedSet ≠ ∅` (the diff touches files outside `expectedFiles`): **SOFT WARNING** — surface a single line `Wave N touched files outside expectedFiles: <comma-separated diff \ expected>` and CONTINUE to step 2. Do not block.
+   - If `expectedSet === ∅` (rare — wave produced no `expectedFiles` because every task lacks `Files:` declarations): skip 1a entirely. Step 1's existing `WAVE_SUMMARY.tasks[].filesChanged` check still runs.
+
+   This check augments — never replaces — the per-task `filesChanged` check in step 1. They guard different invariants: step 1 catches per-task agent drift; step 1a catches wave-level scope drift (agent touched files outside what the plan declared).
 
 2. **Canary check per task:** For each task with a `verifyToken` in the `WAVE_SUMMARY`, grep in the main context for the symbol (`VERIFY: <symbol> in <file>`). This catches cases where `git diff` shows the file changed but the actual edits were incomplete or overwritten.
 
@@ -408,6 +472,41 @@ For each guardrail in `activeGuardrails`:
   > ⚠ Guardrail warning `<id>`: <description> — <rationale>
 
   Include in the progress report (Step 5d). No user prompt required.
+
+**5c-quater. Per-wave WIP commit (Fixes #392 / R35) — gated on `commitWaves === true`.** This sub-step fires ONLY after BOTH G9 (mechanical/filesystem verify) AND G11 (post-wave guardrail check) PASS for the current wave AND the current wave is NOT the small-plan direct-execution path (R5, Step 2b). The small-plan path NEVER triggers per-wave commits regardless of the flag.
+
+When `commitWaves === false` (default): skip this sub-step entirely — proceed to 5d.
+
+When `commitWaves === true`:
+
+1. Compose the subject deterministically: `wip(execute): wave {N} — {comma-separated task titles}`. Truncate the full subject (including the `wip(execute): wave N — ` prefix) to 72 characters; when truncation happens, append `…` as the 72nd character (so the line is exactly 72 chars including the ellipsis).
+
+2. Run from main context (NOT from inside the wave-runner Agent):
+   ```bash
+   git add -A
+   git commit -m "<subject>"
+   COMMIT_EXIT=$?
+   ```
+
+   **Hooks always run.** Do NOT pass `--no-verify`. A pre-commit hook failure is a hard wave-level failure — treat it as failed verification and trigger the existing escalation flow (Step 6 RECOVER); do NOT bypass.
+
+3. Soft-success path — empty diff (nothing to commit, e.g., wave was a no-op or every produced change was reverted by a hook):
+   - `git commit` returns non-zero with "nothing to commit" stderr → treat as soft success.
+   - Surface a one-line notice: `Wave N produced no diff — no WIP commit recorded.`
+   - Persist `committedSha: null` via the state write below.
+
+4. Success path — commit landed:
+   - Capture `committedSha`:
+     ```bash
+     committedSha=$(git rev-parse HEAD)
+     ```
+   - Persist via the new state subcommand:
+     ```bash
+     node "$STATE_SCRIPT" wave-committed --branch <slug> --wave <N> --sha "$committedSha"
+     ```
+   - For the soft-success path above, omit `--sha` (or pass `--sha ""`): the subcommand persists `committedSha: null`.
+
+5. Workspace-mode compatibility (R workspace-mode-compatibility): state writes route through `resolveStateDir()` (already the case in `state/execute.js`); the `git commit` runs in the active worktree (current cwd). When invoked from ship-sdlc pipeline mode with `--workspace worktree`, both the diff and the commit land in the sibling worktree exactly as for the rest of the wave's writes.
 
 **5d. Progress report** — After each wave:
 ```

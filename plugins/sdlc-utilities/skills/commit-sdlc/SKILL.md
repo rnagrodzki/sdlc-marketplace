@@ -69,6 +69,51 @@ Read and parse `COMMIT_CONTEXT_FILE` as `COMMIT_CONTEXT_JSON`. The `trap` above 
 
 Read just enough from `COMMIT_CONTEXT_JSON` for the main-context flow (Step 5 onwards): `currentBranch`, `flags`, `staged.files`, `staged.fileCount`, `staged.diffStat`, `unstaged.hasChanges`, `commitConfig.subjectPattern`, `commitConfig.subjectPatternError`. Heavy fields — `staged.diff`, `recentCommits`, `lastCommitMessage`, full `commitConfig` — are consumed by the orchestrator agent below; do **not** read or quote them in main context.
 
+### Step 1c (WIP-commit squash detection) — Fixes #392 / R35
+
+Read `wipSquash` from `COMMIT_CONTEXT_JSON`. The field has the shape:
+
+```json
+{
+  "wipSquash": {
+    "commits": ["<sha>", "<sha>", ...],
+    "stagedClean": true
+  }
+}
+```
+
+`commits[]` is the list of commit SHAs whose subject starts with `wip(execute):` between the current branch's fork-point and `HEAD` (per `git log --format='%H %s' <fork>..HEAD`, filtered to subjects matching `^wip\(execute\)`). `stagedClean` is `true` iff `git diff --cached --name-only` returned nothing at prepare time.
+
+**When `wipSquash.commits.length === 0`**: skip this step silently — proceed to Step 2 PLAN with the staged diff unchanged.
+
+**When `wipSquash.commits.length > 0` AND `flags.noSquashWip === true`**: print `Detected N wip(execute): commit(s) from execute-plan-sdlc per-wave commits — preserving (--no-squash-wip).` Skip the squash; proceed to Step 2 with the staged diff unchanged. The WIP commits remain in branch history.
+
+**When `wipSquash.commits.length > 0` AND `flags.noSquashWip === false` (default)**:
+
+1. Print:
+   > Detected N `wip(execute):` commit(s) from execute-plan-sdlc per-wave commits. The final commit will subsume them via soft-reset.
+
+2. Resolve the fork-point and soft-reset:
+   ```bash
+   FORK_POINT=$(git merge-base HEAD "$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null || git symbolic-ref --short HEAD)")
+   git reset --soft "$FORK_POINT"
+   ```
+   The soft-reset preserves all changes in the working tree and index — the WIP commits are dropped from history; nothing on disk changes.
+
+3. Re-stage so user hand-edits on top of the WIP commits (preserved by the soft-reset because `stagedClean === false`) and the unwound WIP file changes are both staged:
+   ```bash
+   git add -A
+   ```
+
+4. The staged diff now reflects the FULL feature change (every file the wave WIPs touched, plus any user hand-edits). Proceed to Step 2 PLAN — the orchestrator will generate a single conventional-commit subject for the squashed change.
+
+**Final-message invariant (no `wip:` prefix):** The orchestrator MUST NOT generate a commit subject starting with `wip:` or `wip(execute):` — those are internal markers. This is enforced at two layers:
+
+1. **LLM-side reminder (defense-in-depth):** Step 2 PLAN dispatch includes a reminder in the orchestrator's prompt: "Even when WIP commits are being squashed, the generated subject MUST NOT start with `wip:` or `wip(execute):` — those are internal markers."
+2. **Deterministic post-generation check (load-bearing — `scripts-over-llm-logic` guardrail):** `scripts/skill/commit.js` runs a regex (`^wip(\(|:)`) against the generated subject before the user approval prompt fires. On match, the message is rejected and the orchestrator is re-dispatched with an explicit constraint reminder.
+
+**State-machine idempotency:** Re-running commit-sdlc immediately after a successful squash on the same branch is a no-op: `wipSquash.commits` will be empty (the WIP commits no longer exist between fork-point and HEAD).
+
 ### Step 2 (PLAN): Dispatch the commit-orchestrator Agent <!-- implements R3, R4, R5, R6 -->
 
 Issue #202: pinning `model:` in skill frontmatter routes the skill into a subagent that inherits the entire conversation transcript and overflows the smaller-window models on long sessions. To keep the main context clean and bound the orchestrator's input to the prepared payload only, dispatch the dedicated `commit-orchestrator` agent. See `docs/skill-best-practices.md` → "Why frontmatter `model:` is the wrong context-isolation knob" for the rationale.

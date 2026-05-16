@@ -97,6 +97,8 @@ Model escalation uses `assignedModel` from the task manifest as the starting poi
 
 Track every attempt in the `attempts` array regardless of outcome.
 
+**Guardrail invariance on retry (Fixes #392 / R33):** When constructing the retry prompt, copy the wave manifest's `guardrails` array (and `expectedFiles`) **verbatim** into the new prompt — do NOT regenerate, filter, or omit any entry. Guardrails are wave-level invariants set by main context at wave-build time; the per-task retry inherits the same constraints as the original dispatch at every escalation tier (haiku → sonnet → opus).
+
 ### 5. Produce WAVE_SUMMARY
 
 After all sub-Agents complete (or exhaust retries), emit the required output token as the **final line** of your response.
@@ -181,6 +183,7 @@ The following are main-context responsibilities. Wave-runner MUST NOT perform th
 - Do not add features, refactor, or clean up beyond what each task specifies.
 - If a task is BLOCKED and retries are exhausted, report it clearly in `WAVE_SUMMARY` — do not hallucinate a success.
 - Complete tasks as independently as possible within one wave. If one task FAILED, continue with remaining tasks rather than halting the entire wave.
+- **Wave-runner MUST NOT add, remove, or modify entries in the wave manifest's `guardrails` array.** The array is set by main context at wave-build time and is read-only for the runner (Fixes #392 / R33). Same applies to `expectedFiles` and `verificationHint`.
 
 ---
 
@@ -189,6 +192,10 @@ The following are main-context responsibilities. Wave-runner MUST NOT perform th
 The `perTaskTemplate` and `batchedTrivialTemplate` inputs are the **full inline content** of the templates from `classifying-and-waving-tasks.md`, pasted by main context when constructing the wave-runner Agent's prompt body. Wave-runner uses these templates to fill Agent prompts for each sub-task.
 
 The per-task and batched-trivial templates are NOT duplicated here — main context inlines their content at dispatch time. This file only documents the algorithm, contract, and constraints.
+
+**Guardrail threading (Fixes #392 / R33):** The wave manifest carries a `guardrails: [{id, description, severity}]` array. Wave-runner MUST thread this array into the `{{guardrails}}` placeholder in every per-task AND every batched-trivial Agent prompt it constructs (including retry dispatches). When `guardrails` is empty/absent in the manifest, the template's conditional `## Project Guardrails` block renders nothing (no header, no stub). The block is byte-stable within a single execute-plan-sdlc invocation because `activeGuardrails` is loaded once in Step 1 LOAD and treated as immutable — this preserves the prompt-cache prefix across sibling per-task dispatches.
+
+The WAVE_SUMMARY schema is unchanged: main context handles the per-wave `expectedFiles` cross-check (Step 5c-bis) by comparing `git diff --stat` output against the wave manifest, not by reading anything new out of the runner's output.
 
 ---
 

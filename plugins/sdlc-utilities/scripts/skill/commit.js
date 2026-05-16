@@ -9,11 +9,13 @@
  *   node commit-prepare.js [options]
  *
  * Options:
- *   --no-stash     Skip stashing unstaged changes (passed through to output)
- *   --scope <s>    Override conventional commit scope (passed through to output)
- *   --type <t>     Override conventional commit type (passed through to output)
- *   --amend        Amend last commit instead of creating new (passed through to output)
- *   --auto         Skip interactive approval prompts (passed through to output)
+ *   --no-stash       Skip stashing unstaged changes (passed through to output)
+ *   --scope <s>      Override conventional commit scope (passed through to output)
+ *   --type <t>       Override conventional commit type (passed through to output)
+ *   --amend          Amend last commit instead of creating new (passed through to output)
+ *   --auto           Skip interactive approval prompts (passed through to output)
+ *   --no-squash-wip  Preserve `wip(execute):` commits instead of soft-resetting them
+ *                    into the final commit (Fixes #392 / R35; passed through to output)
  *
  * Exit codes:
  *   0 = success, JSON on stdout
@@ -60,11 +62,12 @@ function truncateStagedDiff(fullDiff) {
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let noStash = false;
-  let scope   = null;
-  let type    = null;
-  let amend   = false;
-  let auto    = false;
+  let noStash      = false;
+  let scope        = null;
+  let type         = null;
+  let amend        = false;
+  let auto         = false;
+  let noSquashWip  = false;
   const warnings = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -79,10 +82,72 @@ function parseArgs(argv) {
       type = args[++i];
     } else if (a === '--auto') {
       auto = true;
+    } else if (a === '--no-squash-wip') {
+      noSquashWip = true;
     }
   }
 
-  return { noStash, scope, type, amend, auto, warnings };
+  return { noStash, scope, type, amend, auto, noSquashWip, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// WIP-commit squash detection (Fixes #392 / R35)
+// ---------------------------------------------------------------------------
+
+/**
+ * Detects `wip(execute):` commits between the current branch's fork-point and HEAD.
+ * Returns { commits: string[], stagedClean: boolean } — consumed by commit-sdlc
+ * SKILL.md Step 1c to decide whether to soft-reset before generating the final
+ * commit message.
+ *
+ * Fork-point resolution order:
+ *   1. `git merge-base HEAD <upstream>` when an upstream is configured
+ *   2. Detected default branch (origin/HEAD symbolic ref → main/master fallback)
+ *   3. When neither resolves, returns { commits: [], stagedClean } — never errors
+ */
+function detectWipSquash(projectRoot) {
+  const stagedRaw = exec('git diff --cached --name-only', { cwd: projectRoot });
+  const stagedClean = !stagedRaw || stagedRaw.split('\n').filter(Boolean).length === 0;
+
+  let forkPoint = null;
+
+  // Try upstream first.
+  const upstream = exec('git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null', { cwd: projectRoot });
+  if (upstream && upstream.trim().length > 0) {
+    const base = exec(`git merge-base HEAD ${upstream.trim()} 2>/dev/null`, { cwd: projectRoot });
+    if (base && base.trim().length > 0) forkPoint = base.trim();
+  }
+
+  // Fall back to detected default branch.
+  if (!forkPoint) {
+    let defaultBranch = exec("git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null", { cwd: projectRoot });
+    if (defaultBranch) defaultBranch = defaultBranch.trim().replace(/^refs\/remotes\/origin\//, '');
+    if (!defaultBranch) defaultBranch = 'main';
+    const base = exec(`git merge-base HEAD ${defaultBranch} 2>/dev/null`, { cwd: projectRoot })
+              || exec(`git merge-base HEAD master 2>/dev/null`, { cwd: projectRoot });
+    if (base && base.trim().length > 0) forkPoint = base.trim();
+  }
+
+  if (!forkPoint) {
+    return { commits: [], stagedClean };
+  }
+
+  const logRaw = exec(`git log --format=%H%x09%s ${forkPoint}..HEAD`, { cwd: projectRoot });
+  if (!logRaw) return { commits: [], stagedClean };
+
+  const wipPrefixRe = /^wip\(execute\)/;
+  const commits = logRaw
+    .split('\n')
+    .filter(Boolean)
+    .map(line => {
+      const tabIdx = line.indexOf('\t');
+      if (tabIdx < 0) return null;
+      return { sha: line.slice(0, tabIdx), subject: line.slice(tabIdx + 1) };
+    })
+    .filter(e => e && wipPrefixRe.test(e.subject))
+    .map(e => e.sha);
+
+  return { commits, stagedClean };
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +156,7 @@ function parseArgs(argv) {
 
 function main() {
   const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
-  const { noStash, scope, type, amend, auto, warnings: parseWarnings } = parseArgs(process.argv);
+  const { noStash, scope, type, amend, auto, noSquashWip, warnings: parseWarnings } = parseArgs(process.argv);
 
   const errors   = [];
   const warnings = [...parseWarnings];
@@ -105,7 +170,7 @@ function main() {
     return;
   }
 
-  const flags = { noStash, scope, type, amend, auto, skipConfigCheck };
+  const flags = { noStash, scope, type, amend, auto, noSquashWip, skipConfigCheck };
 
   // Step 3: Validate git repo and get current branch
   let gitState;
@@ -144,10 +209,30 @@ function main() {
   const stagedRaw   = exec('git diff --cached --name-only', { cwd: projectRoot });
   const stagedFiles = stagedRaw ? stagedRaw.split('\n').filter(Boolean) : [];
 
+  // Detect wip(execute): commits since fork-point BEFORE the staged-files
+  // gate (Fixes #392 / R35). When the user has only wip(execute): commits
+  // and no staged changes on top, commit-sdlc SKILL.md Step 1c will
+  // soft-reset to fork-point and re-stage — at that point the staged set
+  // becomes non-empty. The prepare output therefore must surface
+  // `wipSquash` even on the early "nothing staged" path so SKILL.md can
+  // make the squash decision before erroring out to the user.
+  let wipSquashEarly;
+  try {
+    wipSquashEarly = detectWipSquash(projectRoot);
+  } catch (err) {
+    warnings.push(`Could not detect wip(execute): commits for squash: ${err.message}`);
+    wipSquashEarly = { commits: [], stagedClean: true };
+  }
+
   // Step 5: Error if nothing staged and not amending
   if (stagedFiles.length === 0 && !amend) {
-    errors.push('No staged changes. Use `git add` to stage files before committing.');
-    writeOutput({ errors, warnings, currentBranch, flags }, 'commit-context', 1);
+    // When there are wip(execute): commits to squash, the "nothing staged"
+    // condition is resolvable via Step 1c soft-reset — surface wipSquash so
+    // SKILL.md can detect this and proceed without surfacing the error.
+    if (wipSquashEarly.commits.length === 0) {
+      errors.push('No staged changes. Use `git add` to stage files before committing.');
+    }
+    writeOutput({ errors, warnings, currentBranch, flags, wipSquash: wipSquashEarly }, 'commit-context', errors.length > 0 ? 1 : 0);
     return;
   }
 
@@ -187,6 +272,11 @@ function main() {
     warnings.push(`You are on ${currentBranch}. Amending commits on a protected branch may cause issues.`);
   }
 
+  // Step 13 (Fixes #392 / R35): wip(execute): squash detection — reuse the
+  // result computed earlier (we always run detectWipSquash before the staged
+  // gate so wipSquash is available even on the empty-staging path).
+  const wipSquash = wipSquashEarly;
+
   const result = {
     errors,
     warnings,
@@ -213,6 +303,7 @@ function main() {
     },
     recentCommits,
     lastCommitMessage,
+    wipSquash,
   };
 
   writeOutput(result, 'commit-context', 0);
