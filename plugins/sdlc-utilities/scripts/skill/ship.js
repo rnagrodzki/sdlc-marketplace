@@ -358,6 +358,10 @@ function mergeFlags(cli, config) {
   } else {
     merged.executeCommitWaves  = false;
     sources.executeCommitWaves = 'default';
+    // Track non-boolean values so runValidation can emit a warning.
+    if (execCfg.commitWaves !== undefined) {
+      merged.commitWavesInvalidType = true;
+    }
   }
 
   // Pass-through flags that don't come from config.
@@ -830,6 +834,12 @@ function runValidation(flags, flagSources, steps, context) {
   if (flags.bump && flagSources.bump === 'cli' && versionStep && versionStep.status === 'skipped') {
     errors.push(`--bump "${flags.bump}" specified but version step is skipped — resolve by removing --bump or adding "version" to ship.steps[].`);
     coherentFlags = false;
+  }
+
+  // execute.commitWaves must be a boolean; non-boolean values are silently
+  // treated as false — warn the user so they can correct the config.
+  if (flags.commitWavesInvalidType) {
+    warnings.push('execute.commitWaves in ship config is not a boolean — value ignored, defaulting to false. Set it to true or false explicitly.');
   }
 
   // Always note conditional pause

@@ -127,7 +127,7 @@ try {
         // Fixes #392 / R36: emit a distinct `Active execution (post-compact):`
         // line on compact matcher so execute-plan-sdlc Step 0 can treat it as
         // implicit --resume. The legacy `Active execution:` line is preserved
-        // byte-stable for startup/clear matchers — protects prompt-cache and
+        // byte-stable for startup/clear/resume matchers — protects prompt-cache and
         // avoids breaking existing fast-path consumers (prompt-cache-hit-ratio
         // guardrail). The hook is layer-agnostic: when both ship and execute
         // states exist on compact, both lines are emitted; the consumer
