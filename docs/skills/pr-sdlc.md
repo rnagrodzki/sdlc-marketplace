@@ -25,6 +25,7 @@ The diff stat and diff content used by the description reflect only the branch's
 | `--base <branch>` | Target branch for the PR | repo default |
 | `--auto` | Skip interactive approval — create/update the PR immediately after generation | — |
 | `--label <name>` | Force a label onto the PR (repeatable). Created automatically if it doesn't exist in the repo | — |
+| `--expected-branch <name>` | **Internal — set by ship-sdlc.** Validates that the current branch matches `<name>` before any `gh pr create` / `gh pr edit` invocation. Exits non-zero if the branches differ. Cross-link: see [ship-sdlc branch-verification guard](ship-sdlc.md#branch-verification-guard). | inactive |
 
 ---
 

@@ -558,6 +558,30 @@ Review fixes applied: 3 files modified
 ```
 Then invoke commit-sdlc (step 5) for the fix commit.
 
+### After version — post-version ancestry HARD GATE (R-post-version-ancestry, fixes #349)
+
+After the version step dispatches and returns, capture the new tag from the version-sdlc return value as `NEW_TAG`. When `NEW_TAG` is set (non-empty) AND `EXECUTE_BRANCH` is set (non-empty), run the ancestry check:
+
+```bash
+# Post-version ancestry HARD GATE (R-post-version-ancestry, fixes #349)
+VERIFY_SCRIPT=$(find ~/.claude/plugins -name "verify-tag-ancestry.js" -path "*/sdlc*/scripts/util/verify-tag-ancestry.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$VERIFY_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js" ] && VERIFY_SCRIPT="plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
+if [ -z "$VERIFY_SCRIPT" ]; then
+  echo "WARNING: verify-tag-ancestry.js not found — post-version ancestry check skipped." >&2
+fi
+if [ -n "$VERIFY_SCRIPT" ] && [ -n "$NEW_TAG" ] && [ -n "$EXECUTE_BRANCH" ]; then
+  node "$VERIFY_SCRIPT" --tag "$NEW_TAG" --branch "$EXECUTE_BRANCH" --remote origin
+  ANCESTRY_EXIT=$?
+  if [ "$ANCESTRY_EXIT" -ne 0 ]; then
+    echo "Pipeline halted: tag $NEW_TAG is not an ancestor of $EXECUTE_BRANCH." >&2
+    echo "Remediation: delete the tag (git push origin :refs/tags/$NEW_TAG; git tag -d $NEW_TAG) and re-run version step on the correct branch." >&2
+    exit 1
+  fi
+fi
+```
+
+`NEW_TAG` is the tag string emitted by version-sdlc (e.g. `v1.2.3`). `EXECUTE_BRANCH` is the feature branch variable set during pre-execute workspace isolation (already available in the pipeline shell context). This gate is a **no-op when `NEW_TAG` is unset** (version step was skipped or not in `flags.steps`, e.g., under `workspace: worktree`). Works correctly under both `workspace: branch` and `workspace: worktree`.
+
 ### Between version and pr — archive-openspec (conditional)
 
 If the `archive-openspec` step has `status: "conditional"` in the pipeline plan, execute it inline (no Agent dispatch — this is a deterministic shell operation):
@@ -908,6 +932,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Dispatch pipeline step Agents without `model: step.model` — the model field is computed by skill/ship.js from each skill's spec. Omitting it defaults all steps to opus.
 - Add, remove, or change the `isolation` parameter on Agent dispatches — isolation comes verbatim from `step.isolation`. Adding `isolation: "worktree"` when `step.isolation` is null causes hidden Agent SDK worktrees that conflict with `--workspace branch` (issue #350).
 - Ignore cleanup validation failures — if `state/ship.js cleanup` exits with code 1, the pipeline contract was violated. Surface the violation and preserve state.
+- Skip the post-version ancestry HARD GATE. The check is the only safeguard against tags landing on orphaned commits (issue #349). The gate is a no-op when `NEW_TAG` is unset — do not pre-empt it by skipping it when you believe the version step succeeded on the right branch.
 
 ---
 

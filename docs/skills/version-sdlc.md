@@ -26,6 +26,7 @@ Manages the full semantic release workflow: detects the version source, bumps th
 | `--changelog` | With a bump type: generate a CHANGELOG entry as part of the release. Without a bump type: update the changelog for the already-tagged current version (no new tag created). Can also be enabled permanently by setting `"changelog": true` in `.claude/version.json` — the CLI flag and config value are OR'd together as `flags.changelog`. | off |
 | `--hotfix` | Mark this release as a hotfix for DORA metrics tracking. Annotates the commit message with `[hotfix]` and the tag message body with `Type: hotfix`. | off |
 | `--auto` | Skip interactive approval prompts. Release plan is still displayed for visibility; critique gates and pre-condition checks still run. | off |
+| `--expected-branch <name>` | **Internal — set by ship-sdlc.** Validates that the current branch matches `<name>` before any commit/tag/push operations. Exits non-zero if the branches differ. Cross-link: see [ship-sdlc branch-verification guard](ship-sdlc.md#branch-verification-guard). | inactive |
 
 > **Auto-upstream:** When releasing from a branch with no remote upstream configured, the push step automatically uses `git push --set-upstream origin <branch>` instead of bare `git push`. This avoids first-push failures on fresh feature branches. The subsequent `git push --tags` is unaffected.
 

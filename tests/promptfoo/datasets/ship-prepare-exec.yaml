@@ -951,3 +951,57 @@
       value: |
         const o = JSON.parse(output);
         return !o.errors || o.errors.length === 0;
+
+# R-expected-branch-injection (issues #347, #348, #349): --expected-branch is injected
+# into commit, version, and pr step.invocation by ship.js.
+
+- description: "ship-prepare: commit step.invocation includes --expected-branch (R-expected-branch-injection, #347)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-auto-workspace"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const c = o.steps.find(s => s.name === 'commit');
+        return c && c.args && c.args.includes('--expected-branch');
+
+- description: "ship-prepare: version step.invocation includes --expected-branch (R-expected-branch-injection, #348)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-auto-workspace"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const v = o.steps.find(s => s.name === 'version');
+        return v && v.args && v.args.includes('--expected-branch');
+
+- description: "ship-prepare: pr step.invocation includes --expected-branch (R-expected-branch-injection, #349)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-auto-workspace"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const p = o.steps.find(s => s.name === 'pr');
+        return p && p.args && p.args.includes('--expected-branch');
+
+- description: "ship-prepare: context.expectedBranch field present (R-expected-branch-injection, #349)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-auto-workspace"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return typeof o.context.expectedBranch === 'string' && o.context.expectedBranch.length > 0;

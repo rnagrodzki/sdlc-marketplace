@@ -123,6 +123,19 @@ Read and parse `PR_CONTEXT_FILE` as `PR_CONTEXT_JSON`. The `trap` above guarante
 
 **Note (issue #234):** The prepare script (`skill/pr.js`) populates `errors[]` for auth failures, account mismatches (`accountMismatch`), and expired tokens (`tokenExpired`). The `errors[]` check above already halts on all of these — the reactive recovery flow later in this skill handles edge cases the preflight cannot anticipate (e.g., permission revocation between preflight and `gh pr create`).
 
+**Step 0.5 (BRANCH-GUARD): HARD GATE — Expected Branch Check**
+
+**Implements R-expected-branch (docs/specs/pr-sdlc.md, issues #347, #348, #349).**
+
+Check `branchGuard.active` and `branchGuard.ok` from `PR_CONTEXT_JSON`.
+
+If `branchGuard.active === true` AND `branchGuard.ok === false`:
+- Surface `branchGuard.message` verbatim to the user.
+- Halt the skill immediately. Do NOT proceed to Step 1 or any `gh pr create` / `gh pr edit` invocation.
+- Do NOT re-derive the current branch via shell commands — use the resolved `branchGuard` field only.
+
+If `branchGuard.active === false` (flag was not passed) or `branchGuard.ok === true` (branches match): proceed.
+
 **If `PR_CONTEXT_JSON.warnings` is non-empty**, show the warnings prominently before continuing.
 Do not ask for confirmation — the Step 5 approval gate (AskUserQuestion) is the consent point before PR creation.
 

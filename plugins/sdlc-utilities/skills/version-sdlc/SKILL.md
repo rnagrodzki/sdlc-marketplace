@@ -167,6 +167,19 @@ When `flags.preLabel` is set, use `bumpOptions.preRelease`. Otherwise use `bumpO
 - Multiple commits contributing to one merged entry: include all unique ticket IDs from those commits
 - Only include ticket IDs when `config.ticketPrefix` is set — otherwise skip them to avoid false positives from random uppercase patterns
 
+### Step 2.5 (BRANCH-GUARD): HARD GATE — Expected Branch Check
+
+**Implements R-expected-branch (docs/specs/version-sdlc.md, issues #347, #348, #349).**
+
+Check `branchGuard.active` and `branchGuard.ok` from `VERSION_CONTEXT_JSON`.
+
+If `branchGuard.active === true` AND `branchGuard.ok === false`:
+- Surface `branchGuard.message` verbatim to the user.
+- Halt the skill immediately. Do NOT proceed to Step 3 (commit/tag/push).
+- Do NOT re-derive the current branch via shell commands — use the resolved `branchGuard` field only.
+
+If `branchGuard.active === false` (flag was not passed) or `branchGuard.ok === true` (branches match): proceed to Step 3.
+
 ### Step 3 (CRITIQUE): Self-review Against Quality Gates
 
 Review the planned version and CHANGELOG draft against every quality gate in the table below. Note every failing gate before proceeding.

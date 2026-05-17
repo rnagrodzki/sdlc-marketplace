@@ -1,0 +1,80 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/lib/branch-guard.js.
+# Validates validateExpectedBranch across: match, mismatch, inactive (empty/null/undefined),
+# and detached HEAD edge case. Pure function — no fixture setup needed.
+# Implements R-expected-branch test coverage (issues #347, #348, #349).
+
+- description: "branch-guard: exports validateExpectedBranch"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-guard-test.js"
+    script_args: "--op exports"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"hasValidateExpectedBranch": true'
+
+- description: "branch-guard: matching branches returns ok=true, active=true"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-guard-test.js"
+    script_args: "--op validate --current feat/my-feature --expected feat/my-feature"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"active": true'
+    - type: contains
+      value: '"message": null'
+
+- description: "branch-guard: mismatching branches returns ok=false with both names in message"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-guard-test.js"
+    script_args: "--op validate --current main --expected feat/my-feature"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: contains
+      value: '"active": true'
+    - type: contains
+      value: "feat/my-feature"
+    - type: contains
+      value: "main"
+    - type: contains
+      value: "#347"
+
+- description: "branch-guard: no --expected flag (undefined) returns inactive guard"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-guard-test.js"
+    script_args: "--op validate --current feat/my-feature"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"active": false'
+    - type: contains
+      value: '"expectedBranch": null'
+
+- description: "branch-guard: empty-string expected returns inactive guard"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-guard-test.js"
+    script_args: "--op validate --current feat/my-feature --expected "
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"active": false'
+
+- description: "branch-guard: detached HEAD (empty currentBranch) with expected branch returns ok=false"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/branch-guard-test.js"
+    script_args: "--op validate --current  --expected feat/my-feature"
+    project_root: "file://fixtures-fs/worktree-main-cwd"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: contains
+      value: '"active": true'
+    - type: contains
+      value: "feat/my-feature"
