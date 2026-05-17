@@ -65,3 +65,31 @@
   assert:
     - type: contains
       value: '"status":null'
+
+# Regression tests for #393: copilot[bot] suffix normalisation (R56)
+# GitHub REST `pulls/{pr}/reviews` returns `copilot[bot]` for App-authored reviews.
+# The [bot] suffix must be stripped before reviewerSet lookup; bot guard still applies.
+
+- description: "await-remote-review: copilot[bot] COMMENTED Bot type returns actionable (#393)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
+    script_args: '--reviews [{"id":1,"state":"COMMENTED","authorLogin":"copilot[bot]","authorType":"Bot","submittedAt":"2025-01-01"}] --reviewers copilot'
+  assert:
+    - type: contains
+      value: '"status":"actionable"'
+
+- description: "await-remote-review: copilot[bot] APPROVED Bot type returns approved-clean (#393)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
+    script_args: '--reviews [{"id":1,"state":"APPROVED","authorLogin":"copilot[bot]","authorType":"Bot","submittedAt":"2025-01-01"}] --reviewers copilot'
+  assert:
+    - type: contains
+      value: '"status":"approved-clean"'
+
+- description: "await-remote-review: copilot[bot] APPROVED User type rejected by bot guard (#393)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
+    script_args: '--reviews [{"id":1,"state":"APPROVED","authorLogin":"copilot[bot]","authorType":"User","submittedAt":"2025-01-01"}] --reviewers copilot'
+  assert:
+    - type: contains
+      value: '"status":null'

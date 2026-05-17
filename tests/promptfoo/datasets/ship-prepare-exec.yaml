@@ -879,3 +879,75 @@
       value: "--commit-waves"
     - type: icontains
       value: '"executeCommitWaves": false'
+
+# version.preRelease forwarding (issue #394)
+# When version.preRelease is set in config and --bump was NOT passed on CLI,
+# ship.js must override flags.bump to the preRelease label.
+
+- description: "ship-prepare: version.preRelease=rc forwarded as --bump rc when no CLI --bump (#394)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-prepare-prerelease-rc"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const v = o.steps.find(s => s.name === 'version');
+        return v && v.args && v.args.includes('--bump rc');
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.flags.sources && o.flags.sources.bump === 'config (version.preRelease)';
+
+- description: "ship-prepare: CLI --bump major overrides version.preRelease=rc — explicit bump graduates (#394)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto --bump major"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-prepare-prerelease-rc"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const v = o.steps.find(s => s.name === 'version');
+        return v && v.args && v.args.includes('--bump major');
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.flags.sources && o.flags.sources.bump === 'cli';
+
+- description: "ship-prepare: no version.preRelease in config — behaviour unchanged, --bump patch default (#394)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const v = o.steps.find(s => s.name === 'version');
+        return v && v.args && v.args.includes('--bump patch');
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.flags.sources && ['default', 'config'].includes(o.flags.sources.bump);
+
+- description: "ship-prepare: invalid version.preRelease=RC (uppercase) — no override applied, exit 0 (#394)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-prepare-prerelease-invalid"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const v = o.steps.find(s => s.name === 'version');
+        return v && v.args && v.args.includes('--bump patch');
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return !o.errors || o.errors.length === 0;

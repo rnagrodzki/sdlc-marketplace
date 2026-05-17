@@ -974,6 +974,22 @@ function main() {
   // Merge flags
   const { merged: flags, sources: flagSources } = mergeFlags(cli, fileConfig);
 
+  // #394: When version.preRelease is set in .sdlc/config.json AND the user did
+  // NOT explicitly pass --bump on the CLI, forward the pre-release label as
+  // --bump <label> (sugar for patch + --pre <label> in version-sdlc) so ship
+  // pipelines produce pre-release tags. Explicit CLI --bump graduates out of
+  // the train (version-sdlc R16). See ship-sdlc spec R63.
+  const versionCfg = readSection(projectRoot, 'version') || {};
+  if (
+    typeof versionCfg.preRelease === 'string' &&
+    versionCfg.preRelease.length > 0 &&
+    PRE_RELEASE_LABEL_RE.test(versionCfg.preRelease) &&
+    flagSources.bump !== 'cli'
+  ) {
+    flags.bump = versionCfg.preRelease;
+    flagSources.bump = 'config (version.preRelease)';
+  }
+
   // Auto mode: override workspace default/config from 'prompt' to 'branch'
   if (flags.auto && flags.workspace === 'prompt' && flagSources.workspace !== 'cli') {
     flags.workspace = 'branch';
