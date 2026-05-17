@@ -24,6 +24,7 @@ Inspects staged changes and recent commit history to generate a commit message t
 | `--amend` | Amend the last commit instead of creating a new one | Disabled |
 | `--auto` | Skip interactive approval — commit immediately after message generation | Disabled |
 | `--no-squash-wip` | Preserve `wip(execute):` commits in branch history instead of soft-resetting them into the final commit. Useful when you want the per-wave WIP history visible for review. (Fixes #392 / R35.) | Disabled (squash by default) |
+| `--expected-branch <name>` | **Internal — set by ship-sdlc.** Validates that the current branch matches `<name>` before any `git commit` invocation. Exits non-zero if the branches differ. Cross-link: see [ship-sdlc branch-verification guard](ship-sdlc.md#branch-verification-guard). | inactive |
 
 ---
 

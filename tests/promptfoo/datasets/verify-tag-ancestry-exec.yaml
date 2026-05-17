@@ -1,0 +1,93 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js.
+# Validates ancestry checks across: ancestor (ok=true), non-ancestor (ok=false),
+# nonexistent tag, nonexistent branch, and local-only fallback when remote ref is absent.
+# Implements R-post-version-ancestry test coverage (issue #349).
+#
+# Fixture: tests/promptfoo/fixtures-fs/verify-tag-ancestry/setup.sh creates:
+#   main:          commits A-B(v1.0.0)-C(v1.0.1)
+#   feat/branch:   commits A-B-D(v1.0.2-feature)  [diverges from B]
+#   orphan branch: commit E(v1.0.3-orphan)         [independent root]
+
+- description: "verify-tag-ancestry: v1.0.0 is ancestor of main (local fallback — no remote)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
+    script_args: "--tag v1.0.0 --branch main"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/verify-tag-ancestry"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: contains
+      value: '"tag": "v1.0.0"'
+    - type: contains
+      value: '"branch": "main"'
+
+- description: "verify-tag-ancestry: v1.0.1 (on main) is ancestor of main"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
+    script_args: "--tag v1.0.1 --branch main"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/verify-tag-ancestry"
+  assert:
+    - type: contains
+      value: '"ok": true'
+
+- description: "verify-tag-ancestry: v1.0.2-feature is ancestor of feat/branch"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
+    script_args: "--tag v1.0.2-feature --branch feat/branch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/verify-tag-ancestry"
+  assert:
+    - type: contains
+      value: '"ok": true'
+
+- description: "verify-tag-ancestry: v1.0.3-orphan is NOT ancestor of main (ok=false, message has tag+branch)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
+    script_args: "--tag v1.0.3-orphan --branch main"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/verify-tag-ancestry"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: contains
+      value: "v1.0.3-orphan"
+    - type: contains
+      value: "main"
+
+- description: "verify-tag-ancestry: nonexistent tag returns ok=false with message containing 'unknown tag'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
+    script_args: "--tag v99.99.99 --branch main"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/verify-tag-ancestry"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: icontains
+      value: "unknown tag"
+
+- description: "verify-tag-ancestry: nonexistent branch returns ok=false with message containing 'unknown branch'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
+    script_args: "--tag v1.0.0 --branch nonexistent/branch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/verify-tag-ancestry"
+  assert:
+    - type: contains
+      value: '"ok": false'
+    - type: icontains
+      value: "unknown branch"
+
+- description: "verify-tag-ancestry: local fallback message included when remote ref absent"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
+    script_args: "--tag v1.0.0 --branch main --remote origin"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/verify-tag-ancestry"
+  assert:
+    - type: contains
+      value: '"ok": true'
+    - type: icontains
+      value: "fallback"

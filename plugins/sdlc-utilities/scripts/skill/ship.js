@@ -41,7 +41,7 @@ const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { exec, checkGitState, detectBaseBranch, parseRemoteOwner, probeGhAuth, formatAccountMismatch, probeRepoAccess, formatAccessDenied } = require(path.join(LIB, 'git'));
-const { resolveMainWorktree, detectResumeState: detectResumeStateLib } = require(path.join(LIB, 'state'));
+const { resolveMainWorktree, detectResumeState: detectResumeStateLib, readState, slugifyBranch } = require(path.join(LIB, 'state'));
 const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
@@ -377,7 +377,7 @@ function mergeFlags(cli, config) {
 // Step computation
 // ---------------------------------------------------------------------------
 
-function computeSteps(flags, flagSources, { openspecContext } = {}) {
+function computeSteps(flags, flagSources, { openspecContext, expectedBranch } = {}) {
   // Steps[] is the canonical source of truth for which top-level steps run.
   // A step IS skipped when it is NOT in flags.steps. The provenance for an
   // exclusion is whatever determined the resolved steps[] (cli --steps /
@@ -435,7 +435,10 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       model: 'haiku',
       status: isIn('commit') ? 'will_run' : 'skipped',
       skipSource: skipSource('commit'),
-      args: flags.auto ? '--auto' : '',
+      args: [
+        flags.auto ? '--auto' : '',
+        expectedBranch ? `--expected-branch ${expectedBranch}` : '',
+      ].filter(Boolean).join(' '),
       reason: isIn('commit') ? 'pending (will check after execute)' : 'not in steps[]',
       pause: false,
       isolation: null,
@@ -471,7 +474,10 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       model: 'haiku',
       status: 'conditional',
       skipSource: 'none',
-      args: flags.auto ? '--auto' : '',
+      args: [
+        flags.auto ? '--auto' : '',
+        expectedBranch ? `--expected-branch ${expectedBranch}` : '',
+      ].filter(Boolean).join(' '),
       reason: 'triggered if review fixes applied',
       pause: false,
       isolation: null,
@@ -494,6 +500,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
       args: [
         `--bump ${flags.bump || 'patch'}`,
         flags.auto ? '--auto' : '',
+        expectedBranch ? `--expected-branch ${expectedBranch}` : '',
       ].filter(Boolean).join(' '),
       reason: !isIn('version')
         ? 'not in steps[]'
@@ -563,6 +570,7 @@ function computeSteps(flags, flagSources, { openspecContext } = {}) {
         flags.auto ? '--auto' : '',
         flags.draft ? '--draft' : '',
         flags.workspace === 'worktree' ? '--label skip-version-check' : '',
+        expectedBranch ? `--expected-branch ${expectedBranch}` : '',
       ].filter(Boolean).join(' '),
       reason: !isIn('pr')
         ? 'not in steps[]'
@@ -1098,6 +1106,21 @@ function main() {
     ? isArchived(projectRoot, openspecChangeName)
     : false;
 
+  // R-expected-branch-injection (issues #347, #348, #349): resolve the feature branch
+  // that commit/version/pr sub-skills should operate on.
+  // Preferred source: state.data.branch from the current ship state file (set by cmdInit).
+  // Fallback: gitState.currentBranch (e.g., first-run before init or --workspace continue).
+  let expectedBranch = gitState.currentBranch;
+  try {
+    const slug = slugifyBranch(gitState.currentBranch);
+    const shipState = readState('ship', slug);
+    if (shipState && shipState.data && typeof shipState.data.branch === 'string' && shipState.data.branch) {
+      expectedBranch = shipState.data.branch;
+    }
+  } catch (_) {
+    // Non-fatal: fall back to currentBranch already set above
+  }
+
   // Build context
   const context = {
     currentBranch: gitState.currentBranch,
@@ -1121,6 +1144,7 @@ function main() {
     openspecArchiveActionable: !!(openspecChangeName && !openspecIsArchived),
     sdlcGitignored,
     worktree: worktreeInfo,
+    expectedBranch,
   };
 
   // Compute steps (pass openspec context for archive-openspec step)
@@ -1128,7 +1152,7 @@ function main() {
     branchMatch: openspecBranchMatch,
     isAlreadyArchived: openspecIsArchived,
   };
-  const steps = computeSteps(flags, flagSources, { openspecContext });
+  const steps = computeSteps(flags, flagSources, { openspecContext, expectedBranch });
 
   // Run validation
   const validation = runValidation(flags, flagSources, steps, context);

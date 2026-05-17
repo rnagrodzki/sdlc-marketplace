@@ -472,6 +472,36 @@ When `execute.commitWaves: true` in `.sdlc/local.json` → `ship` section, `scri
 
 To opt out for a single run without editing config, the user can omit the field (or set it to `false`). There is no CLI override for ship-sdlc; the user-facing knob is `execute.commitWaves` in `.sdlc/local.json`.
 
+### Branch-verification guard
+
+Ship-sdlc defends against a class of silent failure (#347, #348, #349) where a sub-skill's Agent — through LLM contract violation, hook bypass, or environment drift — lands its git operations on a different branch than the feature branch ship created. Without a guard, release tags can silently land on orphaned commits that never merge to main; the user discovers the problem only after the PR merges and finds main has no version bump.
+
+**How it works:**
+
+`scripts/skill/ship.js` resolves the feature branch at prepare time (from `state.data.branch` in the ship state file, falling back to `git branch --show-current`) and appends `--expected-branch <featureBranch>` to the invocation of every mutating sub-skill step: `commit`, `commit-fixes`, `version`, and `pr`. The resolved branch is also surfaced as `context.expectedBranch` in the prepare output.
+
+Each sub-skill's prepare script (`skill/commit.js`, `skill/version.js`, `skill/pr.js`) validates the flag via `lib/branch-guard.js::validateExpectedBranch` immediately after resolving git state. On mismatch, the script exits non-zero and the sub-skill halts with:
+
+```
+Branch mismatch: expected 'feat/my-feature' but current is 'main'. The pipeline is
+configured to operate on 'feat/my-feature'. Refusing to proceed to avoid orphaning
+commits on the wrong branch (issues #347, #348, #349).
+```
+
+This flag is **internal — set by ship-sdlc** and does not appear in the user-facing invocation. When sub-skills are invoked standalone (outside ship-sdlc), the flag is absent and the guard is inactive.
+
+**Post-version ancestry check:**
+
+After the version step produces a tag, ship-sdlc additionally verifies the tag is an ancestor of the feature branch via `scripts/util/verify-tag-ancestry.js`. On failure:
+
+```
+Pipeline halted: tag v1.2.3 is not an ancestor of feat/my-feature.
+Remediation: delete the tag (git push origin :refs/tags/v1.2.3; git tag -d v1.2.3)
+and re-run version step on the correct branch.
+```
+
+This check is a no-op when the version step was skipped (e.g., `workspace: worktree` mode).
+
 ### Migrating legacy configs
 
 If your `.sdlc/local.json` was created before the current schema (used `preset:` and `skip:`), the loader will auto-migrate on the next ship run and emit a one-line deprecation notice. The mapping is:

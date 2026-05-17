@@ -43,6 +43,7 @@ const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { truncateText } = require(path.join(LIB, 'diff-truncate'));
 const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
+const { validateExpectedBranch } = require(path.join(LIB, 'branch-guard'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -99,6 +100,7 @@ function parseArgs(argv) {
   let hotfix              = false;
   let auto                = false;
   let fileOverride        = null;
+  let expectedBranch      = null;
   const warnings          = [];
   const errors            = [];
 
@@ -187,6 +189,10 @@ function parseArgs(argv) {
       fileOverride = args[++i];
     } else if (a === '--output-file') {
       // boolean flag; consumed by writeOutput in scripts/lib/output.js
+    } else if (a === '--expected-branch' && args[i + 1]) {
+      // R-expected-branch (issues #347, #348, #349): validated after gitState is resolved
+      // eslint-disable-next-line no-use-before-define
+      expectedBranch = args[++i];
     } else if (a.startsWith('-')) {
       warnings.push(`Unknown flag: ${a}`);
     } else if (PRE_RELEASE_LABEL_RE.test(a)) {
@@ -214,7 +220,7 @@ function parseArgs(argv) {
 
   return {
     init, requestedBump, preLabel, noPush, changelog, hotfix, auto,
-    fileOverride, warnings, errors, bumpFromLabel, preLabelExplicit,
+    fileOverride, expectedBranch, warnings, errors, bumpFromLabel, preLabelExplicit,
     bumpFromFlag,
   };
 }
@@ -571,6 +577,15 @@ async function main() {
 
   const { currentBranch, uncommittedChanges } = gitState;
 
+  // 3.5 Branch-guard HARD GATE (R-expected-branch, issues #347, #348, #349)
+  // Must run before any commit/tag work. Pure check — exits immediately on mismatch.
+  const branchGuard = validateExpectedBranch(currentBranch, args.expectedBranch);
+  if (branchGuard.active && !branchGuard.ok) {
+    process.stderr.write(branchGuard.message + '\n');
+    writeOutput({ flow: 'release', errors: [branchGuard.message], warnings, branchGuard }, 'version-context', 3);
+    return;
+  }
+
   // 4. Warn about uncommitted changes
   if (uncommittedChanges) {
     warnings.push('You have uncommitted changes. The release commit will not include them.');
@@ -852,6 +867,7 @@ async function main() {
     bumpPromotionDetected,
     changelog:          changelogOutput,
     remoteState,
+    branchGuard,
   }, 'version-context', 0);
 }
 

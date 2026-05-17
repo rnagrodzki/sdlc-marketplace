@@ -61,3 +61,5 @@ tests:
   - file://datasets/workspace-setup-exec.yaml
   - file://datasets/cwd-drift-exec.yaml
   - file://datasets/branch-name-exec.yaml
+  - file://datasets/branch-guard-exec.yaml
+  - file://datasets/verify-tag-ancestry-exec.yaml

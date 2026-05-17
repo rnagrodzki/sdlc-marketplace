@@ -944,3 +944,33 @@
         scripts/skill/ship.js per the scripts-over-llm-logic and
         flag-coherence-cross-skill guardrails. The response references the squash
         path in commit-sdlc as the pair that produces the final clean PR history.
+
+# ---------------------------------------------------------------------------
+# R-post-version-ancestry (#349) — post-version tag ancestry HARD GATE
+# ---------------------------------------------------------------------------
+
+- description: "ship-sdlc: aborts pipeline when version tag is not ancestor of feature branch (#349)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-ancestry-abort.md"
+    user_request: >
+      After the version step runs and produces tag v1.2.3, ship-sdlc runs the post-version
+      ancestry check via verify-tag-ancestry.js and it returns exit code 1 (tag is not an
+      ancestor of feat/my-feature). Describe exactly what ship-sdlc does: does it abort,
+      what error message does it emit, and what remediation does it tell the user?
+  assert:
+    - type: icontains
+      value: "v1.2.3"
+    - type: icontains
+      value: "feat/my-feature"
+    - type: icontains
+      value: "git push origin :refs/tags/"
+    - type: llm-rubric
+      value: >
+        The response states that ship-sdlc aborts the pipeline (exits non-zero / halts)
+        when verify-tag-ancestry.js returns a non-zero exit code, and emits an error
+        message containing both the tag name (v1.2.3) and the branch name (feat/my-feature).
+        It also provides the remediation command to delete the tag
+        (git push origin :refs/tags/v1.2.3 and git tag -d v1.2.3) and instructs the user
+        to re-run the version step on the correct branch. The response does NOT proceed
+        to the PR step after the failure.

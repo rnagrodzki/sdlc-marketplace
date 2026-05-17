@@ -55,6 +55,7 @@ const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, '
 const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
 const { loadPrTemplate } = require(path.join(LIB, 'pr-template'));
 const { jiraKeyRegex } = require(path.join(LIB, 'jira-keys'));
+const { validateExpectedBranch } = require(path.join(LIB, 'branch-guard'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -62,11 +63,12 @@ const { jiraKeyRegex } = require(path.join(LIB, 'jira-keys'));
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let isDraft = false;
-  let forceUpdate = false;
+  let isDraft          = false;
+  let forceUpdate      = false;
   let baseBranchOverride = null;
-  let isAuto = false;
-  let forcedLabels = [];
+  let isAuto           = false;
+  let forcedLabels     = [];
+  let expectedBranch   = null;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -80,10 +82,13 @@ function parseArgs(argv) {
       isAuto = true;
     } else if (a === '--label' && args[i + 1]) {
       forcedLabels.push(args[++i]);
+    } else if (a === '--expected-branch' && args[i + 1]) {
+      // R-expected-branch (issues #347, #348, #349): validated after gitState is resolved
+      expectedBranch = args[++i];
     }
   }
 
-  return { isDraft, forceUpdate, baseBranchOverride, isAuto, forcedLabels: [...new Set(forcedLabels)] };
+  return { isDraft, forceUpdate, baseBranchOverride, isAuto, forcedLabels: [...new Set(forcedLabels)], expectedBranch };
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +166,7 @@ function detectPrMode(forceUpdate, prMeta) {
 
 function main() {
   const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
-  const { isDraft, forceUpdate, baseBranchOverride, isAuto, forcedLabels } = parseArgs(process.argv);
+  const { isDraft, forceUpdate, baseBranchOverride, isAuto, forcedLabels, expectedBranch } = parseArgs(process.argv);
 
   const errors   = [];
   const warnings = [];
@@ -304,6 +309,15 @@ function main() {
   }
 
   const { currentBranch, uncommittedChanges, dirtyFiles } = gitState;
+
+  // Branch-guard HARD GATE (R-expected-branch, issues #347, #348, #349)
+  // Must run before any gh pr create / gh pr edit invocation. Pure check — exits immediately on mismatch.
+  const branchGuard = validateExpectedBranch(currentBranch, expectedBranch);
+  if (branchGuard.active && !branchGuard.ok) {
+    process.stderr.write(branchGuard.message + '\n');
+    writeOutput({ errors: [branchGuard.message], warnings, currentBranch, branchGuard }, 'pr-context', 3);
+    return;
+  }
 
   // Step 3: Reject protected branches
   if (currentBranch === 'main' || currentBranch === 'master') {
@@ -547,6 +561,7 @@ function main() {
     remoteState,
     warnings,
     errors,
+    branchGuard,
   };
 
   writeOutput(result, 'pr-context', 0);

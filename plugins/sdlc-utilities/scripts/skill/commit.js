@@ -35,6 +35,7 @@ const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { truncateDiff } = require(path.join(LIB, 'diff-truncate'));
+const { validateExpectedBranch } = require(path.join(LIB, 'branch-guard'));
 
 // ---------------------------------------------------------------------------
 // Diff truncation
@@ -62,12 +63,13 @@ function truncateStagedDiff(fullDiff) {
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let noStash      = false;
-  let scope        = null;
-  let type         = null;
-  let amend        = false;
-  let auto         = false;
-  let noSquashWip  = false;
+  let noStash        = false;
+  let scope          = null;
+  let type           = null;
+  let amend          = false;
+  let auto           = false;
+  let noSquashWip    = false;
+  let expectedBranch = null;
   const warnings = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -84,10 +86,13 @@ function parseArgs(argv) {
       auto = true;
     } else if (a === '--no-squash-wip') {
       noSquashWip = true;
+    } else if (a === '--expected-branch' && args[i + 1]) {
+      // R-expected-branch (issues #347, #348, #349): validated after gitState is resolved
+      expectedBranch = args[++i];
     }
   }
 
-  return { noStash, scope, type, amend, auto, noSquashWip, warnings };
+  return { noStash, scope, type, amend, auto, noSquashWip, expectedBranch, warnings };
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +161,7 @@ function detectWipSquash(projectRoot) {
 
 function main() {
   const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
-  const { noStash, scope, type, amend, auto, noSquashWip, warnings: parseWarnings } = parseArgs(process.argv);
+  const { noStash, scope, type, amend, auto, noSquashWip, expectedBranch, warnings: parseWarnings } = parseArgs(process.argv);
 
   const errors   = [];
   const warnings = [...parseWarnings];
@@ -183,6 +188,15 @@ function main() {
   }
 
   const { currentBranch } = gitState;
+
+  // Branch-guard HARD GATE (R-expected-branch, issues #347, #348, #349)
+  // Must run before any git commit invocation. Pure check — exits immediately on mismatch.
+  const branchGuard = validateExpectedBranch(currentBranch, expectedBranch);
+  if (branchGuard.active && !branchGuard.ok) {
+    process.stderr.write(branchGuard.message + '\n');
+    writeOutput({ errors: [branchGuard.message], warnings, currentBranch, branchGuard }, 'commit-context', 3);
+    return;
+  }
 
   // Step 3b: Read commit config
   let commitConfig = null;
@@ -304,6 +318,7 @@ function main() {
     recentCommits,
     lastCommitMessage,
     wipSquash,
+    branchGuard,
   };
 
   writeOutput(result, 'commit-context', 0);

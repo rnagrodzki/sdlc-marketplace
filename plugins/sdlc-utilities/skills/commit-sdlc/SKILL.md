@@ -63,6 +63,19 @@ Read and parse `COMMIT_CONTEXT_FILE` as `COMMIT_CONTEXT_JSON`. The `trap` above 
 
 **If `COMMIT_CONTEXT_JSON.warnings` is non-empty**, show the warnings to the user before continuing.
 
+### Step 0.5 (BRANCH-GUARD): HARD GATE — Expected Branch Check
+
+**Implements R-expected-branch (docs/specs/commit-sdlc.md, issues #347, #348, #349).**
+
+Check `branchGuard.active` and `branchGuard.ok` from `COMMIT_CONTEXT_JSON`.
+
+If `branchGuard.active === true` AND `branchGuard.ok === false`:
+- Surface `branchGuard.message` verbatim to the user.
+- Halt the skill immediately. Do NOT proceed to Step 1 or any `git commit` invocation.
+- Do NOT re-derive the current branch via shell commands — use the resolved `branchGuard` field only.
+
+If `branchGuard.active === false` (flag was not passed) or `branchGuard.ok === true` (branches match): proceed to Step 1.
+
 ---
 
 ### Step 1 (CONSUME): Quick Context Read <!-- implements R1, R2 -->

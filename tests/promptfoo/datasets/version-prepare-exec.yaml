@@ -128,3 +128,53 @@
     # a promotion was actually detected. Field MUST be present on every run.
     - type: icontains
       value: '"bumpPromotionDetected":'
+
+# R-expected-branch (issues #347, #348, #349): --expected-branch flag is parsed and validated.
+# Four cases: no flag (inactive), match (ok), mismatch (exit 3 + stderr), detached HEAD (exit 3).
+
+- description: "version-prepare: no --expected-branch flag emits branchGuard.active=false (R-expected-branch, #347)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "patch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-config-changelog"
+  assert:
+    - type: icontains
+      value: '"active": false'
+    - type: not-icontains
+      value: "Unknown flag"
+
+- description: "version-prepare: --expected-branch matching current branch emits branchGuard.ok=true (R-expected-branch, #348)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "patch --expected-branch main"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-config-changelog"
+  assert:
+    - type: icontains
+      value: '"ok": true'
+    - type: icontains
+      value: '"active": true'
+
+- description: "version-prepare: --expected-branch mismatching current branch exits non-zero with stderr (R-expected-branch, #348)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "patch --expected-branch feat/nonexistent-branch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-config-changelog"
+    script_capture_stderr: true
+  assert:
+    - type: icontains
+      value: '"ok": false'
+    - type: icontains
+      value: "feat/nonexistent-branch"
+
+- description: "version-prepare: branchGuard field present in successful output (R-expected-branch, #349)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/version.js"
+    script_args: "patch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/version-sdlc-config-changelog"
+  assert:
+    - type: icontains
+      value: '"branchGuard":'
