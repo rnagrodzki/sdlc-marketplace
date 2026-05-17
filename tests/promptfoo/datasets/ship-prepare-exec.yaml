@@ -1005,3 +1005,101 @@
       value: |
         const o = JSON.parse(output);
         return typeof o.context.expectedBranch === 'string' && o.context.expectedBranch.length > 0;
+
+- description: "ship-prepare: --plan-mode-blocked --bump patch writes ship state file with resolved flags (#400)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--plan-mode-blocked --bump patch --has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-plan-mode-blocked"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.flags && o.flags.planModeBlocked === true;
+    - type: javascript
+      value: "file://assertions/ship-plan-mode-state.js"
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return typeof o.stateFile === 'string' &&
+          /ship-feat-test-plan-mode-\d{8}T\d{6}Z\.json$/.test(o.stateFile);
+
+- description: "ship-prepare: --plan-mode-blocked --steps csv → state file flags.steps preserved (#400)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--plan-mode-blocked --steps execute,commit,version,pr --has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-plan-mode-blocked"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: "file://assertions/ship-plan-mode-steps.js"
+
+- description: "ship-prepare: state file from plan-mode-blocked is found by resume detection on next invocation (#400)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-plan-mode-blocked"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.resume && o.resume.found === true;
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.resume && o.resume.nextPendingStep === 'execute';
+    - type: javascript
+      value: "file://assertions/ship-plan-mode-resume.js"
+
+- description: "ship-prepare: --plan-mode-blocked is idempotent — prune-on-write, only one state file per branch (#400)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--plan-mode-blocked --bump patch --has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-plan-mode-blocked"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: "file://assertions/ship-plan-mode-idempotent.js"
+
+- description: "ship-prepare: --gc wins when combined with --plan-mode-blocked — gc output, no planModeBlocked field (#400)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--plan-mode-blocked --gc --has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-plan-mode-blocked"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.action === 'gc' || (o.report && (o.report.ship || o.report.commit));
+    - type: not-icontains
+      value: '"planModeBlocked": true'
+
+- description: "ship-prepare: --gc orphan sweep includes commit bucket alongside ship/execute/plan (#399/#400)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--gc"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-gc-commit-orphan"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const report = o.report || o;
+        return report.commit && typeof report.commit === 'object' &&
+          (Array.isArray(report.commit.deleted) || typeof report.commit.deleted === 'number');
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const report = o.report || o;
+        const commitDeleted = report.commit && report.commit.deleted;
+        if (Array.isArray(commitDeleted)) return commitDeleted.length > 0;
+        if (typeof commitDeleted === 'number') return commitDeleted > 0;
+        return false;

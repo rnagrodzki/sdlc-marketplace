@@ -299,6 +299,40 @@ function initState(prefix, branch, data) {
 }
 
 /**
+ * Write a survival-grade manifest blob to the state directory.
+ * Unlike `initState`, this does NOT wrap data in a pipeline state schema —
+ * it writes the data verbatim (for prepare-script manifests like commit-context).
+ *
+ * Prune-on-write: removes pre-existing `<prefix>-<branchSlug>-*.json` files
+ * for the same branch before writing the new file.
+ *
+ * @param {string} prefix  e.g. `"commit"`
+ * @param {string} branch  Raw branch name (will be slugified internally)
+ * @param {object} data    Data to write verbatim (JSON.stringify'd)
+ * @returns {string}  Absolute path to the created file
+ */
+function writeManifestState(prefix, branch, data) {
+  const stateDir = resolveStateDir();
+  fs.mkdirSync(stateDir, { recursive: true });
+
+  const branchSlug = slugifyBranch(branch);
+
+  // Prune-on-write: remove stale same-branch manifests before writing.
+  pruneStateFiles(prefix, branchSlug);
+
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d+Z$/, 'Z');
+
+  const fileName = `${prefix}-${branchSlug}-${timestamp}.json`;
+  const filePath = path.join(stateDir, fileName);
+
+  atomicWriteSync(filePath, JSON.stringify(data, null, 2) + '\n');
+  return filePath;
+}
+
+/**
  * Delete a state file. Ignores errors if the file does not exist.
  * @param {string} filePath  Absolute path to the state file
  */
@@ -348,7 +382,7 @@ function resolveBranch(argBranch) {
 function parseStateFilename(name) {
   // Trailing `-<16 chars>.json` where timestamp pattern is ISO-compact:
   // 8 digits (date) + 'T' + 6 digits (time) + 'Z'.
-  const m = name.match(/^(ship|execute|plan)-(.+)-(\d{8}T\d{6}Z)\.json$/);
+  const m = name.match(/^(ship|execute|plan|commit)-(.+)-(\d{8}T\d{6}Z)\.json$/);
   if (!m) return null;
   return { prefix: m[1], slug: m[2], timestamp: m[3] };
 }
@@ -618,6 +652,7 @@ module.exports = {
   readState,
   writeState,
   initState,
+  writeManifestState,
   deleteState,
   resolveBranch,
   detectResumeState,

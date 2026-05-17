@@ -38,6 +38,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { exec, checkGitState, detectBaseBranch, parseRemoteOwner, probeGhAuth, formatAccountMismatch, probeRepoAccess, formatAccessDenied } = require(path.join(LIB, 'git'));
@@ -80,6 +81,7 @@ function parseArgs(argv) {
   let openspecChange  = null;
   let gc              = false;
   let ttlDays         = null;
+  let planModeBlocked = false;
   // R-implicit-resume (#359): set by session-start.js when re-injecting the
   // "Active pipeline" reminder after /compact. ship-prepare uses this to
   // distinguish a hook-driven resume probe from a direct user invocation —
@@ -129,6 +131,8 @@ function parseArgs(argv) {
       openspecChange = args[++i];
     } else if (a === '--gc') {
       gc = true;
+    } else if (a === '--plan-mode-blocked') {
+      planModeBlocked = true;
     } else if (a === '--ttl-days' && args[i + 1]) {
       const v = parseInt(args[++i], 10);
       if (isNaN(v)) {
@@ -157,7 +161,7 @@ function parseArgs(argv) {
     workspace = workspaceShortcut;
   }
 
-  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, hookActivePipeline, errors };
+  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, hookActivePipeline, planModeBlocked, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -365,10 +369,11 @@ function mergeFlags(cli, config) {
   }
 
   // Pass-through flags that don't come from config.
-  merged.hasPlan        = cli.hasPlan;
-  merged.dryRun         = cli.dryRun;
-  merged.resume         = cli.resume;
-  merged.openspecChange = cli.openspecChange || null;
+  merged.hasPlan          = cli.hasPlan;
+  merged.dryRun           = cli.dryRun;
+  merged.resume           = cli.resume;
+  merged.openspecChange   = cli.openspecChange || null;
+  merged.planModeBlocked  = cli.planModeBlocked === true;
 
   return { merged, sources };
 }
@@ -965,7 +970,8 @@ function main() {
       const ship    = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
       const execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
       const plan    = gcStateFiles({ prefix: 'plan',    ttlDays, knownBranches });
-      report = { ttlDays, ship, execute, plan };
+      const commit  = gcStateFiles({ prefix: 'commit',  ttlDays, knownBranches });
+      report = { ttlDays, ship, execute, plan, commit };
     } catch (err) {
       errors.push(`gc failed: ${err.message}`);
       writeOutput({ action: 'gc', errors, warnings }, 'ship-prepare', 1);
@@ -1011,6 +1017,32 @@ function main() {
   } catch (err) {
     errors.push(err.message);
     writeOutput({ errors, warnings }, 'ship-prepare', 1);
+    return;
+  }
+
+  // plan-mode-blocked short-circuit (R64, fixes #400)
+  // When SKILL.md detects plan mode active, it invokes ship.js with --plan-mode-blocked
+  // to persist pipeline init state so the next /ship-sdlc invocation can auto-resume.
+  if (flags.planModeBlocked) {
+    const stateShipPath = path.join(__dirname, '..', 'state', 'ship.js');
+    const flagsJson = JSON.stringify(flags);
+    const currentBranch = gitState.currentBranch;
+    const result = spawnSync('node', [
+      stateShipPath, 'init',
+      '--branch', currentBranch,
+      '--flags', flagsJson,
+    ], { encoding: 'utf8' });
+    if (result.status !== 0) {
+      process.stderr.write(result.stderr || 'state/ship.js init failed\n');
+      process.exit(result.status || 1);
+    }
+    const { filePath, prunedOrphans } = JSON.parse(result.stdout);
+    writeOutput({
+      flags: { ...flags, planModeBlocked: true },
+      stateFile: filePath,
+      prunedOrphans,
+      planModeBlocked: true,
+    }, 'ship-prepare', 0);
     return;
   }
 
@@ -1242,6 +1274,7 @@ function main() {
       // computeSteps). Surfaced here so downstream consumers can introspect
       // the resolution without parsing step args.
       executeCommitWaves: flags.executeCommitWaves === true,
+      planModeBlocked: flags.planModeBlocked || false,
       skipConfigCheck,
       sources: flagSources,
     },

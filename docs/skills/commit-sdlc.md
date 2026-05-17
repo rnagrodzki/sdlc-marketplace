@@ -23,6 +23,7 @@ Inspects staged changes and recent commit history to generate a commit message t
 | `--type <type>` | Override the conventional commit type (`feat`, `fix`, `refactor`, etc.) | Auto-detected from diff |
 | `--amend` | Amend the last commit instead of creating a new one | Disabled |
 | `--auto` | Skip interactive approval — commit immediately after message generation | Disabled |
+| `--force-default-branch` | Allow `--auto` commits on the default branch. Ignored on non-default branches. (Fixes #398.) | Disabled |
 | `--no-squash-wip` | Preserve `wip(execute):` commits in branch history instead of soft-resetting them into the final commit. Useful when you want the per-wave WIP history visible for review. (Fixes #392 / R35.) | Disabled (squash by default) |
 | `--expected-branch <name>` | **Internal — set by ship-sdlc.** Validates that the current branch matches `<name>` before any `git commit` invocation. Exits non-zero if the branches differ. Cross-link: see [ship-sdlc branch-verification guard](ship-sdlc.md#branch-verification-guard). | inactive |
 
@@ -128,6 +129,14 @@ No stash entry is created or restored. The commit proceeds with only the staged 
 ```
 
 Generates the commit message, runs the critique/improve cycle internally, and commits without prompting for confirmation. Stash behavior is unchanged — unstaged changes are still stashed and restored.
+
+### Auto-commit on default branch (override)
+
+```text
+/commit-sdlc --auto --force-default-branch
+```
+
+Expected behavior: warning is emitted but the commit proceeds. Without `--force-default-branch`, `--auto` on the default branch refuses.
 
 ---
 

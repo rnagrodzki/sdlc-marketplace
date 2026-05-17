@@ -167,29 +167,29 @@
         not propose retrying, editing URLs without user input, or bypassing the gate. The gate is
         described as script-enforced, not advisory.
 
-- description: "commit-sdlc: trap cleanup fires on pre-commit hook failure (issue #209)"
+- description: "commit-sdlc: explicit rm -f cleanup runs on pre-commit hook failure (issue #209, R15/#399)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
     project_context: "file://fixtures/commit-staged-changes.md"
     user_request: >
       Run /commit-sdlc. The pre-commit hook fails (lint error). Walk through what happens
-      to $COMMIT_CONTEXT_FILE in this failure path. Reference the exact bash construct
-      that guarantees cleanup even when the hook causes a non-zero exit before any
-      explicit rm -f could run.
+      to $COMMIT_CONTEXT_FILE in this failure path. Describe the exact mechanism that ensures
+      the manifest file is cleaned up after a pre-commit hook failure. Does the skill use an
+      EXIT trap or explicit rm -f calls?
   assert:
     - type: icontains
-      value: "trap"
-    - type: icontains
-      value: "EXIT"
+      value: "rm -f"
+    - type: not-icontains
+      value: "trap 'rm -f"
     - type: llm-rubric
       value: >
-        The response identifies a single canonical `trap 'rm -f "$COMMIT_CONTEXT_FILE"' EXIT INT TERM`
-        declaration immediately after `COMMIT_CONTEXT_FILE` is assigned, and explains that the trap
-        fires unconditionally on shell exit — including the pre-commit hook failure path. It does NOT
-        describe scattered `rm -f` calls in success / cancel / error branches as the cleanup
-        mechanism (those are removed). It explicitly notes that even if a failure path skips the
-        explicit cleanup branches that previously existed, the trap still removes the manifest, so
-        no `commit-context-*.json` file remains in `$TMPDIR` (or anywhere) after exit.
+        The response describes explicit `rm -f "$COMMIT_CONTEXT_FILE"` cleanup on the pre-commit
+        hook failure path — NOT an EXIT trap. It confirms the manifest at `.sdlc/execution/commit-*.json`
+        is removed via an explicit `rm -f` call in the failure branch (not via a trap construct).
+        It does NOT describe a `trap 'rm -f ...' EXIT INT TERM` as the cleanup mechanism.
+        It correctly notes the manifest persists until explicitly cleaned up (enabling cross-shell
+        survival), and that each exit path (success, cancel, hook failure, link-gate failure)
+        performs its own explicit cleanup.
 
 # ---------------------------------------------------------------------------
 # Fixes #392 / R35 — wip(execute): squash behavioral cases
@@ -238,3 +238,67 @@
         the lines of "Detected N wip(execute): commit(s) ... preserving (--no-squash-wip)"
         and SKIPS the soft-reset. The WIP commits remain in branch history. Step 2 PLAN
         proceeds with the existing staged diff unchanged.
+
+# ---------------------------------------------------------------------------
+# Fixes #398 — default-branch guard behavioral cases
+# ---------------------------------------------------------------------------
+
+- description: "commit-sdlc: interactive mode warns before AskUserQuestion when on default branch (R14/#398)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-staged-changes.md"
+    user_request: >
+      Run /commit-sdlc. The prepare output shows currentBranch=main, defaultBranch=main,
+      onDefaultBranch=true, flags.auto=false. No --force-default-branch was passed.
+      Walk through the default-branch guard section and Step 5 approval prompt.
+  assert:
+    - type: icontains
+      value: "default branch"
+    - type: llm-rubric
+      value: >
+        The response shows a warning about committing to the default branch appearing BEFORE
+        the Step 5 AskUserQuestion approval prompt. The AskUserQuestion prompt still appears
+        (the user is asked to confirm or cancel). The warning cites the default branch name.
+        The skill does NOT refuse to proceed — it warns and defers to the user.
+
+- description: "commit-sdlc: --auto on default branch without --force-default-branch refuses with error (C12/#398)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-staged-changes.md"
+    user_request: >
+      Run /commit-sdlc --auto. The prepare output shows currentBranch=main, defaultBranch=main,
+      onDefaultBranch=true, flags.auto=true, flags.forceDefaultBranch=false, and errors[]
+      contains "Refusing to --auto commit to default branch 'main'. Pass --force-default-branch
+      to override, or remove --auto for interactive approval."
+  assert:
+    - type: icontains
+      value: "Refusing"
+    - type: not-icontains
+      value: "git commit -m"
+    - type: llm-rubric
+      value: >
+        The response stops before creating any commit. It prints the error message from prepare
+        output verbatim (containing "Refusing to --auto commit to default branch"). It does NOT
+        invoke git commit. It cleans up the manifest file with explicit rm -f. It suggests
+        passing --force-default-branch to override or removing --auto for interactive approval.
+
+- description: "commit-sdlc: --auto --force-default-branch on default branch proceeds with warning (R14, C12/#398)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/commit-sdlc/SKILL.md"
+    project_context: "file://fixtures/commit-staged-changes.md"
+    user_request: >
+      Run /commit-sdlc --auto --force-default-branch. The prepare output shows
+      currentBranch=main, defaultBranch=main, onDefaultBranch=true, flags.auto=true,
+      flags.forceDefaultBranch=true, warnings[] contains "Committing to default branch 'main'",
+      and errors[] is empty.
+  assert:
+    - type: icontains
+      value: "default branch"
+    - type: icontains
+      value: "git commit"
+    - type: llm-rubric
+      value: >
+        The response shows the default-branch warning (from warnings[]) printed to the user.
+        Since flags.auto=true and errors[] is empty and flags.forceDefaultBranch=true, the
+        skill proceeds to generate and execute the commit without an AskUserQuestion prompt.
+        It runs git commit. It does NOT stop or refuse.

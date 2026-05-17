@@ -224,3 +224,13 @@ If multiple state files exist for the same branch (from multiple failed attempts
   ]
 }
 ```
+
+---
+
+## Plan-Mode-Blocked Init
+
+When `/ship-sdlc` is invoked while plan mode is active, Step 0 calls `skill/ship.js --plan-mode-blocked` which invokes `state/ship.js init` to persist an init state file. The state file shape is **byte-identical** to a normal `cmdInit` write — all 7 steps with `status: "pending"`, plus `version`, `startedAt`, `branch`, `flags`, `decisions: []`, `deferredFindings: []`.
+
+The `planModeBlocked` flag does NOT appear in the state file — it is an annotation in the prepare output only, telling SKILL.md what happened.
+
+On the user's next `/ship-sdlc` invocation (after exiting plan mode), `detectResumeState` finds the state file by branch slug and sets `flags.implicitResume = true`. The pipeline resumes from the first pending step with the originally-resolved `flags` snapshot (including `bump`, `steps`, etc.). (Fixes #400.)

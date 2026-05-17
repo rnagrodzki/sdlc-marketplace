@@ -164,7 +164,7 @@
     - type: icontains
       value: '"truncatedFiles": []'
 
-- description: "commit-prepare: --output-file writes payload to temp file and prints absolute path"
+- description: "commit-prepare: script prints path to persistent state-file under .sdlc/execution/ (R15/#399)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--output-file"
@@ -172,32 +172,26 @@
     project_root: "file://fixtures-fs/project-commit-no-config"
     script_passthrough: true
   assert:
-    # stdout is an absolute path, not the JSON payload
     - type: regex
-      value: '^/.+/commit-context-[0-9a-f]+\.json\s*$'
-    # The payload should NOT be on stdout when --output-file is set
+      value: '^.+\.sdlc/execution/commit-[a-z0-9\-]+-\d{8}T\d{6}Z\.json\s*$'
     - type: not-icontains
       value: '"flags":'
 
-- description: "commit-prepare: without --output-file, output is still a tmpdir path (issue #209 — stdout-JSON fallback removed)"
+- description: "commit-prepare: without explicit args, output is path to .sdlc/execution/ state-file (R15/#399, replaces issue #209 tmpdir assertion)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-commit-no-config"
     script_passthrough: true
   assert:
-    # The stdout-JSON branch was removed in #209; writeOutput now always writes
-    # to os.tmpdir() and prints only the path. The legacy "JSON inline" branch
-    # is gone.
     - type: regex
-      value: '^/(tmp|var|private)/.+commit-context-[0-9a-f]+\.json\s*$'
+      value: '^.+\.sdlc/execution/commit-[a-z0-9\-]+-\d{8}T\d{6}Z\.json\s*$'
     - type: not-icontains
       value: '"flags":'
-    # Cwd MUST NOT contain a stray *-context-*.json after the run.
     - type: not-icontains
       value: 'cwd-leak'
 
-- description: "commit-prepare: --output-file path is under os.tmpdir() (issue #209 regression test)"
+- description: "commit-prepare: manifest path is under .sdlc/execution/ not tmpdir root (R15/#399 regression — issue #209 anti-pattern)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
     script_args: "--output-file"
@@ -205,10 +199,10 @@
     project_root: "file://fixtures-fs/project-commit-no-config"
     script_passthrough: true
   assert:
-    # Path must start with /tmp, /var, or /private — never the project root.
     - type: regex
-      value: '^/(tmp|var|private)/.+commit-context-[0-9a-f]+\.json\s*$'
-    # Sanity: payload absent from stdout
+      value: '\.sdlc/execution/commit-[a-z0-9\-]+-\d{8}T\d{6}Z\.json\s*$'
+    - type: not-regex
+      value: '^/(tmp|var|private)/[^/]+\.json'
     - type: not-icontains
       value: '"flags":'
 
@@ -311,3 +305,118 @@
   assert:
     - type: icontains
       value: '"branchGuard":'
+
+# ---------------------------------------------------------------------------
+# Fixes #398/#399 — default-branch guard + persistent manifest exec tests
+# ---------------------------------------------------------------------------
+
+- description: "commit-prepare: --auto on default branch without override → blocking error in errors[] (R14/#398)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_args: "--auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-on-default-branch"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return Array.isArray(o.errors) && o.errors.length > 0 &&
+          o.errors.some(e => typeof e === 'string'
+            ? e.includes('default branch')
+            : (e.id || '').includes('default-branch') || (e.message || '').includes('default branch'));
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.onDefaultBranch === true;
+
+- description: "commit-prepare: --auto --force-default-branch on default branch → warning only, no blocking error (R14/#398)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_args: "--auto --force-default-branch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-on-default-branch"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return Array.isArray(o.errors) && o.errors.length === 0;
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return Array.isArray(o.warnings) && o.warnings.some(w =>
+          (typeof w === 'string' ? w : w.message || '').toLowerCase().includes('default branch'));
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.onDefaultBranch === true && o.flags && o.flags.forceDefaultBranch === true;
+
+- description: "commit-prepare: feature branch with --auto → no default-branch warning or error (R14/#398)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_args: "--auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-wip"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.onDefaultBranch === false;
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const hasDefaultBranchError = Array.isArray(o.errors) &&
+          o.errors.some(e => (typeof e === 'string' ? e : e.message || '').includes('default branch'));
+        const hasDefaultBranchWarning = Array.isArray(o.warnings) &&
+          o.warnings.some(w => (typeof w === 'string' ? w : w.message || '').toLowerCase().includes('default branch'));
+        return !hasDefaultBranchError && !hasDefaultBranchWarning;
+
+- description: "commit-prepare: manifest path is .sdlc/execution/commit-<slug>-<ts>.json not tmpdir (R15/#399)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-on-default-branch"
+    script_passthrough: true
+  assert:
+    - type: regex
+      value: '\.sdlc/execution/commit-[a-z0-9\-]+-\d{8}T\d{6}Z\.json\s*$'
+    - type: not-regex
+      value: 'commit-context-'
+    - type: not-icontains
+      value: '"flags":'
+
+- description: "commit-prepare: prune-on-write removes prior same-branch manifests, preserves other-branch (R15/#399)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-on-default-branch"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+    script_passthrough: true
+  assert:
+    - type: javascript
+      value: "file://assertions/commit-prune-on-write.js"
+
+- description: "commit-prepare: manifest survives after script exits (cross-shell survival, R15/#399)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-on-default-branch"
+    script_passthrough: true
+  assert:
+    - type: javascript
+      value: "file://assertions/commit-cross-shell-survival.js"
+
+- description: "commit-prepare: --force-default-branch on feature branch is no-op, no default-branch signals (R14/#398)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_args: "--force-default-branch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-wip"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.onDefaultBranch === false && Array.isArray(o.errors) && o.errors.length === 0;
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.flags && o.flags.forceDefaultBranch === true;

@@ -1,8 +1,8 @@
 ---
 name: commit-sdlc
-description: "Use this skill when committing staged changes, creating a git commit, or generating a commit message. Analyzes staged diff and recent commit history to generate a message matching the project's style. Stashes unstaged changes to isolate the commit, commits after user confirmation, and auto-restores the stash. Arguments: [--no-stash] [--scope <scope>] [--type <type>] [--amend] [--auto]. Use --auto to skip interactive approval. Triggers on: commit changes, create commit, write commit message, git commit, smart commit, commit staged, stage and commit."
+description: "Use this skill when committing staged changes, creating a git commit, or generating a commit message. Analyzes staged diff and recent commit history to generate a message matching the project's style. Stashes unstaged changes to isolate the commit, commits after user confirmation, and auto-restores the stash. Arguments: [--no-stash] [--scope <scope>] [--type <type>] [--amend] [--auto] [--force-default-branch]. Use --auto to skip interactive approval. Triggers on: commit changes, create commit, write commit message, git commit, smart commit, commit staged, stage and commit."
 user-invocable: true
-argument-hint: "[--no-stash] [--scope <scope>] [--type <type>] [--amend] [--auto]"
+argument-hint: "[--no-stash] [--scope <scope>] [--type <type>] [--amend] [--auto] [--force-default-branch]"
 model: haiku
 ---
 
@@ -44,24 +44,27 @@ SCRIPT=$(find ~/.claude/plugins -name "commit.js" -path "*/sdlc*/scripts/skill/c
 
 COMMIT_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
-# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM, so
-# the manifest is removed even if an error path (subject-pattern gate, link
-# validator, pre-commit hook) skips the explicit cleanup branches below.
-trap 'rm -f "$COMMIT_CONTEXT_FILE"' EXIT INT TERM
+# No EXIT trap: manifest is persistent (.sdlc/execution/commit-<slug>-<ts>.json) so it
+# survives across separate Bash tool invocations. Cleanup is explicit at each exit path below.
 ```
 
-Read and parse `COMMIT_CONTEXT_FILE` as `COMMIT_CONTEXT_JSON`. The `trap` above guarantees cleanup on any exit path — do not add scattered `rm -f` calls in success/cancel branches.
+Read and parse `COMMIT_CONTEXT_FILE` as `COMMIT_CONTEXT_JSON`.
 
 **On non-zero `EXIT_CODE`:**
 
-- Exit code 1: The JSON still contains an `errors` array. Show each error to the user and stop.
-- Exit code 2: Show `Script error — see output above` and stop.
+- Exit code 1: The JSON still contains an `errors` array. Show each error to the user, run `rm -f "$COMMIT_CONTEXT_FILE"`, and stop.
+- Exit code 2: Show `Script error — see output above`, run `rm -f "$COMMIT_CONTEXT_FILE"`, and stop.
 
 **On script crash (exit 2):** Invoke error-report-sdlc — Glob `**/error-report-sdlc/REFERENCE.md`, follow with skill=commit-sdlc, step=Step 0 — skill/commit.js execution, error=stderr.
 
 **If `COMMIT_CONTEXT_JSON.errors` is non-empty**, show each error message and stop.
 
 **If `COMMIT_CONTEXT_JSON.warnings` is non-empty**, show the warnings to the user before continuing.
+
+**Default-branch guard (R14, fixes #398):** If `COMMIT_CONTEXT_JSON.onDefaultBranch === true`:
+- In `--auto` mode without `--force-default-branch`: the prepare script already emitted a `default-branch-auto-block` error in `errors[]` and exited non-zero — the error path above will have already shown the message and stopped. No additional action needed here.
+- In interactive mode (or `--auto --force-default-branch`): the warning from `COMMIT_CONTEXT_JSON.warnings[]` matching `default branch` is already shown by the "show warnings" step above. The Step 5 AskUserQuestion prompt still runs — the user makes the final call.
+All gates cite `COMMIT_CONTEXT_JSON.onDefaultBranch`, `flags.auto`, `flags.forceDefaultBranch` from prepare output — never re-parse `$ARGUMENTS` or re-run `git symbolic-ref`.
 
 ### Step 0.5 (BRANCH-GUARD): HARD GATE — Expected Branch Check
 
@@ -241,7 +244,7 @@ Show `Amend:` instead of `Commit:` heading when `flags.amend` is true.
 
 **On `edit`:** Ask what to change, revise the message, and present again. Loop until explicit `yes` or `cancel`. Re-dispatching the orchestrator is not required for small wording tweaks — apply user-supplied edits to `MESSAGE` directly and re-validate against the subject-pattern gate before re-presenting.
 
-**On `cancel`:** Abort without changes. The `trap` at Step 1 cleans up `$COMMIT_CONTEXT_FILE` automatically on shell exit.
+**On `cancel`:** Abort without changes. Run `rm -f "$COMMIT_CONTEXT_FILE"` to clean up the manifest.
 
 **Hook failure handling**: If `git commit` fails due to a pre-commit hook, the stash is still in place. Inform the user: "Pre-commit hook failed. Your unstaged changes are stashed (`git stash list` to see). Fix the hook issue, re-stage your changes, and re-run `/commit-sdlc`."
 
@@ -259,7 +262,7 @@ Show the result:
 
 Omit the `Stash:` line if no stash was used.
 
-The manifest temp file is removed automatically by the `trap` declared at Step 1 — no explicit cleanup is needed here.
+Run `rm -f "$COMMIT_CONTEXT_FILE"` to clean up the manifest.
 
 ---
 
@@ -324,6 +327,7 @@ When invoking `error-report-sdlc`, provide:
 
 - **Stash pop conflicts**: If a staged file also has unstaged modifications, `git stash pop` may produce merge conflicts. The skill warns the user and does NOT attempt auto-resolution.
 - **Amend on main/master**: A warning is shown when `--amend` is used on a protected branch. The skill does not block — this is the user's decision.
+- **Commit on default branch**: A warning is shown when the current branch is the default branch. In `--auto` mode, the skill refuses (prepare exits non-zero, `errors[]` includes the blocking message); pass `--force-default-branch` to override. In interactive mode, the user sees the warning before Step 5 and the `AskUserQuestion` prompt still runs.
 - **Pre-commit hook failure with active stash**: If a hook fails, the stash remains. The skill informs the user and provides recovery instructions — do not silently leave the stash without notifying.
 - **Empty body**: A commit body is optional. Only include one when the staged diff is non-trivial and the "why" adds real value.
 - **Single commit in repo**: `git log --oneline -15` may return fewer than 15 lines on a new repo. This is fine — the LLM falls back to conventional commits as the default style.

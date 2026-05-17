@@ -16,8 +16,28 @@ End-to-end feature shipping: execute plan, commit, review, fix critical issues, 
 
 If the system context contains "Plan mode is active":
 
-1. Announce: "This skill requires write operations (git commit, gh pr create, git tag). Exit plan mode first, then re-invoke `/ship-sdlc`."
-2. Stop. Do not proceed to subsequent steps.
+1. Locate `skill/ship.js` (same `find` pattern used in Step 1c below).
+2. Invoke:
+   ```bash
+   SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | sort -V | tail -1)
+   [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
+   PLAN_MODE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --plan-mode-blocked $ARGUMENTS)
+   PLAN_MODE_EXIT=$?
+   echo "PLAN_MODE_OUTPUT_FILE=$PLAN_MODE_OUTPUT_FILE"
+   echo "PLAN_MODE_EXIT=$PLAN_MODE_EXIT"
+   ```
+3. If `PLAN_MODE_EXIT` is non-zero: show any errors from the output file and stop.
+4. Read the output JSON from `$PLAN_MODE_OUTPUT_FILE`. Confirm `planModeBlocked === true`. Extract `stateFile`, `flags.bump`, `flags.steps`.
+5. Announce:
+   > Plan mode is active. ship-sdlc requires write operations (git commit, gh pr create, git tag) and cannot run inside plan mode.
+   >
+   > **Pipeline state saved to `<stateFile>` with resolved flags:** bump=`<flags.bump>`, steps=`<flags.steps>`.
+   >
+   > Exit plan mode and re-invoke `/ship-sdlc` (no args needed) — the existing implicit-resume mechanism will pick up the saved state and resume from the first pending step with the originally-resolved flags intact.
+6. Run `rm -f "$PLAN_MODE_OUTPUT_FILE"` to clean up the temp output file.
+7. Stop. Do not proceed to subsequent steps.
+
+All gates in steps 3–5 cite resolved fields from prepare output (`planModeBlocked`, `stateFile`, `flags.bump`, `flags.steps`) — never re-parse `$ARGUMENTS` directly.
 
 ---
 

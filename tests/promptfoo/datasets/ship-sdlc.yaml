@@ -216,28 +216,29 @@
         one-line reason. All four sections appear before the pipeline table. No
         section is omitted.
 
-- description: "ship-sdlc: plan mode active causes immediate refusal with instructions to exit"
+- description: "ship-sdlc: plan mode active → invokes --plan-mode-blocked, saves state, announces stateFile + resolved flags (#400)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     project_context: "file://fixtures/ship-pipeline-ready.md"
     user_request: >
-      Plan mode is active. Run /ship-sdlc. The system context indicates plan mode
+      Plan mode is active. Run /ship-sdlc --bump patch. The system context indicates plan mode
       is currently enabled.
   assert:
-    # Must mention plan mode
     - type: icontains
       value: "plan mode"
-    # Must tell user to exit plan mode
+    - type: icontains
+      value: "ship-sdlc"
     - type: regex
-      value: "(Exit plan mode|exit plan mode|exit Plan Mode)"
-    # Behavioral: stops immediately, does not proceed to pipeline
+      value: "(ship-[a-z0-9\\-]+-\\d{8}T\\d{6}Z\\.json|stateFile|state file)"
     - type: llm-rubric
       value: >
-        The response detects plan mode is active and immediately stops. It announces
-        that ship-sdlc requires write operations (git commit, gh pr create, git tag)
-        and cannot run in plan mode. It instructs the user to exit plan mode first,
-        then re-invoke /ship-sdlc. It does NOT proceed to Step 1 config loading or
-        any pipeline activity.
+        The response detects plan mode is active and invokes ship.js with --plan-mode-blocked.
+        It announces a state file path (matching the ship-<slug>-<ts>.json pattern or using
+        the word "stateFile" / "state file"). It reports the resolved flags (bump=patch or
+        equivalent). It tells the user to exit plan mode and re-invoke /ship-sdlc without
+        re-specifying flags (implicit resume will pick up the saved state). It does NOT
+        proceed to Step 1 config loading or any pipeline activity. It does NOT say the
+        pipeline "cannot run" without also explaining that state was saved for resume.
 
 - description: "ship-sdlc: --workspace worktree uses git worktree add/remove lifecycle"
   vars:
@@ -974,3 +975,24 @@
         (git push origin :refs/tags/v1.2.3 and git tag -d v1.2.3) and instructs the user
         to re-run the version step on the correct branch. The response does NOT proceed
         to the PR step after the failure.
+
+- description: "ship-sdlc: plan-mode-blocked announces resolved flags for resume (#400)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Plan mode is active. Run /ship-sdlc --bump minor --steps execute,commit,review,pr.
+      The system context indicates plan mode is currently enabled. Show what the skill
+      announces about saved flags and how the user should proceed.
+  assert:
+    - type: icontains
+      value: "plan mode"
+    - type: icontains
+      value: "minor"
+    - type: llm-rubric
+      value: >
+        The response announces the resolved flags to the user: bump=minor and
+        steps=execute,commit,review,pr (or equivalent phrasing). It shows a state file
+        path (or confirms state was saved). It instructs the user to exit plan mode and
+        re-invoke /ship-sdlc (no flags needed) — the saved state enables implicit resume.
+        It does not require the user to re-specify --bump minor or --steps on the next run.
