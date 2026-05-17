@@ -566,6 +566,9 @@ After the version step dispatches and returns, capture the new tag from the vers
 # Post-version ancestry HARD GATE (R-post-version-ancestry, fixes #349)
 VERIFY_SCRIPT=$(find ~/.claude/plugins -name "verify-tag-ancestry.js" -path "*/sdlc*/scripts/util/verify-tag-ancestry.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$VERIFY_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js" ] && VERIFY_SCRIPT="plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
+if [ -z "$VERIFY_SCRIPT" ]; then
+  echo "WARNING: verify-tag-ancestry.js not found — post-version ancestry check skipped." >&2
+fi
 if [ -n "$VERIFY_SCRIPT" ] && [ -n "$NEW_TAG" ] && [ -n "$EXECUTE_BRANCH" ]; then
   node "$VERIFY_SCRIPT" --tag "$NEW_TAG" --branch "$EXECUTE_BRANCH" --remote origin
   ANCESTRY_EXIT=$?
