@@ -1031,7 +1031,11 @@ function main() {
       stateShipPath, 'init',
       '--branch', currentBranch,
       '--flags', flagsJson,
-    ], { encoding: 'utf8' });
+    ], { encoding: 'utf8', timeout: 10000 });
+    if (result.error) {
+      process.stderr.write(`state/ship.js init timed out or crashed: ${result.error.message}\n`);
+      process.exit(1);
+    }
     if (result.status !== 0) {
       process.stderr.write(result.stderr || 'state/ship.js init failed\n');
       process.exit(result.status || 1);

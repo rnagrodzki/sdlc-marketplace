@@ -44,8 +44,10 @@ SCRIPT=$(find ~/.claude/plugins -name "commit.js" -path "*/sdlc*/scripts/skill/c
 
 COMMIT_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
 EXIT_CODE=$?
-# No EXIT trap: manifest is persistent (.sdlc/execution/commit-<slug>-<ts>.json) so it
-# survives across separate Bash tool invocations. Cleanup is explicit at each exit path below.
+# No EXIT trap: success-path manifest is persistent (.sdlc/execution/commit-<slug>-<ts>.json)
+# so it survives across separate Bash tool invocations. Error-path manifests still write to
+# os.tmpdir() via writeOutput. Explicit `rm -f "$COMMIT_CONTEXT_FILE"` at each exit path
+# handles both cases.
 ```
 
 Read and parse `COMMIT_CONTEXT_FILE` as `COMMIT_CONTEXT_JSON`.

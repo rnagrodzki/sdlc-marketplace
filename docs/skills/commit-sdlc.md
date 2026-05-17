@@ -288,6 +288,9 @@ Refactor login logic
 |-----------------|-------------|
 | Git commit | A new commit on the current branch, or an amended HEAD commit when `--amend` is passed |
 | Git stash (temporary) | Created from unstaged tracked-file changes before the commit and immediately popped after — not a permanent stash entry |
+| `.sdlc/execution/commit-<slug>-<ts>.json` | Persistent prepare manifest (success path) containing the staged file list, full staged diff, branch metadata, and flags. Survives across Bash invocations to support cross-shell consumers. Error-path manifests instead go to `os.tmpdir()` via `writeOutput`. |
+
+> **Note:** `.sdlc/execution/commit-*.json` files include the full staged diff content. The repo-level `.sdlc/.gitignore` excludes everything under `.sdlc/` except `config.json` and `review-dimensions/`, so these files are not tracked by git — but be aware that the diff sits on disk under the success-path manifest until the next prune-on-write or `--gc` cycle. Do not share or copy `.sdlc/execution/` contents if a stage may have included credentials.
 
 ## OpenSpec Integration
 

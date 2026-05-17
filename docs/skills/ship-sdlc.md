@@ -669,6 +669,8 @@ Then run `/ship-sdlc` without `--resume` to start a new pipeline.
 
 When `/ship-sdlc` was invoked in plan mode, a `ship-<slug>-<ts>.json` state file is written with all steps pending and the originally-resolved flags preserved. After exiting plan mode, re-invoke `/ship-sdlc` (no arguments needed). The implicit-resume mechanism (`detectResumeState` → `flags.implicitResume`) picks up the saved state file and resumes from the first pending step, preserving `--bump`, `--steps`, and other flags from the original invocation. (Fixes #400.)
 
+ship-sdlc also removes the intermediate prepare output file (`$PLAN_MODE_OUTPUT_FILE`) after confirming the state file was written — the temp output file is distinct from the persistent state file in `.sdlc/execution/`.
+
 ---
 
 ## Prerequisites
