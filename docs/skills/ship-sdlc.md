@@ -41,7 +41,7 @@ This skill is for **expert users working on projects with established quality gu
 | `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
 | `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `verify-pipeline` (opt-in), `await-remote-review` (opt-in), `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
 | `--quality <full\|balanced\|minimal>` | Forwarded to execute-plan-sdlc as `--quality` (model tier). Only forwarded when the user explicitly passes `--quality` to ship; otherwise execute-plan-sdlc applies its own selection. (Renamed from `--preset` in #190 to disambiguate from `--steps`.) | Not forwarded |
-| `--bump patch\|minor\|major\|<label>` | Version bump type forwarded to version-sdlc. The `<label>` form (e.g. `--bump rc`, `--bump beta`) is forwarded verbatim and interpreted by version-sdlc as `--bump patch --pre <label>`. Labels must match `^[a-z][a-z0-9]*$` (lowercase, start with a letter, alphanumeric). Example: `ship-sdlc --bump rc` produces a `1.2.4-rc.1` style release. | `patch` |
+| `--bump patch\|minor\|major\|<label>` | Version bump type forwarded to version-sdlc. The `<label>` form (e.g. `--bump rc`, `--bump beta`) is forwarded verbatim and interpreted by version-sdlc as `--bump patch --pre <label>`. Labels must match `^[a-z][a-z0-9]*$` (lowercase, start with a letter, alphanumeric). Example: `ship-sdlc --bump rc` produces a `1.2.4-rc.1` style release. | `patch` (or `version.preRelease` from `.sdlc/config.json` when set and no CLI `--bump` is passed — see R63) |
 | `--draft` | Create the PR as a draft. | Off |
 | `--dry-run` | Display the full pipeline plan and stop. No steps are executed. | Off |
 | `--resume` | Resume from the most recent state file for the current branch. Completed steps are skipped; in-progress steps are retried. | Off |
@@ -461,6 +461,10 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 | `awaitRemoteReviewInterval` | `integer` (≥10) | `60` | Seconds between await-remote-review poll attempts. (R57) |
 | `awaitRemoteReviewers` | `string[]` (minItems 1) | `["copilot"]` | Logins (case-insensitive) whose reviews satisfy await-remote-review. When the login is `copilot`, the reviewer must also be a Bot. (R56, R57) |
 | `execute.commitWaves` | `boolean` | `false` | Forwards `--commit-waves` to the execute step. When `true`, execute-plan-sdlc commits each wave as `wip(execute): wave N — <titles>` after G9+G11 pass; commit-sdlc then squashes those WIP commits via soft-reset into the final feature commit. User-facing pipeline behavior is unchanged — WIPs accumulate, then squash. (Fixes #392 / R35.) |
+
+### `version.preRelease` implicit `--bump` override (R63)
+
+`version.preRelease` lives in `.sdlc/config.json` (the project-shared `version` section, NOT in `.sdlc/local.json`'s `ship` section). When set to a valid label (e.g. `"rc"`, `"beta"`, matching `^[a-z][a-z0-9]*$`) and the user does NOT pass `--bump` on the CLI, ship-sdlc forwards it as `--bump <label>` to version-sdlc — equivalent to `--bump patch --pre <label>`. An explicit CLI `--bump` (any value, including `patch`) wins over the config value, allowing graduation out of the pre-release train (version-sdlc R16). See `docs/specs/ship-sdlc.md` R63 for the full rule.
 
 ### `execute.commitWaves` Forwarding
 

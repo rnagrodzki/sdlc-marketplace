@@ -42,7 +42,12 @@ const { writeJsonLine } = require(path.join(LIB, 'output'));
  * Filtering rules (R56):
  *   - Excludes reviews with state === 'PENDING'.
  *   - Login match is case-insensitive.
- *   - When the reviewer login is `copilot`, also requires authorType === 'Bot'.
+ *   - GitHub App / Bot logins returned by the REST `pulls/{pr}/reviews` endpoint
+ *     carry a trailing `[bot]` suffix (e.g. `copilot[bot]`). This suffix is
+ *     stripped before comparison against the configured reviewers list so that
+ *     a reviewer entry of `copilot` matches both `copilot` and `copilot[bot]`.
+ *   - When the normalised reviewer login is `copilot`, also requires
+ *     authorType === 'Bot' as the authoritative bot-identity guard.
  *
  * Verdict mapping (R52, R53):
  *   - state CHANGES_REQUESTED | COMMENTED → 'actionable'
@@ -60,7 +65,7 @@ function evaluateReviews(reviews, reviewers) {
 
   const matching = list.filter((r) => {
     if (!r || r.state === 'PENDING') return false;
-    const login = (r.authorLogin || '').toLowerCase();
+    const login = (r.authorLogin || '').toLowerCase().replace(/\[bot\]$/, '');
     if (!reviewerSet.has(login)) return false;
     if (login === 'copilot' && r.authorType !== 'Bot') return false;
     return true;
