@@ -16,8 +16,29 @@ End-to-end feature shipping: execute plan, commit, review, fix critical issues, 
 
 If the system context contains "Plan mode is active":
 
-1. Announce: "This skill requires write operations (git commit, gh pr create, git tag). Exit plan mode first, then re-invoke `/ship-sdlc`."
-2. Stop. Do not proceed to subsequent steps.
+1. Locate `skill/ship.js` (same `find` pattern used in Step 1c below).
+2. Invoke:
+   ```bash
+   SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | sort -V | tail -1)
+   [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
+   [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
+   PLAN_MODE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --plan-mode-blocked $ARGUMENTS)
+   PLAN_MODE_EXIT=$?
+   echo "PLAN_MODE_OUTPUT_FILE=$PLAN_MODE_OUTPUT_FILE"
+   echo "PLAN_MODE_EXIT=$PLAN_MODE_EXIT"
+   ```
+3. If `PLAN_MODE_EXIT` is non-zero: show any errors from the output file and stop.
+4. Read the output JSON from `$PLAN_MODE_OUTPUT_FILE`. Confirm `planModeBlocked === true`. Extract `stateFile`, `flags.bump`, `flags.steps`.
+5. Announce:
+   > Plan mode is active. ship-sdlc requires write operations (git commit, gh pr create, git tag) and cannot run inside plan mode.
+   >
+   > **Pipeline state saved to `<stateFile>` with resolved flags:** bump=`<flags.bump>`, steps=`<flags.steps>`.
+   >
+   > Exit plan mode and re-invoke `/ship-sdlc` (no args needed) — the existing implicit-resume mechanism will pick up the saved state and resume from the first pending step with the originally-resolved flags intact.
+6. Run `rm -f "$PLAN_MODE_OUTPUT_FILE"` to clean up the temp output file.
+7. Stop. Do not proceed to subsequent steps.
+
+All gates in steps 3–5 cite resolved fields from prepare output (`planModeBlocked`, `stateFile`, `flags.bump`, `flags.steps`) — never re-parse `$ARGUMENTS` directly.
 
 ---
 
@@ -933,6 +954,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Add, remove, or change the `isolation` parameter on Agent dispatches — isolation comes verbatim from `step.isolation`. Adding `isolation: "worktree"` when `step.isolation` is null causes hidden Agent SDK worktrees that conflict with `--workspace branch` (issue #350).
 - Ignore cleanup validation failures — if `state/ship.js cleanup` exits with code 1, the pipeline contract was violated. Surface the violation and preserve state.
 - Skip the post-version ancestry HARD GATE. The check is the only safeguard against tags landing on orphaned commits (issue #349). The gate is a no-op when `NEW_TAG` is unset — do not pre-empt it by skipping it when you believe the version step succeeded on the right branch.
+- Exit the plan-mode-blocked path (Step 0, steps 3–7) without running `rm -f "$PLAN_MODE_OUTPUT_FILE"` — the temp prepare output file is separate from the persistent state file in `.sdlc/execution/` and must be cleaned up on every exit branch.
 
 ---
 

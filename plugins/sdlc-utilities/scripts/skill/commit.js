@@ -33,6 +33,7 @@ const LIB = path.join(__dirname, '..', 'lib');
 const { exec, checkGitState, splitDiffByFile } = require(path.join(LIB, 'git'));
 const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
+const { writeManifestState } = require(path.join(LIB, 'state'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { truncateDiff } = require(path.join(LIB, 'diff-truncate'));
 const { validateExpectedBranch } = require(path.join(LIB, 'branch-guard'));
@@ -63,13 +64,14 @@ function truncateStagedDiff(fullDiff) {
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let noStash        = false;
-  let scope          = null;
-  let type           = null;
-  let amend          = false;
-  let auto           = false;
-  let noSquashWip    = false;
-  let expectedBranch = null;
+  let noStash             = false;
+  let scope               = null;
+  let type                = null;
+  let amend               = false;
+  let auto                = false;
+  let noSquashWip         = false;
+  let expectedBranch      = null;
+  let forceDefaultBranch  = false;
   const warnings = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -89,10 +91,27 @@ function parseArgs(argv) {
     } else if (a === '--expected-branch' && args[i + 1]) {
       // R-expected-branch (issues #347, #348, #349): validated after gitState is resolved
       expectedBranch = args[++i];
+    } else if (a === '--force-default-branch') {
+      forceDefaultBranch = true;
     }
   }
 
-  return { noStash, scope, type, amend, auto, noSquashWip, expectedBranch, warnings };
+  return { noStash, scope, type, amend, auto, noSquashWip, expectedBranch, forceDefaultBranch, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// Default-branch resolution helper (R14, fixes #398)
+// ---------------------------------------------------------------------------
+
+function resolveDefaultBranch(projectRoot) {
+  let defaultBranch = exec('git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null', { cwd: projectRoot });
+  if (defaultBranch) defaultBranch = defaultBranch.trim().replace(/^refs\/remotes\/origin\//, '');
+  if (!defaultBranch) {
+    // Fall back: try 'main' then 'master'
+    const mainExists = exec('git rev-parse --verify main 2>/dev/null', { cwd: projectRoot });
+    defaultBranch = mainExists ? 'main' : 'master';
+  }
+  return defaultBranch;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,9 +144,7 @@ function detectWipSquash(projectRoot) {
 
   // Fall back to detected default branch.
   if (!forkPoint) {
-    let defaultBranch = exec("git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null", { cwd: projectRoot });
-    if (defaultBranch) defaultBranch = defaultBranch.trim().replace(/^refs\/remotes\/origin\//, '');
-    if (!defaultBranch) defaultBranch = 'main';
+    const defaultBranch = resolveDefaultBranch(projectRoot);
     const base = exec(`git merge-base HEAD ${defaultBranch} 2>/dev/null`, { cwd: projectRoot })
               || exec(`git merge-base HEAD master 2>/dev/null`, { cwd: projectRoot });
     if (base && base.trim().length > 0) forkPoint = base.trim();
@@ -161,7 +178,7 @@ function detectWipSquash(projectRoot) {
 
 function main() {
   const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
-  const { noStash, scope, type, amend, auto, noSquashWip, expectedBranch, warnings: parseWarnings } = parseArgs(process.argv);
+  const { noStash, scope, type, amend, auto, noSquashWip, expectedBranch, forceDefaultBranch, warnings: parseWarnings } = parseArgs(process.argv);
 
   const errors   = [];
   const warnings = [...parseWarnings];
@@ -175,7 +192,7 @@ function main() {
     return;
   }
 
-  const flags = { noStash, scope, type, amend, auto, noSquashWip, skipConfigCheck };
+  const flags = { noStash, scope, type, amend, auto, noSquashWip, skipConfigCheck, forceDefaultBranch };
 
   // Step 3: Validate git repo and get current branch
   let gitState;
@@ -188,6 +205,10 @@ function main() {
   }
 
   const { currentBranch } = gitState;
+
+  // Default-branch detection (R14, fixes #398)
+  const defaultBranch = resolveDefaultBranch(projectRoot);
+  const onDefaultBranch = currentBranch === defaultBranch;
 
   // Branch-guard HARD GATE (R-expected-branch, issues #347, #348, #349)
   // Must run before any git commit invocation. Pure check — exits immediately on mismatch.
@@ -286,6 +307,14 @@ function main() {
     warnings.push(`You are on ${currentBranch}. Amending commits on a protected branch may cause issues.`);
   }
 
+  // Default-branch guard (R14/C12, fixes #398)
+  if (onDefaultBranch) {
+    warnings.push(`Committing to default branch '${defaultBranch}' — this lands directly on the protected branch.`);
+    if (auto && !forceDefaultBranch) {
+      errors.push(`Refusing to --auto commit to default branch '${defaultBranch}'. Pass --force-default-branch to override, or remove --auto for interactive approval.`);
+    }
+  }
+
   // Step 13 (Fixes #392 / R35): wip(execute): squash detection — reuse the
   // result computed earlier (we always run detectWipSquash before the staged
   // gate so wipSquash is available even on the empty-staging path).
@@ -295,6 +324,8 @@ function main() {
     errors,
     warnings,
     currentBranch,
+    defaultBranch,
+    onDefaultBranch,
     flags,
     migration: cv.migration,
     commitConfig,
@@ -321,7 +352,9 @@ function main() {
     branchGuard,
   };
 
-  writeOutput(result, 'commit-context', 0);
+  const manifestPath = writeManifestState('commit', currentBranch, result);
+  process.stdout.write(manifestPath + '\n');
+  process.exit(result.errors && result.errors.length > 0 ? 1 : 0);
 }
 
 if (require.main === module) {

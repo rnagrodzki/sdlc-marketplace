@@ -430,6 +430,7 @@ function cmdCleanupPipeline(opts) {
   report.gc.ship    = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
   report.gc.execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
   report.gc.plan    = gcStateFiles({ prefix: 'plan',    ttlDays, knownBranches });
+  report.gc.commit  = gcStateFiles({ prefix: 'commit',  ttlDays, knownBranches });
 
   process.stdout.write(JSON.stringify(report, null, 2) + '\n');
   process.exit(0);
@@ -483,8 +484,9 @@ function cmdGc(opts) {
   const ship    = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
   const execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
   const plan    = gcStateFiles({ prefix: 'plan',    ttlDays, knownBranches });
+  const commit  = gcStateFiles({ prefix: 'commit',  ttlDays, knownBranches });
 
-  process.stdout.write(JSON.stringify({ ttlDays, ship, execute, plan }, null, 2) + '\n');
+  process.stdout.write(JSON.stringify({ ttlDays, ship, execute, plan, commit }, null, 2) + '\n');
   process.exit(0);
 }
 
