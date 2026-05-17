@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.20.10] - 2026-05-17
+
+### Fixed
+- ship-sdlc: Copilot login + prerelease version override — bot-identity normalization for Copilot reviewer matching and prerelease version override from config (#393, #394)
+
+### Changed
+- ship-sdlc: updated --bump flag documentation to reflect version.preRelease config override (#393)
+
 ## [0.20.9] - 2026-05-17
 
 ### Fixed
