@@ -16,97 +16,22 @@
  *   default — passes dimensionFilter=null; expects status SKIPPED
  *
  * Output:
- *   JSON: { name, status, matched_files_count, changed_files_count }
+ *   JSON: { name, status, matched_files_count, changed_files_count, forced }
+ *
+ * Notes:
+ *   - Imports the REAL loadAndMatchDimensions from review.js to avoid drift.
+ *   - The `forced` field in the output is a harness-only observability signal
+ *     (re-derived from the inputs); it is NOT part of the manifest contract.
  */
 
 'use strict';
 
 const path = require('path');
-const fs   = require('fs');
 
 const REPO_ROOT  = path.resolve(__dirname, '..', '..', '..');
 const reviewPath = path.join(REPO_ROOT, 'plugins', 'sdlc-utilities', 'scripts', 'skill', 'review.js');
 
-// review.js exports matchFiles, globToRegex, analyzeUncoveredFiles
-const { matchFiles } = require(reviewPath);
-
-// Minimal helpers replicated from review.js (not exported) to drive the test.
-// These are stable internal functions — if they change, the test should be updated.
-function extractFrontmatter(content) {
-  const m = content.match(/^---\n([\s\S]*?)\n---/);
-  return m ? m[1] : null;
-}
-
-function parseSimpleYaml(yamlText) {
-  const result = {};
-  if (!yamlText) return result;
-  let currentKey = null;
-  let inList = false;
-  const lines = yamlText.split('\n');
-  for (const line of lines) {
-    const kvMatch = line.match(/^([a-zA-Z_-]+):\s*(.*)/);
-    if (kvMatch && !line.startsWith('  ') && !line.startsWith('\t')) {
-      currentKey = kvMatch[1];
-      const val = kvMatch[2].trim();
-      if (val === '') {
-        result[currentKey] = [];
-        inList = true;
-      } else {
-        result[currentKey] = val.replace(/^["']|["']$/g, '');
-        inList = false;
-      }
-    } else if (inList && line.match(/^\s+-\s+(.*)/)) {
-      const item = line.match(/^\s+-\s+(.*)/)[1].replace(/^["']|["']$/g, '');
-      if (!Array.isArray(result[currentKey])) result[currentKey] = [];
-      result[currentKey].push(item);
-    }
-  }
-  return result;
-}
-
-function resolveDimensionsDir(projectRoot) {
-  const sdlcPath   = path.join(projectRoot, '.sdlc', 'review-dimensions');
-  const claudePath = path.join(projectRoot, '.claude', 'review-dimensions');
-  if (fs.existsSync(sdlcPath)) return sdlcPath;
-  if (fs.existsSync(claudePath)) return claudePath;
-  return sdlcPath;
-}
-
-/**
- * Minimal reimplementation of loadAndMatchDimensions from review.js.
- * Used by the test harness; mirrors the exact logic in the patched version.
- */
-function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
-  const dimensionsDir = resolveDimensionsDir(projectRoot);
-  const dims = [];
-  let files;
-  try { files = fs.readdirSync(dimensionsDir).filter(f => f.endsWith('.md')); }
-  catch (_) { return dims; }
-
-  for (const file of files) {
-    const filePath = path.join(dimensionsDir, file);
-    let content;
-    try { content = fs.readFileSync(filePath, 'utf8'); } catch (_) { continue; }
-
-    const fm = parseSimpleYaml(extractFrontmatter(content) || '');
-    if (!fm.name) continue;
-
-    if (dimensionFilter && !dimensionFilter.includes(fm.name)) continue;
-
-    const { matched, truncated } = matchFiles(fm, changedFiles);
-    const forced = dimensionFilter && dimensionFilter.includes(fm.name) && matched.length === 0;
-    const effectiveMatched = forced ? changedFiles : matched;
-
-    dims.push({
-      name:          fm.name,
-      status:        effectiveMatched.length === 0 ? 'SKIPPED' : (truncated ? 'TRUNCATED' : 'ACTIVE'),
-      matched_files: effectiveMatched,
-      matched_count: effectiveMatched.length,
-      forced,
-    });
-  }
-  return dims;
-}
+const { loadAndMatchDimensions } = require(reviewPath);
 
 // --- CLI ---
 const argv = process.argv.slice(2);
@@ -128,7 +53,13 @@ if (!['forced', 'default'].includes(scenario)) {
   process.exit(1);
 }
 
-// Simulated changed files — these are normal source files that do NOT match __qa-only__/**
+// Simulated changed files for the test.
+//
+// COUPLING NOTE: The fixture at fixtures-fs/project-on-demand-dimension/.sdlc/review-dimensions/qa-on-demand.md
+// declares triggers: ["__qa-only__/**"]. The file path below ('src/index.js') is deliberately chosen
+// so it does NOT match that trigger glob — this produces the zero-trigger-match scenario that the
+// force-active path under test depends on. If the fixture's triggers change, this constant must
+// be updated to maintain the zero-match invariant.
 const changedFiles = ['src/index.js'];
 
 const dimensionFilter = scenario === 'forced' ? ['qa-on-demand'] : null;
@@ -145,10 +76,17 @@ if (!dim) {
   process.exit(1);
 }
 
+// Harness-only observability: re-derive whether the force-active path was taken.
+// The real manifest does NOT include this field — it is only used by this test harness
+// to assert that the force-active branch executed (vs. a coincidental trigger match).
+const forced = !!(dimensionFilter && dimensionFilter.includes(dim.name)
+                  && dim.matched_count > 0
+                  && dim.matched_count === changedFiles.length);
+
 process.stdout.write(JSON.stringify({
   name:               dim.name,
   status:             dim.status,
   matched_files_count: dim.matched_count,
   changed_files_count: changedFiles.length,
-  forced:             dim.forced,
+  forced,
 }) + '\n');

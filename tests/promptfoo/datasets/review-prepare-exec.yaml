@@ -15,7 +15,8 @@
     # matched_files must equal changedFiles (force-active uses all changed files)
     - type: javascript
       value: "JSON.parse(output).matched_files_count === JSON.parse(output).changed_files_count && JSON.parse(output).matched_files_count > 0"
-    # forced flag must be set
+    # forced flag must be set (harness-only observability — NOT a manifest contract field;
+    # the real review.js manifest does not include `forced`, the test script re-derives it from inputs)
     - type: javascript
       value: JSON.parse(output).forced === true
 
