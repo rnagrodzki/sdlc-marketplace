@@ -1,5 +1,41 @@
-# Script execution tests for review.js plugin_version resolution (issue #363).
+# Script execution tests for review.js — covers plugin_version resolution (#363) and
+# on-demand forced-active dimension behavior (#362).
 # These run the harness scripts directly against fixture directories (no LLM).
+
+- description: "review-prepare (#362): --dimensions forces on-demand dimension active when triggers match zero (issue #362)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-review-on-demand-dimension.js"
+    script_args: "--project-root {{project_root}} --scenario forced"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-on-demand-dimension"
+  assert:
+    # Dimension must be ACTIVE when named in --dimensions even though triggers match zero files
+    - type: javascript
+      value: JSON.parse(output).status === 'ACTIVE'
+    # matched_files must equal changedFiles (force-active uses all changed files)
+    - type: javascript
+      value: "JSON.parse(output).matched_files_count === JSON.parse(output).changed_files_count && JSON.parse(output).matched_files_count > 0"
+    # forced flag must be set (harness-only observability — NOT a manifest contract field;
+    # the real review.js manifest does not include `forced`, the test script re-derives it from inputs)
+    - type: javascript
+      value: JSON.parse(output).forced === true
+
+- description: "review-prepare (#362): on-demand dimension stays SKIPPED when --dimensions filter omitted (issue #362)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-review-on-demand-dimension.js"
+    script_args: "--project-root {{project_root}} --scenario default"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-on-demand-dimension"
+  assert:
+    # Dimension must remain SKIPPED when not named in --dimensions (backward-compat)
+    - type: javascript
+      value: JSON.parse(output).status === 'SKIPPED'
+    # matched_files must be 0 (no trigger match, no force-active)
+    - type: javascript
+      value: JSON.parse(output).matched_files_count === 0
+    # forced must be falsy
+    - type: javascript
+      value: "!JSON.parse(output).forced"
 
 - description: "review-prepare (#363): manifest includes plugin_version matching semver or 'unknown'"
   vars:

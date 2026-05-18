@@ -426,6 +426,20 @@ function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
     if (dimensionFilter && !dimensionFilter.includes(fm.name)) continue;
 
     const { matched, truncated } = matchFiles(fm, changedFiles);
+    const forced = dimensionFilter && dimensionFilter.includes(fm.name) && matched.length === 0;
+
+    // Force-active path (R-on-demand-force-active, #362): when forced, use ALL changed files
+    // but still apply the dimension's max-files cap, per spec.
+    const maxFiles = fm['max-files'] || 100;
+    let effectiveMatched;
+    let effectiveTruncated;
+    if (forced) {
+      effectiveTruncated = changedFiles.length > maxFiles;
+      effectiveMatched   = effectiveTruncated ? changedFiles.slice(0, maxFiles) : changedFiles;
+    } else {
+      effectiveMatched   = matched;
+      effectiveTruncated = truncated;
+    }
 
     dims.push({
       name:              fm.name,
@@ -433,10 +447,10 @@ function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
       severity:          fm.severity || 'medium',
       requires_full_diff: fm['requires-full-diff'] || false,
       model:             fm.model || null,
-      status:            matched.length === 0 ? 'SKIPPED' : (truncated ? 'TRUNCATED' : 'ACTIVE'),
-      matched_files:     matched,
-      matched_count:     matched.length,
-      truncated,
+      status:            effectiveMatched.length === 0 ? 'SKIPPED' : (effectiveTruncated ? 'TRUNCATED' : 'ACTIVE'),
+      matched_files:     effectiveMatched,
+      matched_count:     effectiveMatched.length,
+      truncated:         effectiveTruncated,
       diff_file:         null,
       body,
       file_context:      [],
@@ -611,4 +625,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { globToRegex, matchFiles, analyzeUncoveredFiles, UNCOVERED_PATTERN_CATALOG };
+module.exports = { globToRegex, matchFiles, loadAndMatchDimensions, analyzeUncoveredFiles, UNCOVERED_PATTERN_CATALOG };
