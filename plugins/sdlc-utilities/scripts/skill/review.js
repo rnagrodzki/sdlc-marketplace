@@ -426,6 +426,8 @@ function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
     if (dimensionFilter && !dimensionFilter.includes(fm.name)) continue;
 
     const { matched, truncated } = matchFiles(fm, changedFiles);
+    const forced = dimensionFilter && dimensionFilter.includes(fm.name) && matched.length === 0;
+    const effectiveMatched = forced ? changedFiles : matched;
 
     dims.push({
       name:              fm.name,
@@ -433,9 +435,9 @@ function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
       severity:          fm.severity || 'medium',
       requires_full_diff: fm['requires-full-diff'] || false,
       model:             fm.model || null,
-      status:            matched.length === 0 ? 'SKIPPED' : (truncated ? 'TRUNCATED' : 'ACTIVE'),
-      matched_files:     matched,
-      matched_count:     matched.length,
+      status:            effectiveMatched.length === 0 ? 'SKIPPED' : (truncated ? 'TRUNCATED' : 'ACTIVE'),
+      matched_files:     effectiveMatched,
+      matched_count:     effectiveMatched.length,
       truncated,
       diff_file:         null,
       body,
