@@ -104,11 +104,11 @@ function parseArgs(argv) {
 // ---------------------------------------------------------------------------
 
 function resolveDefaultBranch(projectRoot) {
-  let defaultBranch = exec('git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null', { cwd: projectRoot });
+  let defaultBranch = exec('git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null', { cwd: process.cwd() });
   if (defaultBranch) defaultBranch = defaultBranch.trim().replace(/^refs\/remotes\/origin\//, '');
   if (!defaultBranch) {
     // Fall back: try 'main' then 'master'
-    const mainExists = exec('git rev-parse --verify main 2>/dev/null', { cwd: projectRoot });
+    const mainExists = exec('git rev-parse --verify main 2>/dev/null', { cwd: process.cwd() });
     defaultBranch = mainExists ? 'main' : 'master';
   }
   return defaultBranch;
@@ -130,23 +130,23 @@ function resolveDefaultBranch(projectRoot) {
  *   3. When neither resolves, returns { commits: [], stagedClean } — never errors
  */
 function detectWipSquash(projectRoot) {
-  const stagedRaw = exec('git diff --cached --name-only', { cwd: projectRoot });
+  const stagedRaw = exec('git diff --cached --name-only', { cwd: process.cwd() });
   const stagedClean = !stagedRaw || stagedRaw.split('\n').filter(Boolean).length === 0;
 
   let forkPoint = null;
 
   // Try upstream first.
-  const upstream = exec('git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null', { cwd: projectRoot });
+  const upstream = exec('git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null', { cwd: process.cwd() });
   if (upstream && upstream.trim().length > 0) {
-    const base = exec(`git merge-base HEAD ${upstream.trim()} 2>/dev/null`, { cwd: projectRoot });
+    const base = exec(`git merge-base HEAD ${upstream.trim()} 2>/dev/null`, { cwd: process.cwd() });
     if (base && base.trim().length > 0) forkPoint = base.trim();
   }
 
   // Fall back to detected default branch.
   if (!forkPoint) {
     const defaultBranch = resolveDefaultBranch(projectRoot);
-    const base = exec(`git merge-base HEAD ${defaultBranch} 2>/dev/null`, { cwd: projectRoot })
-              || exec(`git merge-base HEAD master 2>/dev/null`, { cwd: projectRoot });
+    const base = exec(`git merge-base HEAD ${defaultBranch} 2>/dev/null`, { cwd: process.cwd() })
+              || exec(`git merge-base HEAD master 2>/dev/null`, { cwd: process.cwd() });
     if (base && base.trim().length > 0) forkPoint = base.trim();
   }
 
@@ -154,7 +154,7 @@ function detectWipSquash(projectRoot) {
     return { commits: [], stagedClean };
   }
 
-  const logRaw = exec(`git log --format=%H%x09%s ${forkPoint}..HEAD`, { cwd: projectRoot });
+  const logRaw = exec(`git log --format=%H%x09%s ${forkPoint}..HEAD`, { cwd: process.cwd() });
   if (!logRaw) return { commits: [], stagedClean };
 
   const wipPrefixRe = /^wip\(execute\)/;
@@ -197,7 +197,7 @@ function main() {
   // Step 3: Validate git repo and get current branch
   let gitState;
   try {
-    gitState = checkGitState(projectRoot);
+    gitState = checkGitState(process.cwd());
   } catch (err) {
     errors.push(err.message);
     writeOutput({ errors, warnings }, 'commit-context', 1);
@@ -241,7 +241,7 @@ function main() {
   }
 
   // Step 4: Get staged files
-  const stagedRaw   = exec('git diff --cached --name-only', { cwd: projectRoot });
+  const stagedRaw   = exec('git diff --cached --name-only', { cwd: process.cwd() });
   const stagedFiles = stagedRaw ? stagedRaw.split('\n').filter(Boolean) : [];
 
   // Detect wip(execute): commits since fork-point BEFORE the staged-files
@@ -277,28 +277,28 @@ function main() {
   }
 
   // Step 6: Get staged diff (may be empty when --amend with nothing staged)
-  const stagedDiff = exec('git diff --cached', { cwd: projectRoot }) || '';
+  const stagedDiff = exec('git diff --cached', { cwd: process.cwd() }) || '';
   const { diff: finalDiff, diffTruncated, truncatedFiles } = truncateStagedDiff(stagedDiff);
 
   // Step 7: Get staged diff stat
-  const stagedDiffStat = exec('git diff --cached --stat', { cwd: projectRoot }) || '';
+  const stagedDiffStat = exec('git diff --cached --stat', { cwd: process.cwd() }) || '';
 
   // Step 8: Get unstaged files
-  const unstagedRaw   = exec('git diff --name-only', { cwd: projectRoot });
+  const unstagedRaw   = exec('git diff --name-only', { cwd: process.cwd() });
   const unstagedFiles = unstagedRaw ? unstagedRaw.split('\n').filter(Boolean) : [];
 
   // Step 9: Get untracked files
-  const untrackedRaw   = exec('git ls-files --others --exclude-standard', { cwd: projectRoot });
+  const untrackedRaw   = exec('git ls-files --others --exclude-standard', { cwd: process.cwd() });
   const untrackedFiles = untrackedRaw ? untrackedRaw.split('\n').filter(Boolean) : [];
 
   // Step 10: Get recent commits
-  const commitsRaw    = exec('git log --oneline -15', { cwd: projectRoot });
+  const commitsRaw    = exec('git log --oneline -15', { cwd: process.cwd() });
   const recentCommits = commitsRaw ? commitsRaw.split('\n').filter(Boolean) : [];
 
   // Step 11: Get last commit message when amending
   let lastCommitMessage = null;
   if (amend) {
-    const raw = exec('git log -1 --format=%B', { cwd: projectRoot });
+    const raw = exec('git log -1 --format=%B', { cwd: process.cwd() });
     lastCommitMessage = raw !== null ? raw.trim() : null;
   }
 

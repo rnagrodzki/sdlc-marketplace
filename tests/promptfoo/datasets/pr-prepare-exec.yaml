@@ -5,6 +5,20 @@
 # Note: pr-prepare.js calls gh CLI which fails without a remote.
 # Tests assert on fields populated before remote operations (flags, prConfig).
 
+# Issue #406 — cwd-aware git state: pr-prepare must read the linked worktree's
+# current branch (not the main worktree's branch) when invoked from a linked
+# worktree. The fix replaces checkGitState(projectRoot) with checkGitState(process.cwd()).
+- description: "pr-prepare (#406): linked-worktree — currentBranch reflects linked worktree branch"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}/worktrees/wt1"
+    project_root: "file://fixtures-fs/project-linked-worktree-staged"
+  assert:
+    - type: icontains
+      value: '"currentBranch": "feature/cwd-test"'
+    - type: not-icontains
+      value: '"currentBranch": "main"'
+
 - description: "pr-prepare: default flags with no args"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"

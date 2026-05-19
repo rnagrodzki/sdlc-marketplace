@@ -2,6 +2,23 @@
 # These tests run commit-prepare.js directly against fixture directories (no LLM).
 # Ported from tests/unit/commit-prepare.test.js.
 
+# Issue #406 — cwd-aware git state: commit-prepare must read the linked worktree's
+# staged files (not the main worktree's empty index) when invoked from a linked
+# worktree. Fixture stages a file inside worktrees/wt1; the test invokes the
+# script with script_cwd pointing at the linked worktree path.
+- description: "commit-prepare (#406): linked-worktree-staged — detects staged files when run from linked worktree"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"
+    script_cwd: "{{project_root}}/worktrees/wt1"
+    project_root: "file://fixtures-fs/project-linked-worktree-staged"
+  assert:
+    - type: icontains
+      value: "linked-file.txt"
+    - type: icontains
+      value: '"currentBranch": "feature/cwd-test"'
+    - type: not-icontains
+      value: "No staged changes"
+
 - description: "commit-prepare: default flags with no args"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/commit.js"

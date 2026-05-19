@@ -302,7 +302,7 @@ async function main() {
     // 1. Verify git repo
     let gitState;
     try {
-      gitState = checkGitState(projectRoot);
+      gitState = checkGitState(process.cwd());
     } catch (err) {
       writeOutput({ flow: 'init', errors: [err.message], warnings }, 'version-context', 1);
       return;
@@ -398,7 +398,7 @@ async function main() {
 
     // 2. Verify git repo
     try {
-      checkGitState(projectRoot);
+      checkGitState(process.cwd());
     } catch (err) {
       errors.push(err.message);
       writeOutput({ flow: 'changelog-update', errors, warnings }, 'version-context', 1);
@@ -568,7 +568,7 @@ async function main() {
   // 3. Verify git repo
   let gitState;
   try {
-    gitState = checkGitState(projectRoot);
+    gitState = checkGitState(process.cwd());
   } catch (err) {
     errors.push(err.message);
     writeOutput({ flow: 'release', errors, warnings }, 'version-context', 1);
