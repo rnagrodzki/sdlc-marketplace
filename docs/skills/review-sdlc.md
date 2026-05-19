@@ -146,6 +146,52 @@ triggers:
 
 When `model:` is absent, the orchestrator falls back to `manifest.subagent_model` (default: `sonnet`).
 
+> For guidance on writing effective `triggers` and `skip-when` patterns, see [Dimension scoping best practices](#dimension-scoping-best-practices) below.
+
+---
+
+### Dimension scoping best practices
+
+Narrow `triggers` keep reviewer subagents focused on the files they are qualified to evaluate. Broad globs hand every changed file to every dimension — cost scales roughly with `dimensions × changed_files`. A 40-file PR reviewed by 5 dimensions with `triggers: ["**/*"]` sends ~200 file-reads to subagents; the same PR with each dimension scoped to its real surface sends ~40 (~5× reduction). Token savings compound on large PRs where most changed files are irrelevant to most dimensions.
+
+#### How matching works
+
+`scripts/skill/review.js::matchFiles` (around L176–L188) intersects the `triggers` glob list against the changed-file set, then subtracts any files matched by `skip-when`. The resulting per-dimension `matched_files` array is the only context the reviewer subagent sees — it does not receive the full diff unless `requires-full-diff: true` is set. There is no implicit fallback: an empty `triggers` list matches zero files and the dimension is reported `SKIPPED`. When a dimension matches more than 80% of changed files, the plan-critique step flags it as `over_broad_dimensions` (around `review.js:599`) — the existing automated signal for this anti-pattern.
+
+#### Glob → dimension examples
+
+| `triggers` | Dimension | Why scoped this way |
+|---|---|---|
+| `**/*.test.{ts,js}` | `test-quality` | Assertions, isolation, coverage — only meaningful on test files |
+| `scripts/**` | `script-conventions` | Exit codes, error handling, Node patterns — irrelevant for app code |
+| `**/*.{yaml,yml}` | `config-schema` | Required fields, type correctness, env references |
+| `plugins/**/SKILL.md` | `skill-authoring` | Skill format, required sections — only valid on SKILL.md files |
+
+Use `skip-when` to carve out sub-paths you do not want reviewed by a broad trigger:
+
+```yaml
+triggers:
+  - "src/**/*.ts"
+skip-when:
+  - "**/*.test.ts"
+  - "**/__generated__/**"
+```
+
+This sends only non-test, non-generated TypeScript files to the dimension — a meaningful reduction on projects that co-locate tests and source.
+
+#### Anti-pattern: the catch-all dimension
+
+Do not author a "general code review" dimension with `triggers: ["**/*"]` and no `skip-when`. Every changed file — config, docs, generated code, test fixtures — is dispatched to that subagent on every review. The cost is `files × dimensions`; the signal is low because the reviewer wastes attention on files unrelated to its stated purpose. The `plan_critique.over_broad_dimensions` warning is the automated detection for this pattern.
+
+#### Migrating from a broad dimension
+
+1. Run `/review-sdlc --dry-run` on a recent PR and inspect which files the broad dimension matched. Look for natural clusters (auth code, migration files, config, tests).
+2. Author one focused dimension per cluster with explicit `triggers`, adding `skip-when` to exclude tests or generated artifacts where appropriate.
+
+Avoid relying on `max-files` truncation as a substitute for scoping — truncation silently drops the tail of the match list, so some files are never reviewed rather than being reviewed by a qualified dimension.
+
+For canonical `triggers:` blocks and complete dimension examples, see [`EXAMPLES.md`](../../plugins/sdlc-utilities/skills/review-sdlc/EXAMPLES.md).
+
 ---
 
 ## Consolidated Comment Format
