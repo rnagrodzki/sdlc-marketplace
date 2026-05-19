@@ -156,7 +156,7 @@ Narrow `triggers` keep reviewer subagents focused on the files they are qualifie
 
 #### How matching works
 
-`scripts/skill/review.js::matchFiles` (around L176–L188) intersects the `triggers` glob list against the changed-file set, then subtracts any files matched by `skip-when`. The resulting per-dimension `matched_files` array is the only context the reviewer subagent sees — it does not receive the full diff unless `requires-full-diff: true` is set. There is no implicit fallback: an empty `triggers` list matches zero files and the dimension is reported `SKIPPED`. When a dimension matches more than 80% of changed files, the plan-critique step flags it as `over_broad_dimensions` (around `review.js:599`) — the existing automated signal for this anti-pattern.
+`scripts/skill/review.js::matchFiles` (around L176–L188) intersects the `triggers` glob list against the changed-file set, then subtracts any files matched by `skip-when`. The resulting per-dimension `matched_files` array is the only context the reviewer subagent sees — it does not receive the full diff unless `requires-full-diff: true` is set. There is no implicit fallback: an empty `triggers` list matches zero files and the dimension is reported `SKIPPED`. When a dimension matches more than 80% of changed files, the plan-critique step flags it as `over_broad_dimensions` (around `review.js:291` in `critiquePlan`) — the existing automated signal for this anti-pattern.
 
 #### Glob → dimension examples
 
