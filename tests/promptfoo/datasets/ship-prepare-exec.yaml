@@ -1,6 +1,39 @@
 # Script execution tests for ship-prepare.js.
 # These tests run ship-prepare.js directly against fixture directories (no LLM).
-# Covers: sdlcGitignored fix (#99) and auto-mode workspace override (#104).
+# Covers: sdlcGitignored fix (#99), auto-mode workspace override (#104), and
+# R65 cwd-assertion diagnostic (#405).
+
+# Issue #405 — R65 cwd-assertion: ship-prepare invoked under workspace: branch
+# from a stale linked worktree path must emit assertions.requireMainWorktreeCwd
+# = true with expectedMainWorktreeRoot set to the MAIN worktree root. SKILL.md
+# consumes this field and aborts the pipeline before any branch creation.
+- description: "ship-prepare (#405): linked-worktree + workspace=branch emits cwd-assertion with main worktree root"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --workspace branch --auto"
+    script_cwd: "{{project_root}}/worktrees/wt1"
+    project_root: "file://fixtures-fs/project-linked-worktree-staged"
+  assert:
+    - type: icontains
+      value: '"requireMainWorktreeCwd": true'
+    - type: icontains
+      value: '"expectedMainWorktreeRoot"'
+    # The expected root must NOT include the worktrees/wt1 sub-path — it must be the main worktree root.
+    - type: not-icontains
+      value: 'worktrees/wt1"'
+
+# Issue #405 — companion: ship-prepare invoked under workspace: worktree from
+# the same linked-worktree fixture must emit assertions.requireMainWorktreeCwd
+# = false. The diagnostic is gated on workspace=branch only.
+- description: "ship-prepare (#405): workspace=worktree disables cwd-assertion"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --workspace worktree"
+    script_cwd: "{{project_root}}/worktrees/wt1"
+    project_root: "file://fixtures-fs/project-linked-worktree-staged"
+  assert:
+    - type: icontains
+      value: '"requireMainWorktreeCwd": false'
 
 - description: "ship-prepare: .sdlc/.gitignore inner pattern sets sdlcGitignored true"
   vars:

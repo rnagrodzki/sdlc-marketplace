@@ -470,6 +470,37 @@ fi
 
 `WORKSPACE_MODE_FLAG` is set from the `--workspace` CLI flag parsed by the prepare script. `SDLC_LIB` is the directory containing `config.js` and `branch-name.js`, resolved via the standard plugin path search above (or the in-repo fallback when developing this plugin). The variable persists across all subsequent Bash invocations in this section.
 
+### Cwd-assertion diagnostic (R65 — fixes #405)
+
+Before any branch creation, state migration, or Agent dispatch, consume the `assertions` field from the prepare output and verify the current working directory is the main worktree root when workspace mode is `branch`. This is a diagnostic gate — it aborts the pipeline with a four-field diagnostic so the failure mode (ship-sdlc launched from inside a stale linked worktree under `workspace: branch`) surfaces with structured evidence on next reproduction.
+
+**Skip when resuming** (`flags.resume === true`) and when workspace mode is `worktree` or `continue` — the prepare script emits `assertions.requireMainWorktreeCwd: false` in those cases, so the assertion is a no-op below.
+
+```bash
+# Read assertions from prepare output. Path is passed via env var (F) so that
+# embedded quotes/backslashes in the temp path cannot break the inline JS.
+REQUIRE_MAIN_CWD=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write(String((d.assertions&&d.assertions.requireMainWorktreeCwd)===true))")
+EXPECTED_ROOT=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write((d.assertions&&d.assertions.expectedMainWorktreeRoot)||'')")
+
+if [ "$REQUIRE_MAIN_CWD" = "true" ] && [ -n "$EXPECTED_ROOT" ]; then
+  ACTUAL_CWD=$(git rev-parse --show-toplevel 2>/dev/null)
+  if [ "$ACTUAL_CWD" != "$EXPECTED_ROOT" ]; then
+    echo "ERROR: ship-sdlc cwd assertion failed (R65, #405)." >&2
+    echo "  actual cwd:    $ACTUAL_CWD" >&2
+    echo "  expected root: $EXPECTED_ROOT" >&2
+    echo "  ship.workspace: $WORKSPACE_MODE" >&2
+    echo "  git worktree list --porcelain:" >&2
+    git worktree list --porcelain | sed 's/^/    /' >&2
+    echo "" >&2
+    echo "ship-sdlc was launched from inside a linked worktree but workspace mode is 'branch'." >&2
+    echo "Re-run from the main worktree root, or pass --workspace worktree." >&2
+    exit 1
+  fi
+fi
+```
+
+The assertion runs unconditionally on every non-resume invocation — when `REQUIRE_MAIN_CWD` is `false` (worktree/continue modes or resume re-entry) the inner block is skipped. `$WORKSPACE_MODE` is already resolved from the section above.
+
 ### Pre-execute workspace isolation (R60, R37 — fixes #378, #379)
 
 **Skip when `WORKSPACE_MODE = continue` or when resuming** — no isolation setup needed.

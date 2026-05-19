@@ -301,7 +301,7 @@ function main() {
   // Step 1–2: Validate git repo and get current branch
   let gitState;
   try {
-    gitState = checkGitState(projectRoot);
+    gitState = checkGitState(process.cwd());
   } catch (err) {
     errors.push(err.message);
     writeOutput({ errors, warnings }, 'pr-context', 1);
@@ -345,7 +345,7 @@ function main() {
     }
     const exists = exec(
       `git rev-parse --verify origin/${baseBranchOverride} 2>/dev/null`,
-      { cwd: projectRoot, shell: true }
+      { cwd: process.cwd(), shell: true }
     );
     if (!exists) {
       errors.push(`Base branch "origin/${baseBranchOverride}" does not exist on the remote.`);
@@ -371,7 +371,7 @@ function main() {
       }
       const exists = exec(
         `git rev-parse --verify origin/${configDefaultBranch} 2>/dev/null`,
-        { cwd: projectRoot, shell: true }
+        { cwd: process.cwd(), shell: true }
       );
       if (!exists) {
         errors.push(

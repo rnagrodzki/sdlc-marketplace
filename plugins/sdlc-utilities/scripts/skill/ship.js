@@ -960,7 +960,7 @@ function main() {
 
     // Build knownBranches from local git
     let knownBranches = [];
-    const out = exec("git branch --list --format='%(refname:short)'", { cwd: projectRoot, shell: true });
+    const out = exec("git branch --list --format='%(refname:short)'", { cwd: process.cwd(), shell: true });
     if (typeof out === 'string') {
       knownBranches = out.split('\n').map(s => s.trim()).filter(Boolean);
     }
@@ -1013,7 +1013,7 @@ function main() {
   // Check git state
   let gitState;
   try {
-    gitState = checkGitState(projectRoot);
+    gitState = checkGitState(process.cwd());
   } catch (err) {
     errors.push(err.message);
     writeOutput({ errors, warnings }, 'ship-prepare', 1);
@@ -1232,6 +1232,32 @@ function main() {
   // threshold. Surfaced verbatim by SKILL.md Step 1c when non-null.
   const contextAdvisory = getAdvisory({ skill: 'ship-sdlc' });
 
+  // R65 (#405): cwd-assertion diagnostic. When workspace mode is `branch` AND
+  // the pipeline is NOT resuming, surface the expected main worktree root so
+  // SKILL.md can compare against `git rev-parse --show-toplevel` BEFORE
+  // dispatching execute. The check is diagnostic — it aborts the pipeline
+  // when ship-sdlc was launched from inside a linked worktree under a
+  // `workspace: branch` configuration (real failure mode observed in #405).
+  // For `worktree` or `continue`, the field is `false` (a stale linked
+  // worktree is irrelevant under those modes).
+  let assertions = { requireMainWorktreeCwd: false, expectedMainWorktreeRoot: null };
+  const notResuming = !(flags.resume === true || flags.implicitResume === true);
+  if (flags.workspace === 'branch' && notResuming) {
+    let mainWorktreeRoot = null;
+    try {
+      const wtList = exec('git worktree list --porcelain', { cwd: process.cwd() }) || '';
+      const firstLine = wtList.split('\n').find(l => l.startsWith('worktree '));
+      if (firstLine) mainWorktreeRoot = firstLine.slice('worktree '.length).trim();
+    } catch (err) {
+      // SKILL.md treats null mainWorktreeRoot as "no assertion". Emit a hint
+      // to stderr so the silent degradation is at least observable.
+      process.stderr.write(`ship-prepare: worktree-list probe failed (${err.message}) — cwd assertion degraded to no-op.\n`);
+    }
+    if (mainWorktreeRoot) {
+      assertions = { requireMainWorktreeCwd: true, expectedMainWorktreeRoot: mainWorktreeRoot };
+    }
+  }
+
   // Build config values for output
   const configValues = {};
   for (const key of Object.keys(BUILT_IN_DEFAULTS)) {
@@ -1295,6 +1321,8 @@ function main() {
     },
     resume,
     contextAdvisory,
+    // R65 (#405): cwd-assertion diagnostic emitted to SKILL.md.
+    assertions,
   };
 
   // Exit with 1 if there are fatal errors, 0 otherwise

@@ -200,7 +200,7 @@ const MAX_COMMITS_PER_FILE = 5;
 function getCommitFileMap(base, projectRoot) {
   const raw = exec(
     `git log --format="COMMIT:%H %s" --name-only ${base}..HEAD`,
-    { cwd: projectRoot }
+    { cwd: process.cwd() }
   );
   if (!raw) return new Map();
 
@@ -247,7 +247,7 @@ function fetchAndSplitDiff(base, projectRoot, scope = 'all') {
     case 'worktree':  cmd = `git diff ${base}`;                         break;
     default:          cmd = buildBranchContribDiffCmd('content', base); break; // 'all' (issue #364)
   }
-  const raw = exec(cmd, { cwd: projectRoot });
+  const raw = exec(cmd, { cwd: process.cwd() });
   if (!raw) return new Map();
 
   return splitDiffByFile(raw);
@@ -501,7 +501,7 @@ function main() {
 
   let gitState;
   try {
-    gitState = checkGitState(projectRoot);
+    gitState = checkGitState(process.cwd());
   } catch (err) {
     process.stderr.write(`Error: ${err.message}\n`);
     process.exit(2);

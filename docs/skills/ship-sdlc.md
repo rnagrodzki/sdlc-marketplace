@@ -679,6 +679,7 @@ ship-sdlc also removes the intermediate prepare output file (`$PLAN_MODE_OUTPUT_
 - **git** — must be run inside a git repository on a feature branch (not the default branch).
 - **Review dimensions** — `.sdlc/review-dimensions/` must contain at least one dimension file for the review step. Run `/setup-sdlc --dimensions` to create them. If review is in the skip set, this is not required.
 - **Plan in context** — for the execute step, a plan must be present in the conversation. If no plan is found and execute is not skipped, the step is auto-skipped.
+- **Cwd in branch workspace mode** — when `ship.workspace = branch`, invoke ship-sdlc from the main worktree root. Invocations from inside a linked worktree path will abort with a diagnostic (R65, fixes #405).
 
 ### Harness Configuration
 
