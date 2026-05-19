@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.20.15] - 2026-05-20
+
+### Added
+- ship-sdlc: `--quick` flag for user-defined shortened step profile — configure a custom subset of pipeline steps via `ship.quick[]` in `.sdlc/local.json` to activate a shortened pipeline on demand (#403)
+
+### Fixed
+- ship-sdlc: post-review cleanup for `--quick` profile implementation (#403)
+
 ## [0.20.14] - 2026-05-20
 
 ### Fixed
