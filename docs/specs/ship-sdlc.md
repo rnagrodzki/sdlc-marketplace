@@ -128,7 +128,7 @@
   - Acceptance: "Under `/ship-sdlc --workspace branch` from a clean main-worktree cwd, the assertion passes and the pipeline proceeds. Under `/ship-sdlc --workspace branch` invoked from inside a linked worktree path (e.g. `.claude/worktrees/agent-<hash>`), the pipeline aborts before EXECUTE_BRANCH derivation with a diagnostic containing all four fields (actual cwd, expected root, worktree list, ship.workspace). Under `/ship-sdlc --workspace worktree` or `--workspace continue`, `assertions.requireMainWorktreeCwd` is `false` (or absent) and no assertion runs."
 - R-quick-1: `.sdlc/local.json` accepts optional `ship.quick: string[]`; values are validated against `VALID_STEPS` (same enum as `ship.steps`). Default: unset. No config-version bump (additive, backward-compatible).
 - R-quick-2: CLI flag `--quick` (switch, no value). When set, the resolved step list is sourced from `ship.quick` instead of `ship.steps[]`.
-- R-quick-3: Step-list precedence (highest → lowest): `--steps <csv>` > `--quick` > `ship.steps[]` > `BUILT_IN_DEFAULTS.steps`. Implementation lives in `mergeFlags`/`computeSteps` in `scripts/skill/ship.js`.
+- R-quick-3: Step-list precedence (highest → lowest): `--steps <csv>` > `--quick` > `ship.steps[]` > `BUILT_IN_DEFAULTS.steps`.
 - R-quick-4: Provenance for canonical steps excluded by `--quick` resolution: `skipSource: "quick"` (parallel to existing `cli` / `config` / `default`).
 - R-quick-5: Conflict — `--quick` combined with `--steps` is a hard error. Message MUST contain literally: `"use --quick or --steps, not both"`.
 - R-quick-6: Missing config — `--quick` invoked with no `ship.quick` configured is a hard error. Message MUST contain literally: `"No quick profile defined. Run \`ship-sdlc --init-config\` to set one."`.

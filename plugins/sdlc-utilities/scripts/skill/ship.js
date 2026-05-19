@@ -251,6 +251,11 @@ function mergeFlags(cli, config) {
       stepsSource = 'quick';
     } else {
       // No ship.quick configured — runValidation will error (R-quick-6).
+      // stepsSource is still 'quick' here (meaning "--quick flag was used"),
+      // not "a quick profile was applied". The empty stepsList + 'quick' source
+      // is the sentinel runValidation uses to detect R-quick-6 (flag requested
+      // but no profile configured). Consumers MUST check flags.steps.length > 0
+      // before treating source 'quick' as a successfully-resolved profile.
       stepsList   = [];
       stepsSource = 'quick';
     }
