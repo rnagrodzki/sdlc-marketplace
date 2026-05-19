@@ -43,6 +43,7 @@ const { VALID_STEPS, CANONICAL_STEPS } = require(path.join(LIB, 'ship-fields'));
 function parseArgs(argv) {
   const args = argv.slice(2);
   let steps     = CANONICAL_STEPS.slice();
+  let quick     = null; // undefined means "not provided"; null persists as "no quick profile"
   let bump      = 'patch';
   let draft     = false;
   let auto      = false;
@@ -56,6 +57,12 @@ function parseArgs(argv) {
     const a = args[i];
     if (a === '--steps' && args[i + 1]) {
       steps = args[++i].split(',').map(s => s.trim()).filter(Boolean);
+    } else if (a === '--quick' && args[i + 1]) {
+      // R-quick-7: internal ingest of --quick <csv> from LLM walkthrough.
+      // The LLM layer (driven by SHIP_FIELDS.quick) invokes ship-init with
+      // --quick <csv> when the user makes a selection; when skipped, the flag
+      // is omitted and quick stays null (field is not written to config).
+      quick = args[++i].split(',').map(s => s.trim()).filter(Boolean);
     } else if (a === '--preset') {
       // Hard-removed in v2: --preset is no longer accepted by ship-init.
       // ship-sdlc still parses --preset as legacy CLI sugar, but ship-init
@@ -80,7 +87,7 @@ function parseArgs(argv) {
     }
   }
 
-  return { steps, bump, draft, auto, threshold, workspace, rebase, warnings, parseErrors: errors };
+  return { steps, quick, bump, draft, auto, threshold, workspace, rebase, warnings, parseErrors: errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +108,15 @@ function validate(parsed) {
     for (const step of parsed.steps) {
       if (!VALID_STEPS.includes(step)) {
         errors.push(`--steps contains invalid value "${step}". Valid values: ${VALID_STEPS.join(', ')}`);
+      }
+    }
+  }
+
+  // R-quick-7: validate --quick values when provided (reuse VALID_STEPS).
+  if (Array.isArray(parsed.quick)) {
+    for (const step of parsed.quick) {
+      if (!VALID_STEPS.includes(step)) {
+        errors.push(`--quick contains invalid value "${step}". Valid values: ${VALID_STEPS.join(', ')}`);
       }
     }
   }
@@ -131,7 +147,7 @@ function validate(parsed) {
 function main() {
   const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
   const parsed = parseArgs(process.argv);
-  const { steps, bump, draft, auto, threshold, workspace, rebase, warnings: parseWarnings, parseErrors } = parsed;
+  const { steps, quick, bump, draft, auto, threshold, workspace, rebase, warnings: parseWarnings, parseErrors } = parsed;
 
   const errors   = [...parseErrors];
   const warnings = [...parseWarnings];
@@ -142,7 +158,7 @@ function main() {
   }
 
   // Validate inputs
-  const validationErrors = validate({ steps, bump, draft, auto, threshold, workspace, rebase });
+  const validationErrors = validate({ steps, quick, bump, draft, auto, threshold, workspace, rebase });
   if (validationErrors.length > 0) {
     errors.push(...validationErrors);
     writeOutput({ errors, warnings }, 'ship-init', 1);
@@ -165,6 +181,10 @@ function main() {
   // legacy boolean true/false values for older configs.
   const config = {
     steps,
+    // R-quick-7: write ship.quick only when --quick was provided and non-empty.
+    // Omitting the field entirely (not writing an empty array) is the correct
+    // "no quick profile" state per R-quick-1.
+    ...(Array.isArray(quick) && quick.length > 0 ? { quick } : {}),
     bump,
     draft,
     auto,

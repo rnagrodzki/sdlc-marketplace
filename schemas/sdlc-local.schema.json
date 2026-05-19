@@ -47,6 +47,15 @@
           "uniqueItems": true,
           "description": "Pipeline steps to run. Replaces legacy preset/skip fields."
         },
+        "quick": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["execute", "commit", "review", "version", "archive-openspec", "pr", "verify-pipeline", "await-remote-review", "learnings-commit"]
+          },
+          "uniqueItems": true,
+          "description": "Optional shortened step list activated by --quick. When set, /ship-sdlc --quick uses this list instead of steps[]. Unset means --quick is not available for this project. See R-quick-1."
+        },
         "bump": {
           "type": "string",
           "pattern": "^(major|minor|patch|[a-z][a-z0-9]*)$",

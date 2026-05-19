@@ -13,6 +13,7 @@
  *   --has-plan              Plan is present in conversation context
  *   --auto                  Skip interactive approval prompts
  *   --steps <csv>           Comma-separated steps to run (overrides config)
+ *   --quick                 Run ship.quick profile from config instead of ship.steps[] (R-quick-2)
  *   --quality full|balanced|minimal  Forwarded to execute-plan-sdlc as --quality (only when explicitly passed)
  *   --bump patch|minor|major  Version bump type
  *   --draft                 Mark PR as draft
@@ -70,6 +71,7 @@ function parseArgs(argv) {
   let hasPlan   = false;
   let auto      = false;
   let steps     = null;
+  let quick     = false;
   let quality   = null;
   let bump      = null;
   let draft     = false;
@@ -98,6 +100,8 @@ function parseArgs(argv) {
       auto = true;
     } else if (a === '--steps' && args[i + 1]) {
       steps = args[++i].split(',').map(s => s.trim()).filter(Boolean);
+    } else if (a === '--quick') {
+      quick = true;
     } else if (a === '--quality' && args[i + 1]) {
       quality = args[++i];
     } else if (a === '--preset') {
@@ -161,7 +165,7 @@ function parseArgs(argv) {
     workspace = workspaceShortcut;
   }
 
-  return { hasPlan, auto, steps, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, hookActivePipeline, planModeBlocked, errors };
+  return { hasPlan, auto, steps, quick, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, hookActivePipeline, planModeBlocked, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -225,10 +229,12 @@ function mergeFlags(cli, config) {
 
   // -- Step resolution --
   //
-  // Single source of truth: `ship.steps[]`. Resolution order:
+  // Precedence (highest → lowest): R-quick-3
   //   1. CLI --steps (one-shot override; fully replaces resolved list)
-  //   2. config.steps from .sdlc/local.json
-  //   3. BUILT_IN_DEFAULTS.steps
+  //   2. CLI --quick (resolves ship.quick from config; conflict with --steps
+  //      is caught later by runValidation — R-quick-5)
+  //   3. config.steps from .sdlc/local.json
+  //   4. BUILT_IN_DEFAULTS.steps
   //
   // No --preset/--skip override paths exist (#190 — hard-removed).
   let stepsList;
@@ -236,6 +242,18 @@ function mergeFlags(cli, config) {
   if (Array.isArray(cli.steps) && cli.steps.length > 0) {
     stepsList   = cli.steps.slice();
     stepsSource = 'cli';
+  } else if (cli.quick === true) {
+    // R-quick-2: resolve from ship.quick when --quick is set and --steps absent.
+    // When ship.quick is unset/empty, leave stepsList empty — runValidation
+    // surfaces the missing-config error (R-quick-6).
+    if (Array.isArray(cfg.quick) && cfg.quick.length > 0) {
+      stepsList   = cfg.quick.slice();
+      stepsSource = 'quick';
+    } else {
+      // No ship.quick configured — runValidation will error (R-quick-6).
+      stepsList   = [];
+      stepsSource = 'quick';
+    }
   } else if (Array.isArray(cfg.steps)) {
     stepsList   = cfg.steps.slice();
     stepsSource = 'config';
@@ -374,6 +392,8 @@ function mergeFlags(cli, config) {
   merged.resume           = cli.resume;
   merged.openspecChange   = cli.openspecChange || null;
   merged.planModeBlocked  = cli.planModeBlocked === true;
+  // quick is already set above in step resolution; re-affirm as bool for clarity.
+  merged.quick            = cli.quick === true;
 
   return { merged, sources };
 }
@@ -395,6 +415,7 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch } = 
     if (stepsSet.has(name)) return 'none';
     const src = flagSources && flagSources.steps;
     if (src === 'cli')    return 'cli';
+    if (src === 'quick')  return 'quick';  // R-quick-4: step excluded by --quick profile
     if (src === 'config') return 'config';
     return 'default';
   }
@@ -847,6 +868,16 @@ function runValidation(flags, flagSources, steps, context) {
   if (flags.bump && flagSources.bump === 'cli' && versionStep && versionStep.status === 'skipped') {
     errors.push(`--bump "${flags.bump}" specified but version step is skipped — resolve by removing --bump or adding "version" to ship.steps[].`);
     coherentFlags = false;
+  }
+
+  // R-quick-5: --quick combined with --steps is a hard error.
+  if (flags.quick && flagSources.steps === 'cli') {
+    errors.push('--quick + --steps not allowed: use --quick or --steps, not both');
+  }
+
+  // R-quick-6: --quick invoked with no ship.quick configured is a hard error.
+  if (flags.quick && flagSources.steps === 'quick' && flags.steps.length === 0) {
+    errors.push('No quick profile defined. Run `ship-sdlc --init-config` to set one.');
   }
 
   // execute.commitWaves must be a boolean; non-boolean values are silently

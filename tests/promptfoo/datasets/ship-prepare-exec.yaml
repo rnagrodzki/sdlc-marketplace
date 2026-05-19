@@ -1136,3 +1136,74 @@
         if (Array.isArray(commitDeleted)) return commitDeleted.length > 0;
         if (typeof commitDeleted === 'number') return commitDeleted > 0;
         return false;
+
+# --quick flag resolution (issue #403 / R-quick-1..R-quick-7)
+# Four exec-only cases covering success, conflict, missing-config, and provenance.
+
+- description: "ship-prepare: --quick resolves ship.quick into steps with sources.steps === 'quick'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --quick"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-quick-defined"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        // R-quick-2: steps resolved from ship.quick
+        const expectedSteps = ['execute', 'commit', 'pr'];
+        return JSON.stringify(o.flags.steps) === JSON.stringify(expectedSteps)
+          && o.flags.sources.steps === 'quick';
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        // R-quick-2: no error when ship.quick is set
+        return !o.errors || o.errors.length === 0;
+
+- description: "ship-prepare: --quick + --steps together produces R-quick-5 error"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --quick --steps execute,commit"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-quick-defined"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        // R-quick-5: literal error string required
+        return Array.isArray(o.errors)
+          && o.errors.some(e => e.includes('use --quick or --steps, not both'));
+
+- description: "ship-prepare: --quick with no ship.quick configured produces R-quick-6 error"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --quick"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-config-workspace-prompt"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        // R-quick-6: literal error string required
+        return Array.isArray(o.errors)
+          && o.errors.some(e => e.includes('No quick profile defined'));
+
+- description: "ship-prepare: --quick provenance — canonical steps absent from ship.quick carry skipSource 'quick'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --quick"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-quick-partial"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        // R-quick-4: version step excluded by --quick carries skipSource 'quick'
+        const versionStep = o.steps && o.steps.find(s => s.name === 'version');
+        return versionStep && versionStep.skipSource === 'quick';
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        // R-quick-4: pr step excluded by --quick carries skipSource 'quick'
+        const prStep = o.steps && o.steps.find(s => s.name === 'pr');
+        return prStep && prStep.skipSource === 'quick';
