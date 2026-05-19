@@ -131,4 +131,5 @@ Only `warning`-severity guardrails are non-blocking under `--auto`. They are rep
 
 - [execute-plan-sdlc](execute-plan-sdlc.md) — Guardrail Enforcement section documents the loading, pre-wave, and post-wave evaluation stages
 - [plan-sdlc](plan-sdlc.md) — plan guardrails (`plan.guardrails[]`) evaluated at planning time
+- [plan-guardrails-best-practices](plan-guardrails-best-practices.md) — how to write evaluable plan guardrails for the planning-time critique gate
 - [setup-sdlc](setup-sdlc.md) — run with `--execution-guardrails` for interactive configuration of `execute.guardrails[]`

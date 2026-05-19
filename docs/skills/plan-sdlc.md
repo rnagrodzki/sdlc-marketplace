@@ -247,3 +247,4 @@ Before declaring the plan ready (Step 7 handoff), the skill pipes the finalized 
 
 - [`/execute-plan-sdlc`](execute-plan-sdlc.md) — executes the plans this skill produces
 - [`/review-sdlc`](review-sdlc.md) — review changes after plan execution
+- [Guardrails authoring best practices](plan-guardrails-best-practices.md) — how to write evaluable plan guardrails
