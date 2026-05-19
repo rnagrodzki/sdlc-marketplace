@@ -1248,7 +1248,11 @@ function main() {
       const wtList = exec('git worktree list --porcelain', { cwd: process.cwd() }) || '';
       const firstLine = wtList.split('\n').find(l => l.startsWith('worktree '));
       if (firstLine) mainWorktreeRoot = firstLine.slice('worktree '.length).trim();
-    } catch (_) { /* leave null — SKILL.md treats null as "no assertion" */ }
+    } catch (err) {
+      // SKILL.md treats null mainWorktreeRoot as "no assertion". Emit a hint
+      // to stderr so the silent degradation is at least observable.
+      process.stderr.write(`ship-prepare: worktree-list probe failed (${err.message}) — cwd assertion degraded to no-op.\n`);
+    }
     if (mainWorktreeRoot) {
       assertions = { requireMainWorktreeCwd: true, expectedMainWorktreeRoot: mainWorktreeRoot };
     }

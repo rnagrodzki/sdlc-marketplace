@@ -103,7 +103,7 @@ function parseArgs(argv) {
 // Default-branch resolution helper (R14, fixes #398)
 // ---------------------------------------------------------------------------
 
-function resolveDefaultBranch(projectRoot) {
+function resolveDefaultBranch() {
   let defaultBranch = exec('git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null', { cwd: process.cwd() });
   if (defaultBranch) defaultBranch = defaultBranch.trim().replace(/^refs\/remotes\/origin\//, '');
   if (!defaultBranch) {
@@ -129,7 +129,7 @@ function resolveDefaultBranch(projectRoot) {
  *   2. Detected default branch (origin/HEAD symbolic ref → main/master fallback)
  *   3. When neither resolves, returns { commits: [], stagedClean } — never errors
  */
-function detectWipSquash(projectRoot) {
+function detectWipSquash() {
   const stagedRaw = exec('git diff --cached --name-only', { cwd: process.cwd() });
   const stagedClean = !stagedRaw || stagedRaw.split('\n').filter(Boolean).length === 0;
 
@@ -144,7 +144,7 @@ function detectWipSquash(projectRoot) {
 
   // Fall back to detected default branch.
   if (!forkPoint) {
-    const defaultBranch = resolveDefaultBranch(projectRoot);
+    const defaultBranch = resolveDefaultBranch();
     const base = exec(`git merge-base HEAD ${defaultBranch} 2>/dev/null`, { cwd: process.cwd() })
               || exec(`git merge-base HEAD master 2>/dev/null`, { cwd: process.cwd() });
     if (base && base.trim().length > 0) forkPoint = base.trim();
@@ -207,7 +207,7 @@ function main() {
   const { currentBranch } = gitState;
 
   // Default-branch detection (R14, fixes #398)
-  const defaultBranch = resolveDefaultBranch(projectRoot);
+  const defaultBranch = resolveDefaultBranch();
   const onDefaultBranch = currentBranch === defaultBranch;
 
   // Branch-guard HARD GATE (R-expected-branch, issues #347, #348, #349)
@@ -253,7 +253,7 @@ function main() {
   // make the squash decision before erroring out to the user.
   let wipSquashEarly;
   try {
-    wipSquashEarly = detectWipSquash(projectRoot);
+    wipSquashEarly = detectWipSquash();
   } catch (err) {
     warnings.push(`Could not detect wip(execute): commits for squash: ${err.message}`);
     wipSquashEarly = { commits: [], stagedClean: true };

@@ -477,9 +477,10 @@ Before any branch creation, state migration, or Agent dispatch, consume the `ass
 **Skip when resuming** (`flags.resume === true`) and when workspace mode is `worktree` or `continue` — the prepare script emits `assertions.requireMainWorktreeCwd: false` in those cases, so the assertion is a no-op below.
 
 ```bash
-# Read assertions from prepare output.
-REQUIRE_MAIN_CWD=$(node -e "const d=JSON.parse(require('fs').readFileSync('$PREPARE_OUTPUT_FILE','utf8'));process.stdout.write(String((d.assertions&&d.assertions.requireMainWorktreeCwd)===true))")
-EXPECTED_ROOT=$(node -e "const d=JSON.parse(require('fs').readFileSync('$PREPARE_OUTPUT_FILE','utf8'));process.stdout.write((d.assertions&&d.assertions.expectedMainWorktreeRoot)||'')")
+# Read assertions from prepare output. Path is passed via env var (F) so that
+# embedded quotes/backslashes in the temp path cannot break the inline JS.
+REQUIRE_MAIN_CWD=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write(String((d.assertions&&d.assertions.requireMainWorktreeCwd)===true))")
+EXPECTED_ROOT=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write((d.assertions&&d.assertions.expectedMainWorktreeRoot)||'')")
 
 if [ "$REQUIRE_MAIN_CWD" = "true" ] && [ -n "$EXPECTED_ROOT" ]; then
   ACTUAL_CWD=$(git rev-parse --show-toplevel 2>/dev/null)
