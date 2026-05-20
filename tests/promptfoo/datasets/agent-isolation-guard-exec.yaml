@@ -14,6 +14,8 @@
     - type: icontains
       value: "stopReason"
     - type: icontains
+      value: "\\\"continue\\\":false"
+    - type: icontains
       value: "BLOCKED"
     - type: icontains
       value: "isolation"
@@ -73,6 +75,8 @@
       value: '"exitCode": 2'
     - type: icontains
       value: "stopReason"
+    - type: icontains
+      value: "\\\"continue\\\":false"
     - type: icontains
       value: "BLOCKED"
     - type: icontains

@@ -45,7 +45,7 @@ function emitContinue() {
 
 function emitBlock(reason) {
   process.stderr.write(reason + '\n');
-  process.stdout.write(JSON.stringify({ continue: false, stopReason: reason, decision: 'block', reason }));
+  process.stdout.write(JSON.stringify({ continue: false, stopReason: reason, decision: 'block' }));
   process.exit(2);
 }
 
