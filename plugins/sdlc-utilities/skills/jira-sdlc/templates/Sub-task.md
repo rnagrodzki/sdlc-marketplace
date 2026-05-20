@@ -4,12 +4,13 @@
 
 ## Objective
 
-[1-2 sentences describing what this sub-task delivers and how it advances the
-parent ticket's goal.]
+[Bullet list:
+- What this sub-task delivers in one line
+- How it advances the parent ticket's goal]
 
 ## Details
 
-[Scope of the sub-task:
+[Bullet list of scope:
 - Specific systems, components, or files affected
 - Technical approach or constraints
 - Dependencies on sibling sub-tasks (if any)]

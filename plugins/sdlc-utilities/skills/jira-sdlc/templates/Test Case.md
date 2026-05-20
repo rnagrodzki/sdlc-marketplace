@@ -6,8 +6,7 @@
 
 ## Steps
 
-[Test steps written in Gherkin format. Use Scenario Outline with Examples table for
-parametric cases where the same flow is repeated with different inputs.]
+[Test steps in Gherkin format. Use Scenario Outline with Examples table for parametric cases.]
 
 ```gherkin
 Feature: <Feature Name>
@@ -20,16 +19,17 @@ Feature: <Feature Name>
 
 ## Expected Results
 
-- [Primary observable outcome — what the user or system should show]
+- [Primary observable outcome]
 - [Secondary outcomes, if any]
-- [Negative assertion — what must NOT happen as a result of this action]
+- [Negative assertion — what must NOT happen]
 
 ## Test Data
 
-- [Specific data, accounts, configuration, or values required to execute this test]
-- [For Scenario Outline: describe the significance of each example row]
+- [Specific data, accounts, configuration, or values required]
+- [For Scenario Outline: significance of each example row]
 
 ## Notes
 
-[Edge cases to watch for, known limitations, dependencies on other test cases, or links
-to related bugs or requirements.]
+- [Edge cases to watch for]
+- [Known limitations or dependencies on other test cases]
+- [Links to related bugs or requirements]

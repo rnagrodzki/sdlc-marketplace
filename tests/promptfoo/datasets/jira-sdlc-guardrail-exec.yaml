@@ -1,4 +1,4 @@
-# jira-sdlc write-op guardrail (R17–R21) hook + helper exec tests.
+# jira-sdlc write-op guardrail (R17–R21, R25/G15) hook + helper exec tests.
 #
 # Coverage matrix:
 #   helper-payload-hash      → R21 (canonical hash)
@@ -8,6 +8,8 @@
 #   hook-allow (×3)          → R17/R18/R19/R20/R21 happy paths
 #   hook-deny (×9)           → R17/R18/R19/R20/R21 violation paths
 #   hook-continue (×2)       → defense-in-depth
+#   hook-allow (×2)          → R25/G15 checklist passes + editJiraIssue no-AC skip
+#   hook-deny (×2)           → R25/G15 prose-AC block (markdown + ADF)
 #
 # All cases use the local script-runner; assertions check the RESULT line
 # emitted by tests/promptfoo/scripts/jira-write-guard-test.js.
@@ -257,3 +259,45 @@
       value: "RESULT: PASS"
     - type: icontains
       value: "allow"
+
+# ---------- R25/G15: Acceptance Criteria checklist-only gate ----------
+
+- description: "jira-write-guardrail R25/G15 #1: createJiraIssue with checklist-only AC → allow (checklist passes, R25)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-allow --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/valid-bug-create-with-checklist-ac.json --artifacts fresh"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "allow"
+
+- description: "jira-write-guardrail R25/G15 #2: editJiraIssue without AC section → allow (permissive fallback, R25)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-allow --tool mcp__atlassian__editJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/edit-details-only-no-ac.json --artifacts fresh"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "allow"
+
+- description: "jira-write-guardrail R25/G15 #3: createJiraIssue with prose AC sentences → deny (R25/G15)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-deny --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/prose-ac-bug-create.json --artifacts fresh --reason-substring R25/G15"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "R25/G15"
+
+- description: "jira-write-guardrail R25/G15 #4: createJiraIssue with ADF paragraph in AC section → deny (R25/G15 ADF path)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/jira-write-guard-test.js"
+    script_args: "--op hook-deny --tool mcp__atlassian__createJiraIssue --payload-fixture tests/promptfoo/datasets/fixtures/jira-payloads/adf-prose-ac-bug-create.json --artifacts fresh --reason-substring R25/G15"
+  assert:
+    - type: icontains
+      value: "RESULT: PASS"
+    - type: icontains
+      value: "R25/G15"

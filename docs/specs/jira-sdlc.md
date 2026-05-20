@@ -51,6 +51,13 @@
 - R22: Link verification (issue #198) — every URL embedded in a Jira description payload or comment body MUST be validated by `plugins/sdlc-utilities/scripts/lib/links.js` before any `createJiraIssue` / `editJiraIssue` / `addCommentToJiraIssue` MCP call. Three URL classes are checked: (1) `github.com/<owner>/<repo>/(issues|pull)/<n>` — owner/repo identity must match the current remote, and the issue/PR number must exist on that repo; (2) `*.atlassian.net/browse/<KEY-N>` — host must match the cached `siteUrl`; (3) any other `http(s)://` URL — generic reachability via HEAD (fall back to GET on 405), 5s timeout. Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) and any `ctx.skipHosts` entries are reported as `skipped`, not violations. `SDLC_LINKS_OFFLINE=1` skips network checks but keeps structural context-aware checks (GitHub identity match, Atlassian host match). Any violation aborts the operation with non-zero exit and a structured violation list — no soft-warning mode; payload is never sent to Jira.
 - R-config-version (issue #232): The prepare script `skill/jira.js` MUST call `verifyAndMigrate(projectRoot, 'project')` at start. The call is short-circuited when CLI `--skip-config-check` OR env `SDLC_SKIP_CONFIG_CHECK=1` is present; both gates resolve into a single `flags.skipConfigCheck` boolean in the prepare output (CLI > env > default false). On migration failure the prepare emits non-zero exit and an `errors[]` entry naming the failing step; SKILL.md halts with that text verbatim.
   - Acceptance: prepare output includes `flags.skipConfigCheck` and a `migration` block (or null when skipped); SKILL.md gates further work on `errors.length === 0`.
+- R25 (terse content format, issue #412): Every `createJiraIssue` and every `editJiraIssue` whose payload touches `description` MUST produce terse, scannable content:
+  1. Every `## ` section body MUST be composed of bullet list items (`- ` or `* `), numbered list items (`1. `), or sub-headings — no paragraph text exceeding two consecutive non-empty lines that are not list or heading lines.
+  2. The `## Acceptance Criteria` section body MUST consist exclusively of GitHub-flavored checklist items (`- [ ] ` or `- [x] `), with no prose introduction or prose summary before or after the list.
+  3. The `summary` field MUST be an imperative phrase ≤ 100 characters, with no filler tokens (`This task covers`, `The goal of`, `We need to make sure`, etc.).
+  4. Filler transitional sentences between sections (`This ticket covers…`, `In summary…`, `The purpose of this issue is…`) MUST be omitted.
+  5. **Exception (R25.5):** The `## Release Notes` section in Bug.md and Story.md MAY contain a single sentence — release notes are changelog-bound and bullet form is contextually awkward. Two or more sentences in `## Release Notes` fail R25.
+  - Acceptance: Spec contains R25 (with R25.5 exception), G15, and C15; R25 cites issue #412; G15 references both the deterministic hook check and the LLM-driven critique step; C15 is in the Constraints section.
 
 ## Assumptions
 
@@ -89,6 +96,7 @@
 - G11: No `low`-confidence placeholder dispatched without R19 user resolution via `AskUserQuestion`
 - G12: No payload presented to the user without a preceding R20 critique block (`Initial:` / `Critique:` / `Final:`)
 - G13: No write MCP call dispatched without the PreToolUse hook successfully verifying R21 artifacts (approval token + critique JSON, payload-hash bound, < 10 min old). Hook absence or matcher gap is a build failure (caught by `validate-plugin-consistency`).
+- G15 (terse content): No `createJiraIssue` / `editJiraIssue` dispatch where the description's `## Acceptance Criteria` section contains non-checklist lines — enforced deterministically by `hooks/pre-tool-jira-write-guard.js` (checklist-only gate, R25.2). Bullet/no-prose enforcement for other description sections is LLM-driven via the Step 2.5 critique pass (R25.1, R25.3, R25.4).
 
 ## Prepare Script Contract
 
@@ -129,6 +137,7 @@
   - Acceptance: the `summary` bracket-form carve-out is unconditional across content formats. `findPlaceholdersForToolInput({ summary: '[FEAT] X', contentFormat: 'adf', commentBody: JSON.stringify({ type: 'doc', version: 1, content: [] }) })` returns zero results; `findPlaceholdersForToolInput({ summary: '{name} X', contentFormat: 'adf', commentBody: JSON.stringify({ type: 'doc', version: 1, content: [] }) })` returns exactly one result on `summary` with marker `{name}`; the same holds for `contentFormat: 'markdown'` and for an unset `contentFormat`.
 - C-projectroot: Scripts that use `process.cwd()` as the project root silently break when invoked from a sub-directory or a git worktree. All projectRoot resolutions in this skill's scripts MUST route through `resolveSdlcRoot()` (lib/config.js); `process.cwd()` is forbidden except in documented bootstrap entry points.
   - Acceptance: `resolveSdlcRoot()` is called to establish `projectRoot` in `skill/jira.js`; no bare `process.cwd()` usage contributes to any path resolved against the project root; invoking the script from a repo sub-directory yields the correct root.
+- C15: Must not introduce free prose paragraphs into `## ` section bodies of issue descriptions — bullet lists, numbered lists, or sub-headings only (R25.1). Must not emit `## Acceptance Criteria` content as sentences — every item MUST be a `- [ ] <discrete criterion>` checklist line (R25.2). Must not add filler transitional sentences between sections (`This ticket covers…`, `The goal of…`, `In summary…`) (R25.4). Release Notes MAY be a single sentence (R25.5 exception); two or more sentences in that section fail C15.
 
 ## Step-Emitter Contract
 

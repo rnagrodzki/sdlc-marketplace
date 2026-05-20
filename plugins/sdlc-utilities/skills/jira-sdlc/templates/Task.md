@@ -1,20 +1,18 @@
 ## Objective
 
-[1-3 sentences describing the technical goal and why it matters to the system,
-team, or product. Even technical work should have a clear reason.
-Example: "Migrate webhook delivery to the new event bus to eliminate the polling
-overhead and enable reliable at-least-once delivery guarantees."]
+[Bullet list:
+- Technical goal in one line — what this task delivers
+- Why it matters to the system, team, or product
+- Dependency or blocker it unblocks (if any)]
 
 ## Details
 
-[Specific description of the work to be done:
-- What systems, components, or configurations are affected
+[Bullet list of work to be done:
+- Systems, components, or configurations affected
 - Current state vs. desired state
 - Technical approach or constraints
 - Dependencies on other tasks or external systems
-- Any migration or rollback considerations
-
-Use subheadings for complex tasks. Code blocks for configs, schemas, or commands.]
+- Migration or rollback considerations if applicable]
 
 ## Acceptance Criteria
 

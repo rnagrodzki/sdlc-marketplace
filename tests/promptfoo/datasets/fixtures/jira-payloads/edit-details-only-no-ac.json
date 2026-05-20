@@ -1,0 +1,9 @@
+{
+  "cloudId": "abc-123",
+  "issueKey": "PROJ-42",
+  "issueTypeName": "Bug",
+  "summary": "Fix login button not submitting on mobile Safari",
+  "description": "## Objective\n\n- Login button fails on iOS Safari 17\n- Affects all users on iPhone 14\n\n## Details\n\n- Root cause identified: event listener not attached on Safari 17\n- Fix: use standard addEventListener instead of jQuery .click()\n",
+  "contentFormat": "markdown",
+  "responseContentFormat": "markdown"
+}

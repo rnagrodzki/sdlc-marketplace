@@ -1,7 +1,9 @@
 ## Objective
 
-[1-3 sentences describing what is being validated and why. Focus on the user-facing behavior
-or business outcome being tested, not the implementation details.]
+[Bullet list:
+- What is being validated (feature area, user flow, or requirement)
+- Why this plan exists (release gate, regression cycle, new feature sign-off)
+- Business outcome being protected by this test coverage]
 
 ## Scope
 
@@ -42,4 +44,5 @@ or business outcome being tested, not the implementation details.]
 
 ## Notes
 
-[Known limitations, external dependencies, deferred items, or cross-references to related plans.]
+- [Known limitations or external dependencies]
+- [Deferred items or cross-references to related plans]
