@@ -8,8 +8,9 @@
  *   { tool_name, tool_input, ... }
  *
  * When tool_name === 'Agent' and tool_input.isolation === 'worktree',
- * emits a permissionDecision: 'deny' response — unless the developer has
- * opted out via .sdlc/local.json hooks.agentIsolationGuard.enabled: false.
+ * emits a blocking response (continue: false, stopReason, exit 2) that binds
+ * under mode: bypassPermissions — unless the developer has opted out via
+ * .sdlc/local.json hooks.agentIsolationGuard.enabled: false.
  *
  * Rationale: SDLC manages worktrees via util/worktree-create.js (git CLI).
  * The Agent SDK's isolation: "worktree" creates ephemeral worktrees at
@@ -42,14 +43,10 @@ function emitContinue() {
   process.stdout.write(JSON.stringify({ continue: true }));
 }
 
-function emitDeny(reason) {
-  process.stdout.write(JSON.stringify({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: reason,
-    },
-  }));
+function emitBlock(reason) {
+  process.stderr.write(reason + '\n');
+  process.stdout.write(JSON.stringify({ continue: false, stopReason: reason, decision: 'block' }));
+  process.exit(2);
 }
 
 /**
@@ -106,7 +103,7 @@ async function main() {
     return emitContinue();
   }
 
-  return emitDeny(
+  return emitBlock(
     'BLOCKED: isolation: "worktree" is forbidden on Agent dispatch. ' +
     'SDLC worktrees are managed by util/worktree-create.js (git CLI). ' +
     'Adding isolation: "worktree" here creates .claude/worktrees/agent-<id> ephemeral paths ' +

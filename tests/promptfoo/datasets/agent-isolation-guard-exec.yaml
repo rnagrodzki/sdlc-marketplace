@@ -1,8 +1,8 @@
 # Script execution tests for hooks/pre-tool-agent-isolation-guard.js.
-# Validates: deny on isolation:"worktree", continue otherwise, config opt-out, malformed-json fail-closed.
+# Validates: block on isolation:"worktree" (exit 2, continue:false), continue otherwise, config opt-out, malformed-json fail-closed.
 # Uses hook-runner provider (no LLM). Fixture git repos supply .sdlc/local.json context.
 
-- description: "agent-isolation-guard (#370 #372): Agent + isolation:worktree, no local.json → deny"
+- description: "agent-isolation-guard (#370 #372): Agent + isolation:worktree, no local.json → block (exit 2)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-agent-isolation-guard.js"
     project_root: "file://fixtures-fs/agent-isolation-guard-no-config"
@@ -10,15 +10,17 @@
     script_stdin: '{"tool_name":"Agent","tool_input":{"isolation":"worktree","prompt":"do something"}}'
   assert:
     - type: icontains
-      value: '"exitCode": 0'
+      value: '"exitCode": 2'
     - type: icontains
-      value: "permissionDecision"
+      value: "stopReason"
     - type: icontains
-      value: "deny"
+      value: "\\\"continue\\\":false"
     - type: icontains
       value: "BLOCKED"
     - type: icontains
       value: "isolation"
+    - type: not-icontains
+      value: "permissionDecision"
 
 - description: "agent-isolation-guard (#370 #372): Agent with no isolation field → continue"
   vars:
@@ -62,7 +64,7 @@
     - type: not-icontains
       value: 'permissionDecision'
 
-- description: "agent-isolation-guard (#370 #372): Agent + isolation:worktree + malformed local.json → deny (fails closed)"
+- description: "agent-isolation-guard (#370 #372): Agent + isolation:worktree + malformed local.json → block (fails closed)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pre-tool-agent-isolation-guard.js"
     project_root: "file://fixtures-fs/agent-isolation-guard-malformed"
@@ -70,10 +72,14 @@
     script_stdin: '{"tool_name":"Agent","tool_input":{"isolation":"worktree","prompt":"do something"}}'
   assert:
     - type: icontains
-      value: '"exitCode": 0'
+      value: '"exitCode": 2'
     - type: icontains
-      value: "permissionDecision"
+      value: "stopReason"
     - type: icontains
-      value: "deny"
+      value: "\\\"continue\\\":false"
     - type: icontains
       value: "BLOCKED"
+    - type: icontains
+      value: "isolation"
+    - type: not-icontains
+      value: "permissionDecision"
