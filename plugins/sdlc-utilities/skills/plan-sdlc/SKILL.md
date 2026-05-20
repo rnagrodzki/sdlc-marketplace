@@ -163,16 +163,20 @@ Replace `<resolved-plan-path>` with the actual absolute path: in plan mode it is
 
 **Orchestrator dispatch (full pipeline only, implements R24–R28):**
 
-After the `fromOpenspecDirect` enrichment block, determine which exploration path to take:
+After the `fromOpenspecDirect` enrichment block, determine which exploration path to take.
+
+**Cleanup trap (install unconditionally before branching, with null guard):** The prepare script always creates a per-invocation tempdir on success — including for lightweight scopes — so cleanup MUST run regardless of which exploration path is taken. The null guard prevents `rm -rf "$(dirname "")"` (which resolves to `rm -rf .`) when `manifestPath` is null.
+
+```bash
+MANIFEST_FILE="<explorePack.manifestPath>"
+if [ -n "$MANIFEST_FILE" ]; then
+  trap 'rm -rf "$(dirname "$MANIFEST_FILE")"' EXIT INT TERM
+fi
+```
 
 - **Full pipeline** (`explorePack.manifestPath` is non-null AND scope is 4+ files / unclear scope):
 
-  1. Install cleanup trap before dispatch (mirrors review-sdlc/SKILL.md):
-     ```bash
-     MANIFEST_FILE="<explorePack.manifestPath>"
-     trap 'rm -rf "$(dirname "$MANIFEST_FILE")"' EXIT INT TERM
-     ```
-  2. Spawn `sdlc:plan-explore-orchestrator` Agent exactly once with inputs:
+  1. Spawn `sdlc:plan-explore-orchestrator` Agent exactly once with inputs:
      ```
      MANIFEST_FILE: <explorePack.manifestPath>
      PROJECT_ROOT: <cwd>
@@ -182,17 +186,18 @@ After the `fromOpenspecDirect` enrichment block, determine which exploration pat
      `USER_PROMPT` is authoritative — the orchestrator re-derives web-research dimensions
      independently from the manifest's `webResearchSignal` (which is a best-effort hint;
      plan.js may not have stdin when invoked from a TTY).
-  3. Read the orchestrator's returned `Brief file:` absolute path. Use `Read` to load the brief into context. The brief is the source of truth for Step 2 task provenance.
+  2. Read the orchestrator's returned `Brief file:` absolute path. Use `Read` to load the brief into context. The brief is the source of truth for Step 2 task provenance.
+  3. **Brief validation:** After loading the brief, grep its content for the pattern `F-[A-Z0-9_-]+-[0-9]+` (the `F-<DIM>-<n>` finding ID format). If zero matches are found, treat the orchestrator as if it had failed: append one line to `.sdlc/learnings/log.md`: `## <YYYY-MM-DD> — plan-sdlc orchestrator returned brief without F-DIM-N findings; using fallback inline exploration`, then proceed via the **Error fallback** path below. Rationale: a brief with no findings cannot satisfy G15 (Brief citation coverage) and would force every task into "out-of-scope addition" — better to fall back cleanly.
 
-  **Brief consumption (when brief is present):**
+  **Brief consumption (when brief is present AND validation passed):**
   - Step 2 tasks MUST cite at least one `F-<DIM>-<n>` finding ID from the brief OR be explicitly marked "out-of-scope addition" with rationale (implements R27)
   - When the brief contains a `## Best-Practice Synthesis` section: Key Decisions MUST explicitly ADOPT / REJECT-with-rationale / mark NOT-APPLICABLE each web finding by its `F-<DIM>-<n>` ID (implements R27)
 
 - **Lightweight scope** (`explorePack.scopeHintCount` ≤ 3 OR `explorePack.manifestPath` is null due to lightweight scope):
-  - Skip orchestrator. Use inline exploration below. No brief.
+  - Skip orchestrator. Use inline exploration below. No brief. (Tempdir cleanup is already installed by the unconditional trap above when `manifestPath` is non-null.)
 
-- **Error fallback** (`explorePack.error` is non-null):
-  - Append one line to `.sdlc/learnings/log.md`: `## <YYYY-MM-DD> — plan-sdlc orchestrator skipped: <explorePack.error>`
+- **Error fallback** (`explorePack.error` is non-null, the orchestrator returned non-zero, or brief validation found zero `F-<DIM>-<n>` IDs):
+  - Append one line to `.sdlc/learnings/log.md`: `## <YYYY-MM-DD> — plan-sdlc orchestrator skipped: <explorePack.error or "brief without F-DIM-N findings">`
   - Use inline exploration below. Plan still produced. (implements R28)
 
 **Structured discovery:** When requirements are vague (a single sentence or ambiguous goal), use AskUserQuestion with 2–3 targeted questions at once:

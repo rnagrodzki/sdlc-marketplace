@@ -286,8 +286,8 @@ Every field is required. Use `0` for counts and `"none"` for empty lists.
 - Write to anything outside `manifest.outDir`
 - Modify or delete `manifest.json`
 - Delete `manifest.outDir` — plan-sdlc owns cleanup
-- Always specify `model:` on every Agent dispatch — omitting it inherits the parent model (opus)
-- Dispatch dimension subagents without `model:` parameter
+- Omit `model:` on any Agent dispatch — omitting it silently inherits the parent model (opus)
+- Dispatch dimension subagents without an explicit `model:` parameter
 - Dispatch dimensions sequentially — all must be in a SINGLE message
 - Add web/hybrid dimensions for pure rename/move/dead-code refactors when `webResearchSignal: false`
 - Fabricate findings for zero-finding dimensions — report honestly

@@ -30,6 +30,7 @@
 const fs   = require('node:fs');
 const path = require('node:path');
 const os   = require('node:os');
+const { spawnSync } = require('node:child_process');
 
 const LIB = path.join(__dirname, '..', 'lib');
 
@@ -161,10 +162,14 @@ function getKeywordScopeFiles(userPrompt, projectRoot) {
   const files = new Set();
   for (const token of unique) {
     try {
-      // git grep -l -i is safe: returns filenames only, exits non-zero when nothing matches
-      const result = exec(`git grep -l -i ${JSON.stringify(token)}`, { cwd: projectRoot, shell: true });
-      if (result) {
-        for (const f of result.split('\n').filter(Boolean)) {
+      // git grep -l -i returns filenames only; exits non-zero when nothing matches.
+      // Use spawnSync with arg array (no shell) to avoid shell-injection / quoting fragility.
+      const result = spawnSync('git', ['grep', '-l', '-i', token], {
+        cwd: projectRoot,
+        encoding: 'utf8',
+      });
+      if (result.status === 0 && result.stdout) {
+        for (const f of result.stdout.split('\n').filter(Boolean)) {
           files.add(f);
         }
       }

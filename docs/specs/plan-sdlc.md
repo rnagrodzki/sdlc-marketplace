@@ -88,7 +88,7 @@
 - P5: `fromOpenspec.deltaSpecs` (number) — count of delta spec files found
 - P6: `fromOpenspec.hasTasks` (boolean) — whether tasks.md exists for the change
 - P7: `guardrails` (array) — plan guardrails from `.sdlc/config.json` → `plan.guardrails`
-- P8: `explorePack.manifestPath` (string | null) — absolute path to the manifest JSON written by `plan-explore.js` inside the per-invocation tempdir, or null when the script failed or scope is lightweight
+- P8: `explorePack.manifestPath` (string | null) — absolute path to the manifest JSON written by `plan-explore.js` inside the per-invocation tempdir, or null when the script failed (lightweight-scope skip is a SKILL.md concern, not the prepare script's: the script always writes a manifest on success regardless of scope size)
 - P9: `explorePack.outDir` (string | null) — absolute path to the per-invocation tempdir created by `plan-explore.js` (e.g., `os.tmpdir()/sdlc-explore-<branchSlug>-XXXX`), or null
 - P10: `explorePack.scopeHintCount` (number) — integer count of files in the scope-hint set assembled by `plan-explore.js` (0 when no git changes and no OpenSpec paths and no keyword matches)
 - P11: `explorePack.error` (string | null) — non-null when `plan-explore.js` failed or returned a non-zero exit; the string contains the error message. Non-null signals the consumer to use the fallback inline-exploration path (R28).

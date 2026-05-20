@@ -29,7 +29,7 @@ export const skillsMeta: SkillMeta[] = [
     command: '/plan-sdlc',
     category: 'planning',
     userInvocable: true,
-    tagline: 'Writes an implementation plan from requirements with per-task complexity, risk, and dependency metadata — dispatches a dynamic-dimension orchestrator for 4+ file scopes to produce a discovery-brief.md with F-DIM-N finding IDs.',
+    tagline: 'Decomposes requirements into classified tasks; dispatches a dynamic-dimension orchestrator for 4+ file scopes.',
     pipeline: [
       { id: 'requirements', label: 'Gather requirements', type: 'user', description: 'Free-form description, spec file, or clarification questions' },
       { id: 'guardrails', label: 'Load guardrails', type: 'script', description: 'Reads plan guardrails from project config for critique evaluation' },
