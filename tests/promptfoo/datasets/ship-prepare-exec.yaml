@@ -1207,3 +1207,24 @@
         // R-quick-4: pr step excluded by --quick carries skipSource 'quick'
         const prStep = o.steps && o.steps.find(s => s.name === 'pr');
         return prStep && prStep.skipSource === 'quick';
+
+# --- explore tempdir GC (issue #408 / T8) ---
+
+- description: "ship-prepare: --gc sweeps stale sdlc-explore-* tempdirs; fresh dir kept; exploreTempdirs bucket present (#408)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-ship-gc-explore-tempdirs.js"
+    script_args: "--project-root {{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-gc-explore-tempdirs"
+  assert:
+    - type: icontains
+      value: '"explorerTempdirsPresent": true'
+    - type: icontains
+      value: '"planExitCode": 0'
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.staleRemoved >= 1;
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.freshKept >= 1;

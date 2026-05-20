@@ -100,3 +100,123 @@
       value: '"stderrMentionsPath": true'
     - type: icontains
       value: '"stderrMentionsOutputFile": true'
+
+# --- plan-explore.js exec tests (R24, P8–P12, issue #408) ---
+
+- description: "plan-explore: clean repo + plain prompt yields manifestPath non-null, webResearchSignal false, error null"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan-explore.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-explore-clean"
+    script_stdin: "Add a helper function"
+  assert:
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return data.manifestPath !== null && data.manifestPath !== undefined;
+    - type: icontains
+      value: '"webResearchSignal": false'
+    - type: icontains
+      value: '"error": null'
+
+- description: "plan-explore: repo with staged diffs yields manifestPath non-null, scopeHintCount >= 1"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan-explore.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-explore-with-diffs"
+    script_stdin: "Improve the auth module"
+  assert:
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return data.manifestPath !== null && data.scopeHintCount >= 1;
+    - type: icontains
+      value: '"error": null'
+
+- description: "plan-explore: --from-openspec with backtick paths in proposal.md yields scopeHintCount reflecting parsed paths"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan-explore.js"
+    script_args: "--from-openspec test-change"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-explore-openspec"
+    script_stdin: "Implement the token validation endpoint"
+  assert:
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return data.scopeHintCount >= 1;
+    - type: icontains
+      value: '"error": null'
+
+- description: "plan-explore: prompt containing 'best practice' sets webResearchSignal true"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan-explore.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-explore-clean"
+    script_stdin: "What is the best practice for JWT validation in Node.js?"
+  assert:
+    - type: icontains
+      value: '"webResearchSignal": true'
+    - type: icontains
+      value: '"error": null'
+
+- description: "plan-explore: plain rename prompt (no keywords) sets webResearchSignal false"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan-explore.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-explore-clean"
+    script_stdin: "Rename the greet function to hello in src/index.js"
+  assert:
+    - type: icontains
+      value: '"webResearchSignal": false'
+    - type: icontains
+      value: '"error": null'
+
+- description: "plan-explore: non-git directory produces valid output with graceful git fallback (exit code 0)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan-explore.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-plan-explore-no-git"
+    script_stdin: "Add a feature"
+  assert:
+    # Script must always exit 0 and produce a parseable JSON output (R28 contract)
+    - type: icontains
+      value: '"webResearchSignal"'
+    - type: icontains
+      value: '"scopeHintCount"'
+
+# --- plan.js explorePack integration (Task 5 / P8–P12, issue #408) ---
+
+- description: "plan-prepare: clean invocation emits explorePack with all five P8-P12 keys"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-plan-explore-pack.js"
+    script_args: "--project-root {{project_root}} --mode clean"
+    project_root: "file://fixtures-fs/project-plan-explore-clean"
+  assert:
+    - type: icontains
+      value: '"explorerPackPresent": true'
+    - type: icontains
+      value: '"allKeysPresent": true'
+    - type: icontains
+      value: '"planExitCode": 0'
+    - type: icontains
+      value: '"webResearchSignalPresent": true'
+    - type: icontains
+      value: '"scopeHintCountPresent": true'
+
+- description: "plan-prepare: forced plan-explore failure yields explorePack.error non-null and plan exits 0 (R28 fallback)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-plan-explore-pack.js"
+    script_args: "--project-root {{project_root}} --mode error"
+    project_root: "file://fixtures-fs/project-plan-explore-clean"
+  assert:
+    - type: icontains
+      value: '"planExitCode": 0'
+    - type: icontains
+      value: '"explorerPackPresent": true'
+    - type: icontains
+      value: '"allKeysPresent": true'
+    - type: icontains
+      value: '"manifestPathNull": true'
+    - type: not-icontains
+      value: '"explorerPackError": null'

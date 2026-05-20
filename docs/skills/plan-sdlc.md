@@ -49,6 +49,68 @@ For plans with 5+ tasks, the skill also writes a `## Key Decisions` section — 
 
 ---
 
+## Dynamic-Dimension Discovery (R24–R28)
+
+For 4+ file scopes, plan-sdlc dispatches a parallel dynamic-dimension orchestrator before decomposing tasks. The orchestrator produces a `discovery-brief.md` with stable `F-<DIM>-<n>` finding IDs that every Standard/Complex task must cite.
+
+**Step 0 — Prepare.** `plan.js` runs as today, but now also spawns `plan-explore.js`. That script walks git changes, parses backtick paths from any active OpenSpec proposal, tokenizes the user prompt, and `git grep`s for top non-stopword tokens to build a scope-hint file set (capped 30 files). It computes `webResearchSignal` from a regex over best-practice phrases plus a fixed external-tech vocab (oauth, jwt, kafka, redis, kubernetes, terraform, react, vue, angular, postgres, mongodb, graphql, grpc, websocket, oauth2, openid, saml). It writes everything to `manifest.json` inside `os.tmpdir()/sdlc-explore-<branchSlug>-XXXX/`. Output back to plan.js: `explorePack = { manifestPath, outDir, scopeHintCount, webResearchSignal, error }`.
+
+**Step 1 — Routing.** Three branches:
+- **≤3 files (lightweight):** orchestrator skipped. Inline exploration as today. No brief.
+- **4+ files AND `explorePack.manifestPath != null`:** install EXIT/INT/TERM trap to wipe the tempdir, then dispatch `sdlc:plan-explore-orchestrator` exactly once with `MANIFEST_FILE`, `PROJECT_ROOT`, `USER_PROMPT`, `OPENSPEC_CONTEXT`.
+- **`explorePack.error` non-null:** append a one-line note to `.sdlc/learnings/log.md`, fall back to inline exploration. Plan still produced.
+
+**Orchestrator (the new agent).** Four steps, mirroring review-orchestrator but with a load-bearing inversion:
+1. **SCOPE.** LLM-derives 3–7 kebab-case task-specific dimensions as JSON `{ name, description, files[], mode, model }`. Names are task-shaped (`auth-middleware-integration`), not generic axes. Must include ≥1 `web`/`hybrid` dimension when `webResearchSignal: true`; must include zero web/hybrid when the prompt is a pure rename/move/dead-code refactor.
+2. **FAN-OUT.** All dimensions dispatched in a **single message** as parallel `general-purpose` Agent calls. Per-mode tool restriction + budget:
+   - `code` → `Read, Glob, Grep`
+   - `web` → `WebSearch, WebFetch`, ≤5 searches + ≤8 fetches, source-quality steer (OWASP/RFC/MDN/vendor)
+   - `hybrid` → both, ≤3 + ≤5, findings tagged `[web-only | verified-in-codebase | conflicts-with-codebase]`
+3. **CRITIQUE.** Dedupe by file:line / url, keep highest severity, flag contradictions, flag zero-finding dimensions, flag web-vs-codebase conflicts.
+4. **CONSOLIDATE.** Write `discovery-brief.md` to `manifest.outDir` with stable IDs: `F-<DIM>-<n>: file:line — observation` (code) or `F-<DIM>-<n>: <url> — observation (recency, source-type)` (web). When web/hybrid ran, append a `## Best-Practice Synthesis` section.
+
+**Step 2 — Decompose.** Same as today, but each Standard/Complex task must cite ≥1 `F-<DIM>-<n>` ID or be marked "out-of-scope addition" with rationale. Trivial tasks exempt. When web/hybrid ran, Key Decisions explicitly **ADOPTS**, **REJECTS-with-rationale**, or marks **NOT-APPLICABLE** each web finding by ID.
+
+**Step 3 — Critique.** One new gate row (G15): brief-citation coverage. Error severity when brief was produced; not-applicable when fallback ran.
+
+**Step 5 — Reviewer.** plan-reviewer-prompt gains a `{BRIEF_FILE}` input plus two gate rows: *exploration provenance* (uncited Standard/Complex tasks blocking) and *best-practice traceability* (silent omission of a web finding blocking).
+
+**Cleanup.** Tempdir wiped by the EXIT/INT/TERM trap installed in Step 1. Orphans from crashed runs swept by `ship-sdlc --gc`, which now globs `sdlc-explore-*` alongside the existing four state-file buckets and removes by mtime + branch-liveness.
+
+**Three modes for dimensions:**
+| Mode | Tools | Budget | Output tag |
+|---|---|---|---|
+| `code` | Read, Glob, Grep | unlimited | `F-<DIM>-<n>: file:line — observation` |
+| `web` | WebSearch, WebFetch | ≤5 searches + ≤8 fetches | `F-<DIM>-<n>: <url> — observation (recency, source-type)` |
+| `hybrid` | Read, Glob, Grep, WebSearch, WebFetch | ≤3 searches + ≤5 fetches | tagged `[web-only \| verified-in-codebase \| conflicts-with-codebase]` |
+
+**`webResearchSignal` triggers** — set to `true` when the user prompt matches any of:
+- Regex (case-insensitive): `best practice`, `recommended`, `industry standard`, `state of the art`, `compare alternatives`, `alternatives to`
+- External-tech vocab token (any occurrence): `oauth`, `jwt`, `kafka`, `redis`, `kubernetes`, `terraform`, `react`, `vue`, `angular`, `postgres`, `mongodb`, `graphql`, `grpc`, `websocket`, `oauth2`, `openid`, `saml`
+
+**Lightweight-skip rule.** When complexity routing lands at ≤3 files, the orchestrator is skipped entirely. No brief, no tempdir, `explorePack.manifestPath = null`. Inline exploration is used as today.
+
+**Fallback path.** When `plan-explore.js` fails or `sdlc:plan-explore-orchestrator` exits non-zero, plan-sdlc appends a one-line note to `.sdlc/learnings/log.md` and falls back to inline exploration. The plan is still produced — brief absence is not a plan failure.
+
+**Brief example** (3 dimensions, one web, one hybrid):
+```
+## F-auth-middleware-integration
+F-auth-middleware-integration-1: src/middleware/auth.ts:42 — JWT validation only checks expiry, not issuer
+F-auth-middleware-integration-2: src/routes/user.ts:88 — route applies auth middleware but missing RBAC check
+
+## F-oauth2-best-practices
+F-oauth2-best-practices-1: https://www.rfc-editor.org/rfc/rfc6749 — authorization code flow requires PKCE for SPAs (2023-06, RFC)
+F-oauth2-best-practices-2: https://owasp.org/www-project-top-ten/... — token storage in memory preferred over localStorage (2023-01, OWASP) [web-only]
+
+## Best-Practice Synthesis
+- ADOPT F-oauth2-best-practices-1 — PKCE is the current standard and applies to the planned OAuth2 flow
+- REJECT F-oauth2-best-practices-2 — app is server-rendered; localStorage concern does not apply
+```
+
+**Contrast with review-sdlc.** review-sdlc reads a STATIC dimension registry (`lib/dimensions.js`) — same axes every run (security, performance, docs, …). plan-sdlc DERIVES dimensions per task in the orchestrator's SCOPE step. The prepare script supplies raw materials + `webResearchSignal`; the dimension JSON itself is LLM-produced because planning dimensions are unknowable at script-write time (`auth-middleware-integration` ≠ `cli-flag-parser-refactor`).
+
+---
+
 ## Plan Mode
 
 When Claude Code's [plan mode](https://docs.anthropic.com/en/docs/claude-code/plan-mode) is active, the skill adapts automatically:
@@ -187,6 +249,7 @@ The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads i
 | `<plansDirectory>/YYYY-MM-DD-<feature-name>.md` | The written plan document (normal mode). Starts as a skeleton header at Step 0 and grows incrementally: header fields and Requirements section added at Step 1, task blocks at Step 2, critique fixes applied at Steps 4 and 6. Path resolved from: user-specified → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → `~/.claude/plans/` fallback. |
 | Plan mode designated file | When Claude Code plan mode is active, the plan is written to the system-designated file path instead of the above. Same incremental build process applies. The path appears in the plan mode system banner. |
 | `.sdlc/learnings/log.md` | Planning learnings appended after writing: scope decisions, clarification patterns, decomposition issues. |
+| `os.tmpdir()/sdlc-explore-<branchSlug>-XXXX/discovery-brief.md` | Dynamic-dimension discovery brief produced by `plan-explore-orchestrator` for 4+ file scopes. Contains per-dimension findings with stable `F-<DIM>-<n>` IDs, a contradictions section, and (when web/hybrid dimensions ran) a `## Best-Practice Synthesis` section. Wiped by EXIT/INT/TERM trap after Step 1 completes. Orphans swept by `ship-sdlc --gc`. |
 | Step 7 context-heaviness advisory | When the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget), Step 7 prepends a `/compact` advisory above the handoff menu. Sidecar is written by the `UserPromptSubmit` hook `hooks/context-stats.js`. Implementation: [`scripts/lib/context-advisory.js`](../../plugins/sdlc-utilities/scripts/lib/context-advisory.js) consumed via the wrapper [`scripts/skill/plan-handoff-advisory.js`](../../plugins/sdlc-utilities/scripts/skill/plan-handoff-advisory.js). Pipeline state survives `/compact` (PreCompact + SessionStart hooks). |
 
 ## Plan Integrity
