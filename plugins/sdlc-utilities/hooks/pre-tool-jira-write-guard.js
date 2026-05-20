@@ -52,6 +52,11 @@ const NAMESPACE_PREFIXES = ['mcp__atlassian__', 'mcp__claude_ai_Atlassian__'];
 
 const HEADING_RE = /^##\s+(.+?)\s*$/gm;
 
+// Max characters of an offending Acceptance Criteria line to embed in a deny
+// reason. Lines longer than this are truncated with a single-character
+// ellipsis (`…`) so the deny payload stays small.
+const MAX_EXCERPT_LEN = 120;
+
 function isJiraWriteTool(toolName) {
   if (typeof toolName !== 'string') return false;
   for (const prefix of NAMESPACE_PREFIXES) {
@@ -177,8 +182,13 @@ function checkAcceptanceCriteriaChecklist(markdown) {
     const line = rawLine.trimEnd();
     if (line.trim() === '') continue; // blank lines are fine
     if (!checklistRe.test(line)) {
-      // Quote the offending line (truncate at 120 chars to avoid giant deny reasons).
-      const excerpt = line.length > 120 ? line.slice(0, 117) + '…' : line;
+      // Quote the offending line (truncate at MAX_EXCERPT_LEN chars to avoid
+      // giant deny reasons). Reserve 3 chars for the trailing ellipsis so the
+      // final string length stays at MAX_EXCERPT_LEN.
+      const excerpt =
+        line.length > MAX_EXCERPT_LEN
+          ? line.slice(0, MAX_EXCERPT_LEN - 3) + '…'
+          : line;
       return `"${excerpt}"`;
     }
   }
@@ -194,13 +204,14 @@ function checkAcceptanceCriteriaChecklist(markdown) {
  * find a heading node with text "Acceptance Criteria" (case-insensitive).
  * Then inspects the sibling content nodes until the next heading node.
  *
- * Each non-heading sibling MUST be a `bulletList`, `orderedList`, or `taskList`
- * node. Any other node type (e.g., `paragraph`) is a violation.
+ * Each non-heading sibling MUST be a `taskList` node (GitHub-flavored checklist
+ * items per R25.2). Any other node type (e.g., `paragraph`, `bulletList`,
+ * `orderedList`) is a violation.
  *
  * Returns null when:
  *   - No ADF description is present (permissive fallback).
  *   - No "Acceptance Criteria" heading is found in the ADF tree.
- *   - All sibling nodes are list/taskList nodes.
+ *   - All sibling nodes are taskList nodes.
  *
  * Returns the offending node type string on the first violation.
  *
@@ -257,16 +268,19 @@ function checkAcceptanceCriteriaAdf(toolInput) {
   if (acHeadingIdx === -1) return null; // section absent — permissive
 
   // Inspect sibling nodes until the next heading.
-  const ALLOWED_LIST_TYPES = new Set(['bulletList', 'orderedList', 'taskList']);
+  // R25.2 mandates GitHub-flavored checklist items only — only `taskList`
+  // ADF nodes encode that semantic. `bulletList` / `orderedList` are
+  // rejected.
+  const ALLOWED_LIST_TYPES = new Set(['taskList']);
   for (let i = acHeadingIdx + 1; i < adfDoc.content.length; i++) {
     const node = adfDoc.content[i];
     if (node.type === 'heading') break; // reached next section
     if (!ALLOWED_LIST_TYPES.has(node.type)) {
-      return node.type; // violation: non-list node in AC section
+      return node.type; // violation: non-taskList node in AC section
     }
   }
 
-  return null; // all nodes are list/taskList
+  return null; // all nodes are taskList
 }
 
 async function main() {
@@ -339,7 +353,7 @@ async function main() {
       const adfViolation = checkAcceptanceCriteriaAdf(toolInput);
       if (adfViolation !== null) {
         return emitDeny(
-          `R25/G15: Acceptance Criteria section must contain only checklist (taskList) nodes in ADF. Non-list node type: ${adfViolation}`
+          `R25/G15: Acceptance Criteria section must contain only "- [ ] …" checklist items (ADF taskList). Non-taskList node type: ${adfViolation}`
         );
       }
     }
