@@ -1,8 +1,8 @@
 ---
 name: ship-sdlc
-description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Dispatches every sub-skill (including execute-plan-sdlc) as an Agent for context isolation, with structured return values driving the pipeline state machine. Arguments: [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config]. The `<label>` form for --bump (e.g. `--bump rc`) is forwarded to version-sdlc, where it is interpreted as `--bump patch --pre <label>`; labels must match `^[a-z][a-z0-9]*$`. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
+description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Dispatches every sub-skill (including execute-plan-sdlc) as an Agent for context isolation, with structured return values driving the pipeline state machine. Arguments: [--auto] [--steps <csv>] [--quick] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config]. The `<label>` form for --bump (e.g. `--bump rc`) is forwarded to version-sdlc, where it is interpreted as `--bump patch --pre <label>`; labels must match `^[a-z][a-z0-9]*$`. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
-argument-hint: "[--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--branch | --tree] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
+argument-hint: "[--auto] [--steps <csv>] [--quick] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--branch | --tree] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
 model: sonnet
 ---
 
@@ -51,7 +51,10 @@ If `--init-config` was passed:
 **Redirect:** Suggest running `/setup-sdlc` instead for unified configuration. If user insists on `--init-config`, proceed with the existing walkthrough.
 
 1. Read `./config-format.md` and run the interactive walkthrough to collect the user's answers (steps multi-select, bump type, auto, threshold, workspace isolation).
-2. Locate and call `ship-init.js` via Bash with the collected answers:
+   After the `steps[]` selection, offer the optional `--quick` profile prompt (R-quick-7):
+   > "Would you like to define a `--quick` profile? Select steps that form your shortened pipeline, or skip to omit."
+   If the user selects steps, capture them. If the user skips, omit the `--quick` flag when calling `ship-init.js`.
+2. Locate and call `ship-init.js` via Bash with the collected answers (append `--quick <csv>` only when the user made a quick-profile selection):
 ```bash
 SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" -path "*/sdlc*/scripts/util/ship-init.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/ship-init.js"
@@ -233,6 +236,7 @@ Auto-skip decisions (from skill/ship.js):
 
 The parenthetical after `skipped` reflects the step's `skipSource` field:
 - `(cli)` — user passed `--steps` on the command line
+- `(quick)` — step is canonical but absent from `ship.quick` under an active `--quick` run (R-quick-4); `flags.sources.steps === 'quick'` in the prepare output
 - `(config)` — skip set loaded from `.sdlc/local.json`
 - `(auto)` — auto-skipped by `computeSteps` logic (e.g., worktree mode)
 - `(condition)` — conditional step whose condition was not met
@@ -320,6 +324,8 @@ Validation checks:
 - `gh auth status` succeeds
 - Current branch is not the default branch (warn if it is — do not block)
 - All `--steps` values are recognized step names: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `learnings-commit`
+- When `flags.sources.steps === 'quick'` in the prepare output, verify that `flags.steps` is non-empty (R-quick-6 error would have fired if `ship.quick` was missing — non-empty confirms the quick profile resolved correctly). Cite `flags.sources.steps`, NOT raw `--quick` or `$ARGUMENTS`, at all decision sites (R-quick-2, R-quick-3).
+- `--quick` and `--steps` are mutually exclusive — R-quick-5 error fires if both are present; surface from `errors[]` in prepare output, not re-checked independently.
 - At least one step will run
 - Flag combinations are coherent (`--bump` without version step → warn). `--bump` accepts `major|minor|patch` or any pre-release label matching `^[a-z][a-z0-9]*$` (e.g. `--bump rc` ships an RC release; the label is forwarded verbatim to version-sdlc).
 
@@ -1029,7 +1035,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **Sub-skill loading and agent isolation.** Each sub-skill's SKILL.md is 200–550 lines. All sub-skills (including `execute-plan-sdlc`) are Agent-dispatched so each loads SKILL.md in its own context and returns only a structured result (5–10 lines). The ship pipeline's context receives structured data, not sub-skill definitions. `execute-plan-sdlc` bounds its own context impact by dispatching one wave-runner Agent per wave rather than per task — its structured Step-9 result is what ship-sdlc consumes to continue the pipeline.
 
-**skipSource tracks provenance.** Each step's `skipSource` field records why a step was skipped: `"none"` (not skipped), `"cli"` (step omitted from CLI `--steps`), `"config"` (omitted from `ship.steps[]` in `.sdlc/local.json`), `"auto"` (auto-skipped by `computeSteps` logic), `"condition"` (conditional step not triggered), `"default"` (built-in defaults excluded the step). The per-step `skipSource` makes the exclusion provenance auditable per step.
+**skipSource tracks provenance.** Each step's `skipSource` field records why a step was skipped: `"none"` (not skipped), `"cli"` (step omitted from CLI `--steps`), `"quick"` (step is canonical but absent from `ship.quick` under an active `--quick` run — R-quick-4), `"config"` (omitted from `ship.steps[]` in `.sdlc/local.json`), `"auto"` (auto-skipped by `computeSteps` logic), `"condition"` (conditional step not triggered), `"default"` (built-in defaults excluded the step). The per-step `skipSource` makes the exclusion provenance auditable per step.
 
 ---
 

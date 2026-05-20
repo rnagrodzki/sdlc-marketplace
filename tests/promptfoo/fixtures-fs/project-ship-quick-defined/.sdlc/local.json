@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 4,
+  "ship": {
+    "steps": ["execute", "commit", "review", "version", "archive-openspec", "pr", "learnings-commit"],
+    "quick": ["execute", "commit", "pr"]
+  }
+}

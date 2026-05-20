@@ -36,6 +36,14 @@ const SHIP_FIELDS = [
     description: 'Pipeline steps to run by default. received-review and commit-fixes run conditionally based on review verdict and are not configurable here. verify-pipeline and await-remote-review are opt-in entries — add them explicitly to enable post-PR CI verification and remote-reviewer awaiting.',
   },
   {
+    name: 'quick',
+    label: 'Optional --quick profile steps',
+    type: 'multi-select',
+    options: CANONICAL_STEPS.slice(),
+    default: undefined,
+    description: 'Optional shortened step list used when ship-sdlc is invoked with --quick. Same enum as steps. Leave unset to disable the --quick flag for this project.',
+  },
+  {
     name: 'bump',
     label: 'Default version bump level',
     type: 'enum',

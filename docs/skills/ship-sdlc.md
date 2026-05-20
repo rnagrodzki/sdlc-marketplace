@@ -40,6 +40,7 @@ This skill is for **expert users working on projects with established quality gu
 |------|-------------|---------|
 | `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
 | `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `verify-pipeline` (opt-in), `await-remote-review` (opt-in), `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
+| `--quick` | Run the project's quick step profile (`ship.quick` in `.sdlc/local.json`) instead of `ship.steps[]`. Useful for fast local iterations (e.g. execute+commit+pr without review or versioning). Mutually exclusive with `--steps` (R-quick-5). Requires `ship.quick` to be configured (R-quick-6). | Off |
 | `--quality <full\|balanced\|minimal>` | Forwarded to execute-plan-sdlc as `--quality` (model tier). Only forwarded when the user explicitly passes `--quality` to ship; otherwise execute-plan-sdlc applies its own selection. (Renamed from `--preset` in #190 to disambiguate from `--steps`.) | Not forwarded |
 | `--bump patch\|minor\|major\|<label>` | Version bump type forwarded to version-sdlc. The `<label>` form (e.g. `--bump rc`, `--bump beta`) is forwarded verbatim and interpreted by version-sdlc as `--bump patch --pre <label>`. Labels must match `^[a-z][a-z0-9]*$` (lowercase, start with a letter, alphanumeric). Example: `ship-sdlc --bump rc` produces a `1.2.4-rc.1` style release. | `patch` (or `version.preRelease` from `.sdlc/config.json` when set and no CLI `--bump` is passed — see R63) |
 | `--draft` | Create the PR as a draft. | Off |
@@ -400,6 +401,38 @@ Same flow as above, but on CI failure ship-sdlc dispatches `verify-pipeline-sdlc
 
 Walks through an interactive questionnaire and writes `.sdlc/local.json`. Does not run the pipeline.
 
+### Run the project's quick profile (R-quick-1, R-quick-2)
+
+First, define a quick profile in `.sdlc/local.json` (or via `--init-config`):
+
+```json
+{
+  "ship": {
+    "steps": ["execute", "commit", "review", "version", "archive-openspec", "pr", "learnings-commit"],
+    "quick": ["execute", "commit", "pr"]
+  }
+}
+```
+
+Then invoke:
+
+```text
+/ship-sdlc --quick                # runs execute → commit → pr (the quick profile)
+/ship-sdlc --quick --dry-run      # preview which steps would run
+```
+
+Combining `--quick` with `--steps` is a hard error (R-quick-5):
+
+```text
+/ship-sdlc --quick --steps execute,commit   # error: use --quick or --steps, not both
+```
+
+If `ship.quick` is absent from config (R-quick-6):
+
+```text
+/ship-sdlc --quick   # error: No quick profile defined. Run `ship-sdlc --init-config` to set one.
+```
+
 ### Prune stale state files (issue #223)
 
 ```text
@@ -448,6 +481,7 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 |-------|------|---------|-------------|
 | `schemaVersion` (top-level) | `4` | `4` | Schema version literal. New configs MUST include `schemaVersion: 4`. Legacy configs are auto-migrated on read. |
 | `steps` | `string[]` | `["execute","commit","review","version","archive-openspec","pr","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `learnings-commit`. Replaces legacy `preset` / `skip`. |
+| `quick` | `string[]` | unset | Optional shortened step list activated by `--quick`. Same allowed values as `steps`. Unset means `--quick` is unavailable (R-quick-1). |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type. |
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |
 | `auto` | `boolean` | `false` | Run in non-interactive mode by default. |
