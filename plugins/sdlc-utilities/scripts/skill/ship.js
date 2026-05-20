@@ -48,7 +48,7 @@ const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS, RESERVED_STEPS } = require(path.join(LIB, 'ship-fields'));
-const { gcStateFiles } = require(path.join(LIB, 'state'));
+const { gcStateFiles, gcTempdirs } = require(path.join(LIB, 'state'));
 const { detectActiveChanges, isArchived } = require(path.join(LIB, 'openspec'));
 const { getAdvisory } = require(path.join(LIB, 'context-advisory'));
 const { PRE_RELEASE_LABEL_RE } = require(path.join(LIB, 'version'));
@@ -1003,11 +1003,15 @@ function main() {
 
     let report;
     try {
-      const ship    = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
-      const execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
-      const plan    = gcStateFiles({ prefix: 'plan',    ttlDays, knownBranches });
-      const commit  = gcStateFiles({ prefix: 'commit',  ttlDays, knownBranches });
-      report = { ttlDays, ship, execute, plan, commit };
+      const ship             = gcStateFiles({ prefix: 'ship',    ttlDays, knownBranches });
+      const execute          = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
+      const plan             = gcStateFiles({ prefix: 'plan',    ttlDays, knownBranches });
+      const commit           = gcStateFiles({ prefix: 'commit',  ttlDays, knownBranches });
+      // Sweep per-invocation tempdirs created by plan-explore.js (issue #408)
+      // SDLC_EXPLORE_TMPDIR_OVERRIDE allows tests to point at a controlled directory.
+      const exploreTmpdir    = process.env.SDLC_EXPLORE_TMPDIR_OVERRIDE || undefined;
+      const exploreTempdirs  = gcTempdirs({ prefix: 'sdlc-explore-', ttlDays, knownBranches, tmpdir: exploreTmpdir });
+      report = { ttlDays, ship, execute, plan, commit, exploreTempdirs };
     } catch (err) {
       errors.push(`gc failed: ${err.message}`);
       writeOutput({ action: 'gc', errors, warnings }, 'ship-prepare', 1);

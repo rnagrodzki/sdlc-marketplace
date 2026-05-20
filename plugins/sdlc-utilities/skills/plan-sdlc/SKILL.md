@@ -161,6 +161,40 @@ Replace `<resolved-plan-path>` with the actual absolute path: in plan mode it is
 - Skip the "Structured discovery" AskUserQuestion below — the proposal and delta specs already provide scope, integration, and success criteria
 - Delta specs remain the authoritative requirements for Step 3 coverage validation
 
+**Orchestrator dispatch (full pipeline only, implements R24–R28):**
+
+After the `fromOpenspecDirect` enrichment block, determine which exploration path to take:
+
+- **Full pipeline** (`explorePack.manifestPath` is non-null AND scope is 4+ files / unclear scope):
+
+  1. Install cleanup trap before dispatch (mirrors review-sdlc/SKILL.md):
+     ```bash
+     MANIFEST_FILE="<explorePack.manifestPath>"
+     trap 'rm -rf "$(dirname "$MANIFEST_FILE")"' EXIT INT TERM
+     ```
+  2. Spawn `sdlc:plan-explore-orchestrator` Agent exactly once with inputs:
+     ```
+     MANIFEST_FILE: <explorePack.manifestPath>
+     PROJECT_ROOT: <cwd>
+     USER_PROMPT: <verbatim user request>
+     OPENSPEC_CONTEXT: <space-separated path list, or "none">
+     ```
+     `USER_PROMPT` is authoritative — the orchestrator re-derives web-research dimensions
+     independently from the manifest's `webResearchSignal` (which is a best-effort hint;
+     plan.js may not have stdin when invoked from a TTY).
+  3. Read the orchestrator's returned `Brief file:` absolute path. Use `Read` to load the brief into context. The brief is the source of truth for Step 2 task provenance.
+
+  **Brief consumption (when brief is present):**
+  - Step 2 tasks MUST cite at least one `F-<DIM>-<n>` finding ID from the brief OR be explicitly marked "out-of-scope addition" with rationale (implements R27)
+  - When the brief contains a `## Best-Practice Synthesis` section: Key Decisions MUST explicitly ADOPT / REJECT-with-rationale / mark NOT-APPLICABLE each web finding by its `F-<DIM>-<n>` ID (implements R27)
+
+- **Lightweight scope** (`explorePack.scopeHintCount` ≤ 3 OR `explorePack.manifestPath` is null due to lightweight scope):
+  - Skip orchestrator. Use inline exploration below. No brief.
+
+- **Error fallback** (`explorePack.error` is non-null):
+  - Append one line to `.sdlc/learnings/log.md`: `## <YYYY-MM-DD> — plan-sdlc orchestrator skipped: <explorePack.error>`
+  - Use inline exploration below. Plan still produced. (implements R28)
+
 **Structured discovery:** When requirements are vague (a single sentence or ambiguous goal), use AskUserQuestion with 2–3 targeted questions at once:
 1. **Scope** — what's in, what's explicitly out?
 2. **Integration** — what existing code does this touch?
@@ -275,6 +309,7 @@ Check each quality gate:
 | Decomposition balance | No task touches > 5 files; no plan with > 80% Trivial tasks |
 | File existence | Every path under "Modify:" exists in the codebase (verify with Glob) |
 | OpenSpec requirements coverage | When `openspecContext` exists: every ADDED/MODIFIED requirement in delta specs has at least one task |
+| Brief citation coverage | When `explorePack.manifestPath` was non-null AND the orchestrator produced a brief: every Standard/Complex task cites ≥1 `F-<DIM>-<n>` finding ID OR is marked "out-of-scope addition" with rationale. Trivial tasks exempt. Uncited Standard/Complex tasks are a blocking error. (G15) |
 | Dependency target existence | Every "Depends on: Task N" references a task number that exists in the plan |
 | Self-containment test | Pick the most complex task — could an agent implement it using only its description + Key Decisions? If not, the description is incomplete |
 | Guardrail compliance | For each guardrail in `activeGuardrails`: evaluate whether the plan (as written) satisfies its `description`. Report each as PASS or FAIL with a one-line rationale. Guardrails with `severity: "error"` (or no severity, defaulting to error) that FAIL are blocking — they must be fixed in Step 4. Guardrails with `severity: "warning"` that FAIL are advisory — note them but do not block. |

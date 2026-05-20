@@ -3,6 +3,11 @@
 #   plan-from-openspec             -- CORRECT: simulates --from-openspec with ready-for-plan stage, tasks.md present
 #   plan-from-openspec-no-tasks    -- CORRECT: simulates --from-openspec with spec-in-progress stage, no tasks.md
 #   plan-creates-skill             -- CORRECT: simulates a request to plan a new skill; exercises skill-docs-required guardrail (Fixes #185)
+#   plan-orchestrator-dispatch     -- CORRECT: 4+ file scope + non-null manifestPath; exercises R24 orchestrator dispatch path
+#   plan-web-mode-trigger          -- CORRECT: webResearchSignal: true + brief with web/hybrid dims; exercises R25a web requirement
+#   plan-web-mode-suppressed       -- CORRECT: pure-refactor + webResearchSignal: false; exercises R25a web suppression
+#   plan-lightweight-skip          -- CORRECT: ≤3-file scope + manifestPath: null; exercises R24 lightweight skip
+#   plan-orchestrator-fallback     -- CORRECT: explorePack.error non-null; exercises R28 fallback path
 
 - description: "plan-sdlc: asks whether to execute after plan is written"
   vars:
@@ -264,3 +269,139 @@
         before Step 7 (Handoff), passing the plan file via --file, and explicitly states that on
         non-zero exit Step 7 is NOT entered. The gate is script-enforced. The skill does not propose
         retrying, editing URLs without user input, or bypassing.
+
+# --- Dynamic-dimension orchestrator behavioral tests (issue #408, R24–R28) ---
+
+- description: "plan-sdlc: 4+ file scope dispatches sdlc:plan-explore-orchestrator exactly once (#408 orchestrator dispatch)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-dispatch.md"
+    user_request: >
+      Run /plan-sdlc. The context above shows plan-prepare.js output with explorePack.manifestPath
+      non-null and scopeHintCount 8. Process Step 1. Show how you would dispatch the
+      plan-explore-orchestrator. Do not skip to Step 2.
+  assert:
+    - type: icontains
+      value: "plan-explore-orchestrator"
+    - type: llm-rubric
+      value: >
+        The response dispatches sdlc:plan-explore-orchestrator exactly once using the Agent tool.
+        It passes MANIFEST_FILE equal to the manifestPath from explorePack, PROJECT_ROOT set to
+        the working directory, USER_PROMPT set to the verbatim user request, and OPENSPEC_CONTEXT
+        set to "none" (no openspec). It installs a cleanup trap for the tempdir before dispatch.
+        It does NOT dispatch the orchestrator more than once.
+
+- description: "plan-sdlc: orchestrator SCOPE dimensions are task-shaped kebab-case names, not bare generic axes (#408 SCOPE names)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-dispatch.md"
+    user_request: >
+      Run /plan-sdlc. The orchestrator returned the discovery brief shown in the context. The brief
+      has dimensions: jwt-validation-flow, middleware-integration-pattern, session-model-schema,
+      jwt-rfc-compliance. Confirm that the dimension names are task-specific and not generic axes.
+      Then proceed to Step 2, citing F-DIM-N IDs in task descriptions.
+  assert:
+    - type: icontains
+      value: "F-jwt-validation-flow"
+    - type: not-icontains
+      value: "architecture"
+    - type: not-icontains
+      value: "security"
+    - type: llm-rubric
+      value: >
+        The response confirms that dimension names like "jwt-validation-flow" and
+        "middleware-integration-pattern" are task-specific kebab-case names (not bare generic
+        axes like "architecture", "tests", or "security"). When writing Step 2 tasks, the
+        response cites at least one F-DIM-N finding ID per Standard/Complex task.
+
+- description: "plan-sdlc: webResearchSignal true triggers web/hybrid dimensions; Key Decisions adopt/reject each web finding (#408 web-mode trigger)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-web-mode-trigger.md"
+    user_request: >
+      Run /plan-sdlc. The context shows webResearchSignal: true and a brief with web dimensions
+      jwt-node-best-practices and jwks-uri-rotation. Process Step 2 and include Key Decisions.
+      Every web finding in the Best-Practice Synthesis must appear in Key Decisions.
+  assert:
+    - type: icontains
+      value: "F-jwt-node-best-practices"
+    - type: icontains
+      value: "Key Decisions"
+    - type: llm-rubric
+      value: >
+        The response includes a Key Decisions section that explicitly addresses each web finding
+        from the Best-Practice Synthesis by its F-DIM-N ID. Each finding is marked ADOPT,
+        REJECT-with-rationale, or NOT-APPLICABLE. No web finding from the synthesis is silently
+        omitted. The response does not fabricate F-IDs not present in the brief.
+
+- description: "plan-sdlc: pure-refactor with webResearchSignal false has ZERO web/hybrid dimensions (#408 web suppressed)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-web-mode-suppressed.md"
+    user_request: >
+      Run /plan-sdlc. The context shows a pure rename task (greet -> hello) with
+      webResearchSignal: false. The brief shows 3 code dimensions and 0 web/hybrid.
+      Confirm the dimension selection was correct and proceed to Step 2.
+  assert:
+    - type: not-icontains
+      value: "web-only"
+    - type: llm-rubric
+      value: >
+        The response acknowledges that no web or hybrid dimensions were included in the brief
+        because the task is a pure internal rename and webResearchSignal is false. It does not
+        suggest adding web research. Step 2 tasks are derived from the code findings only.
+        No Best-Practice Synthesis section is referenced.
+
+- description: "plan-sdlc: lightweight scope (≤3 files) skips orchestrator; uses inline exploration (#408 lightweight skip)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-lightweight-skip.md"
+    user_request: >
+      Run /plan-sdlc. The context shows explorePack.manifestPath null and scopeHintCount 2.
+      Process Step 1 for the --verbose flag addition task. Show which exploration path is used.
+  assert:
+    - type: not-icontains
+      value: "plan-explore-orchestrator"
+    - type: llm-rubric
+      value: >
+        The response uses inline codebase exploration (Glob, Grep, Read) rather than dispatching
+        sdlc:plan-explore-orchestrator. It explicitly notes that the scope is lightweight (≤3
+        files or manifestPath null) and therefore the orchestrator is skipped. No discovery brief
+        is referenced. No F-DIM-N finding IDs are required in tasks.
+
+- description: "plan-sdlc: orchestrator failure fallback produces plan and logs error to learnings (#408 R28 fallback)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-fallback.md"
+    user_request: >
+      Run /plan-sdlc. The context shows explorePack.error non-null (spawn ENOENT).
+      Process Step 1. Use the R28 fallback path — log the error and continue with inline
+      exploration. The plan must still be produced.
+  assert:
+    - type: icontains
+      value: ".sdlc/learnings/log.md"
+    - type: llm-rubric
+      value: >
+        The response invokes the R28 fallback path: it appends a line to .sdlc/learnings/log.md
+        containing the error string from explorePack.error. It then uses inline codebase
+        exploration (not the orchestrator). The plan is still produced — the error does not block
+        plan creation. No F-DIM-N IDs are required in tasks since no brief was produced.
+
+- description: "plan-sdlc: Step 2 tasks cite F-DIM-N finding IDs from the brief (#408 brief traceability)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-dispatch.md"
+    user_request: >
+      Run /plan-sdlc. The discovery brief has been loaded and contains F-jwt-validation-flow-1,
+      F-middleware-integration-pattern-1, F-session-model-schema-1, and F-jwt-rfc-compliance-1.
+      Write Step 2 task decomposition. Every Standard/Complex task must cite at least one F-ID.
+  assert:
+    - type: icontains
+      value: "F-"
+    - type: llm-rubric
+      value: >
+        Every Standard and Complex task in the response cites at least one F-DIM-N finding ID
+        from the discovery brief (e.g. F-jwt-validation-flow-1, F-middleware-integration-pattern-1).
+        The IDs cited are verbatim from the brief — no invented IDs. Trivial tasks may omit
+        F-IDs. Tasks explicitly marked "out-of-scope addition" with rationale are also acceptable
+        without an F-ID (R27).

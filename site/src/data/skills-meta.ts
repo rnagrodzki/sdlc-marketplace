@@ -29,11 +29,11 @@ export const skillsMeta: SkillMeta[] = [
     command: '/plan-sdlc',
     category: 'planning',
     userInvocable: true,
-    tagline: 'Writes an implementation plan from requirements with per-task complexity, risk, and dependency metadata.',
+    tagline: 'Writes an implementation plan from requirements with per-task complexity, risk, and dependency metadata — dispatches a dynamic-dimension orchestrator for 4+ file scopes to produce a discovery-brief.md with F-DIM-N finding IDs.',
     pipeline: [
       { id: 'requirements', label: 'Gather requirements', type: 'user', description: 'Free-form description, spec file, or clarification questions' },
       { id: 'guardrails', label: 'Load guardrails', type: 'script', description: 'Reads plan guardrails from project config for critique evaluation' },
-      { id: 'explore', label: 'Explore codebase', type: 'script', description: 'Scans project tree, maps files, writes scratchpad' },
+      { id: 'explore', label: 'Explore codebase', type: 'script', description: 'Dispatches dynamic-dimension orchestrator; produces discovery-brief.md with F-DIM-N finding IDs (R24–R28); falls back to inline exploration for ≤3-file scopes or on error' },
       { id: 'decompose', label: 'Decompose tasks', type: 'llm', description: 'Breaks requirements into tasks with complexity/risk metadata' },
       { id: 'critique-plan', label: 'Self-critique plan', type: 'critique', description: 'Reviews for coverage, dependency integrity, scope creep' },
       { id: 'revise-present', label: 'Revise and present', type: 'user', description: 'Fixes critique issues; shows plan for approval' },

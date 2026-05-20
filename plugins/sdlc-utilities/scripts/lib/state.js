@@ -640,6 +640,103 @@ function readTtlDaysFromConfig() {
   return 7;
 }
 
+/**
+ * Garbage-collect stale per-invocation tempdirs created by plan-explore.js.
+ *
+ * Tempdirs follow the naming convention:
+ *   sdlc-explore-<branchSlug>-XXXXXX
+ * where XXXXXX is a random suffix appended by `fs.mkdtempSync`.
+ *
+ * Pruning rule (mirrors gcStateFiles semantics):
+ *   - Dir mtime within TTL → KEEP, reason "ttl-fresh".
+ *   - Dir branch (slug extracted from name) is currently live → KEEP, reason "branch-exists".
+ *   - Dir is older than TTL AND its branch is gone → DELETE (rm -rf), reason "stale+branch-gone".
+ *   - Name doesn't start with prefix → silently skipped.
+ *   - Name matches prefix but slug can't be extracted → KEEP, reason "unparseable-name".
+ *
+ * Note: `parseStateFilename` is NOT used here — tempdirs are not state files.
+ *
+ * @param {object} opts
+ * @param {string}   opts.prefix          directory name prefix, e.g. "sdlc-explore-"
+ * @param {number}   [opts.ttlDays=7]     retention window in days
+ * @param {string[]} opts.knownBranches   current `git branch --list` output (raw branch names)
+ * @param {number}   [opts.now]           current time (ms); defaults to Date.now()
+ * @param {string}   [opts.tmpdir]        override os.tmpdir() for testing
+ * @returns {{ deleted: Array<{dir,branch,mtime,reason}>, kept: Array<{dir,branch,reason}> }}
+ */
+function gcTempdirs({ prefix, ttlDays = 7, knownBranches = [], now, tmpdir } = {}) {
+  const os = require('os');
+  const scanDir = tmpdir || os.tmpdir();
+  const result = { deleted: [], kept: [] };
+
+  if (!prefix) return result;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(scanDir);
+  } catch (_) {
+    return result;
+  }
+
+  const nowMs    = typeof now === 'number' ? now : Date.now();
+  const ttlMs    = ttlDays * 86400000;
+  const liveSlugs = new Set(knownBranches.map(slugifyBranch));
+
+  for (const name of entries) {
+    if (!name.startsWith(prefix)) continue;
+
+    // Extract branchSlug: everything between prefix and the random suffix.
+    // Convention: sdlc-explore-<branchSlug>-XXXXXX
+    // The random suffix from mkdtempSync is 6 alphanumeric chars with no dash.
+    // Split on '-' and drop the last segment (random suffix).
+    const afterPrefix = name.slice(prefix.length);
+    const parts = afterPrefix.split('-');
+    if (parts.length < 2) {
+      // No suffix segment — can't determine branch slug
+      result.kept.push({ dir: name, branch: null, reason: 'unparseable-name' });
+      continue;
+    }
+    const branchSlug = parts.slice(0, -1).join('-');
+
+    const fullPath = path.join(scanDir, name);
+    let stat;
+    try {
+      stat = fs.statSync(fullPath);
+    } catch (_) {
+      continue; // disappeared between readdir and stat
+    }
+
+    if (!stat.isDirectory()) continue;
+
+    const ageMs = nowMs - stat.mtimeMs;
+    const branchExists = liveSlugs.has(branchSlug);
+
+    if (ageMs < ttlMs) {
+      result.kept.push({ dir: name, branch: branchSlug, reason: 'ttl-fresh' });
+      continue;
+    }
+
+    if (branchExists) {
+      result.kept.push({ dir: name, branch: branchSlug, reason: 'branch-exists' });
+      continue;
+    }
+
+    try {
+      fs.rmSync(fullPath, { recursive: true, force: true });
+      result.deleted.push({
+        dir: name,
+        branch: branchSlug,
+        mtime: stat.mtimeMs,
+        reason: 'stale+branch-gone',
+      });
+    } catch (_) {
+      result.kept.push({ dir: name, branch: branchSlug, reason: 'unlink-failed' });
+    }
+  }
+
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
@@ -658,6 +755,7 @@ module.exports = {
   detectResumeState,
   parseStateFilename,
   gcStateFiles,
+  gcTempdirs,
   pruneStateFiles,
   migrateBranchSlug,
   listBranches,

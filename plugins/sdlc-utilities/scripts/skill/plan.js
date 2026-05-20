@@ -25,6 +25,8 @@
 'use strict';
 
 const path = require('node:path');
+const fs   = require('node:fs');
+const { spawnSync } = require('node:child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { detectActiveChanges, validateChange } = require(path.join(LIB, 'openspec'));
@@ -126,11 +128,103 @@ function runMarkMode(markName, markPath) {
 }
 
 // ---------------------------------------------------------------------------
+// plan-explore.js invocation — builds explorePack (R24 / P8–P12)
+// ---------------------------------------------------------------------------
+
+/**
+ * Invoke plan-explore.js via spawnSync, passing the user prompt via stdin.
+ * User prompt comes in on plan.js stdin (piped by SKILL.md; may be empty).
+ * Passing via stdin avoids a new CLI surface and sidesteps argv length limits.
+ *
+ * Returns an explorePack object with five P8–P12 keys:
+ *   { manifestPath, outDir, scopeHintCount, webResearchSignal, error }
+ *
+ * Never throws — on any spawn error the error field is populated and plan.js
+ * continues (R28 fallback is the SKILL.md Step 1 consumer's responsibility).
+ */
+function runExplorePack(fromOpenspec, userPrompt) {
+  const EMPTY_PACK = {
+    manifestPath: null,
+    outDir: null,
+    scopeHintCount: 0,
+    webResearchSignal: false,
+    error: null,
+  };
+
+  // Allow test override via env var (avoids filesystem stubbing for unit tests)
+  const exploreScript = process.env.SDLC_PLAN_EXPLORE_SCRIPT || path.join(__dirname, 'plan-explore.js');
+  if (!fs.existsSync(exploreScript)) {
+    return { ...EMPTY_PACK, error: 'plan-explore.js not found' };
+  }
+
+  const args = ['--output-file'];
+  if (fromOpenspec) {
+    args.push('--from-openspec', fromOpenspec);
+  }
+
+  const result = spawnSync(process.execPath, [exploreScript, ...args], {
+    input: userPrompt || '',
+    encoding: 'utf8',
+    timeout: 30000,
+  });
+
+  if (result.error) {
+    return { ...EMPTY_PACK, error: `plan-explore spawn error: ${result.error.message}` };
+  }
+  if (result.status !== 0) {
+    const errMsg = (result.stderr || '').trim();
+    return { ...EMPTY_PACK, error: `plan-explore exited ${result.status}${errMsg ? ': ' + errMsg : ''}` };
+  }
+
+  const outputFilePath = (result.stdout || '').trim();
+  if (!outputFilePath) {
+    return { ...EMPTY_PACK, error: 'plan-explore produced no output path' };
+  }
+
+  let packData;
+  try {
+    packData = JSON.parse(fs.readFileSync(outputFilePath, 'utf8'));
+    // Clean up the explore output file — we've inlined it into our own output
+    try { fs.unlinkSync(outputFilePath); } catch (_) { /* non-fatal */ }
+  } catch (readErr) {
+    return { ...EMPTY_PACK, error: `plan-explore output read error: ${readErr.message}` };
+  }
+
+  // Validate the five required P8–P12 keys are present
+  const required = ['manifestPath', 'outDir', 'scopeHintCount', 'webResearchSignal', 'error'];
+  for (const key of required) {
+    if (!(key in packData)) {
+      return { ...EMPTY_PACK, error: `plan-explore output missing key: ${key}` };
+    }
+  }
+
+  return {
+    manifestPath: packData.manifestPath,
+    outDir: packData.outDir,
+    scopeHintCount: packData.scopeHintCount,
+    webResearchSignal: packData.webResearchSignal,
+    error: packData.error,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 function main() {
   const { fromOpenspec, markName, markPath } = parseArgs(process.argv);
+
+  // Read user prompt from stdin (piped by SKILL.md). May be empty when
+  // invoked without stdin — e.g. from --mark mode or unit tests.
+  // Passing via stdin avoids a new CLI surface (see Task 5 Key Decision).
+  let userPrompt = '';
+  try {
+    if (!process.stdin.isTTY) {
+      userPrompt = fs.readFileSync('/dev/stdin', 'utf8');
+    }
+  } catch (_) {
+    // Non-fatal — plan-explore will run with empty prompt
+  }
 
   // --mark mode: short-circuit before normal prepare flow
   if (markName !== null) {
@@ -213,11 +307,19 @@ function main() {
     errors.push(`Failed to read plan config: ${err.message}`);
   }
 
-  // 4. Output
+  // 4. plan-explore invocation — gather dynamic-dimension materials (R24 / P8–P12)
+  // Errors absorbed into explorePack.error; never propagated to plan.js errors[] (R28).
+  const explorePack = runExplorePack(fromOpenspec, userPrompt);
+  if (explorePack.error) {
+    process.stderr.write(`[plan-prepare] plan-explore warning: ${explorePack.error}\n`);
+  }
+
+  // 5. Output
   const output = {
     openspec,
     fromOpenspec: fromOpenspecResult,
     guardrails,
+    explorePack,
     errors,
   };
 

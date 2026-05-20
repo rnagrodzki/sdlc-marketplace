@@ -11,6 +11,7 @@ Use this template in plan-sdlc Step 5 (CRITIQUE) when dispatching the plan revie
 - `{PLAN_FILE_PATH}` — path to the written plan document
 - `{REQUIREMENTS_CHECKLIST}` — numbered list from Step 1 (CONSUME)
 - `{SOURCE_REQUIREMENTS}` — file path or inline text of the original spec/requirements (if available)
+- `{BRIEF_FILE}` — absolute path to `discovery-brief.md` produced by `plan-explore-orchestrator`, or `"none — orchestrator skipped"` when the lightweight path or fallback ran
 ```
 Task tool (general-purpose):
   description: "Plan review for <feature name>"
@@ -25,6 +26,7 @@ Task tool (general-purpose):
     **Requirements checklist:**
     {REQUIREMENTS_CHECKLIST}
     **Plan guardrails:** {GUARDRAILS — one per line, or "none configured"}
+    **Discovery brief:** {BRIEF_FILE — absolute path to discovery-brief.md, or "none — orchestrator skipped"}
 
     ## What to Check
 
@@ -43,6 +45,8 @@ Task tool (general-purpose):
     | Decision documentation | Key Decisions section present for plans with 5+ tasks; each rationale references codebase evidence, not preference; no obvious decisions included |
     | Plan completeness | All header fields (Goal, Architecture, Source, Verification) are filled in — no placeholders like "[TBD]"; no leftover working sections (e.g., `## Requirements` scaffolding); task numbering is sequential with no gaps |
     | Guardrail compliance | Each guardrail from the guardrails list above is satisfied by the plan. Error-severity violations are blocking. Warning-severity violations are advisory. If no guardrails configured, skip this check. |
+    | Exploration provenance | When `{BRIEF_FILE}` is provided (not "none"): every Standard/Complex task in the plan cites ≥1 `F-<DIM>-<n>` finding ID OR is marked "out-of-scope addition" with rationale. Trivial tasks exempt. Flag uncited Standard/Complex tasks as a blocking issue (G15). |
+    | Best-practice traceability | When the brief contains a `## Best-Practice Synthesis` section: Key Decisions explicitly ADOPTS / REJECTS-with-rationale / marks NOT-APPLICABLE each web finding by `F-<DIM>-<n>` ID. Silent omission of a web finding is a blocking issue. |
 
     ## Calibration
 
