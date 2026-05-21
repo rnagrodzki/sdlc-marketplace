@@ -12,7 +12,7 @@ Use this skill after an SDLC pipeline failure to analyze the project's hardening
 /harden-sdlc --failure-text "<full failure text>" --skill <caller-name>
 ```
 
-The skill is also opt-in dispatched from `plan-sdlc`, `execute-plan-sdlc`, `review-sdlc`, and `commit-sdlc` failure menus. `ship-sdlc` is intentionally NOT a caller — it delegates failure handling to its sub-skills, so harden-sdlc reaches the user through whichever sub-skill failed.
+The skill is also opt-in dispatched from caller skills (see spec I1 for the canonical list and dispatch contract). `ship-sdlc` is intentionally NOT a caller — it delegates failure handling to its sub-skills, so harden-sdlc reaches the user through whichever sub-skill failed.
 
 ---
 
@@ -159,6 +159,42 @@ Failure → harden classifies → proposes surface edits → user approves → n
 **Proposed change:** harden-sdlc surfaces user-side proposals (tighten the relevant guardrail or dimension) AND an opt-in upstream-report offer (Step 5c), letting the user pick either, both, or neither.
 
 **Outcome:** Normal — not every failure has a clean classification, and dual-routing is intended behavior. The user retains control over which path to take. Approving user-side proposals and filing a plugin issue are not mutually exclusive.
+
+---
+
+### Scenario 5 — Duplicate guardrail — consolidation
+
+**Symptom:** The prepare manifest shows `plan.guardrails[]` already contains `id: "no-bare-cwd"` with description "Avoid bare `process.cwd()` in scripts." A new failure references another `process.cwd()` usage — the orchestrator considers emitting an `add` proposal for a semantically identical guardrail.
+
+**Classification:** `user-code` — an existing guardrail was not enforced or its description needs tightening.
+
+**Proposed change:** Instead of `action: "add"` (which would create a duplicate id), the orchestrator emits `action: "consolidate"` targeting `no-bare-cwd` — tightening the description to cover the new case and optionally raising severity. The proposal `patch` cites the existing guardrail's id.
+
+**Outcome:** `.sdlc/config.json` is updated in-place at the existing guardrail entry (not a new entry added). No duplicate ids. Severity vocabulary per surface: see `lib/dimensions.js` (`VALID_SEVERITIES`, `GUARDRAIL_SEVERITIES`).
+
+---
+
+### Scenario 6 — Invalid existing config — prepare halts
+
+**Symptom:** `.sdlc/config.json` contains a plan guardrail with a malformed id (not kebab-case) or a review-dimension file has missing required frontmatter fields. Running `/harden-sdlc` exits immediately with a non-zero exit code.
+
+**Classification:** Not reached — the prepare script exits before the orchestrator runs.
+
+**Proposed change:** None — the skill halts and prints the structured `errors[]` array listing the file and the specific validation problem. The user must fix the invalid config or dimension file before hardening can proceed.
+
+**Outcome:** `harden-prepare.js` exits 1 and stderr shows `pre-flight validation failed: existing-review-dimension broken.md: <error>`. This prevents the duplication-detection logic from running against a corrupted manifest. Fix the broken file and re-invoke.
+
+---
+
+### Scenario 7 — Review-dimension priority
+
+**Symptom:** A failure has signals across multiple surfaces: a stale plan guardrail AND a gap in review-dimension coverage for a new file type.
+
+**Classification:** `user-code` — both surfaces contributed to the failure reaching production.
+
+**Proposed change:** The orchestrator emits two proposals. The review-dimension proposal appears first in `proposals[]` (R14 ordering), followed by the plan-guardrail proposal. The user sees dimension changes first because they catch drift at review time, before plan execution.
+
+**Outcome:** The user approves the review-dimension proposal first, then the plan-guardrail proposal. Both are written immediately per the per-iteration persistence rule (strengthen-only invariant — see spec R8 / C9). The failure class is now double-covered: review and plan-level.
 
 ---
 

@@ -22,3 +22,26 @@
       value: |
         const m = JSON.parse(output);
         return m.pluginRepoUrl === 'https://github.com/rnagrodzki/sdlc-marketplace'
+
+# R16 pre-flight validation case (issue #416)
+
+- description: "corrupt-existing-dimension-halts-prepare: broken review-dimension frontmatter → exit 1 with structured errors (R16)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/harden-prepare.js"
+    script_args: '--failure-text "test failure" --skill plan-sdlc'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/harden-corrupt-dimension"
+    script_capture_stderr: true
+  assert:
+    # output must contain the errors key (JSON portion) — proves structured error response
+    - type: icontains
+      value: '"errors"'
+      description: "output must include JSON with errors[] key"
+    # stderr must contain the pre-flight failure message (proves exit-1 path fired)
+    - type: icontains
+      value: "pre-flight validation failed"
+      description: "stderr must emit pre-flight validation failed (proves exit-1 code path)"
+    # output must reference the broken dimension file
+    - type: icontains
+      value: "broken.md"
+      description: "errors must mention the corrupt dimension file"

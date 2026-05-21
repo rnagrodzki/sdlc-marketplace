@@ -1,0 +1,15 @@
+{
+  "sdlc": "1.0.0",
+  "plan": {
+    "guardrails": [
+      {
+        "id": "no-bare-cwd",
+        "description": "Avoid bare process.cwd() in scripts.",
+        "severity": "error"
+      }
+    ]
+  },
+  "execute": {
+    "guardrails": []
+  }
+}

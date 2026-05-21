@@ -296,3 +296,86 @@
     # Must NOT silently commit
     - type: not-regex
       value: "(silently.*write|skip.*validation|ignore.*validator)"
+
+# R14–R16 new cases (issue #416)
+
+- description: "duplicate-plan-guardrail-emits-consolidate: existing no-bare-cwd plan guardrail overlaps → orchestrator emits consolidate not add"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-duplicate-plan-guardrail-context.md"
+    user_request: >
+      The project has an existing plan guardrail id=no-bare-cwd. The failure text
+      references another bare process.cwd() usage. Walk through Steps 0–5 of
+      harden-sdlc. What action should the orchestrator use in its proposal for
+      the plan-guardrails surface — and why?
+  assert:
+    # Must use consolidate, not add for the duplicate id
+    - type: regex
+      value: "(consolidate|action.*consolidate)"
+    # Must NOT use add for the same-id guardrail
+    - type: not-regex
+      value: "\"action\":\\s*\"add\""
+    # Must cite the existing guardrail id
+    - type: regex
+      value: "(no-bare-cwd)"
+    # Behavioral check: rationale ties to duplication detection
+    - type: llm-rubric
+      value: >
+        The response explains that the orchestrator detects overlap with the existing
+        no-bare-cwd plan guardrail (either by id match or description overlap per R15)
+        and therefore emits action: "consolidate" rather than action: "add". It
+        explains that consolidate tightens or merges the existing rule — it does NOT
+        create a duplicate guardrail id. The strengthen-only invariant (R8/C9) is
+        preserved — the description is only tightened, severity is not lowered.
+
+- description: "duplicate-execute-guardrail-emits-consolidate: existing no-scope-creep execute guardrail overlaps → consolidate"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-duplicate-execute-guardrail-context.md"
+    user_request: >
+      The project has an existing execute guardrail id=no-scope-creep. The failure
+      text describes an agent adding out-of-scope code during wave execution. What
+      action should the orchestrator emit for the execute-guardrails surface?
+  assert:
+    # Must use consolidate
+    - type: regex
+      value: "(consolidate|action.*consolidate)"
+    # Must target the existing id
+    - type: regex
+      value: "(no-scope-creep)"
+    # Must NOT add a second scope-related guardrail
+    - type: not-regex
+      value: "(action.*add.*scope|new.*scope.*guardrail)"
+    # Behavioral
+    - type: llm-rubric
+      value: >
+        The response explains that the orchestrator detects the existing no-scope-creep
+        execute guardrail overlaps with the failure signal and emits action: "consolidate"
+        targeting no-scope-creep. It does not emit action: "add" for a new scope-related
+        guardrail (which would duplicate the existing one). The proposal tightens the
+        existing guardrail's description to explicitly mention the wave-execution context.
+
+- description: "review-dimension-priority-ordering: review-dimensions proposals appear before plan-guardrails in proposals[] (R14)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-review-dim-priority-context.md"
+    user_request: >
+      The failure has signals for both a missing review-dimension (no YAML config
+      coverage) and a vague plan guardrail (spec-first). The orchestrator proposes
+      both. In what order must the proposals appear in proposals[], and why?
+  assert:
+    # Must state review-dimensions first
+    - type: regex
+      value: "(review-dimensions.*first|first.*review-dimensions|R14|proposals.*review-dimensions.*before)"
+    # Must mention the ordering rule
+    - type: regex
+      value: "(order|ordering|priority|review.dim.*before.*plan)"
+    # Behavioral: ordering explanation
+    - type: llm-rubric
+      value: >
+        The response explains that per R14, review-dimensions proposals must appear
+        first in the proposals[] array, before plan-guardrails. It identifies the
+        YAML config dimension as the review-dimensions proposal and the spec-first
+        guardrail as the plan-guardrails proposal, and states that the YAML dimension
+        proposal must come first regardless of which surface seems more "directly"
+        related to the failure.

@@ -18,10 +18,39 @@ const { readSection } = require('./config');
 const { extractFrontmatter, parseSimpleYaml } = require('./dimensions');
 
 // ---------------------------------------------------------------------------
+// Private helper: resolve a sibling script via in-repo fast path, then peer fallback
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {string} callerDirname  — __dirname of the calling module
+ * @param {string[]} segments     — path segments relative to plugin root (e.g. ['skills','error-report-sdlc','REFERENCE.md'])
+ * @param {object[]} errors       — shared errors array; receives {surface, message} on failure
+ * @param {string} surfaceLabel   — label used in error entry
+ * @returns {string} absolute resolved path, or '' on failure
+ */
+function resolveSibling(callerDirname, segments, errors, surfaceLabel) {
+  // Resolve sibling path: callerDirname is lib/, so ../../ reaches sdlc-utilities/ plugin root.
+  // segments are relative to the plugin root (e.g. ['skills', 'error-report-sdlc', 'REFERENCE.md']).
+  const resolved = path.join(callerDirname, '..', '..', ...segments);
+  if (fs.existsSync(resolved)) return path.resolve(resolved);
+  errors.push({ surface: surfaceLabel, message: `${segments.join('/')} not found at ${resolved}` });
+  return '';
+}
+
+// ---------------------------------------------------------------------------
 // Plan / Execute guardrails — sourced from .sdlc/config.json (issue #231; legacy .claude/sdlc.json read via lib/config.js fallback)
 // ---------------------------------------------------------------------------
 
-function loadGuardrailsSection(projectRoot, sectionName, errors) {
+/**
+ * Load guardrails for the given section ('plan' or 'execute').
+ * Replaces the old loadPlanGuardrails / loadExecuteGuardrails pair (R15 DRY).
+ *
+ * @param {string} projectRoot
+ * @param {string} sectionName — 'plan' | 'execute'
+ * @param {object[]} errors
+ * @returns {{id: string, severity: string, description: string}[]}
+ */
+function loadGuardrails(projectRoot, sectionName, errors) {
   let section;
   try {
     section = readSection(projectRoot, sectionName);
@@ -38,12 +67,43 @@ function loadGuardrailsSection(projectRoot, sectionName, errors) {
   }));
 }
 
-function loadPlanGuardrails(projectRoot, errors) {
-  return loadGuardrailsSection(projectRoot, 'plan', errors);
-}
+// ---------------------------------------------------------------------------
+// Duplication detection helper (R15)
+// ---------------------------------------------------------------------------
 
-function loadExecuteGuardrails(projectRoot, errors) {
-  return loadGuardrailsSection(projectRoot, 'execute', errors);
+/**
+ * Detect id or description overlap between an existing guardrails array and a proposed guardrail.
+ *
+ * @param {{id: string, description: string}[]} existing
+ * @param {{id: string, description: string}} proposed
+ * @returns {{ kind: 'id' | 'description' | null, existingIndex: number }}
+ */
+function findDuplicateGuardrails(existing, proposed) {
+  // 1. Exact id match
+  for (let i = 0; i < existing.length; i++) {
+    if (existing[i].id && existing[i].id === proposed.id) {
+      return { kind: 'id', existingIndex: i };
+    }
+  }
+
+  // 2. Description overlap heuristic:
+  //    shared 5+ char run AND ≥40% Jaccard on whitespace-split tokens (length > 3)
+  const propTokens = new Set(
+    String(proposed.description || '').toLowerCase().split(/\s+/).filter(t => t.length > 3)
+  );
+  for (let i = 0; i < existing.length; i++) {
+    const exTokens = new Set(
+      String(existing[i].description || '').toLowerCase().split(/\s+/).filter(t => t.length > 3)
+    );
+    if (propTokens.size === 0 || exTokens.size === 0) continue;
+    const intersection = [...propTokens].filter(t => exTokens.has(t)).length;
+    const union = new Set([...propTokens, ...exTokens]).size;
+    if (union > 0 && intersection / union >= 0.4) {
+      return { kind: 'description', existingIndex: i };
+    }
+  }
+
+  return { kind: null, existingIndex: -1 };
 }
 
 // ---------------------------------------------------------------------------
@@ -129,35 +189,17 @@ function loadCopilotInstructions(projectRoot, errors) {
 // ---------------------------------------------------------------------------
 
 function resolveErrorReportSkill(projectRoot, errors) {
-  // Primary: in-repo path (fast path when running from a checkout).
-  const inRepo = path.join(
-    projectRoot,
-    'plugins',
-    'sdlc-utilities',
-    'skills',
-    'error-report-sdlc',
-    'REFERENCE.md',
-  );
-  if (fs.existsSync(inRepo)) return inRepo;
-
-  // Fallback: locate via __dirname (lib/) → skill peer.
-  const peer = path.join(
+  return resolveSibling(
     __dirname,
-    '..',
-    '..',
-    'skills',
-    'error-report-sdlc',
-    'REFERENCE.md',
+    ['skills', 'error-report-sdlc', 'REFERENCE.md'],
+    errors,
+    'error-report-skill'
   );
-  if (fs.existsSync(peer)) return path.resolve(peer);
-
-  errors.push({ surface: 'error-report-skill', message: 'REFERENCE.md not found via in-repo or peer path' });
-  return '';
 }
 
 module.exports = {
-  loadPlanGuardrails,
-  loadExecuteGuardrails,
+  loadGuardrails,
+  findDuplicateGuardrails,
   loadReviewDimensions,
   loadCopilotInstructions,
   resolveErrorReportSkill,
