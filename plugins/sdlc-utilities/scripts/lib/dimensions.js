@@ -75,6 +75,10 @@ const GUARDRAIL_SEVERITIES = new Set(['error', 'warning']);
  * - 'plan-guardrails' | 'execute-guardrails' → GUARDRAIL_SEVERITIES
  * - anything else (e.g. 'copilot-instructions') → null
  *
+ * Reserved for programmatic callers (e.g. orchestrator surface-dispatch logic).
+ * Not currently used by any script in this repo — exported intentionally as part
+ * of the R17 severity-vocab API surface.
+ *
  * @param {string} surface
  * @returns {Set<string>|null}
  */

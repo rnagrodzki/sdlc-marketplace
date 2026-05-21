@@ -13,6 +13,7 @@ const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
+const { GUARDRAIL_SEVERITIES } = require(path.join(LIB, 'dimensions'));
 
 /**
  * Parse command-line flags
@@ -112,10 +113,10 @@ function validateGuardrail(guardrail, seenIds) {
     result.status = 'FAIL';
   }
 
-  // Validate severity is valid (optional, defaults to error)
+  // Validate severity is valid (optional, defaults to error) — R17: use GUARDRAIL_SEVERITIES as source of truth
   if (guardrail.severity !== undefined && guardrail.severity !== null) {
-    if (!['error', 'warning'].includes(guardrail.severity)) {
-      errors.push(`severity must be "error", "warning", or undefined (got "${guardrail.severity}")`);
+    if (!GUARDRAIL_SEVERITIES.has(guardrail.severity)) {
+      errors.push(`severity must be ${[...GUARDRAIL_SEVERITIES].map(s => `"${s}"`).join(', ')}, or undefined (got "${guardrail.severity}")`);
       result.status = 'FAIL';
     }
   }
