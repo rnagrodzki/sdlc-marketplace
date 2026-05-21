@@ -246,6 +246,20 @@ Wait for answer.
 - For each OpenSpec task: map to one plan task (or split if > 5 files), add Complexity/Risk/Depends on/Verify metadata, and expand the description to be self-contained for agent dispatch
 - If `tasks.md` is absent (prepare output shows `hasTasks: false`), fall back to standard decomposition from delta specs below
 
+**OpenSpec task annotation (implements R29 — Fixes #414):** When `fromOpenspecDirect` is true AND `openspecContext.tasks[]` is non-null in the prepare output, each plan task derived from one or more OpenSpec tasks MUST carry an `openspec-task:` block beneath its standard metadata fields. Format documented in `./plan-format-reference.md`:
+
+```
+**openspec-task:**
+- change: <change-name>
+- ref: <kebab-slug-6char-hash from openspecContext.tasks[i].ref>
+- line: <openspecContext.tasks[i].line>
+- title: <openspecContext.tasks[i].title>
+```
+
+Plan tasks NOT derived from any OpenSpec task MUST omit the field. N:1 mapping (multiple plan tasks → same `ref`) is allowed when one OpenSpec task expands into several plan tasks — copy the same `change`/`ref`/`line`/`title` quad on each.
+
+**Out-of-scope OpenSpec tasks (implements R30):** When the plan introduces a plan-only task with no OpenSpec source, the plan-author MUST also append (or extend) an `## Out-of-scope OpenSpec tasks` section listing each uncovered OpenSpec task title with a one-line rationale — OR add at least one plan task carrying that `ref`. Every entry from `openspecContext.tasks[]` must be either covered by ≥1 plan task's `openspec-task.ref` OR listed in `## Out-of-scope OpenSpec tasks`. This is enforced by G16 in Step 3.
+
 **Task decomposition rules:**
 - Each task = one independently completable unit with a clear deliverable
 - Each task touches 1–5 files (more than 5 → split)
@@ -318,6 +332,7 @@ Check each quality gate:
 | Dependency target existence | Every "Depends on: Task N" references a task number that exists in the plan |
 | Self-containment test | Pick the most complex task — could an agent implement it using only its description + Key Decisions? If not, the description is incomplete |
 | Guardrail compliance | For each guardrail in `activeGuardrails`: evaluate whether the plan (as written) satisfies its `description`. Report each as PASS or FAIL with a one-line rationale. Guardrails with `severity: "error"` (or no severity, defaulting to error) that FAIL are blocking — they must be fixed in Step 4. Guardrails with `severity: "warning"` that FAIL are advisory — note them but do not block. |
+| OpenSpec tasks.md coverage (G16) | When `fromOpenspecDirect` is true: every entry in `openspecContext.tasks[]` is either (a) referenced by ≥1 plan task's `openspec-task.ref`, or (b) listed in `## Out-of-scope OpenSpec tasks`. Error severity (blocking). |
 
 Note every issue. Do NOT write to the plan file in this step.
 
@@ -342,6 +357,8 @@ SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/pla
 ## Step 4 (IMPROVE): Revise Plan and Present for Approval
 
 Fix all issues from Step 3. Rewrite the plan file with fixes applied (edit the existing file, don't append).
+
+**G16 (OpenSpec tasks.md coverage) failure resolution:** When G16 reports uncovered OpenSpec task entries, resolve each one by EITHER (a) adding a plan task with the missing `openspec-task` block carrying the corresponding `ref`, OR (b) appending the uncovered title under the `## Out-of-scope OpenSpec tasks` section with a one-line rationale. Both paths are valid; choose based on whether the implementation actually covers the work.
 
 If `activeGuardrails` is non-empty, append a `## Guardrail Compliance` section to the plan file listing each guardrail's evaluation result. Error-severity failures must be resolved before presenting to user. When an error-severity failure cannot be resolved by plan revision and blocks the workflow, offer **harden** (run `/harden-sdlc` to analyze why this failed and propose stronger guardrails / dimensions / instructions that would catch it earlier next time — opt-in, no surface is edited without your approval) alongside the user-revision options. When the user selects **harden** (interactive mode only — suppressed when `--auto` is set), dispatch `Skill(harden-sdlc)` with `--failure-text "Plan blocked by error-severity guardrail <id>: <description> — <rationale>"`, `--skill plan-sdlc`, `--step "Step 4 — IMPROVE"`, `--operation "error-severity guardrail block"`. Implements R19. Format:
 

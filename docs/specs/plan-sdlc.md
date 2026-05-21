@@ -44,6 +44,8 @@
 - R26 (Fixes #408 — Discovery brief artifact): The orchestrator writes `discovery-brief.md` to `manifest.outDir/discovery-brief.md` with stable `F-<DIM>-<n>` finding IDs. Code findings format: `F-<DIM>-<n>: file:line — observation`. Web findings format: `F-<DIM>-<n>: <url> — observation (recency, source-type)`. Hybrid findings are tagged `[web-only | verified-in-codebase | conflicts-with-codebase]`. When web/hybrid dimensions ran, the brief includes a `## Best-Practice Synthesis` section.
 - R27 (Fixes #408 — Brief traceability): Step 2 cites brief finding IDs in task descriptions. Standard/Complex tasks each reference ≥1 `F-<DIM>-<n>` ID OR are explicitly marked "out-of-scope addition" with rationale. Trivial tasks are exempt. When web/hybrid dimensions ran, Key Decisions explicitly ADOPTS / REJECTS-with-rationale / marks NOT-APPLICABLE each web finding, citing its ID.
 - R28 (Fixes #408 — Orchestrator-failure fallback): When `explorePack.error` is non-null OR the orchestrator returns non-zero, Step 1 falls back to inline exploration without the brief. Plan is still produced. Failure is logged to `.sdlc/learnings/log.md`.
+- R29 (Fixes #414 — `openspec-task` annotation requirement): When `--from-openspec <name>` is passed AND the change has a `tasks.md`, plan-sdlc MUST annotate every plan task derived from an OpenSpec task with an `openspec-task: { change, ref, line, title }` block. `ref` is a stable kebab-slug-plus-6-char-content-hash identifier of the OpenSpec task title. Plan tasks not derived from any OpenSpec task MUST omit the field. N:1 mapping (multiple plan tasks → same ref) is allowed and intentional. Rationale: #414.
+- R30 (Fixes #414 — tasks.md coverage requirement): When R29 applies, every `- [ ]` line in source tasks.md MUST map to at least one plan task carrying the corresponding `openspec-task.ref`, OR be explicitly listed in a plan section titled `## Out-of-scope OpenSpec tasks` with a one-line rationale per entry. Uncovered tasks with no documented out-of-scope entry are a blocking critique failure (G16).
 - R-config-version (issue #232): The prepare script `skill/plan.js` MUST call `verifyAndMigrate(projectRoot, 'project')` at start. The call is short-circuited when CLI `--skip-config-check` OR env `SDLC_SKIP_CONFIG_CHECK=1` is present; both gates resolve into a single `flags.skipConfigCheck` boolean in the prepare output (CLI > env > default false). On migration failure the prepare emits non-zero exit and an `errors[]` entry naming the failing step; SKILL.md halts with that text verbatim.
   - Acceptance: prepare output includes `flags.skipConfigCheck` and a `migration` block (or null when skipped); SKILL.md gates further work on `errors.length === 0`.
 
@@ -78,6 +80,7 @@
 - G13: Self-containment test — the most complex task can be implemented from its description + Key Decisions alone
 - G14: Guardrail compliance — each guardrail evaluated against the plan; error-severity failures are blocking, warning-severity are advisory
 - G15: Brief citation coverage — when `explorePack.manifestPath` was non-null AND the orchestrator produced a brief, every Standard/Complex task cites ≥1 `F-<DIM>-<n>` finding ID OR is marked "out-of-scope addition" with rationale. Trivial tasks are exempt. Severity: error when brief was produced; not applicable when fallback path ran.
+- G16: OpenSpec tasks.md coverage — when `fromOpenspecDirect` is true: every entry in `openspecContext.tasks[]` is either (a) referenced by ≥1 plan task's `openspec-task.ref`, or (b) listed in `## Out-of-scope OpenSpec tasks`. Error severity (blocking).
 
 ## Prepare Script Contract
 
@@ -93,6 +96,7 @@
 - P10: `explorePack.scopeHintCount` (number) — integer count of files in the scope-hint set assembled by `plan-explore.js` (0 when no git changes and no OpenSpec paths and no keyword matches)
 - P11: `explorePack.error` (string | null) — non-null when `plan-explore.js` failed or returned a non-zero exit; the string contains the error message. Non-null signals the consumer to use the fallback inline-exploration path (R28).
 - P12: `explorePack.webResearchSignal` (boolean) — true when the user prompt matches best-practice phrases or external-technology tokens in `plan-explore.js`'s regex; false otherwise. Consumed by the orchestrator's SCOPE step to determine whether web/hybrid dimensions are required (R25a).
+- P13: `openspecContext.tasks` (array | null) — structured task list parsed from `openspec/changes/<name>/tasks.md` when `--from-openspec` is valid; each entry has `{ ref, line, title, indent }`. Null when `hasTasks` is false.
 
 ## Error Handling
 
@@ -140,3 +144,4 @@
 - I4: OpenSpec — optional spec-driven planning via `--spec` or `--from-openspec`
 - I5: Plan reviewer subagent — cross-model review for plans with 5+ tasks
 - I6: ExitPlanMode — called at handoff when plan mode is active
+- I7: plan-sdlc writes `<!-- ref:<ref> -->` HTML comments to source tasks.md exactly once per line (idempotent, additive). The Markdown rendering of tasks.md is unchanged (HTML comments are invisible).

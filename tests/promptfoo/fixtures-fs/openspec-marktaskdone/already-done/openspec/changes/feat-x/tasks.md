@@ -1,0 +1,2 @@
+- [x] Completed alpha <!-- ref:done-alpha -->
+- [ ] Pending beta <!-- ref:pending-beta -->

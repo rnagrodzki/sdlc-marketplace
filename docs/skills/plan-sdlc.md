@@ -296,6 +296,19 @@ When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this 
 - **Direct bridge (`--from-openspec <name>`):** Validates the named change, loads all artifacts, and uses `tasks.md` as the primary decomposition skeleton. Bypasses the gate check entirely. This is the recommended path when `session-start.js` reports a change at stage `ready-for-plan`.
 - **Functional change routing:** When OpenSpec is detected but neither `--spec` nor `--from-openspec` is passed, the skill classifies the user's request. For functional changes (new features, behavior modifications, API changes), it checks for a matching active OpenSpec change — if found, it auto-loads the spec context. If no match exists, it proposes three options: start the OpenSpec flow with `/opsx:propose`, continue planning directly without specs, or re-invoke with `/plan-sdlc --from-openspec <name>`. Non-functional changes (refactoring, config, docs) receive a passive hint only.
 
+### OpenSpec task annotation and checkbox tracking
+
+When `--from-openspec <name>` is active and `tasks.md` is present, `plan-sdlc` enriches the plan with per-task back-pointers:
+
+- **`openspec-task` block** — each plan task derived from an OpenSpec task carries an `openspec-task: { change, ref, line, title }` block beneath its acceptance criteria. `ref` is a stable identifier: kebab-slug of the title plus a 6-char sha256 suffix. N:1 mapping is allowed (multiple plan tasks → same OpenSpec task).
+- **HTML-comment ref injection** — `plan-sdlc` writes `<!-- ref:<ref> -->` to source `tasks.md` lines (write-once, additive). The annotation is rendered-invisible in Markdown. A second invocation on the same file is a no-op.
+- **`## Out-of-scope OpenSpec tasks`** — when a plan task has no OpenSpec source, the uncovered OpenSpec task title must appear in this optional section with a one-line rationale. Satisfies the G16 coverage gate.
+- **G16 coverage gate** — Step 3 critique blocks plan approval when any `tasks.md` entry is neither covered by a plan task's `openspec-task.ref` nor documented as out-of-scope.
+
+At execute time, `execute-plan-sdlc` reads the `openspec-task` blocks and flips the corresponding `tasks.md` checkboxes from `- [ ]` to `- [x]` as each wave completes. See [`/execute-plan-sdlc` docs](execute-plan-sdlc.md) for details.
+
+For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R29, R30, G16.
+
 See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
 
 ---

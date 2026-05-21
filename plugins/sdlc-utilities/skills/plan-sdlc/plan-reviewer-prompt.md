@@ -12,6 +12,7 @@ Use this template in plan-sdlc Step 5 (CRITIQUE) when dispatching the plan revie
 - `{REQUIREMENTS_CHECKLIST}` — numbered list from Step 1 (CONSUME)
 - `{SOURCE_REQUIREMENTS}` — file path or inline text of the original spec/requirements (if available)
 - `{BRIEF_FILE}` — absolute path to `discovery-brief.md` produced by `plan-explore-orchestrator`, or `"none — orchestrator skipped"` when the lightweight path or fallback ran
+- `{OPENSPEC_TASKS}` — serialized JSON array from `openspecContext.tasks[]` when `--from-openspec` was active; `"none — plan not from OpenSpec"` otherwise
 ```
 Task tool (general-purpose):
   description: "Plan review for <feature name>"
@@ -27,6 +28,7 @@ Task tool (general-purpose):
     {REQUIREMENTS_CHECKLIST}
     **Plan guardrails:** {GUARDRAILS — one per line, or "none configured"}
     **Discovery brief:** {BRIEF_FILE — absolute path to discovery-brief.md, or "none — orchestrator skipped"}
+    **openspecContext.tasks:** {OPENSPEC_TASKS — serialized JSON array from prepare output, or "none — plan not from OpenSpec"}
 
     ## What to Check
 
@@ -47,6 +49,7 @@ Task tool (general-purpose):
     | Guardrail compliance | Each guardrail from the guardrails list above is satisfied by the plan. Error-severity violations are blocking. Warning-severity violations are advisory. If no guardrails configured, skip this check. |
     | Exploration provenance | When `{BRIEF_FILE}` is provided (not "none"): every Standard/Complex task in the plan cites ≥1 `F-<DIM>-<n>` finding ID OR is marked "out-of-scope addition" with rationale. Trivial tasks exempt. Flag uncited Standard/Complex tasks as a blocking issue (G15). |
     | Best-practice traceability | When the brief contains a `## Best-Practice Synthesis` section: Key Decisions explicitly ADOPTS / REJECTS-with-rationale / marks NOT-APPLICABLE each web finding by `F-<DIM>-<n>` ID. Silent omission of a web finding is a blocking issue. |
+    | **OpenSpec tasks.md coverage (G16)** | When the plan was generated with `--from-openspec` AND `openspecContext.tasks[]` is provided in the input data: every entry in `openspecContext.tasks[]` is either (a) referenced by ≥1 plan task's `openspec-task.ref`, OR (b) listed in `## Out-of-scope OpenSpec tasks`. Each `openspec-task` block must have all four fields (`change`, `ref`, `line`, `title`) populated. Flag any uncovered task (not referenced AND not out-of-scope) as a blocking issue (G16). When the plan was NOT generated from OpenSpec (no `openspecContext.tasks` in the input), skip this check entirely. |
 
     ## Calibration
 

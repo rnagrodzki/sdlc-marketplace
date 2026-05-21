@@ -29,7 +29,7 @@ const fs   = require('node:fs');
 const { spawnSync } = require('node:child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { detectActiveChanges, validateChange } = require(path.join(LIB, 'openspec'));
+const { detectActiveChanges, validateChange, parseTasks } = require(path.join(LIB, 'openspec'));
 const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
@@ -273,6 +273,7 @@ function main() {
 
   // 2. --from-openspec validation
   let fromOpenspecResult = null;
+  let openspecContext = { tasks: null, tasksUpdated: 0 };
   if (fromOpenspec) {
     const validation = validateChange(projectRoot, fromOpenspec);
     fromOpenspecResult = {
@@ -292,6 +293,35 @@ function main() {
         if (!err.startsWith('Warning:')) {
           errors.push(err);
         }
+      }
+    }
+
+    // 2a. Parse tasks.md, populate openspecContext.tasks (P13), inject ref comments (I7).
+    // Idempotent + additive: existing <!-- ref: --> comments are left untouched.
+    if (validation.valid && validation.hasTasks) {
+      const tasksPath = path.join(projectRoot, 'openspec', 'changes', fromOpenspec, 'tasks.md');
+      try {
+        const original = fs.readFileSync(tasksPath, 'utf8');
+        const parsed = parseTasks(original);
+        openspecContext.tasks = parsed;
+
+        // Inject <!-- ref:<ref> --> on `- [ ]` or `- [x]` lines without an existing ref comment.
+        const lines = original.split('\n');
+        let updated = 0;
+        for (const entry of parsed) {
+          const idx = entry.line - 1;
+          if (idx < 0 || idx >= lines.length) continue;
+          if (/<!--\s*ref:/.test(lines[idx])) continue; // write-once
+          lines[idx] = lines[idx].replace(/\s*$/, '') + ` <!-- ref:${entry.ref} -->`;
+          updated++;
+        }
+        if (updated > 0) {
+          fs.writeFileSync(tasksPath, lines.join('\n'), 'utf8');
+        }
+        openspecContext.tasksUpdated = updated;
+      } catch (err) {
+        // Surface as warning but do not block prepare.
+        process.stderr.write(`[plan-prepare] tasks.md ref injection warning: ${err.message}\n`);
       }
     }
   }
@@ -318,6 +348,7 @@ function main() {
   const output = {
     openspec,
     fromOpenspec: fromOpenspecResult,
+    openspecContext,
     guardrails,
     explorePack,
     errors,

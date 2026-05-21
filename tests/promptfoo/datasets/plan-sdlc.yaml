@@ -405,3 +405,64 @@
         The IDs cited are verbatim from the brief — no invented IDs. Trivial tasks may omit
         F-IDs. Tasks explicitly marked "out-of-scope addition" with rationale are also acceptable
         without an F-ID (R27).
+
+- description: "plan-sdlc: Step 2 emits openspec-task blocks when --from-openspec is active (R29, #414)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-with-tasks.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. The prepare output shows
+      fromOpenspecDirect: true and openspecContext.tasks[] with 5 entries. Execute Step 2
+      task decomposition. Each plan task derived from an OpenSpec task must carry an
+      openspec-task block with change, ref, line, and title fields.
+  assert:
+    - type: icontains
+      value: "openspec-task:"
+    - type: icontains
+      value: "change: add-resource-indicators"
+    - type: icontains
+      value: "ref:"
+    - type: llm-rubric
+      value: >
+        Every plan task derived from an OpenSpec task carries an openspec-task block with
+        four fields: change (add-resource-indicators), ref (kebab-slug-6char-hash format),
+        line (integer), and title (verbatim OpenSpec task title). Plan tasks that introduce
+        new implementation work not in tasks.md either omit the openspec-task block or carry
+        a matching ref. The openspec-task block appears beneath the acceptance criteria.
+
+- description: "plan-sdlc: Step 3 G16 gate blocks plan when OpenSpec task has no coverage (R30, G16, #414)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-with-tasks.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. The plan has been written but
+      one OpenSpec task ("Create IndicatorCache with TTL support") has no corresponding plan
+      task with openspec-task.ref = "create-indicatorcache-with-ttl-support-cd56ef" AND is not
+      listed in ## Out-of-scope OpenSpec tasks. Evaluate Step 3 G16 quality gate.
+  assert:
+    - type: icontains
+      value: "G16"
+    - type: llm-rubric
+      value: >
+        The response evaluates the G16 coverage gate and identifies "Create IndicatorCache
+        with TTL support" as uncovered (not referenced by any plan task's openspec-task.ref
+        and not in ## Out-of-scope OpenSpec tasks). G16 is an error-severity gate, so the
+        plan is BLOCKED. The response describes both resolution paths: (a) add a plan task
+        with the missing openspec-task block, or (b) add the title to ## Out-of-scope OpenSpec
+        tasks with a one-line rationale.
+
+- description: "plan-sdlc: Out-of-scope section satisfies G16 for uncovered OpenSpec tasks (R30, #414)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-with-tasks.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. The plan has been written and
+      includes an ## Out-of-scope OpenSpec tasks section listing "Add unit tests for all new
+      code — covered by individual task acceptance criteria". Evaluate Step 3 G16 gate for
+      this plan.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response evaluates G16 and finds it SATISFIED: "Add unit tests for all new code"
+        is listed in ## Out-of-scope OpenSpec tasks with a one-line rationale. G16 does not
+        block. The response does not flag this as a problem and proceeds past the coverage gate.

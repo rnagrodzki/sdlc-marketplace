@@ -29,7 +29,7 @@ export const skillsMeta: SkillMeta[] = [
     command: '/plan-sdlc',
     category: 'planning',
     userInvocable: true,
-    tagline: 'Decomposes requirements into classified tasks; dispatches a dynamic-dimension orchestrator for 4+ file scopes.',
+    tagline: 'Decomposes requirements into classified tasks; dispatches a dynamic-dimension orchestrator for 4+ file scopes; annotates OpenSpec tasks.md with per-task back-pointers when `--from-openspec` is active.',
     pipeline: [
       { id: 'requirements', label: 'Gather requirements', type: 'user', description: 'Free-form description, spec file, or clarification questions' },
       { id: 'guardrails', label: 'Load guardrails', type: 'script', description: 'Reads plan guardrails from project config for critique evaluation' },
@@ -53,7 +53,7 @@ export const skillsMeta: SkillMeta[] = [
     command: '/execute-plan-sdlc',
     category: 'planning',
     userInvocable: true,
-    tagline: 'Orchestrates wave-based parallel plan execution with critique loops, spec compliance review, and automatic error recovery.',
+    tagline: 'Orchestrates wave-based parallel plan execution with critique loops, spec compliance review, and automatic error recovery; flips OpenSpec tasks.md checkboxes in real time as waves complete.',
     pipeline: [
       { id: 'load-plan', label: 'Load and validate plan', type: 'script', description: 'Reads plan from context or file; validates structure' },
       { id: 'classify', label: 'Classify tasks and build waves', type: 'llm', description: 'Assigns complexity, risk, model; builds dependency waves' },

@@ -47,6 +47,8 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
 
 **OpenSpec context loading (optional):** After the plan is loaded, check the plan header's `**Source:**` field. If it points to an `openspec/changes/<name>/` path, Read all markdown files matching `openspec/changes/<name>/specs/*.md` (the delta specs). Store these as `openspecSpecs` for use in Step 5c-bis. If the path does not exist or yields no files, proceed without OpenSpec context — this is not a blocking error.
 
+**OpenSpec task-flip map (implements R37 — Fixes #414):** When parsing the plan, for each task that includes an `openspec-task:` block, capture `{ taskId, change, ref, line, title }` into an in-memory `openspecTaskMap`. Derive the inverse `refToTaskIds: Map<ref, Set<taskId>>` in a single pass and seed an empty `flippedRefs: Set<ref>` (refs already flipped this run — prevents redundant calls and powers idempotent `--resume`). When the plan has no `openspec-task` blocks, all three structures are empty and Step 5d's new behavior is a no-op. The change name is consistent across blocks (it is the same OpenSpec change); the `change` field on each block is what is passed to `markTaskDone`.
+
 **Hook context fast-path:** If the session-start system-reminder contains an `Active execution:` line, note the state file details. When the user does not pass `--resume` explicitly but the hook reported an active execution, use this to inform the resume prompt — skip the filesystem scan since the hook already found the state file. The hook context is a session-start snapshot.
 
 **Guardrail loading:** Load execution guardrails from project config:
@@ -539,6 +541,33 @@ The `state/execute.js` CLI surface is unchanged — only the SKILL.md call-site 
 
 On successful completion: `node "$STATE_SCRIPT" cleanup`
 
+**OpenSpec task flip (implements R37, R39, I13, E14 — Fixes #414).** After `task-done` state writes for this wave, before the `wave-done` state write, flip OpenSpec checkboxes for refs whose plan-task siblings have all reached DONE / DONE_WITH_CONCERNS. This step runs in execute-plan-sdlc main context ONLY — never from inside the wave-runner Agent or per-task sub-agents (cite R37). When `refToTaskIds` is empty (plan has no `openspec-task` blocks), skip this step entirely (zero new behavior).
+
+Algorithm:
+
+1. Build `completedOpenspecTaskIds`: the cumulative set of plan-task IDs (across all waves so far) whose `status` in the state file is `completed`. Source this from `state/execute.js read` output so it survives `--resume` — do NOT cache in conversation memory only.
+2. For each `(ref, siblings)` in `refToTaskIds`:
+   - Skip if `ref` ∈ `flippedRefs` (already attempted this run — idempotent).
+   - Skip if `siblings` is NOT a subset of `completedOpenspecTaskIds` (at least one sibling is still pending, failed, or blocked — leaves the OpenSpec checkbox `- [ ]` per R37).
+   - Otherwise, look up the `openspec-task` block for any one sibling (all siblings share `change`/`ref`/`line`/`title`) and call `markTaskDone(change, ref, { line, title })` via inline Node.js:
+
+     ```bash
+     LIB=$(find ~/.claude/plugins -name "openspec.js" -path "*/sdlc*/scripts/lib/openspec.js" 2>/dev/null | sort -V | tail -1)
+     [ -z "$LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/openspec.js" ] && LIB="plugins/sdlc-utilities/scripts/lib/openspec.js"
+     node -e "
+     const { markTaskDone } = require('$LIB');
+     const r = markTaskDone('<change>', '<ref>', { line: <line>, title: <JSON.stringified title> });
+     console.log(JSON.stringify(r));
+     "
+     ```
+   - Add `ref` to `flippedRefs` regardless of the outcome (single-fire per run; idempotency in `markTaskDone` handles a future `--resume`).
+   - Interpret the result:
+     - `{ changed: true }` — no action.
+     - `{ changed: false, reason: 'already-done' }` — no action; OpenSpec already showed it as done (e.g., resumed run, user manual edit).
+     - `{ changed: false, reason: 'not-found' }` or `{ changed: false, reason: 'io-error' }` — append to `.sdlc/learnings/log.md` (one line: `## <YYYY-MM-DD> — execute-plan-sdlc markTaskDone failed: change=<change> ref=<ref> reason=<reason>`) and add `{ change, ref, reason }` to an in-memory `openspecSyncWarnings` array surfaced by Step 9 REPORT. Pipeline continues — this is non-blocking per R39/E14.
+
+Wave abort on `markTaskDone` failure is FORBIDDEN.
+
 **Progress signal — wave complete (mandatory, always last).** After state persistence, update TodoWrite:
 - Mark this wave's tasks as `completed`.
 
@@ -656,6 +685,14 @@ If `openspecSpecs` was loaded in Step 1, append to the report:
 ```
 OpenSpec:         openspec/changes/<name>/ — run /opsx:verify to validate
 ```
+
+**OpenSpec sync warnings (implements R39 — Fixes #414):** When `openspecSyncWarnings` (populated by Step 5d's `markTaskDone` failure handler) is non-empty, append:
+```
+OpenSpec sync warnings:
+  - change=<change> ref=<ref> reason=<not-found|io-error>
+  - ...
+```
+When the array is empty (the happy path), omit the section entirely.
 
 **Branch/worktree emission (R31, fixes #378, #379):** When `EXECUTE_NEW_BRANCH` is set (either from `--branch` flag or from Step 1 self-creation), append to the report:
 ```
@@ -792,11 +829,24 @@ If `openspecSpecs` was loaded in Step 1 (the plan was OpenSpec-sourced), also su
 3. **If `cliAvailable === false`:** emit the existing static advisory (no fabricated validation claim):
    - `/opsx:verify` — validate implementation completeness against the spec
    - `/opsx:archive` — merge delta specs into main specs after verification passes
-4. **If `ok === true`:** emit a validated suggestion:
-   ```
-   OpenSpec validation passed for change "<name>".
-   → Run `openspec archive <name> --yes` to archive, or use `/ship-sdlc` which handles archival as a pipeline step.
-   ```
+4. **If `ok === true`:** apply the tasks.md coverage gate (implements R38 — Fixes #414) before emitting the suggestion:
+   - Re-parse `openspec/changes/<name>/tasks.md` via `lib/openspec.js::parseTasks`. Build `unflippedTitles` from entries where `done === false`.
+   - Parse the plan file's `## Out-of-scope OpenSpec tasks` section (a flat bullet list of `- <title> — <rationale>` items) into `outOfScopeTitles: Set<string>` (case-sensitive title match).
+   - Compute `undocumentedUnflipped = unflippedTitles.filter(t => !outOfScopeTitles.has(t))`.
+   - If `undocumentedUnflipped.length === 0`: emit the validated suggestion as before:
+     ```
+     OpenSpec validation passed for change "<name>".
+     → Run `openspec archive <name> --yes` to archive, or use `/ship-sdlc` which handles archival as a pipeline step.
+     ```
+   - If `undocumentedUnflipped.length > 0`: SUPPRESS the archive suggestion (R38) and emit the diagnostic listing — derived from `refToTaskIds` (built in Step 1):
+     ```
+     OpenSpec tasks incomplete — archive suggestion suppressed.
+     Unflipped tasks (not in `## Out-of-scope OpenSpec tasks`):
+       line <N>: <title> — expected from plan task(s) <id>...
+       ...
+     Fix the underlying plan-task failures or add these titles to `## Out-of-scope OpenSpec tasks` and re-run.
+     ```
+     When a title's `ref` is not in `refToTaskIds` at all, render `(no plan task carries this ref)` in place of the plan-task ID list. This skill MUST NOT call `lib/openspec.js::runArchive` — archival is deferred (preserves R23 "execute only" boundary).
 5. **If `ok === false`:** emit the validation errors and suppress the archive suggestion:
    ```
    OpenSpec validation failed for change "<name>":

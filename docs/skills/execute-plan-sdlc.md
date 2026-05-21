@@ -371,6 +371,18 @@ When executing a plan whose `**Source:**` header points to an OpenSpec change pa
 - **Inter-wave critique** checks for contradictions between implementations and delta spec requirements not captured in task descriptions
 - **Post-pipeline archive suggestion** — after all waves complete, if the plan was OpenSpec-sourced and `openspec validate <name> --strict` passes, emits a suggestion to archive via `openspec archive <name> --yes` or `/ship-sdlc`. If validation fails, surfaces errors instead. If the CLI is not available, falls back to the existing advisory. The suggestion is never auto-executed.
 
+### Per-task checkbox flipping
+
+When executing a plan produced by `plan-sdlc --from-openspec <name>`, this skill tracks OpenSpec checkbox state in real time:
+
+- **Per-task flipping** — after each wave's `WAVE_SUMMARY` is parsed, every completed task (DONE or DONE_WITH_CONCERNS) whose plan entry carries an `openspec-task` block triggers a `markTaskDone` call. The corresponding `- [ ]` line in `openspec/changes/<name>/tasks.md` flips to `- [x]` immediately.
+- **N:1 last-sibling semantics** — when multiple plan tasks share the same `openspec-task.ref`, the flip fires only after the LAST sibling reaches a success status. A FAILED or BLOCKED sibling leaves the checkbox `- [ ]`, preserving honest intermediate state.
+- **`markTaskDone` is non-blocking** — if the ref is missing or the file is unreadable, the pipeline continues. The failure is logged to `.sdlc/learnings/log.md` and surfaced in the Step 9 REPORT under `OpenSpec sync warnings:`.
+- **Archive suggestion gate** — after all waves complete, if any `- [ ]` task in `tasks.md` is NOT documented in the plan's `## Out-of-scope OpenSpec tasks` section, the archive suggestion is suppressed. A diagnostic lists each unflipped task with the expected plan-task ID(s). When all unflipped entries are documented as out-of-scope (or none remain), the suggestion fires as usual.
+- **`--resume` safe** — `markTaskDone` is idempotent; replaying against an already-flipped line is a no-op.
+
+For spec definitions: [docs/specs/execute-plan-sdlc.md](../specs/execute-plan-sdlc.md) — R37, R38, R39.
+
 See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
 
 ## Guardrail Enforcement
