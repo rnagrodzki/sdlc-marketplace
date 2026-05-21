@@ -541,7 +541,7 @@ The `state/execute.js` CLI surface is unchanged — only the SKILL.md call-site 
 
 On successful completion: `node "$STATE_SCRIPT" cleanup`
 
-**OpenSpec task flip (implements R37, R39, I13, E14 — Fixes #414).** After `task-done` state writes for this wave, before the `wave-done` state write, flip OpenSpec checkboxes for refs whose plan-task siblings have all reached DONE / DONE_WITH_CONCERNS. This step runs in execute-plan-sdlc main context ONLY — never from inside the wave-runner Agent or per-task sub-agents (cite R37). When `refToTaskIds` is empty (plan has no `openspec-task` blocks), skip this step entirely (zero new behavior).
+**5d-bis — OpenSpec task flip (implements R37, R39, I13, E14 — Fixes #414).** After `task-done` state writes for this wave, before the `wave-done` state write, flip OpenSpec checkboxes for refs whose plan-task siblings have all reached DONE / DONE_WITH_CONCERNS. This step runs in execute-plan-sdlc main context ONLY — never from inside the wave-runner Agent or per-task sub-agents (cite R37). When `refToTaskIds` is empty (plan has no `openspec-task` blocks), skip this step entirely (zero new behavior).
 
 Algorithm:
 
@@ -554,9 +554,18 @@ Algorithm:
      ```bash
      LIB=$(find ~/.claude/plugins -name "openspec.js" -path "*/sdlc*/scripts/lib/openspec.js" 2>/dev/null | sort -V | tail -1)
      [ -z "$LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/openspec.js" ] && LIB="plugins/sdlc-utilities/scripts/lib/openspec.js"
+     [ -z "$LIB" ] && { echo "ERROR: Could not locate openspec.js. Is the sdlc plugin installed?" >&2; exit 2; }
+     # Pass arguments as env vars to avoid shell injection from LLM-generated task titles
+     # (titles may contain ", `, $(...), or newlines that would break inline interpolation).
+     OPENSPEC_LIB="$LIB" \
+     OPENSPEC_CHANGE='<change>' \
+     OPENSPEC_REF='<ref>' \
+     OPENSPEC_LINE='<line>' \
+     OPENSPEC_TITLE='<title>' \
      node -e "
-     const { markTaskDone } = require('$LIB');
-     const r = markTaskDone('<change>', '<ref>', { line: <line>, title: <JSON.stringified title> });
+     const { markTaskDone } = require(process.env.OPENSPEC_LIB);
+     const line = process.env.OPENSPEC_LINE ? Number(process.env.OPENSPEC_LINE) : undefined;
+     const r = markTaskDone(process.env.OPENSPEC_CHANGE, process.env.OPENSPEC_REF, { line, title: process.env.OPENSPEC_TITLE });
      console.log(JSON.stringify(r));
      "
      ```
@@ -830,7 +839,23 @@ If `openspecSpecs` was loaded in Step 1 (the plan was OpenSpec-sourced), also su
    - `/opsx:verify` — validate implementation completeness against the spec
    - `/opsx:archive` — merge delta specs into main specs after verification passes
 4. **If `ok === true`:** apply the tasks.md coverage gate (implements R38 — Fixes #414) before emitting the suggestion:
-   - Re-parse `openspec/changes/<name>/tasks.md` via `lib/openspec.js::parseTasks`. Build `unflippedTitles` from entries where `done === false`.
+   - Re-parse `openspec/changes/<name>/tasks.md` via `lib/openspec.js::parseTasks` using the same `$LIB` resolution + failure-guard + env-var contract as the `markTaskDone` block in Step 5d-bis:
+
+     ```bash
+     LIB=$(find ~/.claude/plugins -name "openspec.js" -path "*/sdlc*/scripts/lib/openspec.js" 2>/dev/null | sort -V | tail -1)
+     [ -z "$LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/openspec.js" ] && LIB="plugins/sdlc-utilities/scripts/lib/openspec.js"
+     [ -z "$LIB" ] && { echo "ERROR: Could not locate openspec.js. Is the sdlc plugin installed?" >&2; exit 2; }
+     OPENSPEC_LIB="$LIB" \
+     OPENSPEC_TASKS_PATH="openspec/changes/<name>/tasks.md" \
+     node -e "
+     const fs = require('fs');
+     const { parseTasks } = require(process.env.OPENSPEC_LIB);
+     const content = fs.readFileSync(process.env.OPENSPEC_TASKS_PATH, 'utf8');
+     console.log(JSON.stringify(parseTasks(content)));
+     "
+     ```
+
+     Build `unflippedTitles` from entries where `done === false`.
    - Parse the plan file's `## Out-of-scope OpenSpec tasks` section (a flat bullet list of `- <title> — <rationale>` items) into `outOfScopeTitles: Set<string>` (case-sensitive title match).
    - Compute `undocumentedUnflipped = unflippedTitles.filter(t => !outOfScopeTitles.has(t))`.
    - If `undocumentedUnflipped.length === 0`: emit the validated suggestion as before:

@@ -298,7 +298,19 @@ function main() {
 
     // 2a. Parse tasks.md, populate openspecContext.tasks (P13), inject ref comments (I7).
     // Idempotent + additive: existing <!-- ref: --> comments are left untouched.
-    if (validation.valid && validation.hasTasks) {
+    // Path-traversal guard: fromOpenspec is caller-supplied (CLI/argv) and is interpolated
+    // into a filesystem path. Reject empty, separator, or parent-ref components so the
+    // resulting path cannot escape openspec/changes/<fromOpenspec>/.
+    if (
+      validation.valid &&
+      validation.hasTasks &&
+      typeof fromOpenspec === 'string' &&
+      fromOpenspec.length > 0 &&
+      !fromOpenspec.includes('/') &&
+      !fromOpenspec.includes('\\') &&
+      !fromOpenspec.includes('..') &&
+      !fromOpenspec.includes('\0')
+    ) {
       const tasksPath = path.join(projectRoot, 'openspec', 'changes', fromOpenspec, 'tasks.md');
       try {
         const original = fs.readFileSync(tasksPath, 'utf8');

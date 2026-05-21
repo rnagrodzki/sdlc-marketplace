@@ -435,6 +435,19 @@ function parseTasks(content) {
  * @returns {{ changed: boolean, reason: 'already-done'|'not-found'|'io-error'|null, line: number|null }}
  */
 function markTaskDone(changeName, taskRef, opts = {}, env = {}) {
+  // Path-traversal guard: changeName is caller-supplied (LLM/CLI) and is interpolated
+  // into a filesystem path. Reject empty, separator, or parent-ref components so the
+  // resulting path cannot escape openspec/changes/<changeName>/.
+  if (
+    !changeName ||
+    typeof changeName !== 'string' ||
+    changeName.includes('/') ||
+    changeName.includes('\\') ||
+    changeName.includes('..') ||
+    changeName.includes('\0')
+  ) {
+    return { changed: false, reason: 'io-error', line: null };
+  }
   const projectRoot = env && env.projectRoot ? env.projectRoot : process.cwd();
   const tasksPath = path.join(projectRoot, 'openspec', 'changes', changeName, 'tasks.md');
 
