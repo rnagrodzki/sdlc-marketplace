@@ -4,13 +4,15 @@
  * Zero external dependencies — Node.js built-ins only (+ lib/git.js).
  *
  * Exports:
- *   detectActiveChanges, validateChange, STAGE_LABELS
+ *   detectActiveChanges, validateChange, validateChangeStrict, isArchived,
+ *   runArchive, parseTasks, markTaskDone, STAGE_LABELS
  */
 
 'use strict';
 
-const fs   = require('fs');
-const path = require('path');
+const fs     = require('fs');
+const path   = require('path');
+const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 
 // ---------------------------------------------------------------------------
@@ -349,6 +351,186 @@ function runArchive(projectRoot, changeName, { yes = true } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Task-level parsing and mutation (R29/R37 — Fixes #414)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute a stable, deterministic reference identifier for an OpenSpec task title.
+ * Format: kebab-slug(title) + '-' + first 6 chars of sha256(title).
+ * Slug rules: lowercase, non-alnum→'-', collapse '--+'→'-', trim leading/trailing
+ * '-', cap at 40 chars. Same title → same ref across invocations.
+ * @param {string} title
+ * @returns {string}
+ */
+function computeRef(title) {
+  const slug = String(title)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40)
+    .replace(/-$/, '');
+  const hash = crypto.createHash('sha256').update(String(title)).digest('hex').slice(0, 6);
+  return `${slug}-${hash}`;
+}
+
+/**
+ * Extract the value inside an inline `<!-- ref:<id> -->` HTML comment on a line.
+ * Returns the ref string or null if no such comment is present.
+ * @param {string} line
+ * @returns {string|null}
+ */
+function extractInlineRef(line) {
+  const m = /<!--\s*ref:([^\s]+?)\s*-->/.exec(line);
+  return m ? m[1] : null;
+}
+
+/**
+ * Parse a tasks.md content blob into structured task entries.
+ *
+ * The override-via-comment semantics: when a line carries `<!-- ref:<id> -->`,
+ * the comment value OVERRIDES the computed hash. This preserves the historical
+ * mapping after a task is reworded (the hash would otherwise drift).
+ *
+ * @param {string} content  Raw string content of tasks.md
+ * @returns {Array<{ ref: string, line: number, title: string, indent: number, done: boolean }>}
+ */
+function parseTasks(content) {
+  const lines = String(content == null ? '' : content).split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const m = /^([ \t]*)- \[([ xX])\] (.*)$/.exec(raw);
+    if (!m) continue;
+    const indent = m[1].length;
+    const done = m[2].toLowerCase() === 'x';
+    // Strip any inline HTML comments from the visible title.
+    const rawAfterBox = m[3];
+    const inlineRef = extractInlineRef(rawAfterBox);
+    const title = rawAfterBox.replace(/\s*<!--[\s\S]*?-->\s*$/g, '').trim();
+    const ref = inlineRef || computeRef(title);
+    out.push({ ref, line: i + 1, title, indent, done });
+  }
+  return out;
+}
+
+/**
+ * Mark an OpenSpec task as done. Pure-IO, idempotent, never throws.
+ *
+ * Resolution priority:
+ *   1. Line ending with `<!-- ref:<taskRef> -->` HTML comment.
+ *   2. (fallback) 1-indexed `line` if provided AND that line text starts with `- [ ] <title>`.
+ *   3. (fallback) First `- [ ] <title>` exact title match.
+ *
+ * Return shape: { changed, reason, line }
+ *   - { changed: true,  reason: null,           line: N }    — line flipped
+ *   - { changed: false, reason: 'already-done', line: N }    — resolved and already [x]
+ *   - { changed: false, reason: 'not-found',    line: null } — no resolution path matched
+ *   - { changed: false, reason: 'io-error',     line: null } — read/write failed
+ *
+ * @param {string} changeName
+ * @param {string} taskRef
+ * @param {{ line?: number, title?: string }} [opts]
+ * @param {{ projectRoot?: string }} [env]
+ * @returns {{ changed: boolean, reason: 'already-done'|'not-found'|'io-error'|null, line: number|null }}
+ */
+function markTaskDone(changeName, taskRef, opts = {}, env = {}) {
+  // Path-traversal guard: changeName is caller-supplied (LLM/CLI) and is interpolated
+  // into a filesystem path. Reject empty, separator, or parent-ref components so the
+  // resulting path cannot escape openspec/changes/<changeName>/.
+  if (
+    !changeName ||
+    typeof changeName !== 'string' ||
+    changeName.includes('/') ||
+    changeName.includes('\\') ||
+    changeName.includes('..') ||
+    changeName.includes('\0')
+  ) {
+    return { changed: false, reason: 'io-error', line: null };
+  }
+  const projectRoot = env && env.projectRoot ? env.projectRoot : process.cwd();
+  const tasksPath = path.join(projectRoot, 'openspec', 'changes', changeName, 'tasks.md');
+
+  let content;
+  try {
+    content = fs.readFileSync(tasksPath, 'utf8');
+  } catch (_) {
+    return { changed: false, reason: 'io-error', line: null };
+  }
+
+  const lines = content.split('\n');
+  const optLine = typeof opts.line === 'number' ? opts.line : null;
+  const optTitle = typeof opts.title === 'string' ? opts.title : null;
+
+  let resolvedIdx = -1; // 0-indexed
+  let alreadyDone = false;
+
+  // Priority 1: comment-bearing line.
+  if (taskRef) {
+    for (let i = 0; i < lines.length; i++) {
+      const inline = extractInlineRef(lines[i]);
+      if (inline && inline === taskRef) {
+        const m = /^([ \t]*)- \[([ xX])\] /.exec(lines[i]);
+        if (m) {
+          resolvedIdx = i;
+          alreadyDone = m[2].toLowerCase() === 'x';
+          break;
+        }
+      }
+    }
+  }
+
+  // Priority 2: 1-indexed line hint + title prefix.
+  if (resolvedIdx === -1 && optLine != null && optTitle != null) {
+    const idx = optLine - 1;
+    if (idx >= 0 && idx < lines.length) {
+      const m = /^([ \t]*)- \[([ xX])\] (.*)$/.exec(lines[idx]);
+      if (m) {
+        const titleOnLine = m[3].replace(/\s*<!--[\s\S]*?-->\s*$/g, '').trim();
+        if (titleOnLine === optTitle.trim()) {
+          resolvedIdx = idx;
+          alreadyDone = m[2].toLowerCase() === 'x';
+        }
+      }
+    }
+  }
+
+  // Priority 3: exact title match anywhere.
+  if (resolvedIdx === -1 && optTitle != null) {
+    const wanted = optTitle.trim();
+    for (let i = 0; i < lines.length; i++) {
+      const m = /^([ \t]*)- \[([ xX])\] (.*)$/.exec(lines[i]);
+      if (!m) continue;
+      const titleOnLine = m[3].replace(/\s*<!--[\s\S]*?-->\s*$/g, '').trim();
+      if (titleOnLine === wanted) {
+        resolvedIdx = i;
+        alreadyDone = m[2].toLowerCase() === 'x';
+        break;
+      }
+    }
+  }
+
+  if (resolvedIdx === -1) {
+    return { changed: false, reason: 'not-found', line: null };
+  }
+
+  if (alreadyDone) {
+    return { changed: false, reason: 'already-done', line: resolvedIdx + 1 };
+  }
+
+  // Flip [ ] → [x] preserving everything else on the line.
+  lines[resolvedIdx] = lines[resolvedIdx].replace(/^([ \t]*)- \[ \] /, '$1- [x] ');
+
+  try {
+    fs.writeFileSync(tasksPath, lines.join('\n'), 'utf8');
+  } catch (_) {
+    return { changed: false, reason: 'io-error', line: null };
+  }
+
+  return { changed: true, reason: null, line: resolvedIdx + 1 };
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -358,5 +540,7 @@ module.exports = {
   validateChangeStrict,
   isArchived,
   runArchive,
+  parseTasks,
+  markTaskDone,
   STAGE_LABELS,
 };

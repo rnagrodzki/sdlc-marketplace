@@ -428,3 +428,85 @@
         outside expectedFiles. The response surfaces a single line of the form
         "Wave N touched files outside expectedFiles: <list>" naming src/auth/index.ts. Execution
         CONTINUES to step 2 (canary check) — the soft warning does NOT block.
+
+- description: "execute-plan-sdlc: Step 5d calls markTaskDone after wave WAVE_SUMMARY for tasks with openspec-task blocks (R37, #414)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-openspec-flip.md"
+    user_request: >
+      Wave 1 returned WAVE_SUMMARY with tasks t1 (DONE) and t2 (DONE). Both tasks carry
+      openspec-task blocks: t1 has ref=create-resourceindicator-component-ab12cd and t2 has
+      ref=add-getindicators-to-resourceservice-ef34ab. Each ref maps to a single plan task.
+      Walk through Step 5d (state writes) and describe what markTaskDone calls are made.
+  assert:
+    - type: icontains
+      value: "markTaskDone"
+    - type: llm-rubric
+      value: >
+        The response describes two markTaskDone calls in Step 5d — one per completed task.
+        For t1: markTaskDone(add-resource-indicators, create-resourceindicator-component-ab12cd, ...).
+        For t2: markTaskDone(add-resource-indicators, add-getindicators-to-resourceservice-ef34ab, ...).
+        The calls happen AFTER the WAVE_SUMMARY is parsed and AFTER task-done state writes — not
+        inside the wave-runner Agent. The response correctly identifies this as main-context work.
+
+- description: "execute-plan-sdlc: N:1 grouping — flip fires only when last sibling completes (R37, #414)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-openspec-flip.md"
+    user_request: >
+      Two plan tasks (t3 and t4) share openspec-task.ref = create-indicatorcache-with-ttl-support-cd56ef.
+      Wave 1 completes with t3 DONE. Wave 2 completes with t4 DONE. When does markTaskDone
+      fire for this ref? What happens if t4 is FAILED instead?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response correctly explains N:1 semantics: markTaskDone fires only after the
+        LAST sibling (t4) reaches a success status. After Wave 1 (only t3 done), the checkbox
+        remains - [ ]. After Wave 2 (t4 also done), markTaskDone fires for ref
+        create-indicatorcache-with-ttl-support-cd56ef. If t4 is FAILED, the checkbox stays
+        - [ ] because not all siblings completed successfully.
+
+- description: "execute-plan-sdlc: markTaskDone failure is non-blocking — warning logged and surfaced in Step 9 (R39, #414)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-openspec-flip.md"
+    user_request: >
+      Wave 1 completes with t1 DONE. t1 has openspec-task.ref = create-resourceindicator-component-ab12cd.
+      markTaskDone returns { changed: false, reason: 'not-found', line: null }. What happens?
+      Does the pipeline abort? What is logged?
+  assert:
+    - type: not-icontains
+      value: "abort"
+    - type: icontains
+      value: ".sdlc/learnings/log.md"
+    - type: icontains
+      value: "OpenSpec sync warnings"
+    - type: llm-rubric
+      value: >
+        The response confirms the pipeline does NOT abort. The failure is appended to
+        .sdlc/learnings/log.md (format: ## YYYY-MM-DD — execute-plan-sdlc markTaskDone failed:
+        change=add-resource-indicators ref=create-resourceindicator-component-ab12cd reason=not-found).
+        The warning is queued and surfaced in Step 9 REPORT under "OpenSpec sync warnings:".
+
+- description: "execute-plan-sdlc: archive suggestion suppressed when undocumented - [ ] tasks remain (R38, #414)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-openspec-flip.md"
+    user_request: >
+      All waves completed. Re-parsing tasks.md shows one - [ ] line: "Create IndicatorCache
+      with TTL support" (line 3). This title is NOT in the plan's ## Out-of-scope OpenSpec
+      tasks section. What does the archive suggestion output look like?
+  assert:
+    - type: not-icontains
+      value: "openspec archive add-resource-indicators --yes"
+    - type: icontains
+      value: "suppressed"
+    - type: icontains
+      value: "Create IndicatorCache with TTL support"
+    - type: llm-rubric
+      value: >
+        The archive suggestion is suppressed (R38). The response emits "OpenSpec tasks
+        incomplete — archive suggestion suppressed." followed by a diagnostic listing the
+        unflipped task: "line 3: Create IndicatorCache with TTL support — expected from plan
+        task(s) <id>". The runArchive function is NOT called. The response instructs the user
+        to fix the plan-task failures or add the title to ## Out-of-scope OpenSpec tasks.

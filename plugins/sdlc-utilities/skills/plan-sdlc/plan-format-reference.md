@@ -84,7 +84,24 @@ Complete enough that an agent with no codebase context can execute it.]
 **Acceptance criteria:**
 - [ ] [Specific, verifiable criterion]
 - [ ] [Another criterion]
+
+**openspec-task:** (optional — present only when plan was generated with `--from-openspec`)
+- change: <change-name>
+- ref: <kebab-slug-6char-hash>
+- line: <1-indexed-line-number-at-plan-time>
+- title: <verbatim-task-title-at-plan-time>
 ```
+
+---
+
+## Out-of-scope OpenSpec tasks (optional)
+
+Present only when `--from-openspec` was used AND at least one OpenSpec task has no plan
+coverage. Documents intentional exclusions so the G16 coverage gate passes and the archive
+gate (R38) does not suppress the suggestion at execute time.
+
+Format:
+- <verbatim OpenSpec task title> — <one-line rationale>
 
 ---
 
@@ -99,6 +116,10 @@ Complete enough that an agent with no codebase context can execute it.]
 | Files → Create | Relative path from project root | Must be exact — agents use this to know what to create |
 | Files → Modify | Relative path + one-line description of change | Required if an existing file is modified |
 | Files → Test | Relative path from project root | Omit row if task has no tests |
+| openspec-task → change | String | OpenSpec change directory name |
+| openspec-task → ref | kebab-slug + 6-char sha256 suffix | Computed from task title at plan time |
+| openspec-task → line | Integer ≥ 1 | 1-indexed line in tasks.md at plan time |
+| openspec-task → title | String | Verbatim task title at plan time |
 
 ---
 

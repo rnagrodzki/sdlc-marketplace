@@ -29,7 +29,7 @@ export const skillsMeta: SkillMeta[] = [
     command: '/plan-sdlc',
     category: 'planning',
     userInvocable: true,
-    tagline: 'Decomposes requirements into classified tasks; dispatches a dynamic-dimension orchestrator for 4+ file scopes.',
+    tagline: 'Decomposes requirements into classified tasks; dispatches a dynamic-dimension orchestrator for 4+ file scopes; annotates OpenSpec tasks.md with per-task back-pointers when `--from-openspec` is active.',
     pipeline: [
       { id: 'requirements', label: 'Gather requirements', type: 'user', description: 'Free-form description, spec file, or clarification questions' },
       { id: 'guardrails', label: 'Load guardrails', type: 'script', description: 'Reads plan guardrails from project config for critique evaluation' },
@@ -38,6 +38,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'critique-plan', label: 'Self-critique plan', type: 'critique', description: 'Reviews for coverage, dependency integrity, scope creep' },
       { id: 'revise-present', label: 'Revise and present', type: 'user', description: 'Fixes critique issues; shows plan for approval' },
       { id: 'save', label: 'Write plan document', type: 'script', description: 'Writes plan to plansDirectory with date prefix' },
+      { id: 'openspec-annotate', label: 'Annotate OpenSpec tasks', type: 'script', description: 'Injects ref comments into tasks.md and annotates plan tasks with openspec-task blocks' },
       { id: 'plan-review', label: 'Cross-model review', type: 'dispatch', description: 'Dispatches a second model to review the written plan' },
     ],
     connections: [
@@ -53,7 +54,7 @@ export const skillsMeta: SkillMeta[] = [
     command: '/execute-plan-sdlc',
     category: 'planning',
     userInvocable: true,
-    tagline: 'Orchestrates wave-based parallel plan execution with critique loops, spec compliance review, and automatic error recovery.',
+    tagline: 'Orchestrates wave-based parallel plan execution with critique loops, spec compliance review, and automatic error recovery; flips OpenSpec tasks.md checkboxes in real time as waves complete.',
     pipeline: [
       { id: 'load-plan', label: 'Load and validate plan', type: 'script', description: 'Reads plan from context or file; validates structure' },
       { id: 'classify', label: 'Classify tasks and build waves', type: 'llm', description: 'Assigns complexity, risk, model; builds dependency waves' },
@@ -63,6 +64,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'dispatch-wave', label: 'Dispatch wave agents', type: 'dispatch', description: 'One wave-runner Agent per wave; wave-runner fans out per-task sub-agents internally; batches trivials' },
       { id: 'mechanical-verify', label: 'Verify and checkpoint', type: 'verify', description: 'git diff, canary tokens, tests, conflict detection' },
       { id: 'spec-review', label: 'Spec compliance review', type: 'critique', description: 'Reviewer checks implementations against specifications' },
+      { id: 'openspec-flip', label: 'Flip OpenSpec checkboxes', type: 'script', description: 'Marks completed OpenSpec tasks as done in tasks.md after each wave' },
       { id: 'final-verify', label: 'Final verification', type: 'verify', description: 'Full test suite, build, lint after all waves complete' },
       { id: 'final-critique', label: 'Final output critique', type: 'critique', description: 'Checks deliverables, drift, orphaned files, TODOs' },
     ],

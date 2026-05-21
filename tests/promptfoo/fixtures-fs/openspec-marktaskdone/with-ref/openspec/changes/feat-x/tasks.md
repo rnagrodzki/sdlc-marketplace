@@ -1,0 +1,3 @@
+- [ ] Alpha task <!-- ref:alpha-custom -->
+- [ ] Beta task <!-- ref:beta-custom -->
+- [ ] Gamma task <!-- ref:gamma-custom -->
