@@ -292,6 +292,20 @@ A `PreToolUse` hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the payloa
 
 Canonicalization strips `null`-valued keys recursively (in addition to `undefined`) so that MCP-harness defaulting (e.g., schema-default `commentVisibility: null` injection between artifact write and hook read) cannot desync the skill-side and hook-side hashes.
 
+### Terse ticket content (R25)
+
+Every `createJiraIssue` and `editJiraIssue` that touches `description` is required to produce scannable, structured content — no prose paragraphs:
+
+- **Descriptions are bullet-formatted.** Every `## ` section body uses bullet lists (`- `), numbered lists (`1. `), or sub-headings. No paragraph text of two or more consecutive non-list non-heading lines is allowed in any section.
+- **Acceptance criteria are `- [ ]` checklists.** Every line under `## Acceptance Criteria` must be a GitHub-flavored checklist item (`- [ ] <criterion>`). Prose introductions, sentence-form criteria, and prose summaries after the list are all blocked.
+- **Summary is imperative and filler-free.** The `summary` field must be an imperative phrase ≤ 100 characters. Filler tokens (`This task covers`, `The goal of`, `We need to make sure`) are not allowed.
+- **No filler transitions.** Sentences such as `This ticket covers…`, `In summary…`, or `The purpose of this issue is…` between sections are omitted.
+- **Release Notes exception (R25.5).** The `## Release Notes` section (Bug, Story templates) may be a single sentence — release notes are changelog-bound and bullet form is awkward in that context. Two or more sentences in this section fail the constraint.
+
+**Enforcement layers:**
+- The Step 2.5 critique pass checks descriptions for prose paragraphs, filler tokens, and non-checklist acceptance criteria — findings appear in the `Critique:` block before the approval prompt.
+- The `hooks/pre-tool-jira-write-guard.js` PreToolUse hook deterministically blocks dispatch when the `## Acceptance Criteria` section contains any non-checklist lines. The deny reason cites R25/G15 and quotes the offending line.
+
 ### Diagnostics
 
 When `SDLC_DEBUG_DUMP=1` is set, the hook writes the received `tool_input` and the canonical-JSON byte-string to `$TMPDIR/jira-sdlc-debug/<hook-hash-prefix>.json`. Use this to diff against the skill artifact (`$TMPDIR/jira-sdlc/critique-<hash>.json`) byte-for-byte when a hash mismatch denial occurs. The dump is diagnostic only — it does not change the deny decision.

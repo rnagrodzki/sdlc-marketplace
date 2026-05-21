@@ -1,25 +1,28 @@
 ## Objective
 
-[1-2 sentences describing the broken behavior and its impact.
-Example: "Webhook delivery fails silently when the target endpoint returns a 5xx
-status, causing publishers to miss critical events with no retry or alert."]
+[Bullet list:
+- One-line statement of the broken behavior
+- Impact on users or system (e.g., data loss, failed operation, incorrect output)
+- Affected scope (component, endpoint, user type)]
 
 ## Details
 
 ### Current Behavior
 
-[Describe exactly what happens now — include error messages, incorrect values,
-unexpected UI states, or API responses.]
+- [What happens now — one bullet per observable symptom]
+- [Error message, incorrect value, or unexpected state]
+- [Affected code path or endpoint if known]
 
 ### Expected Behavior
 
-[Describe what should happen instead. Be specific.]
+- [What should happen instead — one bullet per expected outcome]
+- [Specific measurable condition that would indicate correctness]
 
 ### Reproduction Steps
 
-1. [Step 1 — starting condition or setup]
-2. [Step 2 — action that triggers the bug]
-3. [Step 3 — observe the incorrect behavior]
+1. [Starting condition or setup]
+2. [Action that triggers the bug]
+3. [Observe the incorrect behavior]
 
 ### Environment
 
@@ -30,8 +33,8 @@ unexpected UI states, or API responses.]
 
 ### Supporting Evidence
 
-[Attach logs, screenshots, Sentry links, trace IDs, or API response samples.
-Use code blocks for raw output.]
+- [Log excerpt, Sentry link, trace ID, or API response sample]
+- [Use a code block for raw output]
 
 ## Acceptance Criteria
 
@@ -58,6 +61,5 @@ _To be defined by the development team._
 
 ## Release Notes
 
-[Optional — only if the bug was customer-visible and the fix should appear in a changelog.]
-
-_Example: "Fixed an issue where webhook delivery failures were silently dropped without retry."_
+<!-- R25.5 exception: single sentence only — changelog-bound -->
+[One sentence describing the fix from the end-user perspective.]

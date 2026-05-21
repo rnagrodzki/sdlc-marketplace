@@ -394,3 +394,65 @@
         fails with a cloudId authorization error. The response indicates the
         working namespace is persisted for the rest of the session — it does
         NOT re-probe per-call. The response references spec R23.
+
+# ---------- R25: Terse ticket content (bullet descriptions, checklist AC, imperative summary) ----------
+
+- description: "jira-sdlc R25: description uses bullets, no prose paragraphs (Story create)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      Run /jira-sdlc. Create a Story in PROJ: "Add OIDC single sign-on support for publishers so they can authenticate using their organization's identity provider instead of managing separate credentials. This should support the standard OAuth2/OIDC authorization code flow. Acceptance criteria: the feature must work with major identity providers, it must be well-tested, and it must not break existing password-based login."
+  assert:
+    - type: not-regex
+      value: "^[A-Za-z][^\\-\\*#\\d\\n]{80,}$"
+    - type: llm-rubric
+      value: >
+        The proposed Jira ticket description's section bodies are bullet lists or numbered lists.
+        No prose paragraphs appear in any section body (no line that is 80+ characters without
+        a leading list marker or heading marker). No filler transitional sentences appear between
+        sections (no "This ticket covers", "The goal of", "In summary"). References R25.
+
+- description: "jira-sdlc R25: acceptance criteria are checklist items only (Bug create)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      Run /jira-sdlc. Create a Bug in PROJ: "Webhook delivery fails silently when the target endpoint returns HTTP 503. Publishers miss events with no retry or alert. This must be fixed so failed deliveries are retried and publishers are notified."
+  assert:
+    - type: regex
+      value: "- \\[ \\]"
+    - type: llm-rubric
+      value: >
+        Every line under ## Acceptance Criteria in the proposed payload starts with "- [ ]".
+        No prose introduction appears before the checklist. No prose summary appears after.
+        The criteria are discrete, independently-testable checklist items. References R25.
+
+- description: "jira-sdlc R25: summary is imperative and filler-free (Task create)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      Run /jira-sdlc. Create a Task in PROJ about making sure we update the event bus integration from polling to webhook-driven delivery so that we can eliminate the polling overhead and enable reliable at-least-once delivery.
+  assert:
+    - type: not-regex
+      value: "(?i)(This (ticket|task|story) (covers|addresses)|The goal of|We need to make sure)"
+    - type: llm-rubric
+      value: >
+        The proposed summary is an imperative phrase of 100 characters or fewer.
+        It contains no filler tokens such as "This task covers", "The goal of", or
+        "We need to make sure". It starts with an action verb. References R25.
+
+- description: "jira-sdlc R25: Release Notes section is single sentence, not bullet-formatted (Bug create)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      Run /jira-sdlc. Create a Bug in PROJ: "Payment processing fails when currency is non-EUR. This is customer-visible and needs a Release Notes entry in the ticket."
+  assert:
+    - type: llm-rubric
+      value: >
+        If a ## Release Notes section is present in the proposed description, it contains
+        a single sentence (changelog-bound format). The skill does NOT bullet-format Release Notes
+        and recognizes this as the documented R25.5 exception. The section does not contain
+        two or more sentences.

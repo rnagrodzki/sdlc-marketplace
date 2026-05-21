@@ -345,6 +345,7 @@ Skip this step for read operations (`search`, `view`). For every write operation
    - **Field correctness** — issue type / project key / parent / components / labels match cached `allowedValues`.
    - **Workflow validity** — for `transition`, the target status is reachable per the cached workflow graph (R6).
    - **Terminology consistency** — summary vocabulary matches description vocabulary (no contradictions).
+   - **Terse content (R25)** — every `## ` section body in the description payload is a bullet list, numbered list, sub-heading set, or (Release Notes only) a single sentence. No paragraph longer than two consecutive non-list non-heading lines in any section. No filler transitional sentences between sections (`This ticket covers…`, `In summary…`, `The goal of…`). The `## Acceptance Criteria` section body is exclusively `- [ ] …` checklist items — no prose introduction, no prose summary, no sentence-form criteria. Summary is an imperative phrase ≤ 100 characters with no filler tokens (`This task covers`, `The goal of`, `We need to make sure`). Surface any violations in the `Critique:` block.
 3. Compute `payload_hash` and write the critique artifact:
    ```js
    const { payloadHash } = require('./lib/payload-hash.js');
@@ -476,6 +477,7 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 | Critique surfaced (G12) | No proposal presented to the user without a preceding `Initial:` / `Critique:` / `Final:` block (R20) |
 | Hook verified (G13) | No write MCP call dispatched without the PreToolUse hook successfully verifying R21 artifacts (payload-hash bound, < 10 min old) |
 | Link verified (G14, R22, #198) | No write MCP call (`createJiraIssue`, `editJiraIssue`, `addCommentToJiraIssue`) dispatched without `scripts/skill/jira.js --validate-body` returning exit 0. The script enforces — SKILL.md only invokes it. See Step 2.7. |
+| Terse content (G15) | No `createJiraIssue` / `editJiraIssue` dispatch where the description's `## Acceptance Criteria` section contains non-checklist lines — blocked deterministically by `hooks/pre-tool-jira-write-guard.js` (R25.2). Bullet/no-prose enforcement for all other description sections is LLM-driven via the Step 2.5 critique checklist (R25.1, R25.3, R25.4). |
 
 ---
 
@@ -486,6 +488,7 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 - Escalate every low-confidence placeholder marker via `AskUserQuestion` (R19)
 - Run a critique pass before the approval gate; surface findings to the user (R20)
 - Write critique + approval artifacts via `lib/artifact-store.js` and use `lib/payload-hash.js` for the canonical hash (R21)
+- Compose description section bodies as bullet lists or numbered lists; emit `## Acceptance Criteria` content as `- [ ] …` checklist items only (R25)
 
 ## DO NOT
 
@@ -507,6 +510,9 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 - Fill `[bracketed prose]` or `{name}` placeholders from inference — every `low`-confidence marker requires explicit user resolution (R19)
 - Apply critique deltas silently — always surface the `Initial:` / `Critique:` / `Final:` block (R20)
 - Bypass `lib/artifact-store.js` with direct `fs.writeFile` calls — direct writes break the canonical hash contract the hook verifies (R21)
+- Write prose paragraphs in description sections — bullet lists, numbered lists, or sub-headings only (R25)
+- Write acceptance criteria as sentences — every item is `- [ ] <discrete criterion>` (R25)
+- Add filler transitional sentences between description sections (`This ticket covers…`, `The goal of…`, `In summary…`) (R25)
 
 ---
 
@@ -530,6 +536,7 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 - `unsampled: true` markers (from `--skip-workflow-discovery` in CI, or from no-sample results above) route transition operations through a live `getTransitionsForJiraIssue` per issue — the skill reuses the existing stale-cache auto-refresh path, so no separate branch is required in Step 3. Treat `unsampled` identically to "transition ID not cached".
 - The `mcp__atlassian__` prefix is the default; if the user's MCP is registered under a different prefix (e.g., `mcp__claude_ai_Atlassian__`), use the active prefix consistently across all calls in the session
 - **Namespace fallback (spec R23):** When the primary namespace (`mcp__atlassian__`) returns a cloudId authorization error and `mcp__claude_ai_Atlassian__` is also registered (visible in the deferred-tools list), retry the operation under the sibling namespace once. Persist the working namespace for the rest of the session — do not re-probe per-call. Combine with the Step 3 cloudId-error ladder: namespace-fallback is the second leg after the cache-refresh retry fails.
+- **Release Notes is the one allowed single-sentence carve-out (R25.5).** The `## Release Notes` section in Bug and Story templates may contain a single sentence — it is changelog-bound and bullet form is contextually awkward. Two or more sentences in this section fail the R25 critique check. All other sections must use bullet lists, numbered lists, or sub-headings.
 
 ---
 

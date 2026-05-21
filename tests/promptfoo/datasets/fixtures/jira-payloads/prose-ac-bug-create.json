@@ -1,0 +1,9 @@
+{
+  "cloudId": "abc-123",
+  "projectKey": "PROJ",
+  "issueTypeName": "Bug",
+  "summary": "Fix login button not submitting on mobile Safari",
+  "description": "## Objective\n\n- Login button fails on iOS Safari 17\n\n## Acceptance Criteria\n\nThe login button must submit the form correctly on iPhone 14 Safari 17. There should be no regression on other browsers. An automated test should be added.\n\n## How to Test\n\n1. Open app on iPhone 14 Safari 17\n2. Enter credentials\n3. Tap login\n",
+  "contentFormat": "markdown",
+  "responseContentFormat": "markdown"
+}

@@ -1,18 +1,14 @@
 ## Business Context
 
-[Describe the business problem or opportunity this epic addresses. Include:
-- What is the current situation or pain point
+[Bullet list:
+- Current situation or pain point being addressed
 - Why this work matters now (business driver, customer need, strategic goal)
 - What success looks like at a high level
-- Who are the stakeholders or users affected
-
-This section should give anyone enough context to understand why the team is
-investing time in this work. Link to the parent PROJ initiative if one exists.]
+- Stakeholders or users affected]
 
 ## Phase Scope
 
-[Describe what is included in this phase of work and, equally important, what is
-explicitly excluded. Structure as:]
+[Description of what is included and explicitly excluded in this phase.]
 
 ### In Scope
 

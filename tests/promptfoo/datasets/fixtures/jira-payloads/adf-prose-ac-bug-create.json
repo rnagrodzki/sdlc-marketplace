@@ -1,0 +1,44 @@
+{
+  "cloudId": "abc-123",
+  "projectKey": "PROJ",
+  "issueTypeName": "Bug",
+  "summary": "Fix login button not submitting on mobile Safari",
+  "description": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "Objective" }]
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": "Login button fails on iOS Safari 17" }]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "Acceptance Criteria" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "The login button must work on all supported browsers." }
+        ]
+      }
+    ]
+  },
+  "contentFormat": "adf",
+  "responseContentFormat": "markdown"
+}

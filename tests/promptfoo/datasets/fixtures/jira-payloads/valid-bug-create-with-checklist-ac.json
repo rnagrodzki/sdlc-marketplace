@@ -1,0 +1,9 @@
+{
+  "cloudId": "abc-123",
+  "projectKey": "PROJ",
+  "issueTypeName": "Bug",
+  "summary": "Fix login button not submitting on mobile Safari",
+  "description": "## Objective\n\n- Login button fails to submit on iOS Safari 17\n- Blocks all mobile Safari users from logging in\n- Affects iPhone 14 and newer (100% repro rate)\n\n## Details\n\n### Current Behavior\n\n- Tapping the login button on iPhone 14 Safari 17 does nothing\n- No console error; form submit event is not fired\n- Affects only Safari — Chrome Mobile works correctly\n\n### Expected Behavior\n\n- Login button submits the form and navigates to dashboard\n- Works consistently across all supported mobile browsers\n\n### Reproduction Steps\n\n1. Open the app on iPhone 14 Safari 17\n2. Enter valid credentials\n3. Tap the login button\n4. Observe: nothing happens\n\n### Environment\n\n- **Environment:** production\n- **Affected version / release:** v2.4.1\n- **Affected accounts / tenants:** all\n- **Frequency:** always\n\n### Supporting Evidence\n\n- Sentry issue: https://example.sentry.io/issues/123\n\n## Acceptance Criteria\n\n- [ ] Login button submits the form on iPhone 14 Safari 17\n- [ ] No regression on Chrome Mobile or desktop browsers\n- [ ] Automated test added for mobile Safari form submission\n\n## How to Test\n\n1. **Prerequisites:** iPhone 14 or Safari 17 simulator\n2. **Reproduction:** Open app, enter credentials, tap login; confirm no submit\n3. **Verification:** After fix, tap login; confirm navigation to dashboard\n4. **Regression check:**\n   - Chrome Mobile login still works\n   - Desktop Safari login still works\n\n## Release Notes\n\nFixed an issue where the login button did not submit on iOS Safari 17.\n",
+  "contentFormat": "markdown",
+  "responseContentFormat": "markdown"
+}

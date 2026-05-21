@@ -52,6 +52,11 @@ const NAMESPACE_PREFIXES = ['mcp__atlassian__', 'mcp__claude_ai_Atlassian__'];
 
 const HEADING_RE = /^##\s+(.+?)\s*$/gm;
 
+// Max characters of an offending Acceptance Criteria line to embed in a deny
+// reason. Lines longer than this are truncated with a single-character
+// ellipsis (`…`) so the deny payload stays small.
+const MAX_EXCERPT_LEN = 120;
+
 function isJiraWriteTool(toolName) {
   if (typeof toolName !== 'string') return false;
   for (const prefix of NAMESPACE_PREFIXES) {
@@ -141,6 +146,143 @@ function projectRoot() {
   return process.env.JIRA_GUARD_PROJECT_ROOT || process.cwd();
 }
 
+/**
+ * Check that the `## Acceptance Criteria` section (if present) in a markdown
+ * description contains only GitHub-flavored checklist items (- [ ] / - [x] / - [X]).
+ *
+ * Returns null when the section is absent (permissive fallback for edits that
+ * don't touch AC) or when every non-blank line in the section is a valid
+ * checklist item.
+ *
+ * Returns a quoted excerpt of the first offending line on violation.
+ *
+ * Implements R25/G15 deterministic gate (spec #412).
+ */
+function checkAcceptanceCriteriaChecklist(markdown) {
+  if (!markdown || typeof markdown !== 'string') return null;
+
+  // Locate ## Acceptance Criteria heading (case-insensitive, optional trailing colon).
+  const acHeadingRe = /^##\s+Acceptance Criteria[:\s]*$/im;
+  const headingMatch = acHeadingRe.exec(markdown);
+  if (!headingMatch) {
+    // Section absent — permissive: skip check (covers partial edits per R25 spec).
+    return null;
+  }
+
+  // Extract the section body from after the heading to the next ## heading or end-of-string.
+  const afterHeading = markdown.slice(headingMatch.index + headingMatch[0].length);
+  const nextHeadingIdx = afterHeading.search(/^##\s/m);
+  const sectionBody = nextHeadingIdx === -1 ? afterHeading : afterHeading.slice(0, nextHeadingIdx);
+
+  // Checklist item regex: optional leading spaces, dash, space, bracket pair, content.
+  // Allows: - [ ] ..., - [x] ..., - [X] ... (optionally indented for nested criteria).
+  const checklistRe = /^[\t ]*-\s\[[\sxX]\]\s+\S/;
+
+  for (const rawLine of sectionBody.split('\n')) {
+    const line = rawLine.trimEnd();
+    if (line.trim() === '') continue; // blank lines are fine
+    if (!checklistRe.test(line)) {
+      // Quote the offending line (truncate at MAX_EXCERPT_LEN chars to avoid
+      // giant deny reasons). Reserve 3 chars for the trailing ellipsis so the
+      // final string length stays at MAX_EXCERPT_LEN.
+      const excerpt =
+        line.length > MAX_EXCERPT_LEN
+          ? line.slice(0, MAX_EXCERPT_LEN - 3) + '…'
+          : line;
+      return `"${excerpt}"`;
+    }
+  }
+
+  return null; // all non-blank lines passed
+}
+
+/**
+ * ADF form of the R25/G15 acceptance-criteria gate.
+ *
+ * Extracts a possible ADF description from tool_input (handles both raw ADF
+ * object and JSON-stringified ADF). Walks the top-level `doc.content[]` to
+ * find a heading node with text "Acceptance Criteria" (case-insensitive).
+ * Then inspects the sibling content nodes until the next heading node.
+ *
+ * Each non-heading sibling MUST be a `taskList` node (GitHub-flavored checklist
+ * items per R25.2). Any other node type (e.g., `paragraph`, `bulletList`,
+ * `orderedList`) is a violation.
+ *
+ * Returns null when:
+ *   - No ADF description is present (permissive fallback).
+ *   - No "Acceptance Criteria" heading is found in the ADF tree.
+ *   - All sibling nodes are taskList nodes.
+ *
+ * Returns the offending node type string on the first violation.
+ *
+ * Implements R25/G15 ADF path (spec #412).
+ */
+function checkAcceptanceCriteriaAdf(toolInput) {
+  if (!toolInput || typeof toolInput !== 'object') return null;
+
+  // Try to extract an ADF doc object from the payload.
+  let adfDoc = null;
+
+  // Direct ADF object at top level or in fields.
+  const rawDesc =
+    (toolInput.description && typeof toolInput.description === 'object' ? toolInput.description : null) ||
+    (toolInput.fields && toolInput.fields.description && typeof toolInput.fields.description === 'object'
+      ? toolInput.fields.description
+      : null);
+
+  if (rawDesc && rawDesc.type === 'doc') {
+    adfDoc = rawDesc;
+  } else {
+    // JSON-stringified ADF.
+    const strDesc =
+      (typeof toolInput.description === 'string' ? toolInput.description : null) ||
+      (toolInput.fields && typeof toolInput.fields.description === 'string'
+        ? toolInput.fields.description
+        : null);
+    if (strDesc) {
+      try {
+        const parsed = JSON.parse(strDesc);
+        if (parsed && parsed.type === 'doc') adfDoc = parsed;
+      } catch { /* not JSON — not ADF */ }
+    }
+  }
+
+  if (!adfDoc || !Array.isArray(adfDoc.content)) return null;
+
+  // Find the heading node whose text content is "Acceptance Criteria".
+  let acHeadingIdx = -1;
+  for (let i = 0; i < adfDoc.content.length; i++) {
+    const node = adfDoc.content[i];
+    if (node.type === 'heading') {
+      const text = (Array.isArray(node.content) ? node.content : [])
+        .filter((c) => c.type === 'text')
+        .map((c) => c.text || '')
+        .join('');
+      if (/acceptance criteria/i.test(text.trim())) {
+        acHeadingIdx = i;
+        break;
+      }
+    }
+  }
+
+  if (acHeadingIdx === -1) return null; // section absent — permissive
+
+  // Inspect sibling nodes until the next heading.
+  // R25.2 mandates GitHub-flavored checklist items only — only `taskList`
+  // ADF nodes encode that semantic. `bulletList` / `orderedList` are
+  // rejected.
+  const ALLOWED_LIST_TYPES = new Set(['taskList']);
+  for (let i = acHeadingIdx + 1; i < adfDoc.content.length; i++) {
+    const node = adfDoc.content[i];
+    if (node.type === 'heading') break; // reached next section
+    if (!ALLOWED_LIST_TYPES.has(node.type)) {
+      return node.type; // violation: non-taskList node in AC section
+    }
+  }
+
+  return null; // all nodes are taskList
+}
+
 async function main() {
   let stdin;
   try {
@@ -189,6 +331,32 @@ async function main() {
   if (markers.length > 0) {
     const sample = markers.slice(0, 3).map((m) => `${m.path}:${m.marker}`).join(', ');
     return emitDeny(`R19/C13: unfilled placeholder marker(s) in payload — ${sample}`);
+  }
+
+  // (b-pre) R25/G15 — Acceptance Criteria checklist-only gate.
+  // Runs after the C13 placeholder check (a) and before the R18 fingerprint check (b).
+  // Checks that the `## Acceptance Criteria` section body (when present) contains
+  // only `- [ ]` / `- [x]` / `- [X]` checklist items. Other sections are not
+  // checked here — they are covered by the LLM-driven Step 2.5 critique pass.
+  if (op === 'createJiraIssue' || op === 'editJiraIssue') {
+    const acMarkdown = extractDescriptionMarkdown(toolInput);
+    if (acMarkdown !== null && acMarkdown !== '') {
+      // Markdown path
+      const acViolation = checkAcceptanceCriteriaChecklist(acMarkdown);
+      if (acViolation !== null) {
+        return emitDeny(
+          `R25/G15: Acceptance Criteria section must contain only "- [ ] …" checklist items. Non-checklist line: ${acViolation}`
+        );
+      }
+    } else {
+      // ADF path: description may be an ADF object or a JSON string of an ADF object.
+      const adfViolation = checkAcceptanceCriteriaAdf(toolInput);
+      if (adfViolation !== null) {
+        return emitDeny(
+          `R25/G15: Acceptance Criteria section must contain only "- [ ] …" checklist items (ADF taskList). Non-taskList node type: ${adfViolation}`
+        );
+      }
+    }
   }
 
   // (b) R18 template fingerprint (createJiraIssue / editJiraIssue with description only)
