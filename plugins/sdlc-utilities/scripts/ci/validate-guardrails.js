@@ -13,6 +13,7 @@ const path = require('path');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
+const { GUARDRAIL_SEVERITIES } = require(path.join(LIB, 'dimensions'));
 
 /**
  * Parse command-line flags
@@ -112,10 +113,10 @@ function validateGuardrail(guardrail, seenIds) {
     result.status = 'FAIL';
   }
 
-  // Validate severity is valid (optional, defaults to error)
+  // Validate severity is valid (optional, defaults to error) — R17: use GUARDRAIL_SEVERITIES as source of truth
   if (guardrail.severity !== undefined && guardrail.severity !== null) {
-    if (!['error', 'warning'].includes(guardrail.severity)) {
-      errors.push(`severity must be "error", "warning", or undefined (got "${guardrail.severity}")`);
+    if (!GUARDRAIL_SEVERITIES.has(guardrail.severity)) {
+      errors.push(`severity must be ${[...GUARDRAIL_SEVERITIES].map(s => `"${s}"`).join(', ')}, or undefined (got "${guardrail.severity}")`);
       result.status = 'FAIL';
     }
   }
@@ -124,19 +125,67 @@ function validateGuardrail(guardrail, seenIds) {
 }
 
 /**
- * Main validation logic
+ * Validate guardrail config for a given section — no process.exit, no console output.
+ * Exported for programmatic use by harden-prepare.js (R16).
+ *
+ * @param {string} projectRoot — absolute path to the project root
+ * @param {string} sectionName — 'plan' | 'execute' (or any readSection key)
+ * @returns {{ errors: string[], warnings: string[], guardrailCount: number }}
+ */
+function validateGuardrailsConfig(projectRoot, sectionName) {
+  const errors = [];
+  const warnings = [];
+
+  let readSection;
+  try {
+    readSection = loadReadSection(projectRoot);
+  } catch (err) {
+    errors.push(`Cannot load readSection: ${err.message}`);
+    return { errors, warnings, guardrailCount: 0 };
+  }
+
+  const section = sectionName || 'plan';
+  let sectionData;
+  try {
+    sectionData = readSection(projectRoot, section);
+  } catch (err) {
+    errors.push(`Cannot read section "${section}": ${err.message}`);
+    return { errors, warnings, guardrailCount: 0 };
+  }
+
+  if (!sectionData || !Array.isArray(sectionData.guardrails)) {
+    return { errors, warnings, guardrailCount: 0 };
+  }
+
+  const guardrails = sectionData.guardrails;
+  const seenIds = new Set();
+
+  for (const guardrail of guardrails) {
+    const validation = validateGuardrail(guardrail, seenIds);
+    for (const err of validation.errors) {
+      errors.push(`${validation.id}: ${err}`);
+    }
+    for (const warn of validation.warnings) {
+      warnings.push(`${validation.id}: ${warn}`);
+    }
+  }
+
+  return { errors, warnings, guardrailCount: guardrails.length };
+}
+
+/**
+ * Main validation logic — thin CLI wrapper around validateGuardrailsConfig.
  */
 function main() {
   const args = process.argv.slice(2);
   const flags = parseArgs(args);
 
   try {
-    const readSection = loadReadSection(flags.projectRoot);
     const section = flags.section || 'plan';
-    const sectionData = readSection(flags.projectRoot, section);
+    const result = validateGuardrailsConfig(flags.projectRoot, section);
 
-    // If no section or no guardrails, return empty pass
-    if (!sectionData || !Array.isArray(sectionData.guardrails)) {
+    // If no guardrails configured, treat as pass
+    if (result.guardrailCount === 0 && result.errors.length === 0) {
       const output = {
         overall: 'pass',
         summary: { total: 0, pass: 0, errors: 0, warnings: 0 },
@@ -150,7 +199,10 @@ function main() {
       process.exit(0);
     }
 
-    const guardrails = sectionData.guardrails;
+    // Re-run per-guardrail validation for structured output (needed for CLI display)
+    const readSection = loadReadSection(flags.projectRoot);
+    const sectionData = readSection(flags.projectRoot, section);
+    const guardrails = sectionData ? (sectionData.guardrails || []) : [];
     const seenIds = new Set();
     const results = [];
 
@@ -205,4 +257,8 @@ function main() {
   }
 }
 
-main();
+module.exports = { validateGuardrailsConfig };
+
+if (require.main === module) {
+  main();
+}

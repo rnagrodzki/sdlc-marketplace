@@ -13,6 +13,8 @@ the project's hardening surfaces (plan guardrails, execute guardrails, review
 dimensions, copilot instructions) so the same class of failure is caught earlier
 next time. Implements `docs/specs/harden-sdlc.md`.
 
+**Key spec requirements implemented here:** R14 (review-dimension priority + minimum coverage), R15 (duplication scan + `consolidate` action), R16 (pre-flight validation in prepare script), R17 (severity vocabulary single source — `lib/dimensions.js`).
+
 **Announce at start:** "I'm using harden-sdlc (sdlc v{sdlc_version})." — extract the version from the `sdlc:` line in the session-start system-reminder. If no version is in context, omit the parenthetical.
 
 ---
@@ -34,8 +36,10 @@ invocation.
 > **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "harden-prepare.js" -path "*/sdlc*/scripts/skill/harden-prepare.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/harden-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/harden-prepare.js"
+RESOLVER=$(find ~/.claude/plugins -name "resolve-script.sh" -path "*/sdlc*/scripts/lib/resolve-script.sh" 2>/dev/null | sort -V | tail -1)
+[ -z "$RESOLVER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/resolve-script.sh" ] && RESOLVER="plugins/sdlc-utilities/scripts/lib/resolve-script.sh"
+[ -n "$RESOLVER" ] && . "$RESOLVER"
+SCRIPT=$(resolve_script "harden-prepare.js" "*/sdlc*/scripts/skill/harden-prepare.js" "plugins/sdlc-utilities/scripts/skill/harden-prepare.js")
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/harden-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 MANIFEST_FILE=$(node "$SCRIPT" \
@@ -186,8 +190,11 @@ When the user selects **apply**, validate the proposed change BEFORE writing:
   validate via the canonical guardrails validator:
 
   ```bash
-  VALIDATOR=$(find ~/.claude/plugins -name "validate-guardrails.js" -path "*/sdlc*/scripts/ci/validate-guardrails.js" 2>/dev/null | sort -V | tail -1)
-  [ -z "$VALIDATOR" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-guardrails.js" ] && VALIDATOR="plugins/sdlc-utilities/scripts/ci/validate-guardrails.js"
+  # resolve_script is sourced once at Step 1; re-source here if running in a fresh shell block
+  RESOLVER=$(find ~/.claude/plugins -name "resolve-script.sh" -path "*/sdlc*/scripts/lib/resolve-script.sh" 2>/dev/null | sort -V | tail -1)
+  [ -z "$RESOLVER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/resolve-script.sh" ] && RESOLVER="plugins/sdlc-utilities/scripts/lib/resolve-script.sh"
+  [ -n "$RESOLVER" ] && . "$RESOLVER"
+  VALIDATOR=$(resolve_script "validate-guardrails.js" "*/sdlc*/scripts/ci/validate-guardrails.js" "plugins/sdlc-utilities/scripts/ci/validate-guardrails.js")
   [ -z "$VALIDATOR" ] && { echo "ERROR: Could not locate ci/validate-guardrails.js. Is the sdlc plugin installed?" >&2; exit 2; }
   ```
 
@@ -215,13 +222,11 @@ Use Edit (preferred) or Write to apply the approved, validated change to
 Applied {action} on {surface} → {targetFile}
 ```
 
-Severity vocabulary MUST be preserved per surface (R10):
+Severity vocabulary per surface is canonical in `lib/dimensions.js` (`VALID_SEVERITIES`, `GUARDRAIL_SEVERITIES`); see spec R10 + R17. The orchestrator already chose the correct vocabulary in its proposal — never substitute one for the other.
 
-- `plan-guardrails` / `execute-guardrails` use `error|warning`
-- `review-dimensions` use `critical|high|medium|low|info`
+**When `proposal.action === "consolidate"` (R15):** the proposal targets an existing guardrail by id. Read the current `.sdlc/config.json` from disk, locate the guardrail in `<section>.guardrails[]` by the id specified in the proposal's `patch`, and replace its fields with the proposal's merged values (description, severity). Do NOT remove fields; do NOT lower severity (strengthen-only invariant — see spec R8 / C9). If no guardrail with the target id exists in the current file, treat the proposal as malformed and surface to the user.
 
-The orchestrator already chose the correct vocabulary in its proposal — never
-substitute one vocabulary for the other.
+Note: `consolidate` is validated like `strengthen` — the prospective merged config must pass `validate-guardrails.js` before write.
 
 ### 5c. Ambiguous upstream-report offer (R-ambig-offer, issue #288)
 
@@ -318,19 +323,14 @@ the `.sdlc/learnings/` directory and `log.md` file if they don't exist.
   in the caller's failure-handling menu.
 - Recursively dispatch this skill on its own prepare-script or orchestrator
   crash — log the failure and stop.
-- Substitute one severity vocabulary for another (sdlc.json `error|warning` vs
-  review-dimensions `critical|high|medium|low|info`) — preserve per surface.
+- Override severity vocabulary chosen by orchestrator (see R10/R17) — each surface has its own canonical vocabulary in `lib/dimensions.js`; never substitute one for the other.
 
 ---
 
 ## When This Skill Is Invoked
 
 - **Standalone:** `/harden-sdlc --failure-text "..." --skill plan-sdlc --step "Step 5" --operation "reviewer-loop"`
-- **Caller-dispatched:** `plan-sdlc`, `execute-plan-sdlc`, `review-sdlc`, and
-  `commit-sdlc` each present an opt-in menu option at their failure surfaces
-  that dispatches `Skill(harden-sdlc)` with the same flag shape. `ship-sdlc` is
-  intentionally NOT a caller — it delegates failure handling to its sub-skills,
-  so harden-sdlc reaches the user through whichever sub-skill failed.
+- **Caller-dispatched:** Caller-dispatched skills present an opt-in menu option at their failure surfaces that dispatches `Skill(harden-sdlc)` with the same flag shape; see spec I1 for the canonical list and dispatch contract. `ship-sdlc` is intentionally NOT a caller — it delegates failure handling to its sub-skills, so harden-sdlc reaches the user through whichever sub-skill failed.
 
 ---
 

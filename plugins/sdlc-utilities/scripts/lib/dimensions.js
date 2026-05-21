@@ -63,6 +63,31 @@ const KNOWN_FIELDS = new Set([
 
 const VALID_SEVERITIES = new Set(['critical', 'high', 'medium', 'low', 'info']);
 
+/**
+ * Canonical severity vocabulary for plan/execute guardrails (R17).
+ * See lib/dimensions.js::GUARDRAIL_SEVERITIES for the source of truth.
+ */
+const GUARDRAIL_SEVERITIES = new Set(['error', 'warning']);
+
+/**
+ * Returns the canonical severity vocabulary Set for the given surface name.
+ * - 'review-dimensions' → VALID_SEVERITIES
+ * - 'plan-guardrails' | 'execute-guardrails' → GUARDRAIL_SEVERITIES
+ * - anything else (e.g. 'copilot-instructions') → null
+ *
+ * Reserved for programmatic callers (e.g. orchestrator surface-dispatch logic).
+ * Not currently used by any script in this repo — exported intentionally as part
+ * of the R17 severity-vocab API surface.
+ *
+ * @param {string} surface
+ * @returns {Set<string>|null}
+ */
+function severityForSurface(surface) {
+  if (surface === 'review-dimensions') return VALID_SEVERITIES;
+  if (surface === 'plan-guardrails' || surface === 'execute-guardrails') return GUARDRAIL_SEVERITIES;
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Validate a single dimension file
 // ---------------------------------------------------------------------------
@@ -281,6 +306,8 @@ module.exports = {
   isValidGlob,
   KNOWN_FIELDS,
   VALID_SEVERITIES,
+  GUARDRAIL_SEVERITIES,
+  severityForSurface,
   validateDimensionFile,
   validateAll,
   resolveDimensionsDir,

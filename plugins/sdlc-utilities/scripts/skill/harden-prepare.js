@@ -3,7 +3,7 @@
  * harden-prepare.js — pre-computes the manifest for the harden-orchestrator
  * agent. Loads all five hardening surfaces deterministically (per-surface
  * loaders live in lib/harden-surfaces.js to honor the ≤200-line cap).
- * Implements docs/specs/harden-sdlc.md R1-R4, R10, R13.
+ * Implements docs/specs/harden-sdlc.md R1-R4, R10, R13, R16.
  * Required: --failure-text, --skill. Stdin JSON fallback supported (CLI wins).
  * Exit codes: 0 success, 1 missing-required, 2 crash.
  */
@@ -167,9 +167,47 @@ function main() {
   const projectRoot = resolveSdlcRoot();
   const surfaceLoadErrors = [];
 
+  // R16 — Pre-flight validation: validate existing .sdlc/config.json guardrails
+  // and .sdlc/review-dimensions/*.md BEFORE assembling the manifest. On any
+  // error, exit 1 with structured errors[] — do NOT write the manifest.
+  const { validateGuardrailsConfig } = require('../ci/validate-guardrails');
+  const { validateDimensionFile, resolveDimensionsDir } = require('../lib/dimensions');
+  const preflightErrors = [];
+
+  for (const section of ['plan', 'execute']) {
+    const result = validateGuardrailsConfig(projectRoot, section);
+    for (const err of result.errors) {
+      preflightErrors.push(`existing-${section}-guardrails: ${err}`);
+    }
+  }
+
+  const dimDir = resolveDimensionsDir(projectRoot);
+  if (fs.existsSync(dimDir)) {
+    let dimFiles = [];
+    try {
+      dimFiles = fs.readdirSync(dimDir).filter(x => x.endsWith('.md'));
+    } catch (readErr) {
+      preflightErrors.push(`review-dimensions: readdir failed: ${readErr.message}`);
+    }
+    for (const f of dimFiles) {
+      const filePath = path.join(dimDir, f);
+      const { errors: dimErrors } = validateDimensionFile(filePath);
+      for (const err of dimErrors) {
+        preflightErrors.push(`existing-review-dimension ${f}: ${err.message || err}`);
+      }
+    }
+  }
+
+  if (preflightErrors.length > 0) {
+    for (const e of preflightErrors) errors.push(e);
+    process.stderr.write(`harden-prepare: pre-flight validation failed:\n${preflightErrors.join('\n')}\n`);
+    writeOutput({ errors, warnings: [], flags: { skipConfigCheck }, migration: cv.migration }, 'sdlc-harden', 1);
+    return;
+  }
+
   // Load all five surfaces deterministically (R4).
-  const planGuardrails    = surfaces.loadPlanGuardrails(projectRoot, surfaceLoadErrors);
-  const executeGuardrails = surfaces.loadExecuteGuardrails(projectRoot, surfaceLoadErrors);
+  const planGuardrails    = surfaces.loadGuardrails(projectRoot, 'plan',    surfaceLoadErrors);
+  const executeGuardrails = surfaces.loadGuardrails(projectRoot, 'execute', surfaceLoadErrors);
   const reviewDimensions  = surfaces.loadReviewDimensions(projectRoot, surfaceLoadErrors);
   const copilotInstructions = surfaces.loadCopilotInstructions(projectRoot, surfaceLoadErrors);
   const errorReportSkillPath = surfaces.resolveErrorReportSkill(projectRoot, surfaceLoadErrors);

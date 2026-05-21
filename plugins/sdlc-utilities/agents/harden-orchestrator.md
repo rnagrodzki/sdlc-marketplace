@@ -87,21 +87,20 @@ A surface qualifies for PROPOSE when at least one of:
 A surface should be SKIPPED when none of its existing rules can be reasonably
 strengthened against this failure signal AND there is no obvious gap to fill.
 
+**Proposal ordering (R14):** When emitting `proposals[]`, list all `review-dimensions` proposals first, then `plan-guardrails`, then `execute-guardrails`, then `copilot-instructions`. Within a surface, preserve the order in which proposals were drafted.
+
+**Minimum review-dimension coverage (R14):** Per iteration, the envelope MUST contain ≥1 `review-dimensions` proposal OR set `skipped.reviewDimensions.rationale` (string) explaining why no review-dimension hardening applies (e.g., "failure is a config schema violation, not a code-review missable"). The skill body surfaces this rationale to the user. Absence of both is a malformed envelope (treated per E4).
+
 ## Step 3 — Draft Proposals
 
-For each PROPOSE decision, draft one proposal. Use the **destination surface's**
-severity vocabulary:
-
-- `plan-guardrails` and `execute-guardrails` → `error` | `warning`
-- `review-dimensions` → `critical` | `high` | `medium` | `low` | `info`
-- `copilot-instructions` → no severity field (severity lives in the body)
+For each PROPOSE decision, draft one proposal. Severity vocabulary per surface is defined in `lib/dimensions.js` (`VALID_SEVERITIES`, `GUARDRAIL_SEVERITIES`); see R17. Use the destination surface's vocabulary — never substitute.
 
 Each proposal:
 
 ```json
 {
   "surface": "plan-guardrails | execute-guardrails | review-dimensions | copilot-instructions",
-  "action": "add | strengthen",
+  "action": "add | strengthen | consolidate",
   "targetFile": "absolute path to the file that would be edited",
   "patch": "preview block — for sdlc.json, the new/modified guardrail object as JSON; for review-dimensions, the new frontmatter or new rule line; for copilot-instructions, the new checklist line",
   "rationale": "one to two sentences linking back to the failure signal"
@@ -110,6 +109,8 @@ Each proposal:
 
 The `patch` is a **preview**, not a diff to be auto-applied. The skill's main
 context performs the actual write after user approval.
+
+**`consolidate` (R15):** Use when the proposed change targets an existing `plan-guardrails` or `execute-guardrails` entry by id OR strongly overlaps an existing description (per `lib/harden-surfaces.js::findDuplicateGuardrails`). A `consolidate` proposal MUST cite the existing guardrail by id in `patch` and MUST be strengthen-direction only (tighter description, raised severity, narrower glob) per R8 / C9 — `consolidate` MAY NOT remove fields or lower severity. When duplication is detected, prefer `consolidate` over `strengthen` or `add` to avoid creating duplicate guardrail ids.
 
 ## Step 4 — Self-Critique (first pass)
 
@@ -122,6 +123,9 @@ Before emitting JSON, verify:
 - When `classification == "plugin-defect"`, `proposals` is an empty array and
   `routeToErrorReport` is `true` with a non-empty `errorReportPayload`
 - No proposal targets a path outside `PROJECT_ROOT`
+- Review-dimensions ordering: `review-dimensions` proposals appear first in `proposals[]` (R14)
+- Minimum coverage: envelope contains ≥1 review-dimensions proposal OR `skipped.reviewDimensions.rationale` is set (R14)
+- Duplication: every `plan-guardrails` / `execute-guardrails` proposal that overlaps an existing guardrail (by id or description) uses `action: "consolidate"`, not `"strengthen"` or `"add"` (R15)
 
 Note every failing check.
 
@@ -137,7 +141,7 @@ Re-run all Step 4 checks after improvements. Continue until all checks pass (max
 
 ## Step 5 — Emit the JSON Object
 
-Output a single JSON object and nothing else:
+Output a single JSON object and nothing else. When the envelope contains proposals for multiple surfaces, list `review-dimensions` proposals first (R14):
 
 ```json
 {
@@ -145,10 +149,20 @@ Output a single JSON object and nothing else:
   "classificationRationale": "string",
   "routeToErrorReport": false,
   "errorReportPayload": null,
+  "skipped": {
+    "reviewDimensions": { "rationale": "optional — set when no review-dimensions proposal is emitted" }
+  },
   "proposals": [
     {
-      "surface": "plan-guardrails",
+      "surface": "review-dimensions",
       "action": "add",
+      "targetFile": "/abs/path/.sdlc/review-dimensions/new-dim.md",
+      "patch": "...",
+      "rationale": "..."
+    },
+    {
+      "surface": "plan-guardrails",
+      "action": "consolidate",
       "targetFile": "/abs/path/.sdlc/config.json",
       "patch": "...",
       "rationale": "..."
@@ -214,7 +228,8 @@ chain-of-thought.
   invariant is enforced at the tool boundary.
 - **Do not delete the manifest.** The skill body owns cleanup.
 - **Do not return prose around the JSON.** One JSON object only.
-- **Do not propose relaxing or removing existing rules.** v1 is strengthen-only.
+- **Do not propose relaxing or removing existing rules.** v1 is strengthen-only (R8/C9).
 - **Do not invent surface contents.** If a surface array is empty in the
   manifest, do not fabricate proposals for it — either propose `add` with an
   explicit new rule rationalized by the failure signal, or SKIP.
+- **Strengthen-only invariant applies to `consolidate` identically (R8/C9).** A `consolidate` proposal MUST NOT remove fields, lower severity, or widen descriptions. It may only tighten descriptions, raise severity, or narrow globs — same constraints as `strengthen` or `add`.
