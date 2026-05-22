@@ -71,9 +71,9 @@ For 4+ file scopes, plan-sdlc dispatches a parallel dynamic-dimension orchestrat
 
 **Step 2 — Decompose.** Same as today, but each Standard/Complex task must cite ≥1 `F-<DIM>-<n>` ID or be marked "out-of-scope addition" with rationale. Trivial tasks exempt. When web/hybrid ran, Key Decisions explicitly **ADOPTS**, **REJECTS-with-rationale**, or marks **NOT-APPLICABLE** each web finding by ID.
 
-**Step 3 — Critique.** One new gate row (G15): brief-citation coverage. Error severity when brief was produced; not-applicable when fallback ran.
+**Step 3 — Critique (5-lane parallelized).** All 17 quality gates (G1–G17) are partitioned across five lanes and dispatched in a single message as parallel Agent calls — one subagent per lane. The lanes run concurrently; Step 3 completes only after **all five lanes have returned** (JOIN barrier). One new gate row (G15): brief-citation coverage. Error severity when brief was produced; not-applicable when fallback ran. Lane 3 is the guardrail-compliance lane — `guardrailsEvaluated` fires when lane 3 returns. `critiqueRan` fires after all five lanes join.
 
-**Step 5 — Reviewer.** plan-reviewer-prompt gains a `{BRIEF_FILE}` input plus two gate rows: *exploration provenance* (uncited Standard/Complex tasks blocking) and *best-practice traceability* (silent omission of a web finding blocking).
+**Step 5 — Reviewer.** plan-reviewer-prompt gains a `{BRIEF_FILE}` input plus two gate rows: *exploration provenance* (uncited Standard/Complex tasks blocking) and *best-practice traceability* (silent omission of a web finding blocking). The reviewer also uses the multi-lens fan-out (R36): review dimensions are dispatched in parallel across the same five-lane structure, with each lane receiving `{REQUIREMENTS_SUMMARY}` (the numbered requirements list captured from the Step 1 CONSUME pass) so independent lenses can check requirement coverage without repeating work.
 
 **Cleanup.** Tempdir wiped by the EXIT/INT/TERM trap installed in Step 1. Orphans from crashed runs swept by `ship-sdlc --gc`, which now globs `sdlc-explore-*` alongside the existing four state-file buckets and removes by mtime + branch-liveness.
 
@@ -319,8 +319,8 @@ When `plan-sdlc` runs, it writes a per-branch plan integrity state file at `.sdl
 |---|---|
 | `skillInvoked` | Step 0 prepare — plan-sdlc was invoked |
 | `planFile` | After Step 0 path resolution — plan file path resolved and recorded |
-| `guardrailsEvaluated` | End of Step 3 — guardrail-compliance gate completed |
-| `critiqueRan` | Final action of Step 3 — all critique checks completed |
+| `guardrailsEvaluated` | End of Step 3, lane 3 (guardrail-compliance) — fires when lane 3 returns its result, before the 5-lane JOIN barrier completes |
+| `critiqueRan` | After Step 3 JOIN barrier — fires only when all five critique lanes have returned and results are merged |
 
 A sibling field `planFilePath` stores the absolute path to the plan file so the hook can stat it for non-empty content.
 

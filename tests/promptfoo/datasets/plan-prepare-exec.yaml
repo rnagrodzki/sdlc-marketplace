@@ -278,3 +278,62 @@
       value: '"promptTemplatePath"'
     - type: icontains
       value: 'g17-dimension-coverage-prompt.md'
+
+# --- P16/P17 signals: lanes[] and lensReviewers[] (R35, R36 — Fixes #418) ---
+
+- description: "plan-prepare T4a: lanes[] has exactly 5 entries with disjoint gateIds covering G1-G17 (R35, Fixes #418)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/plan-prepare-github-remote"
+  assert:
+    - type: icontains
+      value: '"lanes"'
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        if (!data.lanes || !Array.isArray(data.lanes)) return 'lanes field missing or not array';
+        if (data.lanes.length !== 5) return `expected 5 lanes, got ${data.lanes.length}`;
+        // Check all required fields present on each entry (including null promptTemplatePath entries)
+        for (const lane of data.lanes) {
+          if (!lane.name) return `lane missing name: ${JSON.stringify(lane)}`;
+          if (!lane.subagentType) return `lane missing subagentType: ${lane.name}`;
+          if (!lane.model) return `lane missing model: ${lane.name}`;
+          if (!('promptTemplatePath' in lane)) return `lane missing promptTemplatePath key: ${lane.name}`;
+          if (!lane.gateIds || !Array.isArray(lane.gateIds) || lane.gateIds.length === 0) return `lane missing gateIds: ${lane.name}`;
+        }
+        // Check disjoint gateIds
+        const allGateIds = data.lanes.flatMap(l => l.gateIds);
+        const uniqueGateIds = new Set(allGateIds);
+        if (allGateIds.length !== uniqueGateIds.size) return `duplicate gateIds across lanes: ${allGateIds}`;
+        // Check G1-G17 coverage
+        const expectedGates = new Set(['G1','G2','G3','G4','G5','G6','G7','G8','G9','G10','G11','G12','G13','G14','G15','G16','G17']);
+        for (const g of expectedGates) {
+          if (!uniqueGateIds.has(g)) return `missing gate in lanes[].gateIds: ${g}`;
+        }
+        if (uniqueGateIds.size !== expectedGates.size) return `unexpected extra gates: ${[...uniqueGateIds].filter(g => !expectedGates.has(g))}`;
+        return true;
+
+- description: "plan-prepare T4b: lensReviewers[] has exactly 3 entries with non-empty focusCategories (R36, Fixes #418)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/plan-prepare-github-remote"
+  assert:
+    - type: icontains
+      value: '"lensReviewers"'
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        if (!data.lensReviewers || !Array.isArray(data.lensReviewers)) return 'lensReviewers field missing or not array';
+        if (data.lensReviewers.length !== 3) return `expected 3 lensReviewers, got ${data.lensReviewers.length}`;
+        const expectedLenses = ['architecture', 'requirements', 'risk'];
+        for (let i = 0; i < data.lensReviewers.length; i++) {
+          const lr = data.lensReviewers[i];
+          if (lr.lens !== expectedLenses[i]) return `expected lens ${expectedLenses[i]} at index ${i}, got ${lr.lens}`;
+          if (!lr.subagentType) return `lensReviewer[${i}] missing subagentType`;
+          if (!lr.model) return `lensReviewer[${i}] missing model`;
+          if (!('promptTemplatePath' in lr)) return `lensReviewer[${i}] missing promptTemplatePath key`;
+          if (!lr.focusCategories || !Array.isArray(lr.focusCategories) || lr.focusCategories.length === 0) return `lensReviewer[${i}] missing or empty focusCategories`;
+        }
+        return true;
