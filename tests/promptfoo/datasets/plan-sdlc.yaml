@@ -8,6 +8,11 @@
 #   plan-web-mode-suppressed       -- CORRECT: pure-refactor + webResearchSignal: false; exercises R25a web suppression
 #   plan-lightweight-skip          -- CORRECT: ≤3-file scope + manifestPath: null; exercises R24 lightweight skip
 #   plan-orchestrator-fallback     -- CORRECT: explorePack.error non-null; exercises R28 fallback path
+#   plan-g17-create-new-glob-family    -- CORRECT: C2 create proposal for uncovered path prefix (Fixes #417)
+#   plan-g17-update-rename-drift       -- CORRECT: U3 update proposal for directory rename trigger staleness (Fixes #417)
+#   plan-g17-behavior-mod-no-new-files -- CORRECT: B1 update-behavior proposal for public CLI flag addition (Fixes #417)
+#   plan-g17-doc-only-suppressed       -- CORRECT: doc-only diff suppresses all G17 proposals, empty findings (Fixes #417)
+#   plan-g17-pure-refactor-suppressed  -- CORRECT: pure-refactor markers suppress B-criteria, empty findings (Fixes #417)
 
 - description: "plan-sdlc: asks whether to execute after plan is written"
   vars:
@@ -466,3 +471,152 @@
         The response evaluates G16 and finds it SATISFIED: "Add unit tests for all new code"
         is listed in ## Out-of-scope OpenSpec tasks with a one-line rationale. G16 does not
         block. The response does not flag this as a problem and proceeds past the coverage gate.
+
+# G17 Dimension Coverage gate tests (Fixes #417) — T8a through T8h
+
+- description: "plan-sdlc: G17 dispatched in parallel at Step 3 start using g17Dispatch fields (R31, R33, #417)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-dispatch.md"
+    user_request: >
+      Run /plan-sdlc. The prepare output includes g17Dispatch: { subagentType:
+      "general-purpose", model: "sonnet", promptTemplatePath:
+      "/some/path/g17-dimension-coverage-prompt.md" } and githubHosting: { detected: true,
+      host: "github.com" }. Describe what happens at the START of Step 3.
+  assert:
+    - type: icontains
+      value: "G17"
+    - type: llm-rubric
+      value: >
+        The response describes dispatching the G17 Dimension Coverage subagent at the START
+        of Step 3, in parallel with main-thread gate evaluations. The dispatch uses
+        g17Dispatch.subagentType ("general-purpose"), g17Dispatch.model ("sonnet"), and
+        g17Dispatch.promptTemplatePath as parameters — it does NOT hardcode these values.
+        The response explains that the main thread continues gate evaluations while G17 runs
+        concurrently, and that results are joined before writing the critiqueRan marker.
+
+- description: "plan-sdlc: G17 skipped when promptTemplatePath is null (R31, #417)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-dispatch.md"
+    user_request: >
+      Run /plan-sdlc. The prepare output includes g17Dispatch: { subagentType:
+      "general-purpose", model: "sonnet", promptTemplatePath: null, error: "template not
+      found" }. Describe what happens at Step 3 for G17.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response skips G17 dispatch entirely because promptTemplatePath is null. It
+        treats g17Findings as empty (findings: [], rendering: "", suppressed_count: 0).
+        The response does NOT attempt to dispatch the subagent with a null template path.
+        It logs the skip (or describes logging to .sdlc/learnings/log.md). Plan finalization
+        is NOT blocked — G17 is advisory and a skip is not a failure.
+
+- description: "plan-sdlc: G17 dispatch failure treated as empty findings, plan not blocked (R31, #417)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-dispatch.md"
+    user_request: >
+      Run /plan-sdlc. Step 3 G17 subagent was dispatched but returned malformed JSON (not
+      parseable). Describe how plan-sdlc handles this failure.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response treats the dispatch failure as an empty-findings fallback: g17Findings
+        becomes { findings: [], rendering: "", suppressed_count: 0 }. The plan is NOT blocked
+        — G17 is advisory. The failure is logged to .sdlc/learnings/log.md. The response
+        does not re-attempt dispatch in a retry loop. Step 4 proceeds normally with empty
+        g17Findings.
+
+- description: "plan-sdlc: G17 C2 finding spliced into plan at Step 4 as Suggested Review Dimensions (R34, #417)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-g17-create-new-glob-family.md"
+    user_request: >
+      Run /plan-sdlc. Step 3 G17 subagent returned: { findings: [{ kind: "CREATE",
+      dimension: "payments-processing", criteria: ["C2"], severity_hint: "medium", why:
+      "4 files under packages/payments/ not covered by any dimension", triggers:
+      ["packages/payments/**"], actions: { dimension: "/harden-sdlc --surface
+      review-dimensions --dimension payments-processing", copilot_mirror: null } }],
+      suppressed_count: 0, rendering: "## Suggested Review Dimensions\n\n### CREATE:
+      payments-processing\n**Why:** 4 files under packages/payments/ not covered.\n**Severity
+      hint:** medium\n**Triggers:** packages/payments/**\n**Action (dimension):**
+      /harden-sdlc --surface review-dimensions --dimension payments-processing" }.
+      Describe what happens at Step 4.
+  assert:
+    - type: icontains
+      value: "Suggested Review Dimensions"
+    - type: llm-rubric
+      value: >
+        The response appends the g17Findings.rendering markdown verbatim to the plan file
+        at Step 4. Placement: after ## Guardrail Compliance if present, otherwise after the
+        last ### Task N: block. The response does NOT modify the rendering content — it
+        splices it verbatim. Plan finalization is not blocked. The response proceeds to
+        Step 5 autonomously after splicing.
+
+- description: "plan-sdlc: G17 empty findings — no Suggested Review Dimensions section appended (R34, #417)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-g17-doc-only-suppressed.md"
+    user_request: >
+      Run /plan-sdlc. Step 3 G17 subagent returned empty findings: { findings: [],
+      suppressed_count: 0, rendering: "" }. Describe what happens at Step 4 regarding
+      the Suggested Review Dimensions section.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response does NOT append a ## Suggested Review Dimensions section to the plan
+        file. Empty findings mean no advisory section is written. The response does not
+        treat absent proposals as a failure. Plan finalization proceeds normally. The
+        response does not mention G17 in the plan output — the absence of proposals is
+        silent.
+
+- description: "plan-sdlc: G17 row appears in Step 3 gate table as advisory non-blocking (R31, G17, #417)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-written.md"
+    user_request: >
+      List the quality gates evaluated at Step 3 of plan-sdlc. Is G17 blocking or
+      non-blocking?
+  assert:
+    - type: icontains
+      value: "G17"
+    - type: llm-rubric
+      value: >
+        The response lists G17 (Dimension Coverage) as one of the Step 3 quality gates.
+        G17 is described as advisory and non-blocking — findings are surfaced in Step 4
+        but absent proposals do not fail plan finalization. The response does not claim
+        G17 can block the plan.
+
+- description: "plan-sdlc: G17 join guard — critiqueRan marker written only after G17 returns (R31, #417)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-dispatch.md"
+    user_request: >
+      Run /plan-sdlc. G17 subagent is still running when main-thread gate evaluations
+      complete. Describe when the critiqueRan checkpoint marker is written.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that the critiqueRan marker is NOT written until G17 has
+        returned and g17Findings is populated. The main thread waits (joins) on G17 before
+        writing the critiqueRan checkpoint. This join requirement is described as mandatory —
+        critiqueRan marks that ALL Step 3 checks are complete including G17.
+
+- description: "plan-sdlc: G17 does not re-derive githubHosting — consumes P14 value (flag-resolution-single-source, #417)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-dispatch.md"
+    user_request: >
+      Run /plan-sdlc. The prepare output has githubHosting: { detected: true, host:
+      "github.com" }. How does SKILL.md pass this information to the G17 subagent?
+      Does SKILL.md re-derive whether the repo is on GitHub?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that SKILL.md passes the githubHosting.detected value from
+        the P14 prepare output field directly to the G17 subagent as the
+        {GITHUB_HOSTING_DETECTED} template variable. SKILL.md does NOT re-run git remote
+        commands or re-derive the hosting flag — it consumes the value from P14 exactly
+        once (flag-resolution-single-source guardrail). The G17 prompt also instructs the
+        subagent not to re-derive this value.

@@ -220,3 +220,61 @@
       value: '"manifestPathNull": true'
     - type: not-icontains
       value: '"explorerPackError": null'
+
+# --- P14/P15 signals: githubHosting and g17Dispatch (R32, R33 — Fixes #417) ---
+
+- description: "plan-prepare T3a: GitHub origin → githubHosting.detected true, host github.com (R32, Fixes #417)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/plan-prepare-github-remote"
+  assert:
+    - type: icontains
+      value: '"githubHosting"'
+    - type: icontains
+      value: '"detected": true'
+    - type: icontains
+      value: '"host": "github.com"'
+
+- description: "plan-prepare T3b: GitLab origin → githubHosting.detected false, host gitlab.com (R32, Fixes #417)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/plan-prepare-gitlab-remote"
+  assert:
+    - type: icontains
+      value: '"githubHosting"'
+    - type: icontains
+      value: '"detected": false'
+    - type: icontains
+      value: '"host": "gitlab.com"'
+
+- description: "plan-prepare T3c: no origin → githubHosting.detected false, host null (R32, Fixes #417)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/plan-prepare-no-remote"
+  assert:
+    - type: icontains
+      value: '"githubHosting"'
+    - type: icontains
+      value: '"detected": false'
+    - type: icontains
+      value: '"host": null'
+
+- description: "plan-prepare T3d: g17Dispatch shape present with required keys (R33, Fixes #417)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/plan-prepare-github-remote"
+  assert:
+    - type: icontains
+      value: '"g17Dispatch"'
+    - type: icontains
+      value: '"subagentType": "general-purpose"'
+    - type: icontains
+      value: '"model": "sonnet"'
+    - type: icontains
+      value: '"promptTemplatePath"'
+    - type: icontains
+      value: 'g17-dimension-coverage-prompt.md'

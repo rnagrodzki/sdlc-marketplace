@@ -313,6 +313,21 @@ Do not mandate TDD for config, documentation, or infrastructure tasks.
 
 **Re-anchor:** Re-read the plan file before evaluating gates. The file — not your memory of it — is the source of truth.
 
+**G17 Dimension Coverage subagent dispatch (R31, R33, parallel with main-thread gates):**
+
+Dispatch the G17 subagent at the START of Step 3, in parallel with the main thread's gate evaluations below. Parameters come verbatim from prepare output (`agent-dispatch-script-driven` guardrail — do NOT hardcode these values):
+
+- `subagent_type`: `g17Dispatch.subagentType`
+- `model`: `g17Dispatch.model`
+- prompt body: read `g17Dispatch.promptTemplatePath` and fill template variables `{PLAN_FILE_PATH}` (absolute path to the plan file), `{DIMENSIONS_DIR}` (`.sdlc/review-dimensions/`), `{COPILOT_DIR}` (`.github/instructions/`), `{GITHUB_HOSTING_DETECTED}` (`githubHosting.detected` from P14), `{LEARNINGS_LOG_PATH}` (`.sdlc/learnings/log.md`), `{PR_COMMIT_WINDOW}` (best-effort "last 14 days" if unknown)
+
+When `g17Dispatch.promptTemplatePath` is null (prepare script reported an error finding the template), skip G17 dispatch entirely and treat `g17Findings` as empty. Log to `.sdlc/learnings/log.md`:
+```
+## YYYY-MM-DD — plan-sdlc: G17 skipped — promptTemplatePath null (template not found at prepare time)
+```
+
+While G17 runs, continue main-thread gate evaluations below. **JOIN on G17 before writing the `critiqueRan` marker.** Persist G17's returned JSON in memory as `g17Findings` for Step 4 consumption. Parse the `findings` JSON object from the subagent's response. **On dispatch failure / timeout / malformed JSON** — treat `g17Findings` as `{ findings: [], rendering: "", suppressed_count: 0 }` and continue; log failure to `.sdlc/learnings/log.md` per R31 dispatch-failure fallback.
+
 Check each quality gate:
 
 | Gate | Check |
@@ -333,6 +348,7 @@ Check each quality gate:
 | Self-containment test | Pick the most complex task — could an agent implement it using only its description + Key Decisions? If not, the description is incomplete |
 | Guardrail compliance | For each guardrail in `activeGuardrails`: evaluate whether the plan (as written) satisfies its `description`. Report each as PASS or FAIL with a one-line rationale. Guardrails with `severity: "error"` (or no severity, defaulting to error) that FAIL are blocking — they must be fixed in Step 4. Guardrails with `severity: "warning"` that FAIL are advisory — note them but do not block. |
 | OpenSpec tasks.md coverage (G16) | When `fromOpenspecDirect` is true: every entry in `openspecContext.tasks[]` is either (a) referenced by ≥1 plan task's `openspec-task.ref`, or (b) listed in `## Out-of-scope OpenSpec tasks`. Error severity (blocking). |
+| Dimension Coverage (G17) | When G17 subagent dispatched: emit proposals per R31 criteria with R31 suppression and ranking. Severity: **advisory** — findings are surfaced in Step 4 but never block plan finalization. Absent proposals do not fail this gate. |
 
 Note every issue. Do NOT write to the plan file in this step.
 
@@ -345,7 +361,9 @@ SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/pla
 [ -n "$SCRIPT" ] && node "$SCRIPT" --mark guardrailsEvaluated 2>/dev/null || true
 ```
 
-**critiqueRan marker (implements R20, issue #285):** After all Step 3 checks are complete (this is the final action of Step 3), record the checkpoint.
+Ensure G17 has returned and `g17Findings` is populated before marking critiqueRan (implements R31 join requirement).
+
+**critiqueRan marker (implements R20, issue #285):** After all Step 3 checks are complete AND G17 has returned (this is the final action of Step 3), record the checkpoint.
 
 ```bash
 SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
@@ -371,7 +389,15 @@ If `activeGuardrails` is non-empty, append a `## Guardrail Compliance` section t
 | prefer-composition | warning | PASS | No class hierarchies proposed |
 ```
 
-Step 4 is autonomous (implements R22 single-touchpoint handoff). After fixes are applied (and the Guardrail Compliance section written when `activeGuardrails` is non-empty), proceed directly to Step 5. The user does NOT see the plan at Step 4; the single user touchpoint for the finalized plan is Step 7 (Handoff). The Step 4 error-severity guardrail-block harden offer above remains a genuine decision gate and is preserved (R19).
+**Suggested Review Dimensions (R34, KD6 placement — Fixes #417):**
+
+When `g17Findings.findings` is non-empty, append the `g17Findings.rendering` markdown verbatim to the plan file. Placement (KD6):
+- If `## Guardrail Compliance` was written above, splice immediately after that section.
+- Otherwise, splice immediately after the last `### Task N:` block.
+
+When `g17Findings.findings` is empty (or `g17Findings` is the empty-fallback from a dispatch failure), do nothing. Absent proposals are not a failure — G17 is advisory (R31).
+
+Step 4 is autonomous (implements R22 single-touchpoint handoff). After fixes are applied (Guardrail Compliance section written when `activeGuardrails` is non-empty, and Suggested Review Dimensions spliced when `g17Findings.findings` is non-empty per R34), proceed directly to Step 5. The user does NOT see the plan at Step 4; the single user touchpoint for the finalized plan is Step 7 (Handoff). The Step 4 error-severity guardrail-block harden offer above remains a genuine decision gate and is preserved (R19).
 
 ## Step 5 (CRITIQUE): Plan Review Loop
 

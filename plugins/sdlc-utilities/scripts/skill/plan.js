@@ -34,7 +34,7 @@ const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { initState, findStateFile, readState, writeState, slugifyBranch, pruneStateFiles } = require(path.join(LIB, 'state'));
-const { exec } = require(path.join(LIB, 'git'));
+const { exec, parseRemoteOwner } = require(path.join(LIB, 'git'));
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -128,6 +128,75 @@ function runMarkMode(markName, markPath) {
 }
 
 // ---------------------------------------------------------------------------
+// P14/P15 helpers — G17 Dimension Coverage gate (R32, R33) — Fixes #417
+// ---------------------------------------------------------------------------
+
+/**
+ * Build P14 githubHosting signal (R32).
+ * Uses parseRemoteOwner from lib/git.js — no re-derivation in SKILL.md or G17 prompt.
+ * @param {string} projectRoot
+ * @returns {{ detected: boolean, host: string|null }}
+ */
+function buildGithubHosting(projectRoot) {
+  try {
+    const parsed = parseRemoteOwner(projectRoot);
+    if (!parsed) return { detected: false, host: null };
+    return { detected: parsed.host === 'github.com', host: parsed.host };
+  } catch {
+    return { detected: false, host: null };
+  }
+}
+
+/**
+ * Build P15 g17Dispatch metadata (R33).
+ * Resolves the G17 prompt template path via find cascade:
+ *   1. ~/.claude/plugins (installed plugin path)
+ *   2. workspace-relative (development / CI path)
+ * Returns null promptTemplatePath and adds an error when the file cannot be found.
+ * @returns {{ subagentType: string, model: string, promptTemplatePath: string|null, error?: string }}
+ */
+function buildG17Dispatch() {
+  const templateName = 'g17-dimension-coverage-prompt.md';
+  const subagentType = 'general-purpose';
+  const model = 'sonnet';
+
+  // 1. Try installed plugin path via find
+  const findResult = spawnSync(
+    'find',
+    [
+      `${process.env.HOME}/.claude/plugins`,
+      '-name', templateName,
+      '-path', '*/plan-sdlc/*',
+    ],
+    { encoding: 'utf8' },
+  );
+  if (!findResult.error && findResult.status === 0) {
+    const lines = (findResult.stdout || '').trim().split('\n').filter(Boolean);
+    if (lines.length > 0) {
+      // sort -V semantics: pick the last (highest version) entry
+      const sorted = lines.slice().sort();
+      return { subagentType, model, promptTemplatePath: sorted[sorted.length - 1] };
+    }
+  }
+
+  // 2. Workspace-relative fallback (development / CI)
+  const workspacePath = path.join(
+    __dirname,
+    '..', '..', 'skills', 'plan-sdlc', templateName,
+  );
+  if (fs.existsSync(workspacePath)) {
+    return { subagentType, model, promptTemplatePath: workspacePath };
+  }
+
+  // 3. Not found — surface as error; G17 cannot dispatch without a prompt template
+  return {
+    subagentType,
+    model,
+    promptTemplatePath: null,
+    error: `G17 prompt template not found: ${templateName}`,
+  };
+}
+
 // plan-explore.js invocation — builds explorePack (R24 / P8–P12)
 // ---------------------------------------------------------------------------
 
@@ -356,13 +425,23 @@ function main() {
     process.stderr.write(`[plan-prepare] plan-explore warning: ${explorePack.error}\n`);
   }
 
-  // 5. Output
+  // 5. P14/P15 — G17 dispatch signals (R32, R33 — Fixes #417)
+  // --mark mode short-circuits before this point, so these only run in --output-file mode.
+  const githubHosting = buildGithubHosting(projectRoot);
+  const g17Dispatch = buildG17Dispatch();
+  if (g17Dispatch.error) {
+    errors.push(g17Dispatch.error);
+  }
+
+  // 6. Output
   const output = {
     openspec,
     fromOpenspec: fromOpenspecResult,
     openspecContext,
     guardrails,
     explorePack,
+    githubHosting,
+    g17Dispatch: { subagentType: g17Dispatch.subagentType, model: g17Dispatch.model, promptTemplatePath: g17Dispatch.promptTemplatePath },
     errors,
   };
 

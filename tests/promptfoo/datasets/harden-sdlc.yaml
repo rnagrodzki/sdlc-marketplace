@@ -379,3 +379,62 @@
         guardrail as the plan-guardrails proposal, and states that the YAML dimension
         proposal must come first regardless of which surface seems more "directly"
         related to the failure.
+
+- description: "dimensions-line-emitted-when-review-dimensions-in-surface-list (R18, Fixes #417): Dimensions: line appears in Learning Capture when review-dimensions surface was touched"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-dimension-blocker-context.md"
+    user_request: >
+      A harden-sdlc run touched the review-dimensions surface and created a new
+      dimension file named 'yaml-config-coverage'. The hardening was classified
+      as user-code with one proposal applied. What does the Step 7 Learning Capture
+      log entry look like? Show the full multi-line block including all required fields.
+  assert:
+    # Must include Dimensions: line
+    - type: regex
+      value: "Dimensions:\\s*yaml-config-coverage"
+    # Must include surface-list with review-dimensions
+    - type: regex
+      value: "review-dimensions"
+    # Must include Applied: line
+    - type: regex
+      value: "Applied:"
+    # Must include AmbiguousOffer: line
+    - type: regex
+      value: "AmbiguousOffer:"
+    # Behavioral
+    - type: llm-rubric
+      value: >
+        The response shows a multi-line Learning Capture log entry that includes
+        a 'Dimensions: yaml-config-coverage' line (R18). The entry includes the
+        standard Applied: / AmbiguousOffer: / Trigger: lines. The Dimensions: line
+        appears because review-dimensions was in the surface-list. The response
+        explains that G17 in plan-sdlc will grep this line to suppress duplicate
+        dimension proposals within the PR window (Fixes #417 defer rule).
+
+- description: "dimensions-line-omitted-when-review-dimensions-not-in-surface-list (R18, Fixes #417): Dimensions: line must NOT appear when only plan-guardrails was touched"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plan-guardrail-failure-context.md"
+    user_request: >
+      A harden-sdlc run touched only the plan-guardrails surface (no review-dimensions
+      were created or modified). The hardening was classified as user-code with one
+      proposal applied. What does the Step 7 Learning Capture log entry look like?
+  assert:
+    # Must NOT include Dimensions: line
+    - type: not-regex
+      value: "Dimensions:"
+    # Must include Applied: line
+    - type: regex
+      value: "Applied:"
+    # Must include AmbiguousOffer: line
+    - type: regex
+      value: "AmbiguousOffer:"
+    # Behavioral
+    - type: llm-rubric
+      value: >
+        The response shows a Learning Capture log entry that does NOT contain a
+        'Dimensions:' line (R18). The Dimensions: line is only emitted when
+        review-dimensions appears in the surface-list. Since only plan-guardrails
+        was touched, the line is absent. The entry includes Applied:, AmbiguousOffer:,
+        and Trigger: lines only.
