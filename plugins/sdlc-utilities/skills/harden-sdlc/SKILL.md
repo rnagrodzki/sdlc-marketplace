@@ -19,15 +19,31 @@ next time. Implements `docs/specs/harden-sdlc.md`.
 
 ---
 
-## Step 0 — Parse Arguments (R1, R2)
+## Step 0 — Parse Arguments (R1, R2, R19)
 
-Required CLI flags: `--failure-text`, `--skill`. Optional: `--step`,
-`--operation`, `--exit-code`, `--error-type`, `--user-intent`, `--args-string`.
+**Mutually exclusive primary inputs:**
 
-If `--failure-text` or `--skill` is missing, stop with an error message and do
-not proceed past this step. The prepare script enforces this hard constraint
-again at runtime, but failing fast in the skill body avoids wasting a script
-invocation.
+| Mode | Flag | Required when |
+|---|---|---|
+| Inline failure text | `--failure-text <string>` | Always, unless `--from-issue` is used |
+| GitHub issue fetch | `--from-issue <num>` | Alternative to `--failure-text` |
+
+If both `--failure-text` and `--from-issue` are provided simultaneously, stop
+immediately with exit code 2 and a clear mutual-exclusion error message. Do not
+proceed to the prepare script.
+
+If neither `--failure-text` nor `--from-issue` is present, stop with an error
+message.
+
+Required flag (always): `--skill`. Optional: `--step`, `--operation`,
+`--exit-code`, `--error-type`, `--user-intent`, `--args-string`.
+
+**When `--from-issue <num>` is used:** the prepare script fetches the GitHub
+issue body automatically (via `gh issue view`). When the issue carries the
+`mcp-failure` label, the prepare script pre-sets `classification: "plugin-defect"`
+in the manifest, which causes Step 4 to jump directly to Step 6 (PLUGIN-DEFECT
+ROUTE) without the Step 3 orchestrator dispatch. Pass `--from-issue "$ISSUE_NUM"`
+to the prepare script invocation in Step 1.
 
 ---
 
@@ -43,7 +59,8 @@ SCRIPT=$(resolve_script "harden-prepare.js" "*/sdlc*/scripts/skill/harden-prepar
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/harden-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
 MANIFEST_FILE=$(node "$SCRIPT" \
-  --failure-text "$FAILURE_TEXT" \
+  ${FAILURE_TEXT:+--failure-text "$FAILURE_TEXT"} \
+  ${FROM_ISSUE:+--from-issue "$FROM_ISSUE"} \
   --skill "$SKILL_NAME" \
   --step "$STEP_NAME" \
   --operation "$OPERATION" \
@@ -91,8 +108,13 @@ harden-sdlc: failure context loaded
   Classification hint:  {classification_hint or "(none — orchestrator will classify)"}
 ```
 
-The orchestrator (Step 3) is responsible for the authoritative classification.
-Continue to Step 3.
+When `classification_hint == "plugin-defect"` (set by prepare script when
+`--from-issue` fetches an issue with the `mcp-failure` label), skip Step 3 and
+jump directly to Step 4 → Step 6 (PLUGIN-DEFECT ROUTE). The manifest already
+carries the pre-set classification; the orchestrator agent is not needed.
+
+The orchestrator (Step 3) is responsible for the authoritative classification
+in all other cases. Continue to Step 3.
 
 ---
 

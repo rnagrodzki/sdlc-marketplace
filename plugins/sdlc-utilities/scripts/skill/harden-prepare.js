@@ -150,6 +150,53 @@ function main() {
     return;
   }
 
+  // R19 — --from-issue mutual exclusion with --failure-text
+  const hasFailureText = Boolean(input.failureText && String(input.failureText).trim());
+  const hasFromIssue   = Boolean(input.fromIssue   && String(input.fromIssue).trim());
+
+  if (hasFailureText && hasFromIssue) {
+    const msg = '--failure-text and --from-issue are mutually exclusive — provide one or the other, not both';
+    process.stderr.write(`harden-prepare: ${msg}\n`);
+    writeOutput({ errors: [msg], warnings: [] }, 'sdlc-harden', 2);
+    return;
+  }
+
+  // R19 — fetch issue body when --from-issue is used
+  let classificationHint = null;
+  if (hasFromIssue) {
+    const issueNum = String(input.fromIssue).trim();
+    // Validate as pure positive integer before passing to execSync to prevent
+    // shell injection via metacharacters (e.g., `; rm -rf /`).
+    if (!/^\d+$/.test(issueNum)) {
+      const msg = `--from-issue: invalid issue number "${issueNum}" — must be a positive integer`;
+      errors.push(msg);
+      process.stderr.write(`harden-prepare: ${msg}\n`);
+      writeOutput({ errors, warnings: [] }, 'sdlc-harden', 1);
+      return;
+    }
+    let issueJson = null;
+    try {
+      const out = execSync(
+        `gh issue view ${issueNum} --json body,labels,title`,
+        { stdio: ['ignore', 'pipe', 'pipe'], timeout: 15000 }
+      ).toString().trim();
+      issueJson = JSON.parse(out);
+    } catch (err) {
+      const msg = `--from-issue ${issueNum}: gh issue view failed — ${err.stderr ? err.stderr.toString().trim() : err.message}`;
+      errors.push(msg);
+      process.stderr.write(`harden-prepare: ${msg}\n`);
+      writeOutput({ errors, warnings: [] }, 'sdlc-harden', 1);
+      return;
+    }
+    // Populate failureText from issue body
+    input.failureText = issueJson.body || '';
+    // Pre-set classification hint when issue has mcp-failure label (R19)
+    const labels = (issueJson.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+    if (labels.includes('mcp-failure')) {
+      classificationHint = 'plugin-defect';
+    }
+  }
+
   const required = ['failureText', 'skill'];
   for (const key of required) {
     if (!input[key] || String(input[key]).trim() === '') {
@@ -225,7 +272,7 @@ function main() {
       userIntent: input.userIntent != null ? String(input.userIntent)        : '',
       argsString: input.argsString != null ? String(input.argsString)        : '',
     },
-    classification_hint: null,
+    classification_hint: classificationHint,
     surfaces: {
       planGuardrails,
       executeGuardrails,
