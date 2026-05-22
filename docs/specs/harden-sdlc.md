@@ -52,6 +52,18 @@
 - R16 — Pre-flight existing-config validation: `harden-prepare.js` MUST validate the on-disk state of `.sdlc/config.json` (both `plan.guardrails[]` and `execute.guardrails[]` sections) AND every existing `.sdlc/review-dimensions/*.md` file BEFORE assembling the manifest. Validation uses `ci/validate-guardrails.js::validateGuardrailsConfig` (extracted per Task 4) and `lib/dimensions.js::validateDimensionFile`. On any error, the prepare script MUST exit 1 with structured `errors[]` (per-surface, per-file) and MUST NOT write the manifest.
   - Acceptance: invocation against a fixture with broken dimension frontmatter exits 1 and prints the file path + error.
 - R17 — Severity vocabulary single source: The canonical severity vocabularies live in `lib/dimensions.js`: existing `VALID_SEVERITIES` (review-dimensions: `critical|high|medium|low|info`) and new export `GUARDRAIL_SEVERITIES` (`error|warning`, for plan/execute guardrails). This inline definition at R17 is the single canonical restatement of the literal vocabulary — all other markdown surfaces (SKILL.md, orchestrator, docs) MUST reference by qualified name (`lib/dimensions.js::VALID_SEVERITIES`, `lib/dimensions.js::GUARDRAIL_SEVERITIES`) and MUST NOT restate the literal vocabulary inline.
+- R18 (Fixes #417 — Learning Capture log format with Dimensions line): The LEARN step MUST append a multi-line entry to `.sdlc/learnings/log.md` with the following format:
+  ```
+  ## YYYY-MM-DD — harden-sdlc: <classification> for <failure.skill> at <failure.step>
+  Applied: <count> proposal(s) across <surface-list> | Skipped: <count> | Routed: <yes|no>
+  AmbiguousOffer: <not-applicable|offered-dispatched|offered-skipped>
+  Trigger: <first 80 chars of failure.text>
+  ```
+  When `<surface-list>` includes `review-dimensions`, the entry MUST include one additional line immediately after `Trigger:`:
+  ```
+  Dimensions: <comma-separated dimension names that were created or modified>
+  ```
+  The `Dimensions:` line MUST be omitted when the surface-list does not include `review-dimensions`. This line exists so that plan-sdlc's G17 gate can deterministically suppress duplicate dimension proposals on subsequent runs within the same PR commit window — it greps the last 100 lines of `log.md` for recent `harden-sdlc` entries whose `Dimensions:` line names the candidate dimension (Fixes #417 defer rule, R31 in the plan-sdlc spec).
 
 ## Workflow Phases
 

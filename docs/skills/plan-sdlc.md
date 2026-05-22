@@ -252,6 +252,65 @@ The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads i
 | `os.tmpdir()/sdlc-explore-<branchSlug>-XXXX/discovery-brief.md` | Dynamic-dimension discovery brief produced by `plan-explore-orchestrator` for 4+ file scopes. Contains per-dimension findings with stable `F-<DIM>-<n>` IDs, a contradictions section, and (when web/hybrid dimensions ran) a `## Best-Practice Synthesis` section. Wiped by EXIT/INT/TERM trap after Step 1 completes. Orphans swept by `ship-sdlc --gc`. |
 | Step 7 context-heaviness advisory | When the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget), Step 7 prepends a `/compact` advisory above the handoff menu. Sidecar is written by the `UserPromptSubmit` hook `hooks/context-stats.js`. Implementation: [`scripts/lib/context-advisory.js`](../../plugins/sdlc-utilities/scripts/lib/context-advisory.js) consumed via the wrapper [`scripts/skill/plan-handoff-advisory.js`](../../plugins/sdlc-utilities/scripts/skill/plan-handoff-advisory.js). Pipeline state survives `/compact` (PreCompact + SessionStart hooks). |
 
+### Suggested Review Dimensions advisory (G17)
+
+When G17 finds coverage gaps in the dimension catalog or Copilot mirror, Step 4 splices a `## Suggested Review Dimensions` advisory block into the plan file. This section is **non-blocking** — absent proposals do not prevent plan finalization.
+
+**CREATE proposals** (new dimension needed): fired when plan files land in uncovered territory.
+
+| Criterion | Condition | Default severity |
+|-----------|-----------|-----------------|
+| C1 | New top-level technology directory (e.g., `terraform/`, `k8s/`, `mobile/`) | medium |
+| C2 | 3+ new files share a common path prefix not covered by any dimension | medium |
+| C3 | Security-sensitive path pattern (`**/auth/**`, `**/secret*`, `**/cred*`, `**/iam/**`, `**/crypto/**`, `**/pii/**`) | high |
+| C4 | Infrastructure/deployment pattern (`**/infra/**`, `**/*.tf`, `**/k8s/**`, `**/helm/**`, `**/docker*`, `**/Dockerfile*`) | critical |
+| C5 | 5+ files across multiple uncovered directories | medium |
+| C6 | Single file, not matching C3/C4 (suppressed for single-file diffs) | low |
+
+**UPDATE-path proposals** (existing dimension trigger globs may be stale):
+
+| Criterion | Condition | Default severity |
+|-----------|-----------|-----------------|
+| U1 | Plan files use a different extension than the dimension's trigger globs | medium |
+| U2 | Plan files land in a subdirectory not matched by existing trigger globs | medium |
+| U3 | Plan renames/moves a directory explicitly named in a dimension trigger | high |
+| U4 | Plan adds a new file extension to a path family the dimension covers | low |
+| U5 | Trigger glob uses `**` but new files fall outside its wildcard scope | medium |
+| U6 | 3+ files added to a path family where the trigger is a specific filename, not a glob | medium |
+
+**UPDATE-behavior proposals** (dimension checklist may miss new concerns):
+
+| Criterion | Condition | Default severity |
+|-----------|-----------|-----------------|
+| B1 | Plan describes a public API, CLI flag, env var, webhook, hook, or frontmatter contract change | high |
+| B2 | Plan references auth, cryptography, PII, IAM, secrets, or session management and a `security`-type dimension exists | high |
+| B3 | Plan describes an invariant flip (sync↔async, idempotent↔non-idempotent, atomic↔multi-step) | critical |
+| B4 | Plan adds/removes a runtime dependency that changes the module surface | medium |
+
+**Suppression rules:**
+- C6 is never fired for single-file diffs.
+- UPDATE proposals are suppressed for doc-only diffs (all paths match `docs/**`, `README*`, or `*.md` outside skills).
+- B-criteria are suppressed when the description indicates rename-only, formatting, type-narrowing, or dead-code removal.
+- Surviving proposals are ranked by `severity_rank DESC, criteria_count DESC, dimension_name ASC` and capped at 3. Additional candidates appear as `_N additional candidates suppressed_`.
+- Within an active PR window, any dimension already recorded by a recent `harden-sdlc` run (via the `Dimensions:` line in `.sdlc/learnings/log.md`) is deferred — prevents duplicate proposals.
+
+**X1 Copilot-mirror clause:** When the repo is hosted on GitHub (detected via `P14 githubHosting`), CREATE proposals always include an action to generate a new `.github/instructions/<name>.instructions.md` mirror. UPDATE proposals include this action only when the dimension already has a mirror. On non-GitHub remotes, X1 is omitted entirely.
+
+**Worked example** (plan adds `packages/auth-service/**/*.ts` where no dimension covers `auth-service`):
+
+```
+## Suggested Review Dimensions
+
+### CREATE: auth-service-security
+**Why:** Plan adds 4 files under `packages/auth-service/` — no dimension covers this path. C3 fired (matches `**/auth/**`).
+**Severity hint:** high
+**Triggers:** `packages/auth-service/**`
+**Action (dimension):** `/harden-sdlc --surface review-dimensions --dimension auth-service-security`
+**Action (Copilot mirror, X1):** regenerate `.github/instructions/auth-service-security.instructions.md` per `setup-sdlc/setup-dimensions.md` Step 8 transform
+```
+
+For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R31–R34, G17.
+
 ## Plan Integrity
 
 When `plan-sdlc` runs, it writes a per-branch plan integrity state file at `.sdlc/execution/plan-<branchSlug>-<ts>.json`. The state file records four checkpoint markers as ISO timestamps:

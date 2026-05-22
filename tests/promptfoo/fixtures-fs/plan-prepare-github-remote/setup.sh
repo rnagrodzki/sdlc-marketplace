@@ -1,0 +1,9 @@
+#!/bin/bash
+# Fixture for plan-prepare-exec.yaml — T3a: GitHub remote → githubHosting.detected = true
+git init -q
+git config user.email "test@test.com"
+git config user.name "Test"
+git remote add origin git@github.com:example-org/example-repo.git
+echo "init" > README.md
+git add -A
+git commit -q -m "init"

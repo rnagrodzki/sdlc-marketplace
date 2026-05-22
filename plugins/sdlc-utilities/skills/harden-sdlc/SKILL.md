@@ -290,7 +290,21 @@ action:
 Applied: <count> proposal(s) across <surface-list> | Skipped: <count> | Routed: <yes|no>
 AmbiguousOffer: <not-applicable|offered-dispatched|offered-skipped>
 Trigger: <first 80 chars of failure.text>
+Dimensions: <comma-separated dimension names that were created or modified>
 ```
+
+The `Dimensions:` line MUST be included **only when `<surface-list>` includes
+`review-dimensions`** (i.e., at least one review-dimension file was created or
+modified during this hardening run). When `review-dimensions` is NOT in the
+surface-list, the `Dimensions:` line MUST be omitted entirely — do not emit it
+with an empty value.
+
+This line exists so that plan-sdlc's G17 Dimension Coverage gate (R31 in
+`docs/specs/plan-sdlc.md`, Fixes #417) can deterministically suppress duplicate
+dimension proposals on subsequent runs within the same PR commit window. G17
+greps the last 100 lines of `.sdlc/learnings/log.md` for recent `harden-sdlc`
+entries whose `Dimensions:` line names the candidate dimension, and defers the
+proposal when a match is found.
 
 The `AmbiguousOffer` line records the Step 5c outcome:
 
