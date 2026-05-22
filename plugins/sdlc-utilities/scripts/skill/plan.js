@@ -174,7 +174,8 @@ function buildG17Dispatch() {
     const lines = (findResult.stdout || '').trim().split('\n').filter(Boolean);
     if (lines.length > 0) {
       // sort -V semantics: pick the last (highest version) entry
-      const sorted = lines.slice().sort();
+      const ver = p => { const m = p.match(/\/(\d+)\.(\d+)\.(\d+)\/skills/); return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0]; };
+      const sorted = lines.slice().sort((a, b) => { const [a1, a2, a3] = ver(a); const [b1, b2, b3] = ver(b); return a1 - b1 || a2 - b2 || a3 - b3; });
       return { subagentType, model, promptTemplatePath: sorted[sorted.length - 1] };
     }
   }
@@ -430,7 +431,7 @@ function main() {
   const githubHosting = buildGithubHosting(projectRoot);
   const g17Dispatch = buildG17Dispatch();
   if (g17Dispatch.error) {
-    errors.push(g17Dispatch.error);
+    process.stderr.write(`[plan-prepare] G17 skipped — ${g17Dispatch.error}\n`);
   }
 
   // 6. Output

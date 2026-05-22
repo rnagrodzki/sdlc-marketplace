@@ -222,7 +222,7 @@ Failure → harden classifies → proposes surface edits → user approves → n
 | `.sdlc/config.json` | When user approves a `plan-guardrails` or `execute-guardrails` proposal — schema-validated via `ci/validate-guardrails.js` before write |
 | `.sdlc/review-dimensions/<name>.md` | When user approves a `review-dimensions` proposal — validated via `lib/dimensions.js::validateDimensionFile` before write |
 | `.github/instructions/<name>.instructions.md` | When user approves a `copilot-instructions` proposal — direct write after approval |
-| `.sdlc/learnings/log.md` | One-line append after each invocation summarizing classification, applied/skipped counts, and the failure trigger |
+| `.sdlc/learnings/log.md` | One-line append after each invocation summarizing classification, applied/skipped counts, and the failure trigger. When the `review-dimensions` surface is in the surface-list (i.e., at least one review-dimension file was created or modified), an optional `Dimensions: <comma-separated names>` line is appended immediately after the summary line. This line is consumed by plan-sdlc's G17 defer-check to determine whether a candidate dimension has been recently hardened. |
 
 No file is written without an explicit `apply` AskUserQuestion answer recorded for that specific proposal.
 
