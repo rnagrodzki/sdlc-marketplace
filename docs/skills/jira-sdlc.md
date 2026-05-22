@@ -20,7 +20,7 @@ Manages Jira issues via the Atlassian MCP with a project metadata cache that eli
 |------|-------------|---------|
 | `--project <KEY>` | Jira project key to use (e.g., `PROJ`). Auto-detected from git branch or `.sdlc/config.json` → `jira.defaultProject`. When `jira.projects` is set (≥2 entries), values outside the list are rejected. | Auto |
 | `--force-refresh` | Rebuild the project cache from scratch (cache is permanent by default; use when project metadata has changed) | — |
-| `--init-templates` | Copy the skill's default issue type templates to `.claude/jira-templates/` for customization | — |
+| `--init-templates` | Copy the skill's default issue type templates to `.sdlc/jira-templates/` for customization | — |
 | `--site <host>` | Sanitized site host (lowercased, `.` → `_`, e.g., `acme_atlassian_net`). Disambiguates `--check`/`--load` when the same project key is cached under multiple site subdirectories. | Unset |
 | `--skip-workflow-discovery` | Bypass Phase 5; cache marks each non-subtask issue type `{ unsampled: true }`. Transitions fall back to a live `getTransitionsForJiraIssue` per issue. Use in CI and other pre-seeded environments. | false |
 
@@ -87,7 +87,7 @@ Runs the 5-phase initialization, reports N issue types and M workflow states map
 /jira-sdlc --project PROJ --init-templates
 ```
 
-Copies default templates for each issue type to `.claude/jira-templates/`. Edit them to match your team's conventions.
+Copies default templates for each issue type to `.sdlc/jira-templates/`. Edit them to match your team's conventions.
 
 ### Create with a specific project
 
@@ -113,16 +113,20 @@ Default templates ship in `plugins/sdlc-utilities/skills/jira-sdlc/templates/` �
 - `Test Case.md`
 - `Test Plan.md`
 
-Project-level overrides live at `.claude/jira-templates/<IssueTypeName>.md`. File names must match Jira issue type names exactly (case-sensitive).
+Project-level overrides live at `.sdlc/jira-templates/<IssueTypeName>.md`. File names must match Jira issue type names exactly (case-sensitive).
+
+### Migration from `.claude/jira-templates/`
+
+If you previously had custom templates at the legacy location `.claude/jira-templates/`, they are moved automatically to `.sdlc/jira-templates/` on the first jira-sdlc invocation that needs the templates directory. The migration is a one-time atomic rename — no data is lost. You can also trigger it explicitly with `/setup-sdlc --migrate`. If both directories exist (e.g., you already had content in `.sdlc/jira-templates/`), the legacy directory is left in place with a warning and you can clean it up manually. (Fixes #423.)
 
 Resolution order:
 
-1. **Project custom** — `.claude/jira-templates/<IssueTypeName>.md`
+1. **Project custom** — `.sdlc/jira-templates/<IssueTypeName>.md`
 2. **Skill default** — `plugins/sdlc-utilities/skills/jira-sdlc/templates/<IssueTypeName>.md`
 3. **Subtask fallback** — when none of the above exist, the prepare script consults a fallback map for subtask variants (see below).
 4. **No template** — when no fallback applies, the skill emits a warning and aborts the operation.
 
-Run `/jira-sdlc --init-templates` to export the skill defaults to `.claude/jira-templates/` as a starting point, then edit them to match your team's conventions.
+Run `/jira-sdlc --init-templates` to export the skill defaults to `.sdlc/jira-templates/` as a starting point, then edit them to match your team's conventions.
 
 #### Subtask fallback (spec R18)
 
@@ -135,11 +139,11 @@ When an issue type lacks both a custom and a shipped template, the prepare scrip
 | `Subtask` | `Task` |
 
 When a fallback is applied the skill prints a one-line notice:
-`Using <Parent> template for <Type> — override at .claude/jira-templates/<Type>.md`.
+`Using <Parent> template for <Type> — override at .sdlc/jira-templates/<Type>.md`.
 Override the fallback by creating a custom template at the path shown.
 
 When no fallback applies (e.g., a fictional `Whim` type with no shipped template) the skill prints a warning and stops:
-`No template for <Type>. Run /jira-sdlc --init-templates or create .claude/jira-templates/<Type>.md`.
+`No template for <Type>. Run /jira-sdlc --init-templates or create .sdlc/jira-templates/<Type>.md`.
 
 > **Tip:** On non-English Jira instances, `--init-templates` detects unmapped issue types and interactively asks which default template to use for each.
 
@@ -147,9 +151,9 @@ When no fallback applies (e.g., a fictional `Whim` type with no shipped template
 
 When Jira uses a non-English language, issue type names are localized (e.g., "Zadanie" for Task in Polish). Running `--init-templates` detects unmapped types and interactively asks which default template to use for each, with suggestions based on the Jira hierarchy level (Epic for top-level types, Task for standard types).
 
-After interactive setup, template files are created with your locale's names (e.g., `.claude/jira-templates/Zadanie.md`) containing the selected template content as a starting point. Edit them to match your team's conventions.
+After interactive setup, template files are created with your locale's names (e.g., `.sdlc/jira-templates/Zadanie.md`) containing the selected template content as a starting point. Edit them to match your team's conventions.
 
-**Example custom Bug template** (`.claude/jira-templates/Bug.md`):
+**Example custom Bug template** (`.sdlc/jira-templates/Bug.md`):
 
 ```markdown
 ## Summary
@@ -317,7 +321,7 @@ When `SDLC_DEBUG_DUMP=1` is set, the hook writes the received `tool_input` and t
 | File / Artifact | Description |
 |-----------------|-------------|
 | `~/.sdlc-cache/jira/<site>/<KEY>.json` | Project metadata cache (home-keyed, outside the working tree): cloudId, issue types, field schemas, workflows, user mappings |
-| `.claude/jira-templates/<Type>.md` | Project-level issue description templates (created only when `--init-templates` is run, or manually) |
+| `.sdlc/jira-templates/<Type>.md` | Project-level issue description templates (created only when `--init-templates` is run, or manually) |
 | `$TMPDIR/jira-sdlc/critique-<hash>.json` | Per-operation critique artifact (write-ops only); contains initial/findings/final summary; verified by the PreToolUse hook |
 | `$TMPDIR/jira-sdlc/approval-<hash>.token` | Per-operation approval token (write-ops only); created on `approve`; verified and deleted by the PreToolUse hook after dispatch |
 | Jira issues | Created or updated via the Atlassian MCP |

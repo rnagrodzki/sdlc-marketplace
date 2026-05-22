@@ -1,0 +1,35 @@
+# Exec-only tests for setup.js scriptVersions[] prepare-output block (R-SCRIPT-VERSIONS, #424).
+# Covers all-current, one-outdated, all-missing scenarios.
+
+- description: "setup scriptVersions: all CI scripts missing → outdatedCount>0"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/setup-script-versions-test.js"
+    script_args: "--op all-missing"
+    project_root: "file://fixtures-fs/setup-script-versions/missing"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "outdatedCount="
+
+- description: "setup scriptVersions: all CI scripts current → outdatedCount=0"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/setup-script-versions-test.js"
+    script_args: "--op all-current"
+    project_root: "file://fixtures-fs/setup-script-versions/current"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "outdatedCount=0"
+
+- description: "setup scriptVersions: one outdated CI script → outdatedCount≥1"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/setup-script-versions-test.js"
+    script_args: "--op one-outdated"
+    project_root: "file://fixtures-fs/setup-script-versions/outdated"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "outdated file"

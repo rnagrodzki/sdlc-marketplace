@@ -1,8 +1,8 @@
 ---
 name: version-sdlc
-description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow, updating an existing changelog entry for the current version. Consumes pre-computed context from skill/version.js and handles the complete release process. Use --changelog without a bump type to update the changelog for the already-tagged current version. Arguments: [major|minor|patch|<label>] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix] [--auto]. The positional `<label>` form (e.g. `version-sdlc rc`) is sugar for `--bump patch --pre <label>` and accepts any pre-release label matching `^[a-z][a-z0-9]*$`. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate. Use --auto to skip interactive approval prompts (release plan is still displayed)."
+description: "Use this skill when bumping a project version, creating a git release tag, generating a changelog, or performing a full semantic release workflow, updating an existing changelog entry for the current version, or retagging the current version at HEAD. Consumes pre-computed context from skill/version.js and handles the complete release process. Use --changelog without a bump type to update the changelog for the already-tagged current version. Use --retag to move an existing tag to HEAD. Arguments: [major|minor|patch|<label>] [--init] [--pre <label>] [--no-push] [--changelog] [--hotfix] [--retag] [--auto]. The positional `<label>` form (e.g. `version-sdlc rc`) is sugar for `--bump patch --pre <label>` and accepts any pre-release label matching `^[a-z][a-z0-9]*$`. Triggers on: version bump, create release, bump version, tag release, generate changelog, semantic versioning, semver bump, pre-release, release candidate, retag release. Use --auto to skip interactive approval prompts (release plan is still displayed)."
 user-invocable: true
-argument-hint: "[major|minor|patch|<label>] [--pre <label>] [--changelog] [--hotfix] [--auto]"
+argument-hint: "[major|minor|patch|<label>] [--pre <label>] [--changelog] [--hotfix] [--retag] [--auto]"
 model: haiku
 ---
 
@@ -75,7 +75,11 @@ On **commit first**: invoke `/commit-sdlc` via the Skill tool. After the commit 
 
 ---
 
-The workflow then has two branches determined by `VERSION_CONTEXT_JSON.flow`.
+The workflow then branches based on `VERSION_CONTEXT_JSON.flow` and `VERSION_CONTEXT_JSON.mode`:
+- If `mode === "retag"` → **Branch D: Retag Workflow** (see below). `flow` will be `"retag"`.
+- If `flow === "init"` → Branch A.
+- If `flow === "release"` → Branch B.
+- If `flow === "changelog-update"` → Branch C.
 
 ---
 
@@ -340,6 +344,96 @@ If `flags.hotfix === true`, show instead:
 
 ---
 
+### Branch D: Retag Workflow (`mode === "retag"`) — R-RETAG, G8 (implements #424)
+
+**Entry condition:** `VERSION_CONTEXT_JSON.mode === "retag"`. This flow ONLY activates when `mode` from prepare output equals `"retag"` — never re-derive this from raw `$ARGUMENTS` (flag-coherence-cross-skill).
+
+**Difference from `retag-release.yml`:** `/version-sdlc --retag` is user-initiated — you deliberately move the existing tag to HEAD. The CI workflow `retag-release.yml` is CI-automated squash-drift fix — it fires on push. They are orthogonal; do not conflate.
+
+#### Step D1 (CHECK): Validate Prepare Output
+
+Read `VERSION_CONTEXT_JSON` for the retag flow:
+
+| Field | Description |
+|---|---|
+| `mode` | Must be `"retag"` — gate for this branch |
+| `currentTag` | The tag to be retagged (e.g., `v1.2.3`) |
+| `oldSha` | The SHA the tag currently points to |
+| `head` | The SHA of HEAD (the new target) |
+| `errors` | Any validation errors from prepare script (exclusivity, tag-not-found) |
+| `flags.auto` | Whether `--auto` was passed (suppresses confirmation prompt) |
+
+If `errors.length > 0`, display each error and stop. Example error: `--retag cannot be combined with 'patch'`.
+
+#### Step D2 (CONFIRM): Show Retag Plan and Get Approval
+
+Print the retag plan:
+
+```
+Retag Plan
+────────────────────────────────
+Tag:     <currentTag>
+From:    <oldSha[:7]> (current remote tag)
+To:      <head[:7]> (HEAD)
+────────────────────────────────
+```
+
+**Interactive mode** (when `flags.auto` is false): Use AskUserQuestion:
+> About to retag `<currentTag>` from `<oldSha[:7]>` to `<head[:7]>` (HEAD). Continue?
+
+Options: **yes** — proceed | **no** — cancel
+
+On **no**: stop. Print "Retag cancelled."
+
+**Auto mode** (when `flags.auto` is true): Skip the confirmation prompt. Print the retag plan and proceed immediately.
+
+#### Step D3 (EXECUTE): Perform the Retag Sequence
+
+Execute each step explicitly and in order. All five git operations are required:
+
+**1. Delete local tag:**
+```bash
+git tag -d <currentTag>
+```
+If this fails, stop and report the error. Do not proceed.
+
+**2. Delete remote tag:**
+```bash
+git push origin :refs/tags/<currentTag>
+```
+If this fails, stop and report. Note: the local tag has already been deleted at this point — the user may need to recreate it manually.
+
+**3. Create new annotated tag at HEAD:**
+```bash
+git tag -a <currentTag> -m "Retag <currentTag>"
+```
+If this fails, stop and report.
+
+**4. Push new tag:**
+```bash
+git push origin <currentTag>
+```
+If this fails, stop and report.
+
+**5. Verify new tag points to HEAD:**
+```bash
+git rev-parse refs/tags/<currentTag>
+```
+Compare output to `<head>`. If they differ, report a warning (proceed — the user can verify manually).
+
+#### Step D4 (REPORT): Summary
+
+```
+Retag complete
+────────────────────────────────
+Tag:     <currentTag>
+Old SHA: <oldSha[:7]>
+New SHA: <head[:7]>
+────────────────────────────────
+```
+
+---
+
 ## Quality Gates
 
 | Gate | Check | Pass Criteria |
@@ -394,6 +488,7 @@ When invoking `error-report-sdlc`, provide:
 
 ## Gotchas
 
+- **`/version-sdlc --retag` vs `retag-release.yml`:** `/version-sdlc --retag` is user-initiated — you deliberately move the existing tag to HEAD after a deliberate decision. The CI workflow `retag-release.yml` is CI-automated squash-drift fix — it fires automatically on push when the tag points to a commit that was squash-merged away. They are orthogonal features; the CI workflow is unaffected by `--retag`, and vice versa. (Implements #424.)
 - **Squash merge orphans tags**: When using GitHub's "squash and merge" strategy, the annotated tag created on the feature branch points to the pre-merge commit, which becomes unreachable from main after merge. The `retag-release.yml` workflow (scaffolded during init) automatically moves the tag to the squash commit on main whenever a push lands on main. Without this workflow, tags are orphaned and `git describe` / `git log --decorate` on main will not show them.
 - `bumpOptions.preRelease` is pre-computed in the JSON only when `--pre` was passed at script time. If the user requests a different pre-label during `edit`, re-run the script — the `preRelease` field reflects the label passed at script invocation, not a label added mid-session.
 - **Version-file edit hard gate:** for ALL version-file formats (JSON, TOML, YAML — package.json, plugin.json, Cargo.toml, pyproject.toml, etc.) use the Edit tool with a single targeted string replacement and verify with `git diff <versionFile>` that exactly one line changed. If more than one line differs, abort and `git checkout -- <versionFile>`. Never use the Write tool or rewrite the file from memory — LLMs reliably truncate or paraphrase fields like `description` (see #211).

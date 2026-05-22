@@ -282,9 +282,9 @@ function helperTemplate() {
   }
   // Build a temp project root with override
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'jira-tpl-test-'));
-  fs.mkdirSync(path.join(tmpRoot, '.claude/jira-templates'), { recursive: true });
+  fs.mkdirSync(path.join(tmpRoot, '.sdlc/jira-templates'), { recursive: true });
   fs.writeFileSync(
-    path.join(tmpRoot, '.claude/jira-templates/Bug.md'),
+    path.join(tmpRoot, '.sdlc/jira-templates/Bug.md'),
     '# Override\n## Custom Section\n## Another\n',
     'utf8'
   );
@@ -341,9 +341,9 @@ function helperArtifactStore() {
 function setupTmpProjectRoot(templateMode) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'jira-guard-fix-'));
   if (templateMode === 'override') {
-    fs.mkdirSync(path.join(root, '.claude/jira-templates'), { recursive: true });
+    fs.mkdirSync(path.join(root, '.sdlc/jira-templates'), { recursive: true });
     fs.writeFileSync(
-      path.join(root, '.claude/jira-templates/Bug.md'),
+      path.join(root, '.sdlc/jira-templates/Bug.md'),
       '# Bug Override\n## Steps to reproduce\n## Expected\n## Actual\n',
       'utf8'
     );

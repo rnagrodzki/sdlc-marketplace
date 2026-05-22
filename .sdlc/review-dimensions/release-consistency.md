@@ -28,6 +28,7 @@ Review version and changelog changes for consistency across all release artifact
 - [ ] `tagPrefix` in `version.json` is consistent with existing git tags — e.g., if existing tags are `sdlc-utilities-v1.0.0` then `tagPrefix` must be `sdlc-utilities-v`, not `v` or `sdlc-v`
 - [ ] No version downgrade: the new version in `plugin.json` is greater than or equal to the previous version in semver terms — patch, minor, and major increments are valid; a lower version is not
 - [ ] When `plugin.json` version changes, there must be a corresponding CHANGELOG entry for that exact version — a version bump without a changelog entry is incomplete
+- [ ] If a release tag is retargeted to a new SHA at the same version (e.g., via `/version-sdlc --retag`), `CHANGELOG.md` is unchanged AND `plugin.json` version is unchanged AND the SHA being tagged is reachable from the default branch — retag must not silently rewrite release history across version boundaries. **Note:** `/version-sdlc --retag` is user-initiated; `retag-release.yml` is CI-automated squash-drift fix — they are orthogonal. Do not conflate.
 
 ## Severity Guide
 
@@ -42,3 +43,4 @@ Review version and changelog changes for consistency across all release artifact
 | tagPrefix inconsistent with existing tags | medium |
 | CHANGELOG section not following Keep a Changelog format | medium |
 | Minor formatting deviation in CHANGELOG | low |
+| Tag SHA changed without corresponding plugin.json/CHANGELOG update | high |

@@ -1,0 +1,3 @@
+## New Bug
+
+{summary}

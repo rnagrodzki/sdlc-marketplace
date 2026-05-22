@@ -8,7 +8,7 @@
  *
  * Usage:
  *   node version-prepare.js [major|minor|patch] [--init] [--pre <label>]
- *                           [--no-push] [--changelog] [--hotfix] [--file <path>]
+ *                           [--no-push] [--changelog] [--hotfix] [--retag] [--file <path>]
  *
  * Flags:
  *   major|minor|patch   Requested bump type (positional, optional)
@@ -17,6 +17,7 @@
  *   --no-push           Skip push to remote
  *   --changelog         Enable changelog generation for this run
  *   --hotfix            Mark this release as a hotfix (DORA metrics)
+ *   --retag             Retag current version at HEAD (R-RETAG, #424; incompatible with bump/--init/--changelog/--hotfix)
  *   --file <path>       Override version file path (used with --init)
  *
  * Exit codes:
@@ -99,6 +100,7 @@ function parseArgs(argv) {
   let changelog           = false;
   let hotfix              = false;
   let auto                = false;
+  let retag               = false;
   let fileOverride        = null;
   let expectedBranch      = null;
   const warnings          = [];
@@ -183,6 +185,8 @@ function parseArgs(argv) {
       changelog = true;
     } else if (a === '--hotfix') {
       hotfix = true;
+    } else if (a === '--retag') {
+      retag = true;
     } else if (a === '--auto') {
       auto = true;
     } else if (a === '--file' && args[i + 1]) {
@@ -219,7 +223,7 @@ function parseArgs(argv) {
   }
 
   return {
-    init, requestedBump, preLabel, noPush, changelog, hotfix, auto,
+    init, requestedBump, preLabel, noPush, changelog, hotfix, auto, retag,
     fileOverride, expectedBranch, warnings, errors, bumpFromLabel, preLabelExplicit,
     bumpFromFlag,
   };
@@ -282,12 +286,114 @@ async function main() {
   // Fail fast on argument-parse errors (invalid --pre label, unrecognized
   // positional token). Skip in --init flow because init never accepts a bump
   // value; flag mismatches there are warnings, not errors.
-  if (!args.init && args.errors.length > 0) {
+  if (!args.init && !args.retag && args.errors.length > 0) {
     writeOutput({
       flow:     'release',
       errors:   args.errors,
       warnings: args.warnings,
     }, 'version-context', 1);
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Retag flow (R-RETAG, G8 — implements #424)
+  // Validate exclusivity, read-only git rev-parse, emit mode: "retag".
+  // Destructive ops (tag delete/recreate) are SKILL.md's responsibility.
+  // -------------------------------------------------------------------------
+
+  if (args.retag) {
+    const retagErrors = [...(args.errors || [])];
+
+    // G8: Exclusivity — report ALL conflicts, do not short-circuit.
+    if (args.requestedBump !== null) {
+      retagErrors.push(`--retag cannot be combined with bump type '${args.requestedBump}'`);
+    }
+    if (args.init) {
+      retagErrors.push('--retag cannot be combined with --init');
+    }
+    if (args.changelog) {
+      retagErrors.push('--retag cannot be combined with --changelog');
+    }
+    if (args.hotfix) {
+      retagErrors.push('--retag cannot be combined with --hotfix');
+    }
+
+    // Resolve config to derive current version and tag prefix.
+    let config;
+    let currentVersion = null;
+    let currentTag = null;
+    let oldSha = null;
+    let headSha = null;
+
+    try {
+      config = readConfig(projectRoot);
+    } catch (err) {
+      retagErrors.push(`Failed to read config: ${err.message}`);
+    }
+
+    if (retagErrors.length === 0 && config) {
+      const tagPrefix = config.tagPrefix || 'v';
+      try {
+        if (config.mode === 'file') {
+          // Read version from version file.
+          const versionFile = config.versionFile;
+          if (!versionFile) {
+            retagErrors.push('config.versionFile is required when mode=file');
+          } else {
+            const vfPath = path.join(projectRoot, versionFile);
+            currentVersion = readVersion(vfPath, config.fileType || 'package.json');
+          }
+        } else {
+          // tag mode: derive from latest tag
+          const tags = getTagList(projectRoot);
+          if (!tags[0]) {
+            retagErrors.push('No version tags found — cannot derive current version for retag');
+          } else {
+            currentVersion = tags[0].startsWith('v') ? tags[0].slice(1) : tags[0];
+          }
+        }
+      } catch (err) {
+        retagErrors.push(`Failed to resolve current version: ${err.message}`);
+      }
+
+      if (currentVersion) {
+        currentTag = `${tagPrefix}${currentVersion}`;
+        // Read-only: check that the candidate tag exists.
+        const { spawnSync } = require('child_process');
+        const revParse = spawnSync('git', ['rev-parse', `refs/tags/${currentTag}`], {
+          cwd: projectRoot, encoding: 'utf8',
+        });
+        if (revParse.status !== 0) {
+          retagErrors.push(`--retag requires tag ${currentTag} to already exist; none found`);
+        } else {
+          oldSha = (revParse.stdout || '').trim();
+        }
+
+        // Get HEAD sha.
+        const headRevParse = spawnSync('git', ['rev-parse', 'HEAD'], {
+          cwd: projectRoot, encoding: 'utf8',
+        });
+        if (headRevParse.status === 0) {
+          headSha = (headRevParse.stdout || '').trim();
+        }
+      }
+    }
+
+    writeOutput({
+      flow:        'retag',
+      mode:        'retag',
+      currentTag,
+      oldSha,
+      head:        headSha,
+      errors:      retagErrors,
+      warnings:    args.warnings,
+      flags: {
+        auto:  args.auto,
+        noPush: args.noPush,
+        skipConfigCheck: args.skipConfigCheck,
+      },
+      migration: args.migration,
+    }, 'version-context', retagErrors.length > 0 ? 1 : 0);
     return;
   }
 

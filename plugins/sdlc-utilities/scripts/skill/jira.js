@@ -15,7 +15,7 @@
  *   --save           Read JSON from stdin, write as cache
  *   --save-field <n> Read JSON from stdin, merge into cache[n]
  *   --templates      Resolve templates per issue type
- *   --init-templates Copy defaults to .claude/jira-templates/
+ *   --init-templates Copy defaults to .sdlc/jira-templates/
  *   --clear          Delete cache file
  *
  * Exit codes: 0 = success, 1 = user error, 2 = crash
@@ -34,6 +34,19 @@ const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
 const { parseRemoteOwner } = require(path.join(LIB, 'git'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
+
+// ---------------------------------------------------------------------------
+// Auto-migration: .claude/jira-templates/ → .sdlc/jira-templates/ (R-MIGR, #423)
+// Runs at most once per process (module-level flag). Errors are non-fatal.
+// ---------------------------------------------------------------------------
+let _migrationRan = false;
+function runAutoMigration() {
+  if (_migrationRan) return;
+  _migrationRan = true;
+  try {
+    require(path.join(__dirname, 'migrate-jira-templates'));
+  } catch (_) { /* non-fatal — missing shim should not break jira ops */ }
+}
 
 // ---------------------------------------------------------------------------
 // Home-cache path helpers
@@ -343,8 +356,10 @@ function resolveTemplateStatus(projectKey, cachePath, templatesDir) {
     } catch (_) { /* ignore parse errors */ }
   }
 
+  // R-MIGR (#423): auto-migrate .claude/jira-templates/ → .sdlc/jira-templates/ once per process.
+  runAutoMigration();
   // R-projectroot: main-worktree-rooted resolution (#360).
-  const customDir = path.join(resolveSdlcRoot(), '.claude', 'jira-templates');
+  const customDir = path.join(resolveSdlcRoot(), '.sdlc', 'jira-templates');
 
   // Collect all available default template names (without .md)
   let defaultTemplateNames = [];
@@ -771,8 +786,10 @@ function initTemplates({ projectKey, cacheDir, site }, templatesDir) {
     } catch (_) { /* ignore */ }
   }
 
+  // R-MIGR (#423): auto-migrate .claude/jira-templates/ → .sdlc/jira-templates/ once per process.
+  runAutoMigration();
   // R-projectroot: main-worktree-rooted resolution (#360).
-  const customDir    = path.join(resolveSdlcRoot(), '.claude', 'jira-templates');
+  const customDir    = path.join(resolveSdlcRoot(), '.sdlc', 'jira-templates');
   const initialized  = [];
   const skipped      = [];
   const unavailable  = [];
@@ -830,8 +847,10 @@ function copyTemplate(copyType, copyFrom, templatesDir) {
     return;
   }
 
+  // R-MIGR (#423): auto-migrate .claude/jira-templates/ → .sdlc/jira-templates/ once per process.
+  runAutoMigration();
   // R-projectroot: main-worktree-rooted resolution (#360).
-  const dst = path.join(resolveSdlcRoot(), '.claude', 'jira-templates', copyType + '.md');
+  const dst = path.join(resolveSdlcRoot(), '.sdlc', 'jira-templates', copyType + '.md');
   fs.mkdirSync(path.dirname(dst), { recursive: true });
 
   if (fs.existsSync(dst)) {

@@ -65,6 +65,16 @@ echo "EXIT_CODE=$EXIT_CODE"
 
 Parse the JSON output from `$PREPARE_OUTPUT_FILE`. If exit code != 0, display the error and stop.
 
+**Outdated CI scripts warning (R-SCRIPT-VERSIONS, #424):** After parsing, check `prepare.scriptVersions.outdatedCount`. If `outdatedCount > 0`, print a visible warning before continuing:
+
+```
+⚠ Outdated CI pipeline scripts detected (N file(s)):
+<list each file where action is 'outdated' or 'missing': "  - <file> (installed: v<installedVersion || 'missing'>, current: v<currentVersion>)">
+Run `/setup-sdlc --migrate` or `/version-sdlc --init` to update.
+```
+
+Do not auto-fix. Do not block the rest of setup. This is a report-only warning (mirrors version-sdlc Step 7.5 pattern).
+
 **Flag routing (check after pre-flight succeeds):**
 
 The legacy direct-entry flags map onto `--only` (which now drives Step 3 directly):
@@ -84,7 +94,7 @@ If none of the direct-entry flags or `--only` were passed: continue with the ful
 The JSON contains these top-level keys:
 - `projectConfig` -- `{ exists, sections, misplaced, path }`
 - `localConfig` -- `{ exists, path }`
-- `legacy` -- `{ version, ship, review, reviewLegacy, jira }` each with `{ exists, path }`
+- `legacy` -- `{ version, ship, review, reviewLegacy, jira, jiraTemplates }` each with `{ exists, path }`. `jiraTemplates.exists` is true when `.claude/jira-templates/` is present (R-LEGACY-DETECT, #423).
 - `openspecConfig` -- `{ exists, path, managedBlockVersion }` state of `openspec/config.yaml`
 - `content` -- `{ reviewDimensions: { count, path }, prTemplate: { exists, path }, jiraTemplates: { count, path } }`
 - `detected` -- `{ versionFile, fileType, tagPrefix, defaultBranch }`
@@ -171,6 +181,7 @@ Store the resolved section ids as `selectedIds`. Defer migration and field colle
 - A legacy config file exists (`.claude/version.json`, `.sdlc/ship-config.json`, `.sdlc/jira-config.json`, `.sdlc/review.json`, `.claude/review.json`)
 - `.sdlc/config.json` contains misplaced sections (e.g. `ship` in the project config)
 - `.sdlc/local.json` is v1 schema — has legacy `ship.preset` or `ship.skip` keys, or lacks the top-level `version: 2` stamp (`localIsV1` from prepare output). Auto-migrated by `lib/config.js::readLocalConfig` on next read; `--migrate` triggers it explicitly with a banner.
+- `legacy.jiraTemplates.exists` is true (`.claude/jira-templates/` detected — implements R-LEGACY-DETECT, #423)
 
 If legacy files exist or `projectConfig.misplaced` is non-empty, use AskUserQuestion:
 
@@ -196,6 +207,14 @@ const { migrateConfig } = require('$SCRIPT_DIR/config.js');
 const result = migrateConfig(process.cwd());
 console.log(JSON.stringify(result, null, 2));
 "
+```
+
+Then dispatch the jira-templates migration shim if `prepare.legacy.jiraTemplates.exists` is true (R-LEGACY-DETECT, #423):
+
+```bash
+SHIM=$(find ~/.claude/plugins -name "migrate-jira-templates.js" -path "*/sdlc*/scripts/skill/migrate-jira-templates.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$SHIM" ] && [ -f "plugins/sdlc-utilities/scripts/skill/migrate-jira-templates.js" ] && SHIM="plugins/sdlc-utilities/scripts/skill/migrate-jira-templates.js"
+[ -n "$SHIM" ] && node "$SHIM" && echo "Jira templates migration complete" || echo "Jira templates migration: skipped or not found"
 ```
 
 Parse the output. Report what was migrated:

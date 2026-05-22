@@ -36,7 +36,7 @@ conditionally after Step 2 classifies the operation type.
      by the user, ask before proceeding
 
 2. Resolve description template (R18 — required for Create)
-   a. Check .claude/jira-templates/<issueTypeName>.md — if exists, read it (override)
+   a. Check .sdlc/jira-templates/<issueTypeName>.md — if exists, read it (override)
    b. Else, find templates/<issueTypeName>.md relative to the resolved $SCRIPT path (shipped)
    c. If found: fill all {placeholder} markers from user context (see step 3)
    d. If neither exists: AskUserQuestion with the closed list of available templates —
@@ -86,7 +86,7 @@ conditionally after Step 2 classifies the operation type.
 
 2. Resolve description template (R18) — ONLY when description is being touched
    - Look up the issue's issueTypeName via cache or getJiraIssue
-   - Resolve override `.claude/jira-templates/<Type>.md` then shipped `templates/<Type>.md`
+   - Resolve override `.sdlc/jira-templates/<Type>.md` then shipped `templates/<Type>.md`
    - If editing description without a template match, AskUserQuestion with a closed list
 
 3. Detect placeholders via C13 regex (R19) — applies to every string-valued field, not

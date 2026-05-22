@@ -4,7 +4,7 @@
  * Resolve and fingerprint description templates for R18 enforcement.
  *
  * Resolution order:
- *   1. Override:  <projectRoot>/.claude/jira-templates/<IssueType>.md
+ *   1. Override:  <projectRoot>/.sdlc/jira-templates/<IssueType>.md
  *   2. Shipped:   <pluginRoot>/skills/jira-sdlc/templates/<IssueType>.md
  *
  * The fingerprint is the set of `## ` heading texts. For the hook to allow
@@ -45,7 +45,7 @@ function loadTemplateHeadings(issueType, projectRoot, opts = {}) {
   if (!issueType || typeof issueType !== 'string') {
     return { headings: new Set(), source: null, file: null };
   }
-  const overrideFile = path.join(projectRoot, '.claude', 'jira-templates', `${issueType}.md`);
+  const overrideFile = path.join(projectRoot, '.sdlc', 'jira-templates', `${issueType}.md`);
   if (fs.existsSync(overrideFile)) {
     const md = fs.readFileSync(overrideFile, 'utf8');
     return { headings: extractHeadings(md), source: 'override', file: overrideFile };

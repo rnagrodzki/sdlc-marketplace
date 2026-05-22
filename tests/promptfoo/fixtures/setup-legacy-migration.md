@@ -18,12 +18,13 @@
     "ship": { "exists": false, "path": ".sdlc/ship-config.json" },
     "review": { "exists": false, "path": ".sdlc/review.json" },
     "reviewLegacy": { "exists": false, "path": ".claude/review.json" },
-    "jira": { "exists": false, "path": ".sdlc/jira-config.json" }
+    "jira": { "exists": false, "path": ".sdlc/jira-config.json" },
+    "jiraTemplates": { "exists": true, "path": ".claude/jira-templates/" }
   },
   "content": {
     "reviewDimensions": { "count": 0, "path": ".claude/review-dimensions/" },
     "prTemplate": { "exists": false, "path": ".claude/pr-template.md" },
-    "jiraTemplates": { "count": 0, "path": ".claude/jira-templates/" },
+    "jiraTemplates": { "count": 0, "path": ".sdlc/jira-templates/" },
     "planGuardrails": { "count": 0 }
   },
   "detected": { "versionFile": "package.json", "fileType": "package.json", "tagPrefix": "v", "defaultBranch": "main" },
