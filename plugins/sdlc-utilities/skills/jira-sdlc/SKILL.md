@@ -389,6 +389,21 @@ On non-zero exit (`LINK_EXIT != 0`):
 - Do NOT dispatch the MCP write tool — the payload is never sent to Jira
 - Surface the violation list verbatim to the user
 - Stop. Do not retry. Do not edit URLs without user input. Do not bypass.
+- **MCP failure telemetry + dispatch gate (R27/R28 — implements R22 exhausted path):**
+
+```bash
+HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -n "$HELPER" ] && node "$HELPER" --telemetry --class link-verification --tool "jira.js --validate-body" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "link verification abort: $LINK_EXIT" --recovered no
+```
+
+Then call `--analyze` and surface the returned proposal to the user:
+
+```bash
+[ -n "$HELPER" ] && ANALYZE_JSON=$(node "$HELPER" --analyze --class link-verification --tool "jira.js --validate-body" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "link verification abort: $LINK_EXIT" --recovered no --r-path R22)
+```
+
+Read `ANALYZE_JSON.proposal.title` and `ANALYZE_JSON.proposal.body`; present to user verbatim with prompt "Y (file issue) / edit / skip". On Y, dispatch `error-report-sdlc` with `--error-type mcp-link-verification`, `--skill jira-sdlc`, `--step "Step 2.7"`, `--operation "jira.js --validate-body"`, `--error-text <proposal.body>`, and labels `mcp-failure,class:link-verification`.
 
 On zero exit, proceed to Step 3.
 
@@ -398,12 +413,46 @@ On zero exit, proceed to Step 3.
 
 For write operations: precondition — Step 2.6 returned `approve`, Step 2.7 link verification passed, and both artifacts (`approval-<hash>.token`, `critique-<hash>.json`) are on disk. The PreToolUse hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the hash from `tool_input`, verifies both artifacts, and BLOCKS dispatch otherwise (R21). If dispatch is blocked, surface the hook's `permissionDecisionReason` to the user verbatim — do not retry by guessing what changed.
 
+**MCP failure telemetry on hook deny (R27/R28 — R21 path):** When the PreToolUse hook blocks, call the helper immediately after surfacing the deny reason:
+
+```bash
+HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+HOOK_HASH=$(echo -n "$permissionDecisionReason" | sha256sum | cut -c1-12)
+[ -n "$HELPER" ] && node "$HELPER" --telemetry --class hook-block --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$permissionDecisionReason" --recovered no
+[ -n "$HELPER" ] && HOOK_COUNT=$(node "$HELPER" --record-occurrence --class hook-block --key "$HOOK_HASH")
+```
+
+When `HOOK_COUNT` equals 2 (same hook deny reason seen twice in this session), call `--analyze` and surface the dispatch gate:
+
+```bash
+[ -n "$HELPER" ] && [ "$HOOK_COUNT" -eq 2 ] && ANALYZE_JSON=$(node "$HELPER" --analyze --class hook-block --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$permissionDecisionReason" --recovered no --r-path R21)
+```
+
+Read `ANALYZE_JSON.proposal.title` and `ANALYZE_JSON.proposal.body`; present to user verbatim with prompt "Y (file issue) / edit / skip". On Y, dispatch `error-report-sdlc` with `--error-type mcp-hook-block`, `--skill jira-sdlc`, `--step "Step 3"`, `--operation "$MCP_TOOL_NAME"`, `--error-text <proposal.body>`, and labels `mcp-failure,class:hook-block`.
+
 **On cloudId authorization error** (response text matches `isn't explicitly granted` or auth/403 with cloudId substring) — implements spec R23:
 
 1. Call `getAccessibleAtlassianResources` exactly once.
 2. Compare the returned cloudId(s) against the cached value at `~/.sdlc-cache/jira/<site>/<KEY>.json`.
 3. If different, run `/jira-sdlc --force-refresh` and reload the cache.
-4. Retry the original MCP call exactly once. If it still fails with the same error, surface the error to the user and stop — do not loop.
+4. Retry the original MCP call exactly once under the primary namespace. If it still fails with the same error — try the sibling namespace (`mcp__claude_ai_Atlassian__`) once if registered.
+5. If the primary namespace retry failed, call the helper with `--recovered no` before trying the sibling namespace:
+
+```bash
+HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -n "$HELPER" ] && node "$HELPER" --telemetry --class auth --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$AUTH_ERROR" --recovered no
+```
+
+6. If the sibling namespace also fails (dual-namespace exhausted), call `--telemetry` again and then `--analyze` to trigger the R28 dispatch gate:
+
+```bash
+[ -n "$HELPER" ] && node "$HELPER" --telemetry --class auth --tool "mcp__claude_ai_Atlassian__${MCP_TOOL_SUFFIX}" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$AUTH_ERROR_SIBLING" --recovered no
+[ -n "$HELPER" ] && ANALYZE_JSON=$(node "$HELPER" --analyze --class auth --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$AUTH_ERROR" --recovered no --r-path R23)
+```
+
+Read `ANALYZE_JSON.proposal.title` and `ANALYZE_JSON.proposal.body`; present to user verbatim with prompt "Y (file issue) / edit / skip". On Y, dispatch `error-report-sdlc` with `--error-type mcp-auth`, `--skill jira-sdlc`, `--step "Step 3"`, `--operation "$MCP_TOOL_NAME"`, `--error-text <proposal.body>`, and labels `mcp-failure,class:auth`.
 
 After Step 2 classifies the operation type, read `./operations-reference.md` and follow the procedure for the matching operation type.
 
@@ -439,7 +488,7 @@ After operations that reveal new information, update the cache incrementally:
 
 | Error | Diagnosis | Recovery |
 |-------|-----------|----------|
-| 400 on create | Missing required field or wrong field shape | Verify field key/shape against the cached `fieldSchemas` object. If the field doesn't match, run `--force-refresh`, reload cache, retry once. If still failing after refresh, invoke `error-report-sdlc` |
+| 400 on create | Missing required field or wrong field shape | Verify field key/shape against the cached `fieldSchemas` object. If the field doesn't match, run `--force-refresh`, reload cache, retry once. If still failing after refresh, use the **gated dispatch** below (R9 exhausted path) |
 | 400 on transition | Missing required transition field (e.g., resolution) | Check `workflows[type].transitions[status][n].requiredFields`; include required fields. If transition ID is not recognized, **auto-refresh**: run `--force-refresh`, reload cache, retry once |
 | 400 on edit | Wrong field shape or incorrect custom field key | Verify field key/shape against the cached `fieldSchemas` object. If the field doesn't match, run `--force-refresh`, reload cache, retry once. If field format details are needed, Read `./REFERENCE.md` Section 2 only |
 | 401 | Auth token expired | Reconnect Atlassian MCP; cannot recover programmatically |
@@ -448,14 +497,27 @@ After operations that reveal new information, update the cache incrementally:
 | 404 project | Wrong project key or no access | Re-run `--check`; verify cloudId matches the correct site |
 | 409 | Concurrent edit conflict | Retry the operation once |
 | Stale transition | Transition ID no longer valid | **Auto-refresh**: run `--force-refresh`, reload cache, retry with new IDs |
-| Repeated 400 (2+ attempts) | Cache may have incorrect schema data | **Auto-refresh**: run `--force-refresh`, reload cache, retry once. If still failing after refresh, invoke `error-report-sdlc` |
+| Repeated 400 (2+ attempts) | Cache may have incorrect schema data | **Auto-refresh**: run `--force-refresh`, reload cache, retry once. If still failing after refresh, use the **gated dispatch** below (R9 exhausted path) |
 
-When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
-- **Skill**: jira-sdlc
-- **Step**: Step 3 — Execute Operation (operation name)
-- **Operation**: MCP call that failed (e.g., `createJiraIssue`, `transitionJiraIssue`)
-- **Error**: HTTP status + error message from the MCP response
-- **Suggested investigation**: Check if Jira project schema changed; verify cloudId is still valid; confirm the MCP prefix matches the active session
+**R9 exhausted path — MCP failure telemetry + gated dispatch (R27/R28):**
+
+When a 400 on create or repeated 400 still fails after cache auto-refresh, call the helper to record telemetry and synthesize the dispatch proposal. Classify: `schema` for field/schema errors, `workflow` for transition errors.
+
+```bash
+HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+FAILURE_CLASS=schema  # or "workflow" for transition errors
+[ -n "$HELPER" ] && node "$HELPER" --telemetry --class "$FAILURE_CLASS" --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$ERROR_MSG" --recovered no
+[ -n "$HELPER" ] && ANALYZE_JSON=$(node "$HELPER" --analyze --class "$FAILURE_CLASS" --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$ERROR_MSG" --recovered no --r-path R9)
+```
+
+Read `ANALYZE_JSON.proposal.title` and `ANALYZE_JSON.proposal.body`; present to user verbatim with prompt "Y (file issue) / edit / skip". On Y, dispatch `error-report-sdlc` with `--error-type mcp-${FAILURE_CLASS}`, `--skill jira-sdlc`, `--step "Step 3 — Error Recovery"`, `--operation "$MCP_TOOL_NAME"`, `--error-text <proposal.body>`, and labels `mcp-failure,class:${FAILURE_CLASS}`.
+
+Also call `--telemetry` on every retry (even successful ones) to maintain a per-session failure log:
+
+```bash
+[ -n "$HELPER" ] && node "$HELPER" --telemetry --class "$FAILURE_CLASS" --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$ERROR_MSG" --recovered "yes:R9"
+```
 
 ---
 
@@ -533,7 +595,16 @@ When invoking `error-report-sdlc` for a persistent Jira API failure, provide:
 - Transition `requiredFields` may include screen-only fields not in `fieldSchemas` — if a required field is absent from the schema, try the transition without it first; screen fields sometimes only block the Jira UI, not the API
 - `getVisibleJiraProjects` uses `searchString` (not `query`) for filtering — check parameter name before calling
 - When Phase 5 workflow sampling finds no issues at all for a type, skip workflow discovery for that type entirely and note it in the cache as `"workflows": { "Story": { "unsampled": true } }`
-- `unsampled: true` markers (from `--skip-workflow-discovery` in CI, or from no-sample results above) route transition operations through a live `getTransitionsForJiraIssue` per issue — the skill reuses the existing stale-cache auto-refresh path, so no separate branch is required in Step 3. Treat `unsampled` identically to "transition ID not cached".
+- `unsampled: true` markers (from `--skip-workflow-discovery` in CI, or from no-sample results above) route transition operations through a live `getTransitionsForJiraIssue` per issue — the skill reuses the existing stale-cache auto-refresh path, so no separate branch is required in Step 3. Treat `unsampled` identically to "transition ID not cached". **When the live `getTransitionsForJiraIssue` call itself fails on an unsampled path (R14 exhausted), record telemetry and trigger the analyze gate (R27/R28):**
+
+```bash
+HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -n "$HELPER" ] && node "$HELPER" --telemetry --class workflow --tool "getTransitionsForJiraIssue" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$TRANSITION_ERROR" --recovered no
+[ -n "$HELPER" ] && ANALYZE_JSON=$(node "$HELPER" --analyze --class workflow --tool "getTransitionsForJiraIssue" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$TRANSITION_ERROR" --recovered no --r-path R14)
+```
+
+Present `ANALYZE_JSON.proposal.title` and `ANALYZE_JSON.proposal.body` verbatim with prompt "Y (file issue) / edit / skip". On Y, dispatch `error-report-sdlc` with `--error-type mcp-workflow`, `--skill jira-sdlc`, `--step "Step 3 — unsampled fallback"`, `--operation "getTransitionsForJiraIssue"`, `--error-text <proposal.body>`, and labels `mcp-failure,class:workflow`.
 - The `mcp__atlassian__` prefix is the default; if the user's MCP is registered under a different prefix (e.g., `mcp__claude_ai_Atlassian__`), use the active prefix consistently across all calls in the session
 - **Namespace fallback (spec R23):** When the primary namespace (`mcp__atlassian__`) returns a cloudId authorization error and `mcp__claude_ai_Atlassian__` is also registered (visible in the deferred-tools list), retry the operation under the sibling namespace once. Persist the working namespace for the rest of the session — do not re-probe per-call. Combine with the Step 3 cloudId-error ladder: namespace-fallback is the second leg after the cache-refresh retry fails.
 - **Release Notes is the one allowed single-sentence carve-out (R25.5).** The `## Release Notes` section in Bug and Story templates may contain a single sentence — it is changelog-bound and bullet form is contextually awkward. Two or more sentences in this section fail the R25 critique check. All other sections must use bullet lists, numbered lists, or sub-headings.
@@ -547,6 +618,8 @@ Record entries for: field formats that differ from the defaults documented here,
 quirks discovered in specific projects, issue type names that aren't standard (e.g., custom
 subtask type names), user lookup disambiguation patterns, and transition required fields not
 captured by the workflow sampling.
+
+**MCP failures use the structured R27 form** (written by `scripts/lib/mcp-failure.js --telemetry`). The helper writes a 5-line block under a `## YYYY-MM-DD — jira-sdlc mcp-failure[<class>]: <tool>` heading. Non-MCP discoveries continue to use the free-form prose style above.
 
 ## What's Next
 

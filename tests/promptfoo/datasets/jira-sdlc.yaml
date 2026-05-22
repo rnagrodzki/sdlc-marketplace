@@ -456,3 +456,167 @@
         a single sentence (changelog-bound format). The skill does NOT bullet-format Release Notes
         and recognizes this as the documented R25.5 exception. The section does not contain
         two or more sentences.
+
+# ── MCP failure self-tracking behavioral tests (R26/R27/R28 — implements #422) ──
+
+- description: "jira-sdlc R28 auth-class: dual-namespace exhausted — analyze gate fires and proposal presented verbatim"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-namespace-fallback.md"
+    user_request: >
+      I ran /jira-sdlc and both mcp__atlassian__ and mcp__claude_ai_Atlassian__ returned a
+      cloudId authorization error. The dual-namespace fallback is exhausted (R23). Walk me
+      through what jira-sdlc should do to record telemetry and surface the dispatch gate.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response describes jira-sdlc calling the mcp-failure.js helper with --telemetry
+        (class auth, recovered no) for both namespace attempts. After dual exhaustion, the
+        skill calls --analyze and presents the proposal title and body verbatim to the user,
+        requiring explicit Y/edit/skip approval (R28 gate). The gate fires exactly once, not
+        per namespace attempt. The dispatch to error-report-sdlc only happens after user approval.
+        Labels mcp-failure and class:auth are mentioned. The response cites R23 and R28.
+
+- description: "jira-sdlc R28 hook-block-class: count=2 dispatch gate fires (R21)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      During a /jira-sdlc create operation, the PreToolUse hook blocks twice in this session
+      with the same deny reason (hash mismatch). What does jira-sdlc do on the second block?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that on the first hook block the skill records telemetry via
+        mcp-failure.js --telemetry (class hook-block) and increments the occurrence counter.
+        On the second block with the same hash, HOOK_COUNT equals 2, triggering the --analyze
+        call and surfacing the R28 dispatch gate. The proposal is presented verbatim requiring
+        Y/edit/skip. The gate does NOT fire on the first block (count=1 does not trigger dispatch).
+        error-report-sdlc is dispatched only after user approval with labels mcp-failure,class:hook-block.
+
+- description: "jira-sdlc R28 link-verification-class: R22 abort triggers telemetry+gate immediately"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      A /jira-sdlc create operation aborted because jira.js --validate-body returned non-zero
+      (link verification failed, R22). After surfacing the violation list, what does jira-sdlc
+      do with the MCP failure tracking?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that R22 is always an exhausted path (no retry), so jira-sdlc
+        immediately calls mcp-failure.js --telemetry (class link-verification, recovered no)
+        and then --analyze to synthesize the dispatch proposal. The proposal is presented
+        verbatim with Y/edit/skip gate before dispatching error-report-sdlc. The violation
+        list itself is surfaced separately (Step 2.7 hard gate). The response cites R22 and R28.
+
+- description: "jira-sdlc R28 schema-class: R9 retry-exhausted fires gated dispatch with schema class"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      A /jira-sdlc create still fails with HTTP 400 (bad field value) after a --force-refresh
+      cache retry. The R9 exhausted path is reached. What does jira-sdlc do?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response describes jira-sdlc calling mcp-failure.js --telemetry with class schema
+        (HTTP 400, field error, no workflow keywords) and recovered no. Then --analyze is called
+        to synthesize the dispatch proposal (R28). The proposal title and body are presented
+        verbatim. The user must approve (Y/edit/skip) before error-report-sdlc is dispatched
+        with labels mcp-failure and class:schema. The response notes the existing direct
+        error-report-sdlc invocation has been replaced by this gated path. Cites R9 and R28.
+
+- description: "jira-sdlc R28 workflow-class: R14 unsampled live-call failure triggers gate"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-unsampled-transition.md"
+    user_request: >
+      The cache was built with --skip-workflow-discovery, so workflow markers are unsampled.
+      A live getTransitionsForJiraIssue call fails (R14 unsampled fallback). What happens?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response describes jira-sdlc calling mcp-failure.js --telemetry with class workflow
+        (tool getTransitionsForJiraIssue) and recovered no. Then --analyze is called and the
+        proposal is presented verbatim with Y/edit/skip gate (R28). Dispatch to error-report-sdlc
+        happens only after user approval with labels mcp-failure and class:workflow.
+        The response cites R14 and R28.
+
+- description: "jira-sdlc R28 transport-class: HTTP 503 on MCP call should classify as transport"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      A /jira-sdlc create operation fails with HTTP 503 (service unavailable). After retries
+      are exhausted, what failure class does jira-sdlc assign and what telemetry is recorded?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response correctly identifies HTTP 503 as class transport (>= 500 status).
+        Telemetry is appended to .sdlc/learnings/log.md via mcp-failure.js --telemetry with
+        class transport. The response may describe the R28 dispatch gate if the retry is
+        exhausted. The response does not confuse transport with auth or schema.
+
+- description: "jira-sdlc R28 unknown-class: no signal matches — class unknown, gate still fires"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-create-task.md"
+    user_request: >
+      An MCP failure occurs with no HTTP status and no recognizable error keywords. What
+      class is assigned and does the telemetry + dispatch gate still apply?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response identifies class unknown (no deterministic signal matches). Telemetry
+        is still appended with class unknown. The R28 analyze gate still fires on exhausted
+        recovery paths — the unknown class does not skip the gate. The response confirms
+        that all 7 classes are treated uniformly by the telemetry and gate mechanics.
+
+- description: "jira-sdlc R28 gate: user selects edit — edited body forwarded to error-report-sdlc"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-cloudid-auth-error.md"
+    user_request: >
+      The R28 dispatch gate is presented. The user chooses 'edit' and modifies the proposal
+      body. After editing, does jira-sdlc forward the edited body to error-report-sdlc?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response confirms that when the user selects 'edit', jira-sdlc uses the user-edited
+        proposal body (not the original synthesized body) when dispatching error-report-sdlc.
+        The skill prompts the user to provide the edited body, then dispatches with that content
+        as --error-text. The Y/edit/skip gate always requires explicit approval — no auto-dispatch.
+
+- description: "jira-sdlc R28 gate: user selects skip — NO gh issue create call"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-cloudid-auth-error.md"
+    user_request: >
+      The R28 dispatch gate fires. The user selects 'skip'. Does jira-sdlc still dispatch
+      error-report-sdlc or create any GitHub issue?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response confirms that when the user selects 'skip', jira-sdlc does NOT dispatch
+        error-report-sdlc and does NOT create a GitHub issue. The telemetry entry was already
+        written (before the gate), but the gate itself is bypassed. No gh issue create call
+        is made. The skill stops gracefully after the skip.
+
+- description: "jira-sdlc R28 duplicate-detection: action:comment proposed when duplicate open issue exists"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/jira-sdlc/SKILL.md"
+    project_context: "file://fixtures/jira-cloudid-auth-error.md"
+    user_request: >
+      During the R28 analyze step, gh issue list finds an open issue #99 with label mcp-failure
+      and label class:auth matching the current failure. What action does jira-sdlc propose?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that when a duplicate open issue is found (matching class label
+        and tool name in title), the analyzeForDispatch helper returns action: "comment" and
+        duplicate: 99. The R28 gate presents the proposal as a comment-on-existing suggestion
+        (not create-new). User approval is still required. On Y, error-report-sdlc is dispatched
+        to add a comment to issue #99 rather than create a new issue. The response cites KD6
+        or the dedup query shape (--state open --label mcp-failure --search).

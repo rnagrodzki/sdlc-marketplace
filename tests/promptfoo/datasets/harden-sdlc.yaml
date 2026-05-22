@@ -438,3 +438,40 @@
         review-dimensions appears in the surface-list. Since only plan-guardrails
         was touched, the line is absent. The entry includes Applied:, AmbiguousOffer:,
         and Trigger: lines only.
+
+# ── harden-sdlc --from-issue flag tests (R19 — implements #422) ─────────────
+
+- description: "harden-sdlc R19 --from-issue: fetches issue body via gh and routes through harden flow"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plugin-defect-context.md"
+    user_request: >
+      Run /harden-sdlc --from-issue 422 --skill jira-sdlc. The issue has body "MCP auth failure:
+      getAccessibleAtlassianResources returned 401 on both namespaces. Both R23 retries exhausted."
+      and label mcp-failure. Walk through what happens.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response describes harden-prepare.js fetching issue 422 via gh issue view 422
+        --json body,labels,title and using the body as failureText. Because the issue carries
+        the mcp-failure label, classification_hint is pre-set to plugin-defect in the manifest.
+        Step 2 reads this hint and skips Step 3 (orchestrator dispatch). Step 4 branches
+        to Step 6 (PLUGIN-DEFECT ROUTE) directly. The response confirms that --from-issue
+        routes through the existing harden flow without requiring --failure-text.
+        The response cites R19 and spec R9 (plugin-defect route).
+
+- description: "harden-sdlc R19 --from-issue mutual exclusion: simultaneous --failure-text exits code 2"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plugin-defect-context.md"
+    user_request: >
+      A user runs /harden-sdlc --from-issue 422 --failure-text "some error text" --skill jira-sdlc.
+      What happens?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that --from-issue and --failure-text are mutually exclusive.
+        Providing both simultaneously causes an immediate error (exit code 2) with a clear
+        mutual-exclusion message. The skill does NOT proceed to the prepare script in this case —
+        it stops at Step 0 (Parse Arguments). No manifest is written. The response cites R19
+        and the Step 0 mutual-exclusion guard.

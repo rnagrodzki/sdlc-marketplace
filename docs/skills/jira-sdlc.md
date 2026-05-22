@@ -336,7 +336,64 @@ URL classes checked:
 
 Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability checks while keeping context-aware checks (GitHub identity, Atlassian host). On non-zero exit, the MCP write call is **not** dispatched and the payload is never sent to Jira. No flag toggles this gate — it is hard.
 
+## MCP Failure Self-Tracking
+
+When an Atlassian MCP call fails and all recovery paths are exhausted, jira-sdlc classifies the failure, records structured telemetry, and optionally dispatches a GitHub issue via `error-report-sdlc`.
+
+### Failure classes (R26)
+
+Every observed MCP failure is assigned exactly one class:
+
+| Class | Trigger |
+|-------|---------|
+| `transport` | HTTP 5xx, `ECONNREFUSED`, `ETIMEDOUT`, `fetch failed` |
+| `auth` | HTTP 401/403 or response contains `cloudId`/`unauthorized` |
+| `schema` | HTTP 400 with field/shape error, or hook deny citing R19/C13/R18/R25/G15 |
+| `workflow` | HTTP 400 with `transition`/`workflow`/`invalid status` in error message |
+| `hook-block` | PreToolUse hook deny citing R20/R21 |
+| `link-verification` | R22 link verification abort |
+| `unknown` | No deterministic signal matches |
+
+Classification is deterministic — no LLM, no network call.
+
+### Telemetry (R27)
+
+On every classified failure, a 5-line structured block is appended to `.sdlc/learnings/log.md`:
+
+```
+## YYYY-MM-DD — jira-sdlc mcp-failure[<class>]: <tool>
+tool: <tool name>
+site: <Jira site host>
+project: <project key>
+error: <one-line error, redacted>
+recovered: yes:<R-path> | no
+```
+
+Sensitive values (bearer tokens, cookies, cloudIds, email addresses) are redacted before writing.
+
+### Analyze-then-confirm dispatch gate (R28)
+
+On exhausted-recovery paths (R23 dual-namespace exhausted, R9 retry-exhausted, R14 unsampled-fallback failure, R21 hook-block twice in one session, R22 link-verification abort), the skill:
+
+1. Searches for duplicate open issues (`gh issue list --state open --label mcp-failure`).
+2. Synthesizes a proposal (title + body) using the `McpFailure.md` template.
+3. Presents the proposal verbatim — you must explicitly approve (`Y`), edit, or skip.
+4. On approval, dispatches `error-report-sdlc` with labels `mcp-failure` and `class:<x>`.
+5. When a duplicate is found, proposes commenting on the existing issue rather than creating a new one.
+
+To act on a filed `mcp-failure` issue with hardening proposals, use:
+
+```text
+/harden-sdlc --from-issue <issue-number> --skill jira-sdlc
+```
+
+See [`/harden-sdlc`](harden-sdlc.md) for the `--from-issue` flag documentation.
+
+---
+
 ## Related Skills
 
 - [`/plan-sdlc`](plan-sdlc.md) — write an implementation plan from a Jira ticket
 - [`/execute-plan-sdlc`](execute-plan-sdlc.md) — execute an existing plan
+- [`/harden-sdlc`](harden-sdlc.md) — consume `mcp-failure`-labeled issues as hardening input via `--from-issue`
+- [`/error-report-sdlc`](error-report-sdlc.md) — receives MCP failure dispatches after R28 user approval

@@ -20,7 +20,8 @@ The skill is also opt-in dispatched from caller skills (see spec I1 for the cano
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--failure-text <string>` | Full text of the failure being analyzed (REQUIRED) | — |
+| `--failure-text <string>` | Full text of the failure being analyzed (mutually exclusive with `--from-issue`) | — |
+| `--from-issue <num>` | GitHub issue number to fetch as failure text (mutually exclusive with `--failure-text`); when the issue carries the `mcp-failure` label, pre-sets `plugin-defect` classification | — |
 | `--skill <name>` | Caller skill that produced the failure (REQUIRED) | — |
 | `--step <name>` | Step or section that failed | empty |
 | `--operation <name>` | Operation the caller was attempting | empty |
@@ -69,6 +70,20 @@ Expected: harden-sdlc resumes the user's interactive flow within the caller skil
 ```
 
 Expected: orchestrator emits `classification: "plugin-defect"`, no surface proposals are presented, and the user is asked to confirm dispatch of `error-report-sdlc` with the supplied payload. The prompt names the target repository using `MANIFEST.pluginRepoUrl` (sourced from the prepare-script manifest, not hardcoded in the SKILL).
+
+### Feed a mcp-failure GitHub issue as failure input (--from-issue, R19)
+
+When jira-sdlc files a `mcp-failure`-labeled issue (via the R28 analyze-then-confirm gate), consume it directly as hardening input — no copy-paste needed:
+
+```text
+/harden-sdlc --from-issue 422 --skill jira-sdlc
+```
+
+The prepare script fetches the issue body via `gh issue view 422 --json body,labels,title`. Because the issue carries the `mcp-failure` label, the orchestrator pre-classifies as `plugin-defect` and routes to the plugin-defect path (Step 6 → `error-report-sdlc`). The four hardening surfaces (plan-guardrails, execute-guardrails, review-dimensions, copilot-instructions) are proposed over that classification.
+
+`--from-issue` and `--failure-text` are mutually exclusive — providing both exits with code 2 and a clear error.
+
+See [`/jira-sdlc`](jira-sdlc.md#mcp-failure-self-tracking) for the MCP failure self-tracking section that produces these issues.
 
 ### Ambiguous classification with plugin evidence — Step 5c upstream-report offer (issue #288)
 
@@ -236,6 +251,7 @@ No file is written without an explicit `apply` AskUserQuestion answer recorded f
 - [`/commit-sdlc`](commit-sdlc.md) — caller; dispatches harden-sdlc at Step 5 subject-pattern reject as an alternative to editing the subject
 - [`/error-report-sdlc`](error-report-sdlc.md) — receives plugin-defect routing when classification points at plugin code rather than user content
 - [`/setup-sdlc`](setup-sdlc.md) — initial authoring of guardrails, dimensions, and copilot instructions — harden-sdlc strengthens what setup-sdlc creates
+- [`/jira-sdlc`](jira-sdlc.md#mcp-failure-self-tracking) — source of `mcp-failure`-labeled issues; use `--from-issue <num>` to consume them as hardening input
 
 <!--
 NOTE: This section is for GitHub markdown browsing only.

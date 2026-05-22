@@ -7,6 +7,138 @@
 #   (d) multi-candidate    — two home-cache entries for same key under different sites
 #   (e) --skip-workflow-discovery echoed in flags
 #   (f) --project validation against jira.projects (membership rejected + accepted)
+#
+# mcp-failure.js helper-unit tests (R26/R27/R28 — implements #422)
+#   (g) classify — 7 classifier branches (one per class)
+#   (h) telemetry — structured 5-line block written to log; redaction asserted
+#   (i) analyze — JSON shape + action field
+#   (j) record-occurrence — cross-process counter persistence
+
+# ── mcp-failure.js classifier tests (R26) ──────────────────────────────────
+
+- description: "mcp-failure: classify transport — http-status 503"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+    script_args: "--classify --http-status 503"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: "transport"
+
+- description: "mcp-failure: classify auth — http-status 401"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+    script_args: "--classify --http-status 401"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: "auth"
+
+- description: "mcp-failure: classify schema — http-status 400 no workflow keywords"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+    script_args: "--classify --http-status 400 --error-msg bad-field-value"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: "schema"
+
+- description: "mcp-failure: classify workflow — http-status 400 with transition keyword"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+    script_args: "--classify --http-status 400 --error-msg invalid-transition-id"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: "workflow"
+
+- description: "mcp-failure: classify hook-block — hook deny with R21 prefix"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+    script_args: '--classify --hook-deny "R17/R20/R21: approval token missing"'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: "hook-block"
+
+- description: "mcp-failure: classify link-verification — r-path R22"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+    script_args: "--classify --r-path R22"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: "link-verification"
+
+- description: "mcp-failure: classify unknown — no signal — exits 1 (unknown is reachable)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+    script_args: "--classify"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: "unknown"
+
+# ── mcp-failure.js telemetry test (R27) ────────────────────────────────────
+
+- description: "mcp-failure: telemetry appends 5-line block with cloudId redaction (R27)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+    # script_args uses whitespace-split only — no shell quoting; use single-token values
+    script_args: "--telemetry --class auth --tool mcp__atlassian__createJiraIssue --site acme_atlassian_net --project PROJ --error cloudId=12345678-abcd-1234-5678-abcdef012345 --recovered no"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: icontains
+      value: "mcp-failure[auth]"
+    - type: icontains
+      value: "tool: mcp__atlassian__createJiraIssue"
+    - type: icontains
+      value: "recovered: no"
+    - type: not-icontains
+      value: "12345678-abcd"
+
+# ── mcp-failure.js analyze test (R28) ──────────────────────────────────────
+
+- description: "mcp-failure: analyze outputs stable JSON shape (R28)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+    script_args: "--analyze --class auth --tool mcp__atlassian__createJiraIssue --site acme_atlassian_net --project PROJ --error 401-unauthorized --recovered no --r-path R23"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: javascript
+      value: |
+        try {
+          const o = JSON.parse(output.trim());
+          return typeof o.shouldDispatch === 'boolean' &&
+                 ('duplicate' in o) &&
+                 typeof o.proposal === 'object' &&
+                 typeof o.proposal.title === 'string' &&
+                 typeof o.proposal.body === 'string' &&
+                 (o.action === 'create' || o.action === 'comment');
+        } catch (e) { return false; }
+
+# ── mcp-failure.js record-occurrence test (KD7) ────────────────────────────
+
+- description: "mcp-failure: record-occurrence returns 1 on first call"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+    script_args: "--record-occurrence --class hook-block --key test-key-wave4"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-no-config"
+  assert:
+    - type: javascript
+      value: |
+        const n = parseInt(output.trim(), 10);
+        return n >= 1;
 
 - description: "jira-prepare: fresh install — exists=false, flags echoed"
   vars:
