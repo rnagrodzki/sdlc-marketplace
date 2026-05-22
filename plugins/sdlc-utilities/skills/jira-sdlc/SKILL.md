@@ -395,10 +395,20 @@ On non-zero exit (`LINK_EXIT != 0`):
 > - HELPER is resolved inline at the top of each top-level step (R9/R14/R21/R22/R23) rather than once globally because steps may be entered independently. The `find` is idempotent and cheap.
 > - The helper's stdout (`--telemetry` echoes the appended block, `--analyze` emits JSON) is intentionally NOT redirected to `/dev/null` — the block surfaces in the terminal for user visibility into what was written to `.sdlc/learnings/log.md`.
 > - Cross-step session counting (R28 "twice in one invocation") is keyed by `SDLC_SESSION_ID` if set, otherwise by a per-project marker file at `.sdlc/state/mcp-session.id` written on first call. Callers do not need to export `SDLC_SESSION_ID` for the R21 dedup gate to function.
+> - When the helper cannot be resolved (plugin not installed or `find` returns empty and the cwd fallback also misses), each block emits a single stderr WARNING and proceeds non-fatally. The downstream `[ -n "$HELPER" ] && node "$HELPER" ...` guards then skip the call without aborting the surrounding step. The warning satisfies the script-resolution convention while preserving R27's "telemetry is best-effort" design intent.
+> - `ANALYZE_JSON` is the raw JSON string emitted by `node "$HELPER" --analyze ...` — it is NOT an object. To use `.proposal.title` and `.proposal.body`, parse explicitly:
+>
+>   ```bash
+>   PROPOSAL_TITLE=$(printf '%s' "$ANALYZE_JSON" | node -e "let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>process.stdout.write(JSON.parse(d).proposal.title))")
+>   PROPOSAL_BODY=$(printf  '%s' "$ANALYZE_JSON" | node -e "let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>process.stdout.write(JSON.parse(d).proposal.body))")
+>   ```
+>
+>   Every "Read `ANALYZE_JSON.proposal.title` / `.proposal.body`" instruction below refers to the result of this parse — pass `$PROPOSAL_BODY` (not raw `$ANALYZE_JSON`) to `error-report-sdlc --error-text`.
 
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -z "$HELPER" ] && echo "WARNING: mcp-failure.js not found — R27/R28 telemetry unavailable. Is the sdlc plugin installed?" >&2
 # telemetry block is echoed to terminal for user visibility (intentional)
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class link-verification --tool "jira.js --validate-body" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "link verification abort: $LINK_EXIT" --recovered no
 ```
@@ -424,6 +434,7 @@ For write operations: precondition — Step 2.6 returned `approve`, Step 2.7 lin
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -z "$HELPER" ] && echo "WARNING: mcp-failure.js not found — R27/R28 telemetry unavailable. Is the sdlc plugin installed?" >&2
 HOOK_HASH=$(echo -n "$permissionDecisionReason" | sha256sum | cut -c1-12)
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class hook-block --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$permissionDecisionReason" --recovered no
 [ -n "$HELPER" ] && HOOK_COUNT=$(node "$HELPER" --record-occurrence --class hook-block --key "$HOOK_HASH")
@@ -448,6 +459,7 @@ Read `ANALYZE_JSON.proposal.title` and `ANALYZE_JSON.proposal.body`; present to 
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -z "$HELPER" ] && echo "WARNING: mcp-failure.js not found — R27/R28 telemetry unavailable. Is the sdlc plugin installed?" >&2
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class auth --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$AUTH_ERROR" --recovered no
 ```
 
@@ -512,6 +524,7 @@ When a 400 on create or repeated 400 still fails after cache auto-refresh, call 
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -z "$HELPER" ] && echo "WARNING: mcp-failure.js not found — R27/R28 telemetry unavailable. Is the sdlc plugin installed?" >&2
 FAILURE_CLASS=schema  # or "workflow" for transition errors
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class "$FAILURE_CLASS" --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$ERROR_MSG" --recovered no
 [ -n "$HELPER" ] && ANALYZE_JSON=$(node "$HELPER" --analyze --class "$FAILURE_CLASS" --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$ERROR_MSG" --recovered no --r-path R9)
@@ -606,6 +619,7 @@ Also call `--telemetry` on every retry (even successful ones) to maintain a per-
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -z "$HELPER" ] && echo "WARNING: mcp-failure.js not found — R27/R28 telemetry unavailable. Is the sdlc plugin installed?" >&2
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class workflow --tool "getTransitionsForJiraIssue" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$TRANSITION_ERROR" --recovered no
 [ -n "$HELPER" ] && ANALYZE_JSON=$(node "$HELPER" --analyze --class workflow --tool "getTransitionsForJiraIssue" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$TRANSITION_ERROR" --recovered no --r-path R14)
 ```

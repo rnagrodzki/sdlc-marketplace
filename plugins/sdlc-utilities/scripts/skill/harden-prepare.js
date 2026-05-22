@@ -12,7 +12,7 @@
 
 const fs   = require('node:fs');
 const path = require('node:path');
-const { execSync } = require('node:child_process');
+const { execSync, spawnSync } = require('node:child_process');
 
 const LIB = path.join(__dirname, '..', 'lib');
 const { writeOutput } = require(path.join(LIB, 'output'));
@@ -165,8 +165,9 @@ function main() {
   let classificationHint = null;
   if (hasFromIssue) {
     const issueNum = String(input.fromIssue).trim();
-    // Validate as pure positive integer before passing to execSync to prevent
-    // shell injection via metacharacters (e.g., `; rm -rf /`).
+    // Validate as pure positive integer (defense-in-depth alongside the
+    // spawnSync argv-array invocation below, which already avoids shell
+    // metacharacter parsing).
     if (!/^\d+$/.test(issueNum)) {
       const msg = `--from-issue: invalid issue number "${issueNum}" — must be a positive integer`;
       errors.push(msg);
@@ -174,15 +175,29 @@ function main() {
       writeOutput({ errors, warnings: [] }, 'sdlc-harden', 1);
       return;
     }
+    // Use spawnSync with argv array (shell: false) for defense-in-depth against
+    // shell injection — matches the established pattern in
+    // mcp-failure.js::analyzeForDispatch. The integer-regex above is a first
+    // line of defense; passing argv directly avoids shell-metacharacter parsing
+    // entirely.
     let issueJson = null;
+    const result = spawnSync(
+      'gh',
+      ['issue', 'view', issueNum, '--json', 'body,labels,title'],
+      { stdio: ['ignore', 'pipe', 'pipe'], timeout: 15000, shell: false }
+    );
+    if (result.error || result.status !== 0) {
+      const errText = result.stderr ? result.stderr.toString().trim() : (result.error && result.error.message) || `exit ${result.status}`;
+      const msg = `--from-issue ${issueNum}: gh issue view failed — ${errText}`;
+      errors.push(msg);
+      process.stderr.write(`harden-prepare: ${msg}\n`);
+      writeOutput({ errors, warnings: [] }, 'sdlc-harden', 1);
+      return;
+    }
     try {
-      const out = execSync(
-        `gh issue view ${issueNum} --json body,labels,title`,
-        { stdio: ['ignore', 'pipe', 'pipe'], timeout: 15000 }
-      ).toString().trim();
-      issueJson = JSON.parse(out);
+      issueJson = JSON.parse(result.stdout.toString().trim());
     } catch (err) {
-      const msg = `--from-issue ${issueNum}: gh issue view failed — ${err.stderr ? err.stderr.toString().trim() : err.message}`;
+      const msg = `--from-issue ${issueNum}: gh issue view returned invalid JSON — ${err.message}`;
       errors.push(msg);
       process.stderr.write(`harden-prepare: ${msg}\n`);
       writeOutput({ errors, warnings: [] }, 'sdlc-harden', 1);
