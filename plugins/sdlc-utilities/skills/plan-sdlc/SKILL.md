@@ -195,10 +195,12 @@ fi
 
 - **Lightweight scope** (`explorePack.scopeHintCount` ≤ 3 OR `explorePack.manifestPath` is null due to lightweight scope):
   - Skip orchestrator. Use inline exploration below. No brief. (Tempdir cleanup is already installed by the unconditional trap above when `manifestPath` is non-null.)
+  - Issue all Glob/Grep/Read calls for inline exploration in a SINGLE message (parallel dispatch). (implements R37, Fixes #418)
 
 - **Error fallback** (`explorePack.error` is non-null, the orchestrator returned non-zero, or brief validation found zero `F-<DIM>-<n>` IDs):
   - Append one line to `.sdlc/learnings/log.md`: `## <YYYY-MM-DD> — plan-sdlc orchestrator skipped: <explorePack.error or "brief without F-DIM-N findings">`
   - Use inline exploration below. Plan still produced. (implements R28)
+  - Issue all Glob/Grep/Read calls for inline exploration in a SINGLE message (parallel dispatch). (implements R37, Fixes #418)
 
 **Structured discovery:** When requirements are vague (a single sentence or ambiguous goal), use AskUserQuestion with 2–3 targeted questions at once:
 1. **Scope** — what's in, what's explicitly out?
@@ -213,6 +215,7 @@ Wait for answers before continuing.
 - Testing patterns used in the project
 - Build/lint/test commands (from Makefile, package.json, or similar)
 - Naming conventions and code style
+- All Glob/Grep/Read calls above MUST be issued in a SINGLE message as parallel tool calls — mirror the in-skill precedent at the OpenSpec artifact reads (`Read in parallel: …`). (implements R37, Fixes #418)
 
 Identify constraints: language, framework, existing conventions, testing approach.
 
@@ -309,50 +312,53 @@ Do not mandate TDD for config, documentation, or infrastructure tasks.
 
 **Post-write cleanup:** Remove the `## Requirements` working section from the plan file. Requirements are traceable through task acceptance criteria; the section was temporary scaffolding.
 
-## Step 3 (CRITIQUE): Self-Review Plan
+## Step 3 (CRITIQUE): Self-Review Plan — 5-Lane Parallel Gate Evaluation (R35, Fixes #418)
 
-**Re-anchor:** Re-read the plan file before evaluating gates. The file — not your memory of it — is the source of truth.
+**Re-anchor:** Re-read the plan file before dispatching lanes. The file — not your memory of it — is the source of truth.
 
-**G17 Dimension Coverage subagent dispatch (R31, R33, parallel with main-thread gates):**
+**Fan-out dispatch: Dispatch ALL FIVE Step 3 lanes from `lanes[]` (P16) in a SINGLE message as parallel Agent tool calls. Do not dispatch them sequentially.**
 
-Dispatch the G17 subagent at the START of Step 3, in parallel with the main thread's gate evaluations below. Parameters come verbatim from prepare output (`agent-dispatch-script-driven` guardrail — do NOT hardcode these values):
+All 17 quality gates (G1–G17) are partitioned across five lanes — each gate belongs to exactly one lane. Lane dispatch parameters (`subagent_type`, `model`, and prompt body read from `promptTemplatePath`) MUST be sourced verbatim from the corresponding `lanes[i]` entry in the prepare output (`agent-dispatch-script-driven` guardrail — do NOT hardcode these values).
 
-- `subagent_type`: `g17Dispatch.subagentType`
-- `model`: `g17Dispatch.model`
-- prompt body: read `g17Dispatch.promptTemplatePath` and fill template variables `{PLAN_FILE_PATH}` (absolute path to the plan file), `{DIMENSIONS_DIR}` (`.sdlc/review-dimensions/`), `{COPILOT_DIR}` (`.github/instructions/`), `{GITHUB_HOSTING_DETECTED}` (`githubHosting.detected` from P14), `{LEARNINGS_LOG_PATH}` (`.sdlc/learnings/log.md`), `{PR_COMMIT_WINDOW}` (best-effort "last 14 days" if unknown)
+For each `lanes[i]` entry (i = 0..4):
 
-When `g17Dispatch.promptTemplatePath` is null (prepare script reported an error finding the template), skip G17 dispatch entirely and treat `g17Findings` as empty. Log to `.sdlc/learnings/log.md`:
+- `subagent_type`: `lanes[i].subagentType`
+- `model`: `lanes[i].model`
+- prompt body: Read `lanes[i].promptTemplatePath` and fill template variables:
+  - All lanes: `{PLAN_FILE_PATH}` (absolute path to plan file), `{PROJECT_ROOT}` (cwd)
+  - Lanes 0–3 non-G17: `{REQUIREMENTS_SUMMARY}`, `{ACTIVE_GUARDRAILS}` (from `guardrails[]` P7), `{OPENSPEC_TASKS}` (from `openspecContext.tasks` P13, null when not OpenSpec-sourced), `{BRIEF_FINDING_IDS}` (from `explorePack.manifestPath` context, null when no brief)
+  - Lane 4 (G17/dimension-coverage): `{DIMENSIONS_DIR}` (`.sdlc/review-dimensions/`), `{COPILOT_DIR}` (`.github/instructions/`), `{GITHUB_HOSTING_DETECTED}` (`githubHosting.detected` from P14), `{LEARNINGS_LOG_PATH}` (`.sdlc/learnings/log.md`), `{PR_COMMIT_WINDOW}` (best-effort "last 14 days" if unknown)
+
+**Null `promptTemplatePath` handling:** When `lanes[i].promptTemplatePath` is null (prepare script reported it could not find the template), skip that lane's dispatch and immediately add a synthetic blocking issue:
+```
+{ laneStatus: "failed", gateIds: lanes[i].gateIds, issues: [{ gateId: lanes[i].gateIds[0], severity: "error", message: "Lane <name> skipped — promptTemplatePath null (template not found at prepare time)", blocking: true }], passes: [] }
+```
+Exception: lane 4 (G17/dimension-coverage) — when `g17Dispatch.promptTemplatePath` is null, treat as empty findings (advisory per R31 dispatch-failure fallback) and continue. Log to `.sdlc/learnings/log.md`:
 ```
 ## YYYY-MM-DD — plan-sdlc: G17 skipped — promptTemplatePath null (template not found at prepare time)
 ```
 
-While G17 runs, continue main-thread gate evaluations below. **JOIN on G17 before writing the `critiqueRan` marker.** Persist G17's returned JSON in memory as `g17Findings` for Step 4 consumption. Parse the `findings` JSON object from the subagent's response. **On dispatch failure / timeout / malformed JSON** — treat `g17Findings` as `{ findings: [], rendering: "", suppressed_count: 0 }` and continue; log failure to `.sdlc/learnings/log.md` per R31 dispatch-failure fallback.
+**No `isolation: "worktree"` on any lane dispatch** (forbidden per issues #370/#372).
 
-Check each quality gate:
+**Collect lane results and merge:**
 
-| Gate | Check |
-|---|---|
-| Requirements coverage | Every requirement from Step 1 has at least one task |
-| No orphan tasks | Every task traces back to a requirement |
-| Dependency integrity | No circular deps; every named dependency exists |
-| File conflict potential | Two tasks modifying the same file are in dependency order |
-| Context sufficiency | Each task description is self-contained enough to dispatch as an agent |
-| Classification accuracy | Complexity/risk assignments match the heuristics |
-| No scope creep | No tasks beyond stated requirements |
-| Verification completeness | Every task has at least one verification method |
-| Decomposition balance | No task touches > 5 files; no plan with > 80% Trivial tasks |
-| File existence | Every path under "Modify:" exists in the codebase (verify with Glob) |
-| OpenSpec requirements coverage | When `openspecContext` exists: every ADDED/MODIFIED requirement in delta specs has at least one task |
-| Brief citation coverage | When `explorePack.manifestPath` was non-null AND the orchestrator produced a brief: every Standard/Complex task cites ≥1 `F-<DIM>-<n>` finding ID OR is marked "out-of-scope addition" with rationale. Trivial tasks exempt. Uncited Standard/Complex tasks are a blocking error. (G15) |
-| Dependency target existence | Every "Depends on: Task N" references a task number that exists in the plan |
-| Self-containment test | Pick the most complex task — could an agent implement it using only its description + Key Decisions? If not, the description is incomplete |
-| Guardrail compliance | For each guardrail in `activeGuardrails`: evaluate whether the plan (as written) satisfies its `description`. Report each as PASS or FAIL with a one-line rationale. Guardrails with `severity: "error"` (or no severity, defaulting to error) that FAIL are blocking — they must be fixed in Step 4. Guardrails with `severity: "warning"` that FAIL are advisory — note them but do not block. |
-| OpenSpec tasks.md coverage (G16) | When `fromOpenspecDirect` is true: every entry in `openspecContext.tasks[]` is either (a) referenced by ≥1 plan task's `openspec-task.ref`, or (b) listed in `## Out-of-scope OpenSpec tasks`. Error severity (blocking). |
-| Dimension Coverage (G17) | When G17 subagent dispatched: emit proposals per R31 criteria with R31 suppression and ranking. Severity: **advisory** — findings are surfaced in Step 4 but never block plan finalization. Absent proposals do not fail this gate. |
+Each lane returns a JSON object with schema:
+```json
+{ "gateIds": [...], "issues": [...], "passes": [...], "laneStatus": "ok"|"failed"|"timeout" }
+```
+Lane 3 (guardrail-compliance) additionally returns `guardrailCompliancePayload` in the JSON object — store this for Step 4's `## Guardrail Compliance` section.
+Lane 4 (dimension-coverage/G17) returns the G17 findings JSON — parse the `findings` object and persist as `g17Findings` for Step 4.
 
-Note every issue. Do NOT write to the plan file in this step.
+**Merge algorithm:**
+1. `allIssues` = union of `issues[]` from all lanes
+2. `allPasses` = union of `passes[]` from all lanes
+3. `coverageCheck`: the union of all `gateIds[]` arrays returned by lanes MUST equal {G1..G17} exactly. Any missing gate ID → add a blocking issue: `{ gateId: "<missing>", severity: "error", message: "Gate <missing> not evaluated by any lane", blocking: true }`
+4. Lane returning `laneStatus !== "ok"`: append to `allIssues` as blocking error `{ gateId: "lane-failure", severity: "error", message: "Lane <name> failed: <reason> — gate IDs <list> not evaluated", blocking: true }` — **exception: G17 lane (lanes[4]) failure is advisory, not blocking** (per R31 dispatch-failure fallback)
+5. Dedup `allIssues` by `(gateId, taskRef, message-normalized-prefix)` — keep first occurrence
 
-**guardrailsEvaluated marker (implements R20, issue #285):** After completing the guardrail-compliance gate evaluation above, record the checkpoint. Each `--mark` block re-resolves `$SCRIPT` because SKILL.md bash blocks do not share shell state.
+Note every issue from `allIssues`. Do NOT write to the plan file in this step.
+
+**JOIN barrier — `guardrailsEvaluated` (implements R20, R35, issue #285):** After the guardrail-compliance lane (lanes[3]) result is incorporated into the merged issue list, record the checkpoint. **Do NOT write this marker before lanes[3] returns.** Each `--mark` block re-resolves `$SCRIPT` because SKILL.md bash blocks do not share shell state.
 
 ```bash
 SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
@@ -361,9 +367,7 @@ SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/pla
 [ -n "$SCRIPT" ] && node "$SCRIPT" --mark guardrailsEvaluated 2>/dev/null || true
 ```
 
-Ensure G17 has returned and `g17Findings` is populated before marking critiqueRan (implements R31 join requirement).
-
-**critiqueRan marker (implements R20, issue #285):** After all Step 3 checks are complete AND G17 has returned (this is the final action of Step 3), record the checkpoint.
+**JOIN barrier — `critiqueRan` (implements R20, R35, issue #285):** After ALL five lanes have returned and the merged issue list is complete (including G17/lanes[4] findings parsed into `g17Findings`), record the checkpoint. **Do NOT write this marker until all five lanes have returned.** This extends the existing G17 join semantics to every lane.
 
 ```bash
 SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
@@ -399,26 +403,41 @@ When `g17Findings.findings` is empty (or `g17Findings` is the empty-fallback fro
 
 Step 4 is autonomous (implements R22 single-touchpoint handoff). After fixes are applied (Guardrail Compliance section written when `activeGuardrails` is non-empty, and Suggested Review Dimensions spliced when `g17Findings.findings` is non-empty per R34), proceed directly to Step 5. The user does NOT see the plan at Step 4; the single user touchpoint for the finalized plan is Step 7 (Handoff). The Step 4 error-severity guardrail-block harden offer above remains a genuine decision gate and is preserved (R19).
 
-## Step 5 (CRITIQUE): Plan Review Loop
+## Step 5 (CRITIQUE): Plan Review Loop — Multi-Lens Fan-Out (R36, Fixes #418)
 
 Skip for lightweight plans (2–3 file scope from Step 0 routing).
 
-Dispatch a plan reviewer subagent using `./plan-reviewer-prompt.md`. Provide:
-- Path to the plan file
-- The requirements checklist from Step 1
-- Source requirements or spec (if a file exists)
-- When `openspecContext` is available, include the delta spec files as the "Source requirements" input — this gives the cross-model reviewer the ability to verify that every OpenSpec requirement is covered by at least one task
-- When `activeGuardrails` is non-empty, include them as `{GUARDRAILS}` — format as one guardrail per line: `- [id] (severity): description`. If no guardrails: `"none configured"`.
+**For plans with ≥5 tasks — Multi-lens fan-out:** Dispatch ALL lens reviewers from `lensReviewers[]` (P17) in a SINGLE message as parallel Agent tool calls. Do not dispatch them sequentially. Reuse canonical fan-out wording: "Dispatch ALL … in a SINGLE message as parallel Agent tool calls."
 
-**Model selection:** Use a different model than the one that wrote the plan when the plan has 5+ tasks. Cross-model review catches blind spots.
-- Plan written by sonnet → dispatch reviewer as opus
-- Plan written by opus → dispatch reviewer as sonnet
-- Plans under 5 tasks → same model is acceptable
+For each `lensReviewers[i]` entry (i = 0..2):
+- `subagent_type`: `lensReviewers[i].subagentType`
+- `model`: override with the **opposite-of-plan-author model** at dispatch time (cross-model property — plan written by sonnet → dispatch reviewer as opus; plan written by opus → dispatch reviewer as sonnet). This overrides the default `lensReviewers[i].model` value from the prepare output for ≥5-task plans.
+- prompt body: Read `lensReviewers[i].promptTemplatePath` and fill template variables:
+  - `{PLAN_FILE_PATH}` — absolute path to the plan file
+  - `{LENS}` — `lensReviewers[i].lens` (one of `architecture`, `requirements`, `risk`)
+  - `{LENS_FOCUS}` — `lensReviewers[i].focusCategories` rendered as a bullet list
+  - `{REQUIREMENTS_CHECKLIST}` — numbered list from Step 1 (CONSUME)
+  - `{SOURCE_REQUIREMENTS}` — file path or inline text of spec (if available)
+  - `{BRIEF_FILE}` — absolute path to `discovery-brief.md`, or `"none — orchestrator skipped"`
+  - `{OPENSPEC_TASKS}` — serialized JSON from `openspecContext.tasks[]`, or `"none — plan not from OpenSpec"`
+  - `{GUARDRAILS}` — one guardrail per line (`- [id] (severity): description`), or `"none configured"`
+
+When `lensReviewers[i].promptTemplatePath` is null, skip that lens and log to `.sdlc/learnings/log.md`: `## YYYY-MM-DD — plan-sdlc: lens "<name>" skipped — promptTemplatePath null (template not found at prepare time)`. Continue with remaining lenses.
+
+**No `isolation: "worktree"` on any lens reviewer dispatch** (forbidden per issues #370/#372).
+
+**Merge lens reviewer results (per iteration):**
+1. **Status**: `Approved` iff ALL lens reviewers returned `Approved`; otherwise `Issues Found`
+2. **Issues**: union of blocking issues across all lenses — dedup by `(taskRef, message-normalized-prefix)` (keep first occurrence)
+3. **Recommendations**: collect all recommendations, dedup by string prefix (first 60 chars)
+4. **Iteration counter**: increment by 1 per complete fan-out dispatch, regardless of how many lenses returned
+
+**For plans with <5 tasks — Single reviewer (status quo):** Dispatch one reviewer with `{LENS}=all` using `./plan-reviewer-prompt.md` directly (same model acceptable). Status quo behavior preserved.
 
 **Review loop:**
 - Approved → Step 6 is a no-op, proceed to Step 7
 - Issues found → go to Step 6
-- Max 3 iterations → use AskUserQuestion to surface unresolved issues to user. Offer **harden** (run `/harden-sdlc` to analyze why this failed and propose stronger guardrails / dimensions / instructions that would catch it earlier next time — opt-in, no surface is edited without your approval) alongside the existing escalation options. When the user selects **harden** (interactive mode only — suppressed when `--auto` is set), dispatch `Skill(harden-sdlc)` with `--failure-text "Plan reviewer loop did not converge after 3 iterations. Outstanding issues: <issues>"`, `--skill plan-sdlc`, `--step "Step 5 — review loop"`, `--operation "reviewer-loop max iterations"`. Implements R19.
+- Max 3 iterations → use AskUserQuestion to surface unresolved issues to user. Offer **harden** (run `/harden-sdlc` to analyze why this failed and propose stronger guardrails / dimensions / instructions that would catch it earlier next time — opt-in, no surface is edited without your approval) alongside the existing escalation options. When the user selects **harden** (interactive mode only — suppressed when `--auto` is set), dispatch `Skill(harden-sdlc)` with `--failure-text "Plan reviewer loop did not converge after 3 iterations. Outstanding issues: <union-of-blocking-issues-across-all-lenses>"`, `--skill plan-sdlc`, `--step "Step 5 — review loop"`, `--operation "reviewer-loop max iterations"`. Implements R19.
 
 ## Step 6 (IMPROVE): Apply Review Fixes
 

@@ -13,6 +13,15 @@ Use this template in plan-sdlc Step 5 (CRITIQUE) when dispatching the plan revie
 - `{SOURCE_REQUIREMENTS}` — file path or inline text of the original spec/requirements (if available)
 - `{BRIEF_FILE}` — absolute path to `discovery-brief.md` produced by `plan-explore-orchestrator`, or `"none — orchestrator skipped"` when the lightweight path or fallback ran
 - `{OPENSPEC_TASKS}` — serialized JSON array from `openspecContext.tasks[]` when `--from-openspec` was active; `"none — plan not from OpenSpec"` otherwise
+- `{LENS}` — reviewer lens: one of `architecture`, `requirements`, `risk`, or `all`. When `{LENS}=all`, the reviewer evaluates all categories (status quo for plans <5 tasks). When `{LENS}` is one of the three specific values, the reviewer filters evaluation to the categories listed in `{LENS_FOCUS}`.
+- `{LENS_FOCUS}` — category subset for the lens, rendered as a bullet list (e.g., `- Buildability\n- Task descriptions\n- Decision documentation\n- Dependency accuracy`). When `{LENS}=all`, set to `"all categories below"`.
+
+**Lens → category mapping (KD3, Fixes #418):**
+- `architecture`: Buildability, Task descriptions, Decision documentation, Dependency accuracy
+- `requirements`: Requirements coverage, Metadata completeness, Plan completeness, OpenSpec G16, Exploration provenance, Best-practice traceability
+- `risk`: File paths, Verification strategy, Scope discipline, Guardrail compliance
+- `all`: all categories (single-reviewer mode for plans <5 tasks — preserves today's behavior)
+
 ```
 Task tool (general-purpose):
   description: "Plan review for <feature name>"
@@ -29,6 +38,9 @@ Task tool (general-purpose):
     **Plan guardrails:** {GUARDRAILS — one per line, or "none configured"}
     **Discovery brief:** {BRIEF_FILE — absolute path to discovery-brief.md, or "none — orchestrator skipped"}
     **openspecContext.tasks:** {OPENSPEC_TASKS — serialized JSON array from prepare output, or "none — plan not from OpenSpec"}
+
+    **Focus areas (this lens only):** {LENS_FOCUS}
+    (When lens is `all`, evaluate all categories below. When lens is `architecture`, `requirements`, or `risk`, evaluate only the categories listed in Focus areas above — skip all other categories.)
 
     ## What to Check
 
@@ -59,13 +71,13 @@ Task tool (general-purpose):
     - A wrong file path → flag it
     - A stylistic preference about task ordering → do NOT flag
 
-    Approve unless there are genuine execution blockers.
+    Approve unless there are genuine execution blockers within your focus areas.
 
     ## Output
 
     **Status:** Approved | Issues Found
 
-    **Issues (if any — list only execution blockers):**
+    **Issues (if any — list only execution blockers within your focus areas):**
     - Task N: [specific issue] — [why this would cause execution failure]
 
     **Recommendations (advisory, do not block approval):**
@@ -74,9 +86,11 @@ Task tool (general-purpose):
 
 ## Handling Reviewer Output
 
-**Approved:** Proceed to Step 7 (Handoff).
+**Single reviewer (`{LENS}=all`, plans <5 tasks):**
+- Approved → Proceed to Step 7 (Handoff)
+- Issues Found → Fix each blocking issue in the plan document; re-dispatch the reviewer; maximum 3 reviewer iterations — if still unresolved, surface to user
 
-**Issues Found:**
-1. Fix each blocking issue in the plan document
-2. Re-dispatch the reviewer (same model selection)
-3. Maximum 3 reviewer iterations — if still unresolved, surface to user
+**Multi-lens reviewer (plans ≥5 tasks — merge in Step 5):**
+- Main agent merges lens results: Status = `Approved` iff ALL lenses approved; Issues = union of blocking issues (dedup by taskRef + message-prefix); Recommendations = prefix-dedup
+- Merged Approved → Proceed to Step 7
+- Merged Issues Found → Fix blocking issues; re-dispatch all lenses in next iteration; maximum 3 iterations total

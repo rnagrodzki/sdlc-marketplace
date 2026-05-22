@@ -3,7 +3,7 @@
 #   plan-from-openspec             -- CORRECT: simulates --from-openspec with ready-for-plan stage, tasks.md present
 #   plan-from-openspec-no-tasks    -- CORRECT: simulates --from-openspec with spec-in-progress stage, no tasks.md
 #   plan-creates-skill             -- CORRECT: simulates a request to plan a new skill; exercises skill-docs-required guardrail (Fixes #185)
-#   plan-orchestrator-dispatch     -- CORRECT: 4+ file scope + non-null manifestPath; exercises R24 orchestrator dispatch path
+#   plan-orchestrator-dispatch     -- CORRECT: 4+ file scope + non-null manifestPath; exercises R24 orchestrator dispatch path; now includes lanes[]/lensReviewers[] (Fixes #418)
 #   plan-web-mode-trigger          -- CORRECT: webResearchSignal: true + brief with web/hybrid dims; exercises R25a web requirement
 #   plan-web-mode-suppressed       -- CORRECT: pure-refactor + webResearchSignal: false; exercises R25a web suppression
 #   plan-lightweight-skip          -- CORRECT: ≤3-file scope + manifestPath: null; exercises R24 lightweight skip
@@ -13,6 +13,73 @@
 #   plan-g17-behavior-mod-no-new-files -- CORRECT: B1 update-behavior proposal for public CLI flag addition (Fixes #417)
 #   plan-g17-doc-only-suppressed       -- CORRECT: doc-only diff suppresses all G17 proposals, empty findings (Fixes #417)
 #   plan-g17-pure-refactor-suppressed  -- CORRECT: pure-refactor markers suppress B-criteria, empty findings (Fixes #417)
+
+# --- Fan-out parallelization cases (P1/P2/P3 — Fixes #418) ---
+
+- description: "plan-sdlc: P1-fanout — Step 3 dispatches 5 lane Agents in a single message using lanes[] (Fixes #418)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-dispatch.md"
+    user_request: >
+      Run /plan-sdlc. Step 3 (CRITIQUE) is about to begin. The prepare output includes
+      lanes[] with 5 entries (static-structural, content-coverage, file-existence,
+      guardrail-compliance, dimension-coverage) each with a promptTemplatePath.
+      Describe exactly how Step 3 dispatches its gate evaluations.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response accurately describes Step 3 as dispatching ALL FIVE lane Agents
+        in a SINGLE message (parallel dispatch). Key facts that must be present:
+        (1) all 5 lanes are dispatched simultaneously in one message, not sequentially;
+        (2) dispatch parameters (subagent_type, model, prompt) are sourced verbatim from
+        lanes[i] entries in the prepare output — no hardcoded values;
+        (3) the main agent JOINs on all five lanes before writing the critiqueRan marker;
+        (4) the guardrailsEvaluated marker fires only after the guardrail-compliance lane
+        (lanes[3]) returns — not before;
+        (5) all 17 gate IDs (G1–G17) are covered across the 5 lanes with no gate
+        appearing in two lanes (disjoint partitioning).
+
+- description: "plan-sdlc: P2-fanout — Step 5 dispatches 2-3 lens reviewers in a single message per iteration for >=5-task plans (Fixes #418)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-orchestrator-dispatch.md"
+    user_request: >
+      Run /plan-sdlc. The plan has 7 tasks (>=5) and is written by sonnet.
+      Step 5 (CRITIQUE / Plan Review Loop) is about to begin.
+      The prepare output includes lensReviewers[] with 3 entries (architecture,
+      requirements, risk). Describe how Step 5 dispatches reviewers for this plan.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response accurately describes Step 5 for a >=5-task plan as dispatching
+        ALL lens reviewers from lensReviewers[] in a SINGLE message per iteration
+        (parallel dispatch, not sequential). Key facts:
+        (1) all 3 lens reviewers dispatched simultaneously in one message per iteration;
+        (2) dispatch parameters sourced verbatim from lensReviewers[i] — no hardcoded values;
+        (3) since plan is written by sonnet, all lenses use opus (cross-model strategy);
+        (4) merge semantics: Status=Approved iff ALL lenses approved; Issues=union with
+        dedup; Recommendations=prefix-dedup;
+        (5) iteration counter increments by 1 per complete fan-out, not per reviewer
+        dispatch; max 3 iterations preserved.
+
+- description: "plan-sdlc: P3-fallback — inline exploration issues Glob/Grep/Read calls in a SINGLE message (Fixes #418)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-lightweight-skip.md"
+    user_request: >
+      Run /plan-sdlc. The scope is lightweight (scopeHintCount=2, manifestPath=null).
+      The orchestrator is skipped. Describe how the inline codebase exploration
+      is performed in terms of tool call dispatch.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response describes inline codebase exploration as issuing all Glob, Grep,
+        and Read calls in a SINGLE message as parallel tool calls — not sequentially.
+        The response should indicate this applies both to the lightweight-scope path
+        (orchestrator skipped) and to any error-fallback path. The "SINGLE message"
+        requirement should be mentioned explicitly or clearly implied by describing
+        them as parallel. The response must not describe sequential tool calls for
+        inline exploration.
 
 - description: "plan-sdlc: asks whether to execute after plan is written"
   vars:

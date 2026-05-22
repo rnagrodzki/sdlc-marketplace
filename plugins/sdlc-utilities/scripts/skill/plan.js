@@ -198,6 +198,128 @@ function buildG17Dispatch() {
   };
 }
 
+/**
+ * Resolve a skill/plan-sdlc template path via the same find cascade as buildG17Dispatch.
+ * Returns the resolved absolute path, or null when not found.
+ * @param {string} templateName
+ * @returns {string|null}
+ */
+function resolveSkillTemplate(templateName) {
+  // 1. Try installed plugin path via find
+  const findResult = spawnSync(
+    'find',
+    [
+      `${process.env.HOME}/.claude/plugins`,
+      '-name', templateName,
+      '-path', '*/plan-sdlc/*',
+    ],
+    { encoding: 'utf8' },
+  );
+  if (!findResult.error && findResult.status === 0) {
+    const lines = (findResult.stdout || '').trim().split('\n').filter(Boolean);
+    if (lines.length > 0) {
+      const ver = p => { const m = p.match(/\/(\d+)\.(\d+)\.(\d+)\/skills/); return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0]; };
+      const sorted = lines.slice().sort((a, b) => { const [a1, a2, a3] = ver(a); const [b1, b2, b3] = ver(b); return a1 - b1 || a2 - b2 || a3 - b3; });
+      return sorted[sorted.length - 1];
+    }
+  }
+
+  // 2. Workspace-relative fallback (development / CI)
+  const workspacePath = path.join(__dirname, '..', '..', 'skills', 'plan-sdlc', templateName);
+  if (fs.existsSync(workspacePath)) {
+    return workspacePath;
+  }
+
+  return null;
+}
+
+/**
+ * Build P16 lanes[] metadata (R35).
+ * Five entries per KD1 lane partitioning. Entry [4] mirrors g17Dispatch verbatim.
+ * @param {{ subagentType: string, model: string, promptTemplatePath: string|null }} g17Dispatch
+ * @returns {Array<{ name: string, subagentType: string, model: string, promptTemplatePath: string|null, gateIds: string[] }>}
+ */
+function buildLanes(g17Dispatch) {
+  const laneDefs = [
+    {
+      name: 'static-structural',
+      model: 'haiku',
+      templateName: 'lane-static-structural-prompt.md',
+      gateIds: ['G1', 'G2', 'G3', 'G7', 'G12'],
+    },
+    {
+      name: 'content-coverage',
+      model: 'sonnet',
+      templateName: 'lane-content-coverage-prompt.md',
+      gateIds: ['G5', 'G6', 'G8', 'G9', 'G11', 'G13', 'G15', 'G16'],
+    },
+    {
+      name: 'file-existence',
+      model: 'haiku',
+      templateName: 'lane-file-existence-prompt.md',
+      gateIds: ['G4', 'G10'],
+    },
+    {
+      name: 'guardrail-compliance',
+      model: 'sonnet',
+      templateName: 'lane-guardrail-compliance-prompt.md',
+      gateIds: ['G14'],
+    },
+  ];
+
+  const lanes = laneDefs.map(def => ({
+    name: def.name,
+    subagentType: 'general-purpose',
+    model: def.model,
+    promptTemplatePath: resolveSkillTemplate(def.templateName),
+    gateIds: def.gateIds,
+  }));
+
+  // Entry [4]: dimension-coverage — mirrors g17Dispatch verbatim (backwards compatibility)
+  lanes.push({
+    name: 'dimension-coverage',
+    subagentType: g17Dispatch.subagentType,
+    model: g17Dispatch.model,
+    promptTemplatePath: g17Dispatch.promptTemplatePath,
+    gateIds: ['G17'],
+  });
+
+  return lanes;
+}
+
+/**
+ * Build P17 lensReviewers[] metadata (R36).
+ * Three entries per KD3 lens partitioning.
+ * @returns {Array<{ lens: string, subagentType: string, model: string, promptTemplatePath: string|null, focusCategories: string[] }>}
+ */
+function buildLensReviewers() {
+  const lensDefs = [
+    {
+      lens: 'architecture',
+      templateName: 'lens-architecture-prompt.md',
+      focusCategories: ['Buildability', 'Task descriptions', 'Decision documentation', 'Dependency accuracy'],
+    },
+    {
+      lens: 'requirements',
+      templateName: 'lens-requirements-prompt.md',
+      focusCategories: ['Requirements coverage', 'Metadata completeness', 'Plan completeness', 'OpenSpec G16', 'Exploration provenance', 'Best-practice traceability'],
+    },
+    {
+      lens: 'risk',
+      templateName: 'lens-risk-prompt.md',
+      focusCategories: ['File paths', 'Verification strategy', 'Scope discipline', 'Guardrail compliance'],
+    },
+  ];
+
+  return lensDefs.map(def => ({
+    lens: def.lens,
+    subagentType: 'general-purpose',
+    model: 'sonnet',
+    promptTemplatePath: resolveSkillTemplate(def.templateName),
+    focusCategories: def.focusCategories,
+  }));
+}
+
 // plan-explore.js invocation — builds explorePack (R24 / P8–P12)
 // ---------------------------------------------------------------------------
 
@@ -434,7 +556,22 @@ function main() {
     process.stderr.write(`[plan-prepare] G17 skipped — ${g17Dispatch.error}\n`);
   }
 
-  // 6. Output
+  // 6. P16/P17 — lane fan-out and lens reviewer signals (R35, R36 — Fixes #418)
+  const lanes = buildLanes(g17Dispatch);
+  const lensReviewers = buildLensReviewers();
+  // Warn for any lane with null promptTemplatePath (non-G17 lanes only; G17 already warned above)
+  lanes.slice(0, 4).forEach(lane => {
+    if (lane.promptTemplatePath === null) {
+      process.stderr.write(`[plan-prepare] lane "${lane.name}" skipped — prompt template not found\n`);
+    }
+  });
+  lensReviewers.forEach(lens => {
+    if (lens.promptTemplatePath === null) {
+      process.stderr.write(`[plan-prepare] lens "${lens.lens}" skipped — prompt template not found\n`);
+    }
+  });
+
+  // 7. Output
   const output = {
     openspec,
     fromOpenspec: fromOpenspecResult,
@@ -443,6 +580,8 @@ function main() {
     explorePack,
     githubHosting,
     g17Dispatch: { subagentType: g17Dispatch.subagentType, model: g17Dispatch.model, promptTemplatePath: g17Dispatch.promptTemplatePath },
+    lanes,
+    lensReviewers,
     errors,
   };
 
