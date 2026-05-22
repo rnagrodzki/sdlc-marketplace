@@ -45,3 +45,40 @@
     - type: icontains
       value: "broken.md"
       description: "errors must mention the corrupt dimension file"
+
+# R19 --from-issue mcp-failure label → plugin-defect classification (issue #422)
+
+- description: "harden-prepare R19: --from-issue with mcp-failure label pre-sets classification_hint=plugin-defect in manifest"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/harden-prepare.js"
+    script_args: '--from-issue 422 --skill jira-sdlc'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/harden-from-issue-mcp-failure"
+    script_stub_bin: "bin"
+  assert:
+    # Manifest must include classification_hint=plugin-defect because the stub gh
+    # returned an issue with the mcp-failure label (R19 acceptance).
+    - type: javascript
+      value: |
+        const m = JSON.parse(output);
+        return m.classification_hint === 'plugin-defect';
+      description: "classification_hint must be pre-set to plugin-defect when issue has mcp-failure label"
+    # Failure text must be populated from the stub-returned issue body.
+    - type: icontains
+      value: "MCP auth failure"
+      description: "failureText must be populated from the gh-returned issue body"
+
+- description: "harden-prepare R19: --from-issue rejects non-integer issue number (security — shell-injection guard)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/harden-prepare.js"
+    script_args: '--from-issue not-a-number --skill jira-sdlc'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/harden-from-issue-mcp-failure"
+    script_capture_stderr: true
+  assert:
+    - type: icontains
+      value: "invalid issue number"
+      description: "must reject non-numeric issue number before reaching execSync"
+    - type: not-icontains
+      value: "gh issue view failed"
+      description: "must short-circuit before invoking gh — the value-validation guard fires first"

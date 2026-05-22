@@ -391,9 +391,15 @@ On non-zero exit (`LINK_EXIT != 0`):
 - Stop. Do not retry. Do not edit URLs without user input. Do not bypass.
 - **MCP failure telemetry + dispatch gate (R27/R28 — implements R22 exhausted path):**
 
+> **Telemetry helper conventions (apply to every `mcp-failure.js` callsite below):**
+> - HELPER is resolved inline at the top of each top-level step (R9/R14/R21/R22/R23) rather than once globally because steps may be entered independently. The `find` is idempotent and cheap.
+> - The helper's stdout (`--telemetry` echoes the appended block, `--analyze` emits JSON) is intentionally NOT redirected to `/dev/null` — the block surfaces in the terminal for user visibility into what was written to `.sdlc/learnings/log.md`.
+> - Cross-step session counting (R28 "twice in one invocation") is keyed by `SDLC_SESSION_ID` if set, otherwise by a per-project marker file at `.sdlc/state/mcp-session.id` written on first call. Callers do not need to export `SDLC_SESSION_ID` for the R21 dedup gate to function.
+
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+# telemetry block is echoed to terminal for user visibility (intentional)
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class link-verification --tool "jira.js --validate-body" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "link verification abort: $LINK_EXIT" --recovered no
 ```
 

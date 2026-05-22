@@ -165,6 +165,15 @@ function main() {
   let classificationHint = null;
   if (hasFromIssue) {
     const issueNum = String(input.fromIssue).trim();
+    // Validate as pure positive integer before passing to execSync to prevent
+    // shell injection via metacharacters (e.g., `; rm -rf /`).
+    if (!/^\d+$/.test(issueNum)) {
+      const msg = `--from-issue: invalid issue number "${issueNum}" — must be a positive integer`;
+      errors.push(msg);
+      process.stderr.write(`harden-prepare: ${msg}\n`);
+      writeOutput({ errors, warnings: [] }, 'sdlc-harden', 1);
+      return;
+    }
     let issueJson = null;
     try {
       const out = execSync(

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Stub `gh` binary that returns a fixed `gh issue view` JSON payload for an
+# issue carrying the `mcp-failure` label. Used by harden-prepare-exec.yaml
+# to verify R19: --from-issue pre-sets classification_hint=plugin-defect
+# when the fetched issue has the mcp-failure label.
+#
+# Accepts any `gh issue view <N> --json body,labels,title` invocation and
+# emits a deterministic JSON body so harden-prepare.js can parse it.
+case "$1 $2" in
+  "issue view")
+    cat <<'JSON'
+{"body":"MCP auth failure: cloudId mismatch on Atlassian site","labels":[{"name":"mcp-failure"},{"name":"bug"}],"title":"mcp-failure[auth]: editJiraIssue on cleeng.atlassian.net"}
+JSON
+    exit 0
+    ;;
+  *)
+    echo "stub-gh-mcp-failure: unsupported subcommand: $@" >&2
+    exit 2
+    ;;
+esac

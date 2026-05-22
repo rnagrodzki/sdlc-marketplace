@@ -30,7 +30,7 @@ const fs      = require('node:fs');
 const path    = require('node:path');
 const crypto  = require('node:crypto');
 const os      = require('node:os');
-const { execSync } = require('node:child_process');
+const { spawnSync } = require('node:child_process');
 
 // ---------------------------------------------------------------------------
 // Dependency resolution (plugin-tree aware; mirrors other lib helpers)
@@ -48,6 +48,10 @@ const CLASSES = ['transport', 'auth', 'schema', 'workflow', 'hook-block', 'link-
 /** Redactor patterns — must run before any persistence or presentation. */
 const REDACTORS = [
   { re: /Bearer [A-Za-z0-9._-]+/g,                              sub: 'Bearer [REDACTED]' },
+  // Raw JWT (3 base64url segments separated by `.`) — must run before Bearer pattern
+  // would have matched it, and catches JWTs that appear without a "Bearer " prefix
+  // (e.g., in WWW-Authenticate headers or error bodies).
+  { re: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g, sub: '[jwt:REDACTED]' },
   { re: /cookie:[^;\n]+/gi,                                      sub: 'cookie:[REDACTED]' },
   { re: /(?:cloudId|cloud_id)[=:\s"']+([0-9a-f-]{30,})/gi,     sub: (_, id) => `cloudId=[REDACTED:${id.slice(0,6)}…]` },
   { re: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g, sub: '[email:REDACTED]' },
@@ -169,14 +173,56 @@ function appendTelemetry(failure, root) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Resolve a stable session identifier for the current SKILL invocation.
+ *
+ * Resolution order:
+ *   1. `SDLC_SESSION_ID` env var (explicit caller intent, most reliable).
+ *   2. A marker file under the project's sdlc root containing a UUID written
+ *      on first call and reused thereafter. This is stable across separate
+ *      `node mcp-failure.js` invocations even when each runs in a fresh
+ *      shell (so `process.ppid` differs per invocation) — which is the
+ *      normal case for SKILL.md bash blocks executed by claude-cli.
+ *   3. Fallback to `process.ppid`/`process.pid` when no writable root exists.
+ *
+ * The marker file is intentionally per-project (keyed by sdlc root) rather
+ * than per-shell so the R28 "twice in one invocation" contract works across
+ * the multiple bash blocks a skill emits during one user turn.
+ *
+ * @param {string} [root] — optional project root override
+ * @returns {string} session id
+ */
+function resolveSessionId(root) {
+  if (process.env.SDLC_SESSION_ID) return process.env.SDLC_SESSION_ID;
+  try {
+    const projectRoot = root || resolveSdlcRoot();
+    const markerDir   = path.join(projectRoot, '.sdlc', 'state');
+    const marker      = path.join(markerDir, 'mcp-session.id');
+    if (fs.existsSync(marker)) {
+      const existing = fs.readFileSync(marker, 'utf8').trim();
+      if (existing) return existing;
+    }
+    fs.mkdirSync(markerDir, { recursive: true });
+    const id = crypto.randomBytes(8).toString('hex');
+    fs.writeFileSync(marker, id, 'utf8');
+    return id;
+  } catch (_) {
+    // sdlc root unavailable or read-only — fall back to ppid (best-effort)
+    return String(process.ppid || process.pid);
+  }
+}
+
+/**
  * Increments a per-session counter and returns the post-increment count.
- * Persists across CLI re-spawns within one SKILL invocation.
+ * Persists across CLI re-spawns within one SKILL invocation. The session
+ * is identified by `resolveSessionId()` — see that function for details
+ * on how stability across separate shells is achieved.
  * @param {string} cls — failure class
  * @param {string} key — arbitrary key (e.g. hook-hash, tool name)
+ * @param {string} [root] — optional project root override
  * @returns {number} current count after increment
  */
-function recordOccurrence(cls, key) {
-  const sessionId = process.env.SDLC_SESSION_ID || String(process.ppid || process.pid);
+function recordOccurrence(cls, key, root) {
+  const sessionId = resolveSessionId(root);
   const hash      = crypto.createHash('sha1').update(`${cls}:${key}`).digest('hex');
   const dir       = path.join(os.tmpdir(), `sdlc-mcp-session-${sessionId}`);
   const file      = path.join(dir, `${cls}-${hash}.count`);
@@ -198,6 +244,17 @@ function recordOccurrence(cls, key) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Synthesizes an R28 dispatch proposal. Combines local context (telemetry
+ * log scan, template rendering) with a duplicate-detection lookup.
+ *
+ * @remarks **Network side effect.** This function invokes the `gh` CLI
+ * (`gh issue list --label mcp-failure`) which performs an HTTPS call to
+ * github.com. The lookup is bounded by a 10-second timeout and failures
+ * are swallowed (duplicate is set to `null`). Callers running in offline
+ * or hermetic CI contexts should be aware that the network call still
+ * happens and may delay the function by up to the timeout. An offline
+ * mode is not currently exposed.
+ *
  * @param {{
  *   class: string,
  *   tool: string,
@@ -236,21 +293,30 @@ function analyzeForDispatch(failure, root) {
     }
   } catch (_) { /* non-fatal */ }
 
-  // Duplicate detection via gh CLI (KD6)
+  // Duplicate detection via gh CLI (KD6).
+  // Use spawnSync with an argument array (no shell) to prevent injection via
+  // adversarial tool names containing backticks, $(...), or unbalanced quotes.
   let duplicate = null;
   let action    = 'create';
   try {
-    const ghOut = execSync(
-      `gh issue list --state open --label mcp-failure --search ${JSON.stringify(tool)} --json number,title,labels`,
-      { stdio: ['ignore', 'pipe', 'pipe'], timeout: 10000 }
-    ).toString().trim();
-    const issues = JSON.parse(ghOut || '[]');
-    for (const issue of issues) {
-      const labels = (issue.labels || []).map(l => l.name || l);
-      if (labels.some(l => l === `class:${cls}`)) {
-        duplicate = issue.number;
-        action    = 'comment';
-        break;
+    const ghRes = spawnSync(
+      'gh',
+      ['issue', 'list',
+       '--state', 'open',
+       '--label', 'mcp-failure',
+       '--search', tool,
+       '--json', 'number,title,labels'],
+      { stdio: ['ignore', 'pipe', 'pipe'], timeout: 10000, shell: false, encoding: 'utf8' }
+    );
+    if (ghRes.status === 0 && ghRes.stdout) {
+      const issues = JSON.parse(ghRes.stdout.trim() || '[]');
+      for (const issue of issues) {
+        const labels = (issue.labels || []).map(l => l.name || l);
+        if (labels.some(l => l === `class:${cls}`)) {
+          duplicate = issue.number;
+          action    = 'comment';
+          break;
+        }
       }
     }
   } catch (_) { /* gh CLI unavailable or network failure — not fatal */ }
@@ -318,6 +384,7 @@ module.exports = {
   analyzeForDispatch,
   recordOccurrence,
   resolveLogPath,
+  resolveSessionId,
 };
 
 // ---------------------------------------------------------------------------
