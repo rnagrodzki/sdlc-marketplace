@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.20.24] - 2026-05-23
+
+### Added
+- jira-sdlc: project-local template overrides migrate automatically from `.claude/jira-templates/` to `.sdlc/jira-templates/` on first use; one-shot idempotent migration shim available via `/setup-sdlc --migrate` (#423)
+- setup-sdlc: verifies installed pipeline-script files are at-or-above the version expected by the running plugin; surfaces outdated files with a warning and migration prompt (#424)
+- version-sdlc: `--retag` flag retags the current resolved version at HEAD — deletes local and remote tag, recreates annotated tag, and pushes; incompatible with bump types and `--init`/`--changelog`/`--hotfix` (#424)
+
+### Fixed
+- harden-sdlc: `harden-prepare.js` now uses `spawnSync` with an argv array instead of `execSync` with shell string interpolation, preventing command injection via branch names containing shell metacharacters
+- jira-sdlc: SKILL.md HELPER blocks for `mcp-failure.js` now guarded with stderr `WARNING:` prefix to prevent silent failure swallowing in MCP contexts
+- harden-sdlc: SKILL.md plugin-defect routing phrasing normalized for consistency across all dispatch sites
+
 ## [0.20.23] - 2026-05-22
 
 ### Added

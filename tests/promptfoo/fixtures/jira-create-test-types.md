@@ -33,5 +33,5 @@ The jira-sdlc plugin ships default templates for these issue types under
 - `Test Case.md` — sections: Preconditions, Steps (Gherkin), Expected Results, Test Data, Notes
 - `Test Plan.md` — sections: Objective, Scope (In/Out), Test Types, Entry Criteria, Exit Criteria, Risks and Mitigations, Notes
 
-No project-level overrides exist at `.claude/jira-templates/` for these types,
+No project-level overrides exist at `.sdlc/jira-templates/` for these types,
 so the skill must resolve to the shipped defaults (R18).

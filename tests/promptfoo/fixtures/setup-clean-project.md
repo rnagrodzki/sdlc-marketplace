@@ -21,7 +21,7 @@
   "content": {
     "reviewDimensions": { "count": 0, "path": ".claude/review-dimensions/" },
     "prTemplate": { "exists": false, "path": ".claude/pr-template.md" },
-    "jiraTemplates": { "count": 0, "path": ".claude/jira-templates/" },
+    "jiraTemplates": { "count": 0, "path": ".sdlc/jira-templates/" },
     "planGuardrails": { "count": 0 }
   },
   "detected": { "versionFile": "package.json", "fileType": "package.json", "tagPrefix": "v", "defaultBranch": "main" },

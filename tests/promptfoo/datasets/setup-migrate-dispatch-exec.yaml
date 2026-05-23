@@ -1,0 +1,24 @@
+# Exec-only tests for setup.js legacy.jiraTemplates detection (R-LEGACY-DETECT, #423).
+# Verifies that setup prepare output includes legacy.jiraTemplates row.
+
+- description: "setup migrate-dispatch: .claude/jira-templates/ detected → legacy.jiraTemplates.exists=true"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/setup-migrate-dispatch-test.js"
+    script_args: "--op legacy-jira-templates-detected"
+    project_root: "file://fixtures-fs/setup-migrate-dispatch/only-jira-templates"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "exists=true"
+
+- description: "setup migrate-dispatch: no .claude/jira-templates/ → legacy.jiraTemplates.exists=false"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/setup-migrate-dispatch-test.js"
+    script_args: "--op no-legacy-jira-templates"
+    project_root: "file://fixtures-fs/setup-migrate-dispatch/none"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "exists=false"

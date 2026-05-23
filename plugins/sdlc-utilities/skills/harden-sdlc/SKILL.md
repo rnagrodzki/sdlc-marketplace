@@ -41,9 +41,9 @@ Required flag (always): `--skill`. Optional: `--step`, `--operation`,
 **When `--from-issue <num>` is used:** the prepare script fetches the GitHub
 issue body automatically (via `gh issue view`). When the issue carries the
 `mcp-failure` label, the prepare script pre-sets `classification: "plugin-defect"`
-in the manifest, which causes Step 4 to jump directly to Step 6 (PLUGIN-DEFECT
-ROUTE) without the Step 3 orchestrator dispatch. Pass `--from-issue "$ISSUE_NUM"`
-to the prepare script invocation in Step 1.
+in the manifest. In that case, skip Step 3 — proceed directly to Step 4, which
+will route to Step 6 (PLUGIN-DEFECT ROUTE) without dispatching the orchestrator.
+Pass `--from-issue "$ISSUE_NUM"` to the prepare script invocation in Step 1.
 
 ---
 
@@ -109,9 +109,10 @@ harden-sdlc: failure context loaded
 ```
 
 When `classification_hint == "plugin-defect"` (set by prepare script when
-`--from-issue` fetches an issue with the `mcp-failure` label), skip Step 3 and
-jump directly to Step 4 → Step 6 (PLUGIN-DEFECT ROUTE). The manifest already
-carries the pre-set classification; the orchestrator agent is not needed.
+`--from-issue` fetches an issue with the `mcp-failure` label), skip Step 3 —
+proceed directly to Step 4, which will route to Step 6 (PLUGIN-DEFECT ROUTE)
+without dispatching the orchestrator. The manifest already carries the
+pre-set classification; the orchestrator agent is not needed.
 
 The orchestrator (Step 3) is responsible for the authoritative classification
 in all other cases. Continue to Step 3.

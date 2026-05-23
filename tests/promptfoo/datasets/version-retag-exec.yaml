@@ -1,0 +1,80 @@
+# Exec-only tests for version.js --retag flag (R-RETAG, G8, #424).
+# Tests prepare-script contract: mode field, exclusivity validation, tag-existence.
+# No LLM provider. No destructive git ops.
+
+- description: "version --retag: with existing tag → mode=retag, no errors"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/version-retag-test.js"
+    script_args: "--op retag-with-tag"
+    project_root: "file://fixtures-fs/version-retag/tag-exists"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "mode=retag"
+
+- description: "version --retag: without existing tag → errors contains requires-tag message"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/version-retag-test.js"
+    script_args: "--op retag-no-tag"
+    project_root: "file://fixtures-fs/version-retag/no-tag"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "tag-not-found error present"
+
+- description: "version --retag patch: exclusivity error for bump type"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/version-retag-test.js"
+    script_args: "--op retag-with-patch"
+    project_root: "file://fixtures-fs/version-retag/no-tag"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "exclusivity error present"
+
+- description: "version --retag --init: exclusivity error"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/version-retag-test.js"
+    script_args: "--op retag-with-init"
+    project_root: "file://fixtures-fs/version-retag/no-tag"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "exclusivity error present"
+
+- description: "version --retag --changelog: exclusivity error"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/version-retag-test.js"
+    script_args: "--op retag-with-changelog"
+    project_root: "file://fixtures-fs/version-retag/no-tag"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "exclusivity error present"
+
+- description: "version --retag --hotfix: exclusivity error"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/version-retag-test.js"
+    script_args: "--op retag-with-hotfix"
+    project_root: "file://fixtures-fs/version-retag/no-tag"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "exclusivity error present"
+
+- description: "version --retag patch --hotfix: multiple exclusivity errors (no short-circuit, G8)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/version-retag-test.js"
+    script_args: "--op retag-multi-conflict"
+    project_root: "file://fixtures-fs/version-retag/no-tag"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "no short-circuit"

@@ -277,7 +277,7 @@
       Run /jira-sdlc. Create a Subtask in PROJ: "refactor cache layer". Note that
       this skill ships templates only for Bug, Story, Task, Spike, Epic, Sub-task,
       Test Case, and Test Plan — there is no Subtask.md template, and no override
-      is configured at .claude/jira-templates/Subtask.md. Walk through how the
+      is configured at .sdlc/jira-templates/Subtask.md. Walk through how the
       skill resolves the description template.
   assert:
     # Must ask which template to use rather than fabricating a description

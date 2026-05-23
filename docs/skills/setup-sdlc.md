@@ -48,6 +48,8 @@ Pre-check every row in the menu and skip the per-field `keep` prompt — all con
 | `--add` | Expansion mode with `--dimensions` or `--guardrails` (propose only new items) | — |
 | `--no-copilot` | Skip GitHub Copilot instructions with `--dimensions` | — |
 
+> **Outdated CI scripts:** When setup-sdlc runs, it checks whether the project's installed pipeline-script files (managed by `scaffold-ci.js`) are at-or-above the version shipped by the running plugin. When any file is outdated, setup prints a warning listing the affected files and instructs you to run `/setup-sdlc --migrate` or `/version-sdlc --init` to update them. No auto-fix is applied — setup only reports state. (Implements #424 / R-SCRIPT-VERSIONS.)
+
 ---
 
 ## Examples

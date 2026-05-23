@@ -41,7 +41,7 @@ rebuilt only when `--force-refresh` is passed or when operations fail due to sta
 layout automatically on the next `--check`; the legacy files are left in place.
 
 Each issue type has a description template (shipped in the skill's `templates/` directory
-and customizable per project at `.claude/jira-templates/<Type>.md`). Templates are filled
+and customizable per project at `.sdlc/jira-templates/<Type>.md`). Templates are filled
 from user context before the MCP call, producing well-structured descriptions on the first
 attempt. All `{placeholder}` markers must be replaced with real content or the section
 removed entirely — the API call is never made with raw placeholder text.
@@ -56,7 +56,7 @@ removed entirely — the API call is never made with raw placeholder text.
 |----------|-------------|---------|
 | `--project <KEY>` | Jira project key (e.g., PROJ). When `jira.projects` is set, values outside the list are rejected. | Auto-detected |
 | `--force-refresh` | Rebuild cache even if fresh | false |
-| `--init-templates` | Copy default templates to `.claude/jira-templates/` | false |
+| `--init-templates` | Copy default templates to `.sdlc/jira-templates/` | false |
 | `--site <host>` | Sanitized site host (e.g., `acme_atlassian_net`). Disambiguates `--check`/`--load` when the same project key is cached under multiple sites. | Unset |
 | `--skip-workflow-discovery` | Bypass Phase 5; cache `workflows[type] = { unsampled: true }` per non-subtask type. Transitions fall back to live `getTransitionsForJiraIssue` per issue. Use in CI. | false |
 
@@ -336,9 +336,9 @@ Skip this step for read operations (`search`, `view`). For every write operation
 
 1. Build the initial payload exactly as you would dispatch it (template-resolved per R18, placeholders resolved per R19, fields validated against cache per G5/G6/G8).
    - **Template resolution and fallback notices (R18):** Read `resolved`, `fallbacks`, and `noneTypes` from the prepare script output (`resolveTemplateStatus`). For each entry in `fallbacks`, print a one-line notice before building the payload:
-     `Using <fallbackTo> template for <type> — override at .claude/jira-templates/<type>.md`
+     `Using <fallbackTo> template for <type> — override at .sdlc/jira-templates/<type>.md`
      For each entry in `noneTypes`, print a one-line warning and stop the operation:
-     `No template for <type>. Run /jira-sdlc --init-templates or create .claude/jira-templates/<type>.md`
+     `No template for <type>. Run /jira-sdlc --init-templates or create .sdlc/jira-templates/<type>.md`
      Sub-bug, Sub-task, and Subtask types resolve via the FALLBACK_MAP in the prepare script (Sub-bug → Bug, Sub-task → Task, Subtask → Task) — the skill never re-derives this mapping.
 2. Run the critique checklist:
    - **Template completeness** (create / description-touching edit) — every `## ` heading in the payload description belongs to the resolved template; no invented sections.
@@ -395,10 +395,20 @@ On non-zero exit (`LINK_EXIT != 0`):
 > - HELPER is resolved inline at the top of each top-level step (R9/R14/R21/R22/R23) rather than once globally because steps may be entered independently. The `find` is idempotent and cheap.
 > - The helper's stdout (`--telemetry` echoes the appended block, `--analyze` emits JSON) is intentionally NOT redirected to `/dev/null` — the block surfaces in the terminal for user visibility into what was written to `.sdlc/learnings/log.md`.
 > - Cross-step session counting (R28 "twice in one invocation") is keyed by `SDLC_SESSION_ID` if set, otherwise by a per-project marker file at `.sdlc/state/mcp-session.id` written on first call. Callers do not need to export `SDLC_SESSION_ID` for the R21 dedup gate to function.
+> - When the helper cannot be resolved (plugin not installed or `find` returns empty and the cwd fallback also misses), each block emits a single stderr WARNING and proceeds non-fatally. The downstream `[ -n "$HELPER" ] && node "$HELPER" ...` guards then skip the call without aborting the surrounding step. The warning satisfies the script-resolution convention while preserving R27's "telemetry is best-effort" design intent.
+> - `ANALYZE_JSON` is the raw JSON string emitted by `node "$HELPER" --analyze ...` — it is NOT an object. To use `.proposal.title` and `.proposal.body`, parse explicitly:
+>
+>   ```bash
+>   PROPOSAL_TITLE=$(printf '%s' "$ANALYZE_JSON" | node -e "let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>process.stdout.write(JSON.parse(d).proposal.title))")
+>   PROPOSAL_BODY=$(printf  '%s' "$ANALYZE_JSON" | node -e "let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>process.stdout.write(JSON.parse(d).proposal.body))")
+>   ```
+>
+>   Every "Read `ANALYZE_JSON.proposal.title` / `.proposal.body`" instruction below refers to the result of this parse — pass `$PROPOSAL_BODY` (not raw `$ANALYZE_JSON`) to `error-report-sdlc --error-text`.
 
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -z "$HELPER" ] && echo "WARNING: mcp-failure.js not found — R27/R28 telemetry unavailable. Is the sdlc plugin installed?" >&2
 # telemetry block is echoed to terminal for user visibility (intentional)
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class link-verification --tool "jira.js --validate-body" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "link verification abort: $LINK_EXIT" --recovered no
 ```
@@ -424,6 +434,7 @@ For write operations: precondition — Step 2.6 returned `approve`, Step 2.7 lin
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -z "$HELPER" ] && echo "WARNING: mcp-failure.js not found — R27/R28 telemetry unavailable. Is the sdlc plugin installed?" >&2
 HOOK_HASH=$(echo -n "$permissionDecisionReason" | sha256sum | cut -c1-12)
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class hook-block --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$permissionDecisionReason" --recovered no
 [ -n "$HELPER" ] && HOOK_COUNT=$(node "$HELPER" --record-occurrence --class hook-block --key "$HOOK_HASH")
@@ -448,6 +459,7 @@ Read `ANALYZE_JSON.proposal.title` and `ANALYZE_JSON.proposal.body`; present to 
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -z "$HELPER" ] && echo "WARNING: mcp-failure.js not found — R27/R28 telemetry unavailable. Is the sdlc plugin installed?" >&2
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class auth --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$AUTH_ERROR" --recovered no
 ```
 
@@ -512,6 +524,7 @@ When a 400 on create or repeated 400 still fails after cache auto-refresh, call 
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -z "$HELPER" ] && echo "WARNING: mcp-failure.js not found — R27/R28 telemetry unavailable. Is the sdlc plugin installed?" >&2
 FAILURE_CLASS=schema  # or "workflow" for transition errors
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class "$FAILURE_CLASS" --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$ERROR_MSG" --recovered no
 [ -n "$HELPER" ] && ANALYZE_JSON=$(node "$HELPER" --analyze --class "$FAILURE_CLASS" --tool "$MCP_TOOL_NAME" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$ERROR_MSG" --recovered no --r-path R9)
@@ -540,7 +553,7 @@ Also call `--telemetry` on every retry (even successful ones) to maintain a per-
 | User disambiguation | `lookupJiraAccountId` results always disambiguated if multiple matches |
 | No fabricated values | All field values derived from cache `allowedValues` or user input |
 | Approval gate (G9) | No write MCP call dispatched without an `approve` from the R17 prompt in this turn |
-| Template enforced (G10) | No `description` field built without a resolved template — `.claude/jira-templates/<Type>.md` (override) or shipped `templates/<Type>.md` (R18) |
+| Template enforced (G10) | No `description` field built without a resolved template — `.sdlc/jira-templates/<Type>.md` (override) or shipped `templates/<Type>.md` (R18) |
 | Placeholders resolved (G11) | No `low`-confidence `{name}` or `[prose]` marker dispatched without explicit user resolution (R19) |
 | Critique surfaced (G12) | No proposal presented to the user without a preceding `Initial:` / `Critique:` / `Final:` block (R20) |
 | Hook verified (G13) | No write MCP call dispatched without the PreToolUse hook successfully verifying R21 artifacts (payload-hash bound, < 10 min old) |
@@ -571,7 +584,7 @@ Also call `--telemetry` on every retry (even successful ones) to maintain a per-
 - Use values not in cache `allowedValues` — never fabricate enum values
 - Retry a failed operation more than once without diagnosing the cause first
 - Leave raw `{placeholder}` syntax in issue descriptions
-- Ignore custom templates at `.claude/jira-templates/<Type>.md` when they exist
+- Ignore custom templates at `.sdlc/jira-templates/<Type>.md` when they exist
 - Generate unstructured descriptions when a template is available
 - Dispatch a write MCP without an `approve` answer to the R17 prompt in this turn (R17)
 - Use a free-form description on `createJiraIssue` or `editJiraIssue` (R18)
@@ -606,6 +619,7 @@ Also call `--telemetry` on every retry (even successful ones) to maintain a per-
 ```bash
 HELPER=$(find ~/.claude/plugins -name "mcp-failure.js" -path "*/sdlc*/scripts/lib/mcp-failure.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$HELPER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/mcp-failure.js" ] && HELPER="plugins/sdlc-utilities/scripts/lib/mcp-failure.js"
+[ -z "$HELPER" ] && echo "WARNING: mcp-failure.js not found — R27/R28 telemetry unavailable. Is the sdlc plugin installed?" >&2
 [ -n "$HELPER" ] && node "$HELPER" --telemetry --class workflow --tool "getTransitionsForJiraIssue" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$TRANSITION_ERROR" --recovered no
 [ -n "$HELPER" ] && ANALYZE_JSON=$(node "$HELPER" --analyze --class workflow --tool "getTransitionsForJiraIssue" --site "$JIRA_SITE" --project "$PROJECT_KEY" --error "$TRANSITION_ERROR" --recovered no --r-path R14)
 ```

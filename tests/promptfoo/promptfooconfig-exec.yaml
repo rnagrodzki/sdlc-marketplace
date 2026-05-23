@@ -63,3 +63,7 @@ tests:
   - file://datasets/branch-name-exec.yaml
   - file://datasets/branch-guard-exec.yaml
   - file://datasets/verify-tag-ancestry-exec.yaml
+  - file://datasets/migrate-jira-templates-exec.yaml
+  - file://datasets/setup-script-versions-exec.yaml
+  - file://datasets/setup-migrate-dispatch-exec.yaml
+  - file://datasets/version-retag-exec.yaml

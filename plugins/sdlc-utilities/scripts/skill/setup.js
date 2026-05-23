@@ -80,6 +80,16 @@ const MENU_INPUT_CONTRACT = {
 };
 
 // ---------------------------------------------------------------------------
+// Plugin self-version (R-SCRIPT-VERSIONS, #424 — Key Decision #7)
+// Uses __dirname walk: works in any consumer project (plugin-agnostic).
+// ---------------------------------------------------------------------------
+let pluginVersion = null;
+try {
+  const pluginJsonPath = path.resolve(__dirname, '..', '..', '.claude-plugin', 'plugin.json');
+  pluginVersion = require(pluginJsonPath).version || null;
+} catch (_) { /* non-fatal — plugin.json may not exist in dev setups */ }
+
+// ---------------------------------------------------------------------------
 // Detection logic
 // ---------------------------------------------------------------------------
 
@@ -136,7 +146,7 @@ function detect(projectRoot) {
   // The deprecated .claude/pr-template.md location remains read-only via
   // lib/pr-template.js::resolvePrTemplatePath until the deprecation window closes.
   const prTemplatePath = path.join(projectRoot, '.sdlc', 'pr-template.md');
-  const jiraTemplatesDir = path.join(projectRoot, '.claude', 'jira-templates');
+  const jiraTemplatesDir = path.join(projectRoot, '.sdlc', 'jira-templates');
 
   // --- OpenSpec config detection ---
   const openspecConfigPath = path.join(projectRoot, 'openspec', 'config.yaml');
@@ -198,6 +208,11 @@ function detect(projectRoot) {
       review:  { exists: fs.existsSync(legacyReviewSdlcPath),   path: LEGACY.reviewSdlc   },
       reviewLegacy: { exists: fs.existsSync(legacyReviewClaudePath), path: LEGACY.reviewClaude },
       jira:    { exists: fs.existsSync(legacyJiraPath),    path: LEGACY.jira    },
+      // R-LEGACY-DETECT (#423): detect legacy jira-templates dir for migration reporting.
+      jiraTemplates: {
+        exists: fs.existsSync(path.join(projectRoot, '.claude', 'jira-templates')),
+        path: path.join('.claude', 'jira-templates') + path.sep,
+      },
     },
     content: {
       reviewDimensions: {
@@ -210,7 +225,7 @@ function detect(projectRoot) {
       },
       jiraTemplates: {
         count: countFiles(jiraTemplatesDir, '.md'),
-        path: path.join('.claude', 'jira-templates') + path.sep,
+        path: path.join('.sdlc', 'jira-templates') + path.sep,
       },
       planGuardrails: {
         count: Array.isArray(parsedProjectConfig?.plan?.guardrails)
@@ -231,7 +246,62 @@ function detect(projectRoot) {
     },
     shipFields: SHIP_FIELDS,
     preReleaseCompat: PRE_RELEASE_COMPAT,
+    pluginVersion,
   };
+
+  // R-SCRIPT-VERSIONS (#424): check installed CI scripts using scaffold-ci.js
+  // MANIFEST + extractVersion exports to avoid spawn overhead.
+  // Mirrors the existing version-sdlc Step 7.5 integration — report only, no writes.
+  try {
+    const scaffoldCi = require(path.join(__dirname, '..', 'util', 'scaffold-ci'));
+    const PLUGIN_ROOT = path.resolve(__dirname, '..', '..');
+    const ciFiles = [];
+    for (const entry of scaffoldCi.MANIFEST) {
+      const srcPath  = path.join(PLUGIN_ROOT, entry.src);
+      const destPath = path.join(projectRoot, entry.dest);
+      const legacyPath = entry.legacyDest ? path.join(projectRoot, entry.legacyDest) : null;
+      const destExists   = fs.existsSync(srcPath) && (() => {
+        try { fs.readFileSync(srcPath, 'utf8'); return true; } catch (_) { return false; }
+      })();
+      let currentVersion = null;
+      try {
+        const srcContent = fs.readFileSync(srcPath, 'utf8');
+        currentVersion = scaffoldCi.extractVersion(srcContent, entry.versionRegex);
+      } catch (_) { /* source missing */ }
+
+      const ciDestExists   = fs.existsSync(destPath);
+      const ciLegacyExists = legacyPath ? fs.existsSync(legacyPath) : false;
+      let installedVersion = null;
+      let action = 'current';
+      try {
+        if (ciDestExists) {
+          const destContent = fs.readFileSync(destPath, 'utf8');
+          installedVersion = scaffoldCi.extractVersion(destContent, entry.versionRegex);
+        } else if (ciLegacyExists) {
+          const legacyContent = fs.readFileSync(legacyPath, 'utf8');
+          installedVersion = scaffoldCi.extractVersion(legacyContent, entry.versionRegex);
+        }
+        if (!ciDestExists && ciLegacyExists) {
+          action = 'outdated';
+        } else if (!ciDestExists) {
+          action = 'missing';
+        } else if (currentVersion !== null && installedVersion !== null && installedVersion < currentVersion) {
+          action = 'outdated';
+        } else {
+          action = 'current';
+        }
+      } catch (_) { action = 'missing'; }
+
+      ciFiles.push({ file: entry.dest, action, installedVersion, currentVersion });
+    }
+    const outdatedCount = ciFiles.filter(
+      f => f.action === 'outdated' || f.action === 'missing'
+    ).length;
+    result.scriptVersions = { files: ciFiles, outdatedCount };
+  } catch (_) {
+    // Non-fatal: scaffold-ci.js exports may not be available in all installs.
+    result.scriptVersions = { files: [], outdatedCount: 0 };
+  }
 
   result.needsMigration =
     Object.values(result.legacy).some(l => l.exists) ||

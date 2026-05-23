@@ -1,0 +1,69 @@
+# Script execution tests for migrate-jira-templates.js (issue #423).
+# Tests the four R-MIGR state-machine outcomes, idempotency, and the
+# at-most-once auto-trigger guard. No LLM provider — exec-only.
+
+- description: "migrate-jira-templates: legacy-only → action=moved, files relocated"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/migrate-jira-templates-test.js"
+    script_args: "--op legacy-only"
+    project_root: "file://fixtures-fs/migrate-jira-templates/legacy-only"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "moved ok"
+
+- description: "migrate-jira-templates: target-only → action=noop, target unchanged"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/migrate-jira-templates-test.js"
+    script_args: "--op target-only"
+    project_root: "file://fixtures-fs/migrate-jira-templates/target-only"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "noop ok"
+
+- description: "migrate-jira-templates: both-present → action=skipped, both dirs remain, stderr warning"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/migrate-jira-templates-test.js"
+    script_args: "--op both-present"
+    project_root: "file://fixtures-fs/migrate-jira-templates/both-present"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "skipped + warning ok"
+
+- description: "migrate-jira-templates: neither → action=noop, no dirs created"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/migrate-jira-templates-test.js"
+    script_args: "--op neither"
+    project_root: "file://fixtures-fs/migrate-jira-templates/neither"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "noop ok"
+
+- description: "migrate-jira-templates: idempotency — second run after legacy-only is noop (state-machine-idempotency)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/migrate-jira-templates-test.js"
+    script_args: "--op legacy-only-idempotent"
+    project_root: "file://fixtures-fs/migrate-jira-templates/legacy-only"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "first=moved second=noop ok"
+
+- description: "migrate-jira-templates: auto-trigger guard — at-most-once per Node process"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/migrate-jira-templates-test.js"
+    script_args: "--op auto-trigger-guard"
+    project_root: "file://fixtures-fs/migrate-jira-templates/legacy-only"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+    - type: contains
+      value: "at-most-once ok"

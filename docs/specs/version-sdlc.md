@@ -15,6 +15,7 @@
 - A5: `--auto` — skip interactive approval prompts; critique gates still run (default: false)
 - A6: `--init` — run one-time init workflow to scaffold versioning infrastructure (default: false)
 - A7: `--no-push` — skip pushing to remote after release (default: false)
+- A8: `--retag` — delete the existing tag for the current resolved version (local and remote), recreate it as an annotated tag pointing at HEAD, and push. Incompatible with bump types (`major`/`minor`/`patch`), `--init`, `--changelog`, and `--hotfix`. User-initiated retag; orthogonal to the CI-automated `retag-release.yml` workflow (I5). (Implements #424.)
 
 ## Core Requirements
 
@@ -40,6 +41,7 @@
 - R16: Pre-release source precedence (top wins): (1) explicit base bump `major|minor|patch` (with optional `--pre <label>`); (2) explicit label-form `--bump <label>` OR explicit `--pre <label>`; (3) `config.preRelease` from `.sdlc/config.json`; (4) auto-detection from conventional commits. When `config.preRelease` is set and the user passes neither an explicit base bump nor `--pre` nor a label-form `--bump`, the resolved bump is `patch + --pre <config.preRelease>`. An explicit base bump always graduates the release out of the pre-release train regardless of `config.preRelease`. Label values from any source must match `^[a-z][a-z0-9]*$`.
   - *Non-normative note:* When invoked from ship-sdlc, callers are expected to forward the label form (`--bump <label>`) rather than `--bump patch` when `config.preRelease` is set — see ship-sdlc R63. version-sdlc's R16 precedence is unchanged.
 - R17: Link verification (issue #198) — every URL embedded in changelog or release-notes body MUST be validated by `plugins/sdlc-utilities/scripts/lib/links.js` (CLI: `node scripts/lib/links.js --json`) before any commit/tag operation that publishes the body. Three URL classes are checked: (1) `github.com/<owner>/<repo>/(issues|pull)/<n>` — owner/repo identity must match the current remote, and the issue/PR number must exist on that repo; (2) `*.atlassian.net/browse/<KEY-N>` — host must match the configured Jira site; (3) any other `http(s)://` URL — generic reachability via HEAD (fall back to GET on 405), 5s timeout. Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) and any `ctx.skipHosts` entries are reported as `skipped`, not violations. `SDLC_LINKS_OFFLINE=1` skips network checks but keeps structural context-aware checks (GitHub identity match, Atlassian host match). Any violation aborts publication with non-zero exit and a structured violation list — no soft-warning mode.
+- R-RETAG: When `--retag` is passed, version-sdlc retags the current resolved version by: (1) deleting the local tag (`git tag -d <tag>`), (2) deleting the remote tag (`git push origin :refs/tags/<tag>`), (3) recreating an annotated tag at HEAD (`git tag -a <tag> -m "Retag <tag>"`), and (4) pushing the new tag (`git push origin <tag>`). Exclusivity: `--retag` is incompatible with bump types (`major`/`minor`/`patch`), `--init`, `--changelog`, and `--hotfix`; all conflicts must be reported together (not short-circuited). Tag-existence pre-check: the candidate tag (derived from `v<currentVersion>`) must already exist (`git rev-parse refs/tags/<candidate>`); if not, the prepare script emits an error. This flag is orthogonal to the CI-automated `retag-release.yml` workflow — do not conflate. The prepare script emits `mode: "retag"`, `currentTag`, `oldSha`, and `head` SHA in its JSON output so SKILL.md can render the retag plan without re-parsing argv. (Implements #424.)
 - R18: `flags.changelog` in `skill/version.js` output reflects the resolved value (`config.changelog === true` OR `--changelog` CLI flag passed). After Step 1 (CONSUME), `flags.changelog` is the **only authoritative gate** for every per-release changelog decision in SKILL.md. Specifically:
   - **Step 2 (PLAN — draft CHANGELOG entry):** gated on `flags.changelog === true`
   - **Step 8.2 (DO — write CHANGELOG entry to file):** gated on `flags.changelog === true` (must use the same gate phrasing as Step 2 — divergent phrasing is a violation)
@@ -73,6 +75,7 @@
 - G5: No fabricated entries — every CHANGELOG entry traces to a real commit (when changelog enabled)
 - G6: Commit count — there are commits to release (`commits.length > 0`), or this is a pre-release
 - G7: Version file writable — file type is in the known supported list
+- G8: Retag exclusivity — when `--retag` is passed, all incompatible flags (`major`/`minor`/`patch`/`--init`/`--changelog`/`--hotfix`) must be validated and reported together by the prepare script; SKILL.md must not proceed when `errors[]` is non-empty
 
 ## Prepare Script Contract
 
