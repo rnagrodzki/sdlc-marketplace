@@ -1,0 +1,19 @@
+{
+  "branch": "feat-test",
+  "startedAt": "2026-05-24T10:00:00.000Z",
+  "status": "in_progress",
+  "flags": {
+    "steps": ["execute", "commit", "review", "version", "pr"],
+    "auto": false,
+    "resume": false,
+    "implicitResume": false
+  },
+  "steps": {
+    "execute":  { "name": "execute",  "status": "completed" },
+    "commit":   { "name": "commit",   "status": "completed" },
+    "review":   { "name": "review",   "status": "completed" },
+    "version":  { "name": "version",  "status": "completed" },
+    "pr":       { "name": "pr",       "status": "in_progress" },
+    "cleanup":  { "name": "cleanup",  "status": "pending" }
+  }
+}

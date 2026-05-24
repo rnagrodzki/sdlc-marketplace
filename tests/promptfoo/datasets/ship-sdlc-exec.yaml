@@ -1,0 +1,47 @@
+# Script execution tests for scripts/lib/ship-todos.js (R-todowrite-visibility, #427).
+# These tests run ship-todos.js directly against fixture state files (no LLM).
+# Covers: init event, fail-step lifecycle, resume reconstruction, execute plan-task mirroring.
+#
+# Note: script_args are split on whitespace by the script-runner provider, so
+# multi-word substep names cannot be passed via --substep. Resume test uses
+# first-substep-in_progress default (no --substep) instead.
+
+# ship-todos.js: init event produces ≥1 todo per step in flags.steps + cleanup
+- description: "ship-todos.js: init event produces ≥1 todo per step in flags.steps + cleanup"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
+    script_args: "--state-file {{project_root}}/state-init.json --event init"
+    project_root: "file://fixtures-fs/ship-todos"
+  assert:
+    - type: javascript
+      value: "const j = JSON.parse(output); j.todos.length >= 5 && j.marker.startsWith('[task-tray] init:')"
+
+# ship-todos.js: --fail-step closes all in_progress todos with ' (failed)' suffix
+- description: "ship-todos.js: --fail-step closes all in_progress todos with ' (failed)' suffix"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
+    script_args: "--state-file {{project_root}}/state-mid-commit.json --event step --current-step commit --fail-step commit"
+    project_root: "file://fixtures-fs/ship-todos"
+  assert:
+    - type: javascript
+      value: "const j = JSON.parse(output); !j.todos.some(t => t.status === 'in_progress' && t.content.startsWith('Commit:'))"
+
+# ship-todos.js: resume reconstruction — first pr substep becomes in_progress (default, no --substep)
+- description: "ship-todos.js: --event resume produces completed todos for prior steps and in_progress for nextPendingStep"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
+    script_args: "--state-file {{project_root}}/state-mid-pipeline.json --event resume --current-step pr"
+    project_root: "file://fixtures-fs/ship-todos"
+  assert:
+    - type: javascript
+      value: "const j = JSON.parse(output); j.marker.startsWith('[task-tray] resume:') && j.todos.some(t => t.content.startsWith('Pr:') && t.status === 'in_progress')"
+
+# ship-todos.js: execute-step plan-task mirror
+- description: "ship-todos.js: --plan-file expands execute substeps to one todo per plan task"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
+    script_args: "--state-file {{project_root}}/state-pre-execute.json --plan-file {{project_root}}/plan-3-tasks.md --event execute"
+    project_root: "file://fixtures-fs/ship-todos"
+  assert:
+    - type: javascript
+      value: "const j = JSON.parse(output); j.todos.filter(t => t.content.startsWith('Task ')).length === 3 && j.marker.includes('execute: 3 plan tasks queued')"
