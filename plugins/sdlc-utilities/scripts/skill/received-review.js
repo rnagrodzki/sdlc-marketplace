@@ -27,6 +27,7 @@
 
 'use strict';
 
+const fs   = require('node:fs');
 const path = require('node:path');
 const LIB = path.join(__dirname, '..', 'lib');
 
@@ -42,6 +43,8 @@ const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { readSection, readProjectConfig, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { getPluginVersion } = require(path.join(LIB, 'config-version'));
+const { loadGuardrails } = require(path.join(LIB, 'harden-surfaces'));
+const { resolveDimensionsDir } = require(path.join(LIB, 'dimensions'));
 
 // ---------------------------------------------------------------------------
 // Severity parsing (issue #233)
@@ -104,6 +107,127 @@ function resolveAlwaysFixSeverities(projectRoot) {
     );
   }
   return valid;
+}
+
+// ---------------------------------------------------------------------------
+// harden surface + target file hint inference (issue #429, R24, KD6)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve `alwaysHardenFromReview` from `.sdlc/local.json` only (R24, C17).
+ * Warns and ignores if found in `.sdlc/config.json`.
+ */
+function resolveAlwaysHardenFromReview(projectRoot) {
+  try {
+    const { config: projectConfig } = readProjectConfig(projectRoot);
+    if (projectConfig?.receivedReview?.alwaysHardenFromReview !== undefined) {
+      process.stderr.write(
+        'warning: receivedReview.alwaysHardenFromReview found in .sdlc/config.json — ' +
+        'this field is local-only and will be ignored. Move it to .sdlc/local.json.\n'
+      );
+    }
+  } catch (_) { /* missing or unreadable project config — silent */ }
+
+  const local = readSection(projectRoot, 'receivedReview');
+  return Boolean(local?.alwaysHardenFromReview);
+}
+
+/**
+ * Resolve `hardenClusterCap` from `.sdlc/local.json`. Default 5, clamped to [1, 50].
+ */
+function resolveHardenClusterCap(projectRoot) {
+  const local = readSection(projectRoot, 'receivedReview');
+  const raw = local?.hardenClusterCap;
+  if (raw === undefined || raw === null) return 5;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 5;
+  return Math.max(1, Math.min(50, n));
+}
+
+/**
+ * Load known dimension names and guardrail IDs for hint inference.
+ * Tolerates any load error (returns empty sets).
+ */
+function loadKnownHardenData(projectRoot) {
+  const result = {
+    dimensionNames: new Set(),
+    planGuardrailIds: new Set(),
+    executeGuardrailIds: new Set(),
+  };
+
+  try {
+    const dimDir = resolveDimensionsDir(projectRoot);
+    if (fs.existsSync(dimDir)) {
+      for (const f of fs.readdirSync(dimDir).filter(f => f.endsWith('.md'))) {
+        result.dimensionNames.add(f.replace(/\.md$/, ''));
+      }
+    }
+  } catch (_) { /* tolerate */ }
+
+  try {
+    const errors = [];
+    for (const g of loadGuardrails(projectRoot, 'plan', errors)) {
+      if (g.id) result.planGuardrailIds.add(g.id);
+    }
+    for (const g of loadGuardrails(projectRoot, 'execute', errors)) {
+      if (g.id) result.executeGuardrailIds.add(g.id);
+    }
+  } catch (_) { /* tolerate */ }
+
+  return result;
+}
+
+/**
+ * Rule-based heuristic for hardenSurfaceHint (KD6, P12).
+ * Priority: review-dimensions > plan-guardrails > execute-guardrails > copilot-instructions > null.
+ */
+function inferHardenSurfaceHint(commentBody, knownData) {
+  if (typeof commentBody !== 'string' || commentBody.length === 0) return null;
+  const body = commentBody.toLowerCase();
+
+  if (body.includes('.sdlc/review-dimensions/') || body.includes('review-dimensions')) {
+    return 'review-dimensions';
+  }
+  for (const name of knownData.dimensionNames) {
+    if (body.includes(name.toLowerCase())) return 'review-dimensions';
+  }
+
+  if (body.includes('plan.guardrails') || body.includes('plan guardrails')) {
+    return 'plan-guardrails';
+  }
+  for (const id of knownData.planGuardrailIds) {
+    if (id && body.includes(id.toLowerCase())) return 'plan-guardrails';
+  }
+
+  if (body.includes('execute.guardrails') || body.includes('execute guardrails')) {
+    return 'execute-guardrails';
+  }
+  for (const id of knownData.executeGuardrailIds) {
+    if (id && body.includes(id.toLowerCase())) return 'execute-guardrails';
+  }
+
+  if (body.includes('.github/instructions/') || body.includes('.instructions.md')) {
+    return 'copilot-instructions';
+  }
+
+  return null;
+}
+
+/**
+ * Rule-based heuristic for hardenTargetFileHint (KD6, P13).
+ * Returns first path-like mention that resolves to an existing file, else null.
+ */
+function inferHardenTargetFileHint(commentBody, projectRoot) {
+  if (typeof commentBody !== 'string' || commentBody.length === 0) return null;
+  const pathPattern = /(?:^|[\s`'"(])([/.][a-zA-Z0-9_./-]+\.(?:md|json|yaml|yml|js|ts))/gm;
+  let m;
+  while ((m = pathPattern.exec(commentBody)) !== null) {
+    const candidate = m[1].trim();
+    if (candidate.startsWith('/') && fs.existsSync(candidate)) return candidate;
+    const abs = path.resolve(projectRoot, candidate);
+    if (fs.existsSync(abs)) return abs;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -227,6 +351,11 @@ function main() {
   // Resolve alwaysFixSeverities (issue #233, R18/R19) — single source: .sdlc/local.json
   const alwaysFixSeverities = resolveAlwaysFixSeverities(projectRoot);
 
+  // Resolve harden-from-review flags (issue #429, R24) — single source: .sdlc/local.json
+  const alwaysHardenFromReview = resolveAlwaysHardenFromReview(projectRoot);
+  const hardenClusterCap = resolveHardenClusterCap(projectRoot);
+  const knownHardenData = loadKnownHardenData(projectRoot);
+
   // Classify threads and build output
   const threads = rawThreads.map(thread => {
     const status = classifyThread(thread, currentUser, changedFileSet);
@@ -236,6 +365,11 @@ function main() {
     // null when severity cannot be parsed; such threads NEVER bypass consent (R18).
     const severity = firstComment ? parseSeverity(firstComment.body) : null;
 
+    // Per-thread harden surface + target file hints (issue #429, P12/P13).
+    const body = firstComment?.body || '';
+    const hardenSurfaceHint = inferHardenSurfaceHint(body, knownHardenData);
+    const hardenTargetFileHint = inferHardenTargetFileHint(body, projectRoot);
+
     return {
       id: thread.id,
       status,
@@ -244,6 +378,8 @@ function main() {
       isResolved: thread.isResolved,
       isOutdated: thread.isOutdated,
       severity,
+      hardenSurfaceHint,
+      hardenTargetFileHint,
       firstComment: firstComment
         ? {
             id: firstComment.id,
@@ -274,7 +410,7 @@ function main() {
     timestamp: new Date().toISOString(),
     pr: { number: prNumber, owner, repo },
     currentUser,
-    flags: { auto, alwaysFixSeverities },
+    flags: { auto, alwaysFixSeverities, alwaysHardenFromReview, hardenClusterCap },
     threads,
     summary,
     plugin_version: pluginVersion,
@@ -293,4 +429,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { parseArgs, classifyThread };
+module.exports = { parseArgs, classifyThread, resolveAlwaysHardenFromReview, resolveHardenClusterCap, inferHardenSurfaceHint, inferHardenTargetFileHint };

@@ -453,3 +453,154 @@
         implement/edit/skip options). No finding is auto-applied; no `fixed: ...` log
         lines are emitted. The decision cites flags.alwaysFixSeverities (empty) and
         does not re-read the configuration file.
+
+# ─── Issue #429: Step 11.6 META-ANALYZE / harden-from-review matrix ────────────
+
+- description: "received-review-sdlc (#429): interactive+default — consent gate shown per cluster, dispatch on approval"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/received-review-harden-clusters.md"
+    user_request: >
+      Run /received-review-sdlc --pr 429. The prepare manifest has
+      flags: { auto: false, alwaysHardenFromReview: false, hardenClusterCap: 5 }.
+      Step 11 (IMPLEMENT) has completed. Proceed to Step 11.6 META-ANALYZE.
+      Show the consent gate for at least the first two clusters and demonstrate
+      what a Skill(harden-sdlc) dispatch looks like when the user approves.
+  assert:
+    - type: regex
+      value: "Step 11.6"
+    # Consent gate must be shown per cluster
+    - type: regex
+      value: "(dispatch|skip|consent)"
+    # Skill dispatch must appear in output (for at least one cluster)
+    - type: regex
+      value: "harden.sdlc"
+    # Must NOT call AskUserQuestion from --auto context (this is interactive, so AskUserQuestion IS allowed)
+    - type: not-regex
+      value: "flags.auto.*AskUserQuestion.*skip"
+    # Behavioral: consent gate, Skill dispatch
+    - type: llm-rubric
+      value: >
+        The response enters Step 11.6 (META-ANALYZE). It clusters the outstanding findings
+        by (hardenSurfaceHint, hardenTargetFileHint) from the manifest. For at least one
+        cluster it presents a consent gate (via AskUserQuestion or similar prompt asking
+        dispatch / skip). After the user approves, it invokes Skill("harden-sdlc") with
+        --failure-text, --skill received-review-sdlc, --step "Step 11.6 — meta-analysis",
+        --operation "review-feedback-driven hardening". The --failure-text payload
+        summarizes the cluster's findings. No AskUserQuestion is omitted in interactive mode.
+
+- description: "received-review-sdlc (#429): interactive+default — all-singletons disagree → clusterCount=0, no dispatch"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/received-review-harden-auto-defer.md"
+    user_request: >
+      Run /received-review-sdlc --pr 430. The prepare manifest has
+      flags: { auto: false, alwaysHardenFromReview: false }.
+      All three outstanding threads have verdict "disagree" AND each targets a different file
+      (all are singletons). Proceed to Step 11.6 META-ANALYZE and show what happens.
+  assert:
+    - type: regex
+      value: "Step 11.6"
+    # clusterCount must be 0 (all singletons skipped per R22)
+    - type: regex
+      value: "(clusterCount.*0|0.*cluster|no cluster|zero cluster)"
+    # No harden dispatch
+    - type: not-regex
+      value: "Skill.*harden-sdlc"
+    - type: llm-rubric
+      value: >
+        The response enters Step 11.6. All three "disagree" findings are singletons (each
+        targets a different file). Per R22, singleton "disagree" findings are skipped — they
+        do not form clusters. The step emitter reports clusterCount=0. No AskUserQuestion
+        consent gate is shown and no Skill(harden-sdlc) dispatch occurs. Step 11.7 and
+        Step 12 are not aborted (best-effort).
+
+- description: "received-review-sdlc (#429): --auto+default — no dispatch, deferred-action log entry written (R26)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/received-review-harden-auto-defer.md"
+    user_request: >
+      Run /received-review-sdlc --pr 430 --auto. The prepare manifest has
+      flags: { auto: true, alwaysHardenFromReview: false }.
+      Step 11 has completed. Proceed to Step 11.6 META-ANALYZE (R25 cell 3).
+      Show the deferred-action log entry that should be appended to .sdlc/learnings/log.md.
+  assert:
+    - type: regex
+      value: "Step 11.6"
+    # No harden dispatch (cell 3 — auto+false)
+    - type: not-regex
+      value: "Skill.*harden-sdlc"
+    # AskUserQuestion MUST NOT appear in auto context (C17)
+    - type: not-regex
+      value: "AskUserQuestion"
+    # R26 log entry format
+    - type: regex
+      value: "deferred meta.analysis clusters"
+    - type: regex
+      value: "surface="
+    - type: llm-rubric
+      value: >
+        The response enters Step 11.6 under --auto mode with alwaysHardenFromReview=false
+        (R25 cell 3). It does NOT call AskUserQuestion (C17). It does NOT dispatch
+        Skill(harden-sdlc). Instead it appends a deferred-action entry to
+        .sdlc/learnings/log.md in the R26 format: the entry starts with a header line
+        "## YYYY-MM-DD — received-review-sdlc: deferred meta-analysis clusters", followed
+        by PR number, cluster lines starting with "- surface=", and a Suppressed count.
+        Step 11.7 and Step 12 are not aborted.
+
+- description: "received-review-sdlc (#429): --auto+alwaysHardenFromReview=true — dispatch with --auto propagated (R25 cell 4)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/received-review-harden-clusters.md"
+    user_request: >
+      Run /received-review-sdlc --pr 429 --auto. The prepare manifest has
+      flags: { auto: true, alwaysHardenFromReview: true, hardenClusterCap: 5 }.
+      Step 11 has completed. Proceed to Step 11.6 META-ANALYZE (R25 cell 4).
+      Show the dispatch invocations.
+  assert:
+    - type: regex
+      value: "Step 11.6"
+    # --auto must be propagated to every dispatch (R25 cell 4)
+    - type: regex
+      value: "--auto"
+    # Skill dispatches must appear
+    - type: regex
+      value: "harden.sdlc"
+    # AskUserQuestion MUST NOT appear (C17)
+    - type: not-regex
+      value: "AskUserQuestion"
+    - type: llm-rubric
+      value: >
+        The response enters Step 11.6 under --auto mode with alwaysHardenFromReview=true
+        (R25 cell 4). It does NOT call AskUserQuestion (C17). It clusters the outstanding
+        findings and dispatches Skill(harden-sdlc) for each approved cluster (up to
+        hardenClusterCap=5). Every dispatch invocation includes --auto. The --failure-text
+        for each dispatch summarizes the cluster's findings. No consent gate is shown.
+        Dispatch failures (if any) are logged and do not abort Step 11.7 or Step 12.
+
+- description: "received-review-sdlc (#429): N=5 cap — 7 clusters present, only 5 dispatched, 2 suppressed"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/received-review-sdlc/SKILL.md"
+    project_context: "file://fixtures/received-review-harden-clusters.md"
+    user_request: >
+      Run /received-review-sdlc --pr 429. The prepare manifest has
+      flags: { auto: false, alwaysHardenFromReview: true, hardenClusterCap: 5 }.
+      The fixture has 9 outstanding threads forming 7 distinct clusters.
+      Proceed to Step 11.6 META-ANALYZE. Show how the cap is applied and which
+      clusters are suppressed.
+  assert:
+    - type: regex
+      value: "Step 11.6"
+    # Must apply cap
+    - type: regex
+      value: "(cap|suppress|5.*cluster|cluster.*5)"
+    # Must not dispatch more than 5
+    - type: llm-rubric
+      value: >
+        The response enters Step 11.6 with 7 clusters from the fixture. It applies the
+        hardenClusterCap=5 limit: the top 5 clusters (ranked by highest severity, then
+        finding count, then alphabetic on surface+targetFile) are approved for dispatch,
+        and the remaining 2 are suppressed. The suppressed count is logged (either in a
+        deferred entry or in the step-emitter output). No more than 5 harden-sdlc
+        dispatches occur. The response does not AskUserQuestion (alwaysHardenFromReview=true
+        skips the consent gate in interactive mode).

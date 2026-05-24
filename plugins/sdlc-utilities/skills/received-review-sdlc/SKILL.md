@@ -67,6 +67,48 @@ have not configured the field.
 
 To configure interactively, run `/setup-sdlc --only received-review`.
 
+### `receivedReview.alwaysHardenFromReview` (issue #429, R24)
+
+Per-user flag that controls whether Step 11.6 (META-ANALYZE) automatically dispatches
+`Skill(harden-sdlc)` per cluster without asking for consent.
+
+- **Location:** `.sdlc/local.json` under `receivedReview.alwaysHardenFromReview` (gitignored, per-user).
+  This field is **local-only** — it MUST NEVER be set in `.sdlc/config.json`. The prepare script
+  emits a stderr warning and ignores the value if it appears in project config (R24).
+- **Type:** `boolean` — default `false`.
+- **Scope:** applies uniformly to all Step 11.6 cluster dispatches in every run.
+
+**Auto-mode matrix (R25 — all four cells authoritative):**
+
+| `flags.auto` | `flags.alwaysHardenFromReview` | Step 11.6 behavior |
+|---|---|---|
+| `false` | `false` | Present consent gate per cluster → dispatch approved clusters only. |
+| `false` | `true`  | Skip consent gate → dispatch every cluster (capped at `hardenClusterCap`). |
+| `true`  | `false` | Skip consent gate AND skip dispatch entirely → append deferred-action entry to `.sdlc/learnings/log.md` (R26 format). |
+| `true`  | `true`  | Skip consent gate → dispatch every cluster (capped), propagating `--auto` to every dispatch. |
+
+**Single resolution site:** `skill/received-review.js` (prepare script). SKILL.md cites
+`flags.alwaysHardenFromReview` only — never raw `$ARGUMENTS` or `.sdlc/local.json` directly.
+
+**Example `.sdlc/local.json`:**
+```json
+{
+  "receivedReview": {
+    "alwaysHardenFromReview": true,
+    "hardenClusterCap": 5
+  }
+}
+```
+
+### `receivedReview.hardenClusterCap` (issue #429, P15)
+
+Maximum number of harden-sdlc clusters dispatched per Step 11.6 run.
+
+- **Location:** `.sdlc/local.json` under `receivedReview.hardenClusterCap`.
+- **Type:** `integer` — default `5`, clamped to `[1, 50]`.
+- Excess clusters beyond the cap are suppressed and logged as `suppressed: N additional clusters`
+  in the deferred-action entry or the learning-log dispatch record.
+
 ---
 
 ## Step 0 — Plan Mode Check
@@ -393,7 +435,106 @@ State the correction factually and move on.
 
 ---
 
-## Step 11.5 — LINK VERIFICATION (R17, issue #198) — HARD GATE
+## Step 11.6 — META-ANALYZE: Cluster Findings and Dispatch harden-sdlc (R21–R26)
+
+**Best-effort step.** Failure here MUST NOT abort Step 11.7 or Step 12.
+
+### 11.6.1 — Cluster findings (R22, C18)
+
+Only cluster findings whose verdict is one of the four R6 outcomes
+(`agree-will-fix | agree-won't-fix | disagree | needs-discussion`). Pre-Step-4 threads
+(`cannot-verify`, ungraded) MUST NOT enter clusters (C18).
+
+Cluster key = `(hardenSurfaceHint, hardenTargetFileHint)` from each thread's manifest fields (P12/P13).
+
+Rules:
+- `disagree` findings require ≥2 findings with the same `hardenTargetFileHint` before forming a cluster (singleton `disagree` silently skipped).
+- Apply cap `flags.hardenClusterCap` (default 5): prune by top-highest-severity-in-cluster → ties by finding count → alphabetic on `(surface, targetFile)`.
+- Track `suppressed = totalClusters - cap` for the log entry.
+
+Emit step-emitter: `meta-analyze-findings` — started:
+```
+Step 11.6 — meta-analyze-findings: started | clusterCount=<N> surfaces=[<list>]
+```
+
+### 11.6.2 — Re-run guard (KD7)
+
+Scan the last 100 lines of `.sdlc/learnings/log.md` for prior `received-review-sdlc:` deferred-cluster entries whose `surface=` and `targetFile=` match the current PR's clusters. Suppress matching clusters with a `suppressed: re-run dedup` log line.
+
+### 11.6.3 — Branch on R25 auto-mode matrix
+
+Gate on `flags.auto` and `flags.alwaysHardenFromReview` (resolved fields from manifest — never re-read `$ARGUMENTS` or config directly; C17).
+
+**Cell 1 — `flags.auto === false` AND `flags.alwaysHardenFromReview === false` (interactive, default):**
+
+For each cluster, present consent gate:
+
+> **Step 11.6 — Harden proposal** — cluster: surface=`<hardenSurfaceHint>`, targetFile=`<hardenTargetFileHint>`, findings=`<count>`
+>
+> Synthesized failure text: _`<first 200 chars of cluster body>`_
+>
+> Dispatch `harden-sdlc` for this cluster?
+
+```
+AskUserQuestion: dispatch | skip
+```
+
+Emit per cluster: `present-harden-clusters` — `consent-granted | consent-skipped`.
+
+**Cell 2 — `flags.auto === false` AND `flags.alwaysHardenFromReview === true` (interactive, always-harden):**
+
+Skip consent gate. Emit `consent-skipped` for every cluster. Proceed directly to dispatch (11.6.4).
+
+**Cell 3 — `flags.auto === true` AND `flags.alwaysHardenFromReview === false` (auto, defer):**
+
+NEVER call `AskUserQuestion` (C17). Skip consent gate. Skip dispatch entirely.
+
+Append deferred-action entry to `.sdlc/learnings/log.md` in R26 format:
+```
+## YYYY-MM-DD — received-review-sdlc: deferred meta-analysis clusters
+PR: <pr.number>
+Clusters (<count>):
+- surface=<hardenSurfaceHint> targetFile=<hardenTargetFileHint> findings=<count> verdict-mix=<csv> failure-text-preview="<first 100 chars>"
+- ...
+Suppressed: <N> additional clusters beyond cap=<cap>
+```
+
+Emit: `dispatch-harden` — `skipped`.
+
+**Cell 4 — `flags.auto === true` AND `flags.alwaysHardenFromReview === true` (auto, always-harden):**
+
+NEVER call `AskUserQuestion` (C17). Skip consent gate. Dispatch every cluster (capped), propagating `--auto` to every `Skill(harden-sdlc)` invocation.
+
+### 11.6.4 — Dispatch per approved cluster (R23)
+
+For each approved cluster (cells 1, 2, or 4 above):
+
+1. Synthesize `--failure-text`: concatenate cluster-member comment bodies + verification status + verdict, trimmed to 4096 chars.
+2. Dispatch:
+   ```
+   Skill("harden-sdlc",
+     "--failure-text \"<synthesized cluster text>\"
+      --skill received-review-sdlc
+      --step \"Step 11.6 — meta-analysis\"
+      --operation \"review-feedback-driven hardening\"
+      [--auto when cell 4]"
+   )
+   ```
+3. On dispatch failure (exit ≠ 0): log one line to `.sdlc/learnings/log.md`:
+   ```
+   error: harden dispatch exit <code> — surface=<surface> targetFile=<targetFile>
+   ```
+   Then continue to next cluster. Do NOT abort Step 11.7 or Step 12 (R25 hard rule c).
+4. Emit: `dispatch-harden` — `{ surface, targetFile, hardenExitCode }`.
+
+Emit step-emitter: `meta-analyze-findings` — completed:
+```
+Step 11.6 — meta-analyze-findings: completed | dispatched=<N> deferred=<N> suppressed=<N>
+```
+
+---
+
+## Step 11.7 — LINK VERIFICATION (R17, issue #198) — HARD GATE
 
 Before any `gh api` reply is posted, validate every URL embedded in every drafted reply body via the shared link validator. Concatenate all reply bodies (one per line) and feed them to the validator on stdin. The script auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
 
@@ -527,6 +668,7 @@ Replied to N threads:
 - Express gratitude — let the code changes speak
 - Display output from internal critique steps (Steps 5-6, 8-9) to the user
 - Skip the Step 10 consent gate without an explicit `--auto` flag — pipeline context, conversation history, or inference about "auto mode" is not a substitute for the flag being passed
+- Use `AskUserQuestion` in Step 11.6 when `flags.auto` is true — the R25 / C17 matrix governs all Step 11.6 decision sites; cite `flags.auto` and `flags.alwaysHardenFromReview` (resolved manifest fields) exclusively, never raw `$ARGUMENTS`
 
 ---
 

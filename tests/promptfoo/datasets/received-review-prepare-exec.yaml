@@ -70,6 +70,48 @@
       value: |
         /^\n\n_via `received-review-sdlc` v\S+_$/.test(output)
 
+- description: "received-review-prepare (#429): local config alwaysHardenFromReview=true → flags resolves to true"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-received-review-flag-resolve.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-received-review-harden-local"
+  assert:
+    - type: icontains
+      value: '"alwaysHardenFromReview":true'
+    - type: icontains
+      value: '"hardenClusterCap":5'
+
+- description: "received-review-prepare (#429): misplaced alwaysHardenFromReview in project config emits stderr warning AND resolves flags to false"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-received-review-flag-resolve.js"
+    script_args: ""
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-received-review-harden-misplaced"
+    script_capture_stderr: true
+  assert:
+    - type: icontains
+      value: "warning: receivedReview.alwaysHardenFromReview found in .sdlc/config.json"
+    - type: icontains
+      value: '"alwaysHardenFromReview":false'
+    - type: not-icontains
+      value: '"alwaysHardenFromReview":true'
+
+- description: "received-review-prepare (#429): manifest includes hardenSurfaceHint per thread — inference returns valid enum value"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-received-review-manifest-fields.js"
+    script_args: "--field hardenSurfaceHint --thread-index 0"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-received-review-harden-local"
+  assert:
+    # Result must be a valid hardenSurfaceHint enum value (review-dimensions for thread-index 0)
+    - type: javascript
+      value: |
+        const valid = new Set(['review-dimensions', 'plan-guardrails', 'execute-guardrails', 'copilot-instructions', 'null']);
+        valid.has(output.trim())
+    - type: icontains
+      value: "review-dimensions"
+
 - description: "received-review-prepare (#233): schema rejection — sdlc-config.schema.json does NOT declare receivedReview at top level"
   vars:
     script_path: "repo://tests/promptfoo/scripts/run-schema-rejection-receivedreview.js"
