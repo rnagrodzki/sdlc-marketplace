@@ -57,5 +57,33 @@ for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--project-root' && argv[i + 1]) projectRoot = path.resolve(argv[++i]);
 }
 
+// Resolve alwaysHardenFromReview (issue #429, R24) — local-only
+function resolveAlwaysHardenFromReview(projectRoot) {
+  try {
+    const { config: projectConfig } = readProjectConfig(projectRoot);
+    if (projectConfig?.receivedReview?.alwaysHardenFromReview !== undefined) {
+      process.stderr.write(
+        'warning: receivedReview.alwaysHardenFromReview found in .sdlc/config.json — ' +
+        'this field is local-only and will be ignored. Move it to .sdlc/local.json.\n'
+      );
+    }
+  } catch (_) { /* missing or unreadable project config — silent */ }
+
+  const local = readSection(projectRoot, 'receivedReview');
+  return Boolean(local?.alwaysHardenFromReview);
+}
+
+// Resolve hardenClusterCap (issue #429, P15) — local-only
+function resolveHardenClusterCap(projectRoot) {
+  const local = readSection(projectRoot, 'receivedReview');
+  const raw = local?.hardenClusterCap;
+  if (raw === undefined || raw === null) return 5;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 5;
+  return Math.max(1, Math.min(50, n));
+}
+
 const alwaysFixSeverities = resolveAlwaysFixSeverities(projectRoot);
-process.stdout.write(JSON.stringify({ flags: { alwaysFixSeverities } }) + '\n');
+const alwaysHardenFromReview = resolveAlwaysHardenFromReview(projectRoot);
+const hardenClusterCap = resolveHardenClusterCap(projectRoot);
+process.stdout.write(JSON.stringify({ flags: { alwaysFixSeverities, alwaysHardenFromReview, hardenClusterCap } }) + '\n');

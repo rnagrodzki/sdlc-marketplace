@@ -13,7 +13,7 @@
 
 ## Core Requirements
 
-- R1: 12-step workflow: READ → UNDERSTAND → VERIFY → EVALUATE → CRITIQUE #1 → IMPROVE #1 → RESPOND → CRITIQUE #2 → IMPROVE #2 → PRESENT → IMPLEMENT → REPLY & RESOLVE
+- R1: 13-step workflow: READ → UNDERSTAND → VERIFY → EVALUATE → CRITIQUE #1 → IMPROVE #1 → RESPOND → CRITIQUE #2 → IMPROVE #2 → PRESENT → IMPLEMENT → META-ANALYZE (Step 11.6) → LINK VERIFICATION (Step 11.7) → REPLY & RESOLVE
 - R2: Dual self-critique gates: first gate reviews evaluation quality (Step 5-6), second gate reviews response quality (Step 8-9)
 - R3: Critique gate output is internal only — never displayed to the user
 - R4: Every feedback item verified against the full codebase (not just the change diff) before evaluation
@@ -36,6 +36,31 @@
 - R19 (issue #233): The `alwaysFixSeverities` field is read EXCLUSIVELY from `.sdlc/local.json` (the per-user, gitignored config). The prepare script MUST NOT consume the field from `.sdlc/config.json`. If the field is encountered in `.sdlc/config.json`, the prepare script emits exactly one warning line to stderr and ignores the value (treating it as if absent). The single resolution site for the field is the prepare script; SKILL.md decision sites cite `flags.alwaysFixSeverities` only and never re-read configuration.
 - R20 (issue #363): Every reply body posted by this skill MUST end with `_via \`received-review-sdlc\` v{plugin_version}_` on its own line, separated from the preceding body by a blank line. The footer is composed by the prepare script (`skill/received-review.js`) using `getPluginVersion()` and emitted as `manifest.reply_footer`; SKILL.md instructs verbatim append — the LLM MUST NOT compose, reformat, or modify the footer string. Falls back to `'unknown'` when `plugin.json` is unreadable. Applies to all four reply sites: Step 7 generic reply, Step 12 agree+fix reply, Step 12 pushback reply, and Step 12 won't-fix reply.
 
+- R21 — Meta-analysis step (Step 11.6): After Step 11 (IMPLEMENT) completes and before Step 11.7 (LINK VERIFICATION), cluster evaluated findings by `(hardenSurfaceHint, hardenTargetFileHint)` and dispatch `Skill(harden-sdlc)` per approved cluster. The step is best-effort: failure does NOT propagate a non-zero exit code from this skill and does NOT abort Step 11.7 or Step 12.
+- R22 — Clustering rules: Verdict→action mapping per issue #429 table. Cluster key = `(hardenSurfaceHint, hardenTargetFileHint)`. Singleton `disagree` findings are skipped (require ≥2 same target-file). Cluster cap = `flags.hardenClusterCap` (default 5). Pruning order when cap is exceeded: top-by-highest-severity-in-cluster → ties by finding count → alphabetic on `(surface, targetFile)`. Excess clusters logged as `suppressed: N additional clusters` in the deferred-action log entry.
+- R23 — Harden dispatch contract: Per approved cluster, dispatch `Skill(harden-sdlc)` with `--failure-text "<synthesized cluster text>"`, `--skill received-review-sdlc`, `--step "Step 11.6 — meta-analysis"`, `--operation "review-feedback-driven hardening"`. When `flags.auto === true` AND `flags.alwaysHardenFromReview === true` (R25 cell 4), propagate `--auto` to every dispatched `Skill(harden-sdlc)` invocation.
+- R24 — `flags.alwaysHardenFromReview` semantics: Resolved exclusively from `.sdlc/local.json` `receivedReview.alwaysHardenFromReview` (boolean, default `false`). If encountered in `.sdlc/config.json`, prepare script emits stderr warning and ignores the value (mirrors R19 / C15). Single resolution site = `skill/received-review.js`; SKILL.md cites `flags.alwaysHardenFromReview` only.
+- R25 — Auto-mode decision matrix (4 cells): Authoritative table for Step 11.6 behavior:
+
+  | `flags.auto` | `flags.alwaysHardenFromReview` | Behavior |
+  |---|---|---|
+  | `false` | `false` | Meta-analyze → cluster → present consent gate → dispatch only approved clusters. |
+  | `false` | `true`  | Meta-analyze → cluster → SKIP consent gate → dispatch every cluster (capped). |
+  | `true`  | `false` | Meta-analyze → cluster → SKIP consent gate AND SKIP dispatch entirely. Append deferred-action entry to `.sdlc/learnings/log.md` per R26 format. |
+  | `true`  | `true`  | Meta-analyze → cluster → SKIP consent gate → dispatch every cluster (capped), propagating `--auto` to every dispatched `Skill(harden-sdlc)` invocation. |
+
+  Three hard rules: (a) NEVER call `AskUserQuestion` in Step 11.6 when `flags.auto === true`; (b) MUST propagate `--auto` to harden dispatch when `flags.auto === true`; (c) harden dispatch failure (exit ≠ 0) is logged-and-ignored, never aborts Step 11.7 or Step 12.
+- R26 — Deferred-action log entry format (for R25 cell 3 — `auto=true, alwaysHardenFromReview=false`):
+  ```
+  ## YYYY-MM-DD — received-review-sdlc: deferred meta-analysis clusters
+  PR: <pr.number>
+  Clusters (<count>):
+  - surface=<hardenSurfaceHint> targetFile=<hardenTargetFileHint> findings=<count> verdict-mix=<csv> failure-text-preview="<first 100 chars>"
+  - ...
+  Suppressed: <N> additional clusters beyond cap=<cap>
+  ```
+  Machine-parseable: regex on `^- surface=` lines. A follow-up interactive run can replay deferred clusters using these lines.
+
 ## Workflow Phases
 
 1. READ — gather review feedback via prepare script (PR threads) or manual input
@@ -52,6 +77,9 @@
 9. IMPROVE #2 (internal) — fix response issues
 10. PRESENT — show analysis table, action plan, drafted responses; consent gate
 11. IMPLEMENT — post responses, apply code changes (blocking → simple → complex order)
+11.6. META-ANALYZE — cluster evaluated findings by `(hardenSurfaceHint, hardenTargetFileHint)`, dispatch `Skill(harden-sdlc)` per approved cluster (R21–R26); best-effort, does NOT abort Step 11.7 or Step 12 on failure
+    - **Output → step-emitter:** `meta-analyze-findings { clusterCount, surfaces[] }` (started → completed); `present-harden-clusters { consent-granted | consent-skipped }` per cluster; `dispatch-harden { surface, targetFile, hardenExitCode }` per cluster
+11.7. LINK VERIFICATION — validate all URLs embedded in drafted reply bodies before posting (R17); renumbered from Step 11.5
 12. REPLY & RESOLVE — post PR thread replies and resolve addressed threads
 
 ## Quality Gates
@@ -85,6 +113,10 @@ Critique #2 (responses):
 - P9 (issue #233): `threads[].severity` (string|null) — per-thread severity parsed from the comment body using the review-sdlc severity tag format. `null` when absent or unparseable; such threads NEVER bypass the consent gate per R18.
 - P10 (issue #363): `plugin_version` (string) — sdlc-utilities plugin version resolved via `getPluginVersion()`. Falls back to `'unknown'`.
 - P11 (issue #363): `reply_footer` (string) — pre-composed footer string for verbatim append to all reply bodies. Format: `'\n\n_via \`received-review-sdlc\` v{plugin_version}_'`.
+- P12 (issue #429): `threads[].hardenSurfaceHint` (string | null) — per-thread harden-surface inference. Allowed values: `review-dimensions | plan-guardrails | execute-guardrails | copilot-instructions | null`. Resolved via rule-based heuristic in `skill/received-review.js` (see C17 / KD6 in implementation notes).
+- P13 (issue #429): `threads[].hardenTargetFileHint` (string | null) — per-thread absolute-path inference. First matched file mention resolved via `fs.existsSync`; `null` when no mention resolves to an existing file.
+- P14 (issue #429): `flags.alwaysHardenFromReview` (boolean) — resolved from `.sdlc/local.json` `receivedReview.alwaysHardenFromReview` per R24. Default `false`.
+- P15 (issue #429): `flags.hardenClusterCap` (integer) — resolved from `.sdlc/local.json` `receivedReview.hardenClusterCap`. Default 5. Clamped to `[1, 50]`.
 
 ## Error Handling
 
@@ -114,6 +146,8 @@ Critique #2 (responses):
 - C14: Must not present Step 12 consent gate when `flags.auto` is true — the reply/resolve step auto-executes under the same policy as manual `yes`
 - C15 (issue #233): Must not read `receivedReview.alwaysFixSeverities` from `.sdlc/config.json`. The single source of truth is `.sdlc/local.json`. Misplaced values must produce a stderr warning and be ignored (R19).
 - C16 (issue #233): SKILL.md decision sites that gate on the configurable auto-apply MUST cite `flags.alwaysFixSeverities` (the prepare-script-resolved field). Direct reads of `$ARGUMENTS`, raw CLI strings, or configuration files at decision sites are forbidden (single resolution site).
+- C17 (issue #429): `AskUserQuestion` MUST NOT be called in Step 11.6 when `flags.auto === true`. The R25 matrix governs all Step 11.6 behavior; decision sites MUST cite `flags.auto` and `flags.alwaysHardenFromReview` (resolved fields) — never raw `$ARGUMENTS` or direct config reads.
+- C18 (issue #429): Step 11.6 clusters ONLY findings whose verdict is one of the four R6 outcomes (`agree-will-fix | agree-won't-fix | disagree | needs-discussion`). Threads at pre-Step-4 status (`cannot-verify`, ungraded) MUST NOT enter clusters.
 
 ## Step-Emitter Contract
 
