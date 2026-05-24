@@ -324,7 +324,7 @@ This dispatch is NOT a wave-runner Agent — it is a direct batch-haiku dispatch
 - Mark tasks from the previous wave as `completed` (skip on wave 1).
 - Add one todo per task in this wave with `status: "in_progress"` and `activeForm: "Wave N — <task name>"`.
 
-This runs unconditionally — even if the wave is skipped or blocked. This TodoWrite is for the Agent's OWN context bookkeeping. It is NOT visible to the parent when execute-plan-sdlc runs inside ship-sdlc's Agent dispatch — sub-agent TodoWrite calls do not propagate up. The parent's task tray is populated by ship-sdlc's MAIN-thread TodoWrite orchestration (see ship-sdlc/SKILL.md `### Main-thread TodoWrite orchestration` and `R-todowrite-visibility`, issue #427).
+This runs unconditionally — even if the wave is skipped or blocked. This TodoWrite is for the Agent's OWN context bookkeeping. It is NOT visible to the parent when execute-plan-sdlc runs inside ship-sdlc's Agent dispatch — sub-agent TodoWrite calls do not propagate up. The parent's task tray is populated by ship-sdlc's main-thread TodoWrite orchestration (see ship-sdlc/SKILL.md and `R-todowrite-visibility`, issue #427).
 
 **5a-pre. Pre-wave guardrail check (error-severity only)** — Skip if `activeGuardrails` is empty.
 

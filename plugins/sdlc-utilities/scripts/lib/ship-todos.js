@@ -168,8 +168,9 @@ function renderTodos(state, opts = {}) {
         }
       }
 
-      // Fail-step override: rewrite in_progress → completed with " (failed)" suffix
-      if (failStep && stepName === failStep && status === 'in_progress') {
+      // Fail-step override: rewrite all non-completed substeps → completed with " (failed)" suffix.
+      // Applies to every substep (in_progress or pending) so none linger after step failure.
+      if (failStep && stepName === failStep && status !== 'completed') {
         status     = 'completed';
         activeForm = `${activeForm} (failed)`;
       }
@@ -291,10 +292,12 @@ function main() {
     planTasks,
   });
 
-  // Print marker to stderr (so SKILL.md can echo it to stdout)
+  // Dual output split: marker → stderr, JSON → stdout.
+  // SKILL.md captures stdout with $(...) for TodoWrite, then echoes the marker
+  // (captured separately from stderr) to produce the stdout audit trail.
+  // Keeping them on separate streams avoids stdout JSON parse errors when marker
+  // text is mixed in.
   process.stderr.write(result.marker + '\n');
-
-  // Print JSON to stdout
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
 }
 

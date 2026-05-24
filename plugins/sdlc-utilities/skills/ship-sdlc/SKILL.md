@@ -464,6 +464,8 @@ For ultra-short runs (`flags.steps.length < 2`), skip TodoWrite entirely.
 
 **Per-step completion (called AFTER the Agent return and result print, AFTER `state/ship.js complete` records success):**
 
+<!-- Ordering required: `state/ship.js complete` must persist status=completed BEFORE this call;
+     ship-todos reads the state file to derive substep statuses, so completion must be on disk first. -->
 1. Run: `node "$SHIP_TODOS" --state-file "$STATE_FILE" --event step --current-step <stepName> --mark-completed <stepName>`.
 2. Parse JSON, call `TodoWrite`, echo `marker`.
 
@@ -631,7 +633,7 @@ Before dispatching `execute-plan-sdlc`, run:
 node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan-file "$PLAN_FILE" --event execute --current-step execute
 ```
 
-Where `$PLAN_FILE` is the resolved plan path from the prepare-script output (`flags.planPath` — confirm field name via `node skill/ship.js --dry-run` JSON shape). The helper expands the `execute` step's placeholder substep to one substep per plan task (one `### Task N:` heading per substep). Parse JSON, call `TodoWrite`, echo `marker`.
+Where `$PLAN_FILE` is the resolved plan file path — the same path used when displaying the plan in Step 2 (resolved from `plansDirectory` in Claude Code settings, defaulting to `~/.claude/plans/`; the same file plan-sdlc wrote). The helper expands the `execute` step's placeholder substep to one substep per plan task (one `### Task N:` heading per substep). Parse JSON, call `TodoWrite`, echo `marker`.
 
 Then dispatch `execute-plan-sdlc` as below. On Agent return (success), run per-step-completion as above with `--mark-completed execute`. The parent does NOT receive per-task completion signals from the Agent; per-task todos all transition to `completed` atomically on return.
 

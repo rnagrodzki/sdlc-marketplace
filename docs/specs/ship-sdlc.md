@@ -230,7 +230,7 @@
 - R-todowrite-visibility (issue #427): ship-sdlc MUST surface pipeline progress in the Claude Code task tray by issuing TodoWrite calls from the MAIN thread of `SKILL.md` (not from dispatched sub-agents, which run in isolated contexts and do not propagate TodoWrite state to the parent). Contract:
   1. Every step in `flags.steps` MUST be represented by ≥1 main-thread todo.
   2. The synthetic terminal `cleanup` step (R38) MUST emit ≥1 main-thread todo even though it is not user-configurable.
-  3. Substep granularity: `commit`, `review`, `pr`, `execute`, `received-review`, `archive-openspec`, `verify-pipeline`, `await-remote-review`, `learnings-commit` MUST emit ≥2 todos each. Trivial steps (`version`, `commit-fixes`, `cleanup`) MAY emit one todo.
+  3. Substep granularity: `commit`, `review`, `pr`, `execute`, `received-review`, `archive-openspec`, `verify-pipeline`, `await-remote-review`, `learnings-commit`, `version` MUST emit ≥2 todos each. Trivial steps (`commit-fixes`, `cleanup`) MAY emit one todo.
   4. For the `execute` step, main-thread todos MUST mirror the plan's task list (one todo per plan task) — the plan file is read by the main thread before dispatching `execute-plan-sdlc`.
   5. Todo lifecycle MUST be `pending → in_progress → completed`. On a step's Agent return (success), every in_progress todo for that step MUST be marked `completed`. On step failure (`state.steps[name].status === "failed"`), every in_progress todo for that step MUST be marked `completed` with `activeForm` suffix `" (failed)"` — no todo MAY linger in_progress after the step finishes.
   6. Steps NOT in `flags.steps` (skipped via `--steps` exclusion or config) MUST produce zero todos.
