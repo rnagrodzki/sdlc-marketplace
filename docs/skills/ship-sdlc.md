@@ -187,6 +187,36 @@ plan-sdlc      (--auto if     (--committed)
 
 ## What Gets Printed
 
+### Task tray (Claude Code progress UI)
+
+ship-sdlc surfaces live pipeline progress in the Claude Code task tray by
+issuing TodoWrite calls from the MAIN thread of `SKILL.md`. You'll see one
+todo per substep, transitioning `pending → in_progress → completed` as the
+pipeline advances:
+
+- **commit** — stash unstaged, generate message, commit, restore stash
+- **review** — dispatch review dimensions, collect verdicts
+- **execute** — one todo per plan task (mirrors the plan you accepted)
+- **pr** — push branch, draft body, `gh pr create`, apply labels
+- (other steps emit their own substep todos; see `R-todowrite-visibility` in `docs/specs/ship-sdlc.md`)
+
+Each TodoWrite call is also paired with a stdout marker in the form:
+
+```
+[task-tray] step commit: pending=12, in_progress=1, completed=4
+```
+
+This marker is a stdout audit trail when the tray is collapsed or running
+non-interactively. On `--resume`, the tray is reconstructed from the
+persistent state file — completed steps appear `completed`, the resume target
+appears `in_progress`/`pending`. On step failure, in_progress todos for the
+failed step are closed with an `" (failed)"` `activeForm` suffix (no todo
+lingers in_progress).
+
+The existing verbose progress headers (`━━━ Ship Pipeline — Step 2/7: Commit ━━━`),
+the pipeline table, and the final summary are **unchanged** — the tray is
+additive.
+
 The pipeline prints every decision and state change. Here is a realistic full output for a run with `--auto --quality balanced`:
 
 ```

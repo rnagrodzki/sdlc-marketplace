@@ -1,0 +1,18 @@
+{
+  "branch": "feat-test",
+  "startedAt": "2026-05-24T10:00:00.000Z",
+  "status": "in_progress",
+  "flags": {
+    "steps": ["execute", "commit", "review", "pr"],
+    "auto": false,
+    "resume": false,
+    "implicitResume": false
+  },
+  "steps": {
+    "execute":  { "name": "execute",  "status": "in_progress" },
+    "commit":   { "name": "commit",   "status": "pending" },
+    "review":   { "name": "review",   "status": "pending" },
+    "pr":       { "name": "pr",       "status": "pending" },
+    "cleanup":  { "name": "cleanup",  "status": "pending" }
+  }
+}

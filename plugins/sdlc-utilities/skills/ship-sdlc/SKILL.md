@@ -437,6 +437,53 @@ For each step that will run, apply the dispatch protocol based on `step.dispatch
 
 Ship-sdlc retains full control of: pipeline table display, validation output, step progress headers, result formatting, state persistence messages, verdict-based flow decisions, and the final summary report. Sub-skills only execute their skill and return structured data — they do not print pipeline-level output.
 
+### Main-thread TodoWrite orchestration (R-todowrite-visibility, #427)
+
+ship-sdlc surfaces live pipeline progress in the Claude Code task tray via main-thread `TodoWrite` calls. All derivation logic lives in `scripts/lib/ship-todos.js` (R-todowrite-visibility clause 11). The MAIN thread invokes the helper via Bash and passes the returned `todos[]` array to the `TodoWrite` tool. The helper's `marker` field is echoed verbatim to stdout (audit trail when the tray is hidden).
+
+**Helper resolution (run once at Step 5 entry):**
+
+```bash
+SHIP_TODOS=$(find ~/.claude/plugins -name "ship-todos.js" -path "*/sdlc*/scripts/lib/ship-todos.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$SHIP_TODOS" ] && [ -f "plugins/sdlc-utilities/scripts/lib/ship-todos.js" ] && SHIP_TODOS="plugins/sdlc-utilities/scripts/lib/ship-todos.js"
+[ -z "$SHIP_TODOS" ] && { echo "ERROR: ship-todos.js not found"; exit 2; }
+```
+
+**Setup (one-time, BEFORE the Step 5 dispatch loop, only when `flags.steps.length >= 2`):**
+
+1. Run: `node "$SHIP_TODOS" --state-file "$STATE_FILE" --event init` (where `$STATE_FILE` is the resolved ship state file path from Step 1c output).
+2. Parse JSON from stdout. Call `TodoWrite` with `todos` array.
+3. Echo `marker` verbatim to stdout.
+
+For ultra-short runs (`flags.steps.length < 2`), skip TodoWrite entirely.
+
+**Per-step transition (called at start of EACH Step 5 iteration, BEFORE the verbose progress header):**
+
+1. Run: `node "$SHIP_TODOS" --state-file "$STATE_FILE" --event step --current-step <stepName>`.
+2. Parse JSON, call `TodoWrite`, echo `marker`.
+
+**Per-step completion (called AFTER the Agent return and result print, AFTER `state/ship.js complete` records success):**
+
+<!-- Ordering required: `state/ship.js complete` must persist status=completed BEFORE this call;
+     ship-todos reads the state file to derive substep statuses, so completion must be on disk first. -->
+1. Run: `node "$SHIP_TODOS" --state-file "$STATE_FILE" --event step --current-step <stepName> --mark-completed <stepName>`.
+2. Parse JSON, call `TodoWrite`, echo `marker`.
+
+**Per-step failure (called when `state/ship.js fail` records a failure):**
+
+1. Run: `node "$SHIP_TODOS" --state-file "$STATE_FILE" --event step --current-step <stepName> --fail-step <stepName>`.
+2. Parse JSON, call `TodoWrite`, echo `marker`.
+3. No todo lingers in_progress (helper enforces — AC4).
+
+**Resume reconstruction (called inside the existing implicit-resume banner block, BEFORE the pipeline table prints, when `flags.resume === true`):**
+
+1. Run: `node "$SHIP_TODOS" --state-file "$STATE_FILE" --event resume --current-step <resume.nextPendingStep>`.
+2. Parse JSON, call `TodoWrite`, echo `marker`.
+
+`flags.resume === true` is the single gate (the prepare script unifies explicit `--resume` and `flags.implicitResume`; this matches the existing implicit-resume banner condition and satisfies `no-opposite-logical-vectors`).
+
+**Cross-skill note:** `execute-plan-sdlc`'s internal per-wave `TodoWrite` calls remain (Agent-context bookkeeping). They are NOT parent-visible — see `execute-plan-sdlc/SKILL.md` Progress signal section and `R-todowrite-visibility`, issue #427.
+
 ### Workspace-mode resolution and default-branch guard (R61, R62 — fixes #378)
 
 **Skip on resume re-entry** (`flags.resume === true`) — the resume block below already handled mode/cwd.
@@ -577,6 +624,18 @@ If false (resuming from the main worktree but the pipeline originally ran in a w
 git worktree list --porcelain
 ```
 Match the branch from the ship state file against worktree entries. If found and directory exists, `cd <path>` before continuing. If the worktree directory is gone, warn and fall back to running on the current branch.
+
+**Execute-step todo mirroring (R-todowrite-visibility clause 4):**
+
+Before dispatching `execute-plan-sdlc`, run:
+
+```bash
+node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan-file "$PLAN_FILE" --event execute --current-step execute
+```
+
+Where `$PLAN_FILE` is the resolved plan file path — the same path used when displaying the plan in Step 2 (resolved from `plansDirectory` in Claude Code settings, defaulting to `~/.claude/plans/`; the same file plan-sdlc wrote). The helper expands the `execute` step's placeholder substep to one substep per plan task (one `### Task N:` heading per substep). Parse JSON, call `TodoWrite`, echo `marker`.
+
+Then dispatch `execute-plan-sdlc` as below. On Agent return (success), run per-step-completion as above with `--mark-completed execute`. The parent does NOT receive per-task completion signals from the Agent; per-task todos all transition to `completed` atomically on return.
 
 Example dispatch sequence (use `step.invocation` for actual args):
 - Agent: execute-plan-sdlc, args: from `step.invocation` PLUS `--branch "$EXECUTE_BRANCH"` when `EXECUTE_BRANCH` is set (i.e. `WORKSPACE_MODE` is `branch` or `worktree`). When `WORKSPACE_MODE` is `continue`, omit `--branch` (execute handles its own isolation or runs on existing branch). Example: `"--quality balanced --branch feat/my-feature"`. This implements R60 step 5 — execute-plan-sdlc short-circuits its own Step 1 isolation in response (R30).
@@ -844,6 +903,16 @@ Dispatch the cleanup step **as a direct Bash call**, not as an Agent. Each `clea
   "forced": "node \"$SCRIPT\" cleanup-pipeline --force"
 }
 ```
+
+**Cleanup-step todo (R-todowrite-visibility clause 2):**
+
+Before invoking the cleanup Bash command, run:
+
+```bash
+node "$SHIP_TODOS" --state-file "$STATE_FILE" --event cleanup --current-step cleanup
+```
+
+Call `TodoWrite`, echo `marker`. After the cleanup command returns (success or contract violation), run per-step-completion with `--mark-completed cleanup`.
 
 Selection rule: walk `steps[]` and check whether any prior step's recorded status (from the live state file, not the prepare snapshot) is `failed`. If so, dispatch with `step.invocation.forced`; otherwise dispatch with `step.invocation.normal`. `$SCRIPT` is the same `state/ship.js` path resolved in the state-persistence section above.
 

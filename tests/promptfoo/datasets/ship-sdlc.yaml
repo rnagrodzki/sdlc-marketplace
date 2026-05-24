@@ -996,3 +996,40 @@
         path (or confirms state was saved). It instructs the user to exit plan mode and
         re-invoke /ship-sdlc (no flags needed) — the saved state enables implicit resume.
         It does not require the user to re-specify --bump minor or --steps on the next run.
+
+- description: "ship-sdlc: main-thread TodoWrite markers appear at every step transition (#427)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --auto --steps execute,commit,review,pr --dry-run. The project context
+      is provided above. Walk through the pipeline up to and including the dry-run table.
+      For each step that WILL run, emit a [task-tray] stdout marker showing the
+      transition (init, step <name>, ..., final). Demonstrate that the main thread
+      issues TodoWrite calls and prints the marker alongside each call. Do not invoke
+      any sub-skills.
+  assert:
+    # Initial setup marker is emitted before the pipeline table
+    - type: icontains
+      value: "[task-tray] init:"
+    # Per-step transition markers appear for each will_run step
+    - type: regex
+      value: "\\[task-tray\\] step execute:"
+    - type: regex
+      value: "\\[task-tray\\] step commit:"
+    - type: regex
+      value: "\\[task-tray\\] step review:"
+    - type: regex
+      value: "\\[task-tray\\] step pr:"
+    # Counts format is well-formed: pending=N, in_progress=N, completed=N
+    - type: regex
+      value: "pending=\\d+, in_progress=\\d+, completed=\\d+"
+    # Behavioral: TodoWrite is called from main thread, not just text
+    - type: llm-rubric
+      value: >
+        The response demonstrates that the MAIN thread (not a dispatched sub-agent)
+        calls the TodoWrite tool at the start of the pipeline (init) and before each
+        step transition. Each TodoWrite call is paired with a [task-tray] stdout
+        marker. The response does NOT claim that sub-agent TodoWrite calls bubble up
+        to the parent — it instead documents that main-thread calls are the source
+        of task-tray visibility.
