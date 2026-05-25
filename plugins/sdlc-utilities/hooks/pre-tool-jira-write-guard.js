@@ -23,7 +23,6 @@
  */
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 
 // Dependency resolution: the hook lives in plugins/.../hooks/, the helpers
@@ -37,6 +36,8 @@ const {
   verifyArtifacts,
   consumeArtifacts,
   purgeStale,
+  debugDir,
+  atomicWrite,
 } = require(path.join(LIB_ROOT, 'artifact-store.js'));
 
 const WRITE_TOOLS = new Set([
@@ -404,13 +405,17 @@ async function main() {
     // the same-prefix nearby artifact hashes so the user can diff against the
     // skill's critique artifact byte-for-byte without re-triggering the
     // dispatch. Dump-write failures are swallowed — the deny is still emitted.
+    // Uses `debugDir()` + `atomicWrite()` from artifact-store so the directory
+    // constant matches `purgeStale()` (single TMPDIR_REAL resolution) and so a
+    // crash mid-write cannot leave a partially written dump on disk.
     let dumpPath = null;
+    const canonicalInput = canonicalize(toolInput);
+    const canonical = JSON.stringify(canonicalInput);
     try {
-      const dumpDir = path.join(fs.realpathSync(os.tmpdir()), 'jira-sdlc-debug');
-      fs.mkdirSync(dumpDir, { recursive: true, mode: 0o700 });
-      const canonical = JSON.stringify(canonicalize(toolInput));
-      dumpPath = path.join(dumpDir, `${hash.slice(0, 12)}.json`);
-      fs.writeFileSync(
+      const dumpDirPath = debugDir();
+      fs.mkdirSync(dumpDirPath, { recursive: true, mode: 0o700 });
+      dumpPath = path.join(dumpDirPath, `${hash.slice(0, 12)}.json`);
+      atomicWrite(
         dumpPath,
         JSON.stringify({
           tool_input: toolInput,
@@ -424,16 +429,27 @@ async function main() {
 
     // R21.2: length hints for multi-line string fields. Helps the user
     // recognize trailing-whitespace hash-mismatch failures from a single
-    // failed call instead of 3–5 trial-and-error retries.
+    // failed call instead of 3–5 trial-and-error retries. We emit BOTH the
+    // raw `tool_input` length and — when it differs — the canonicalized
+    // length (post-`trimEnd()`). Without this, a trailing-whitespace mismatch
+    // shows a hint of N while the hash was actually computed on N-k chars,
+    // misleading the user into hunting for a content diff that isn't there.
     const lenHints = [];
-    if (typeof toolInput.commentBody === 'string') {
-      lenHints.push(`commentBody-len=${toolInput.commentBody.length}`);
-    }
-    if (typeof toolInput.description === 'string') {
-      lenHints.push(`description-len=${toolInput.description.length}`);
-    }
+    const pushLen = (label, raw, canon) => {
+      if (typeof raw !== 'string') return;
+      lenHints.push(canon !== undefined && canon !== raw.length
+        ? `${label}-len=${raw.length} (canonical=${canon})`
+        : `${label}-len=${raw.length}`);
+    };
+    pushLen('commentBody', toolInput.commentBody,
+      typeof canonicalInput.commentBody === 'string' ? canonicalInput.commentBody.length : undefined);
+    pushLen('description', toolInput.description,
+      typeof canonicalInput.description === 'string' ? canonicalInput.description.length : undefined);
     if (toolInput.fields && typeof toolInput.fields.description === 'string') {
-      lenHints.push(`fields.description-len=${toolInput.fields.description.length}`);
+      const canonFD = canonicalInput.fields && typeof canonicalInput.fields.description === 'string'
+        ? canonicalInput.fields.description.length
+        : undefined;
+      pushLen('fields.description', toolInput.fields.description, canonFD);
     }
 
     const extras = [

@@ -31,6 +31,15 @@ function storeDir() {
   return path.join(TMPDIR_REAL, 'jira-sdlc');
 }
 
+/**
+ * R21.2 deny-path diagnostic dump directory. Exposed so the hook can write
+ * into the same constant that `purgeStale()` sweeps, instead of resolving
+ * `os.tmpdir()` a second time at deny-time.
+ */
+function debugDir() {
+  return path.join(TMPDIR_REAL, 'jira-sdlc-debug');
+}
+
 function ensureDir() {
   const dir = storeDir();
   fs.mkdirSync(dir, { recursive: true });
@@ -45,11 +54,14 @@ function approvalPath(hash) {
   return path.join(storeDir(), `approval-${hash}.token`);
 }
 
-function atomicWrite(targetPath, contents) {
+function atomicWrite(targetPath, contents, opts) {
   const dir = path.dirname(targetPath);
   fs.mkdirSync(dir, { recursive: true });
   const tmp = path.join(dir, `.tmp-${crypto.randomBytes(6).toString('hex')}`);
-  fs.writeFileSync(tmp, contents, 'utf8');
+  const writeOpts = opts && typeof opts.mode === 'number'
+    ? { encoding: 'utf8', mode: opts.mode }
+    : 'utf8';
+  fs.writeFileSync(tmp, contents, writeOpts);
   fs.renameSync(tmp, targetPath);
 }
 
@@ -178,7 +190,7 @@ function consumeArtifacts(hash) {
  */
 function purgeStale() {
   const now = Date.now();
-  for (const dir of [storeDir(), path.join(TMPDIR_REAL, 'jira-sdlc-debug')]) {
+  for (const dir of [storeDir(), debugDir()]) {
     let entries;
     try { entries = fs.readdirSync(dir); } catch { continue; }
     for (const name of entries) {
@@ -194,6 +206,8 @@ function purgeStale() {
 module.exports = {
   TTL_MS,
   storeDir,
+  debugDir,
+  atomicWrite,
   critiquePath,
   approvalPath,
   writeCritique,
