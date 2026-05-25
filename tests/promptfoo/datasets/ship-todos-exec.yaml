@@ -45,7 +45,7 @@
                output.includes('ERROR');
 
 # (c) --event commit without --plan-file succeeds — regression guard for execute-only change.
-- description: "ship-todos (R-SHIPTODOS-FAILLOUD): --event commit without --plan-file exits 0 with valid JSON"
+- description: "ship-todos (R-SHIPTODOS-FAILLOUD): --event step --current-step commit without --plan-file exits 0 with valid JSON"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
     script_args: "--state-file {{project_root}}/state-pre-execute.json --event step --current-step commit"

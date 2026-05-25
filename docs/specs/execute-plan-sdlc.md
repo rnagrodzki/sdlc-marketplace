@@ -14,6 +14,7 @@
 - A4: `--workspace branch|worktree|prompt` — workspace isolation mode when on default branch (default: prompt)
 - A5: `--rebase auto|prompt|skip` — rebase onto default branch before execution (default: skip)
 - A6: `--auto` — suppress interactive prompts; auto-resume, auto-approve high-risk gates, use `--quality` value (default: false). When `--auto` is set, `--quality` is required.
+- A7: `--plan-file <path>` — explicit path to the active plan markdown; when set, Step 1 (LOAD) uses this file directly and skips the conversation-context discovery heuristic. Forwarded by ship-sdlc from `context.planFile` for compaction stability. Users may also pass it directly for non-interactive invocations. (default: unset)
 
 ## Core Requirements
 
@@ -186,3 +187,5 @@
 - R-PRIORWAVE: The bounded prior-wave context object passed from main context to each wave-runner dispatch MUST use the key name `priorWaveSummary`. No other key names (e.g., `priorWaveContext`) are permitted. All SKILL.md prose, wave-runner prompt templates, and examples must use this name consistently.
 
 - R-FILESTOUCHED: The orchestrator's `--files-changed` argument in `task-done` state writes MUST be populated from `WAVE_SUMMARY.tasks[].filesTouched`. SKILL.md handoff text at the `--files-changed` call site MUST explicitly cite `WAVE_SUMMARY.tasks[].filesTouched` as the source field by name.
+
+- R-PLANFILE: When `--plan-file <path>` is passed, execute-plan-sdlc MUST use this path as the authoritative plan source and MUST skip the "plan in context" discovery heuristic in Step 1 (LOAD). Conversation context is NEVER consulted for plan content when `--plan-file` is set, even if plan text is present in context. Forwarded by ship-sdlc from `context.planFile` for compaction stability — ensures the same plan file is read across compaction boundaries. Acceptance: "Given `--plan-file /path/to/plan.md` is passed AND plan text is present in conversation context, Step 1 reads from the file path and ignores the context payload."
