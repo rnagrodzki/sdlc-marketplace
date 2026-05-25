@@ -68,3 +68,4 @@ tests:
   - file://datasets/setup-script-versions-exec.yaml
   - file://datasets/setup-migrate-dispatch-exec.yaml
   - file://datasets/version-retag-exec.yaml
+  - file://datasets/execute-plan-sdlc-overflow-exec.yaml

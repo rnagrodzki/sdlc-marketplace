@@ -16,15 +16,15 @@
     - type: javascript
       value: "const j = JSON.parse(output); j.todos.length >= 5 && j.marker.startsWith('[task-tray] init:')"
 
-# ship-todos.js: --fail-step closes ALL commit substeps (not just in_progress) with ' (failed)' suffix
-- description: "ship-todos.js: --fail-step closes all substeps (in_progress and pending) with ' (failed)' suffix"
+# ship-todos.js: --fail-step closes in_progress substeps with ' (failed)' and leaves pending as '(not attempted)' (R-TODOWRITE-TRUTHFUL, #432)
+- description: "ship-todos.js: --fail-step marks in_progress substeps (failed) and pending substeps (not attempted)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
     script_args: "--state-file {{project_root}}/state-mid-commit.json --event step --current-step commit --fail-step commit"
     project_root: "file://fixtures-fs/ship-todos"
   assert:
     - type: javascript
-      value: "const j = JSON.parse(output); const commitTodos = j.todos.filter(t => t.content.startsWith('Commit:')); !commitTodos.some(t => t.status === 'in_progress') && commitTodos.filter(t => t.activeForm.endsWith('(failed)')).length === commitTodos.length"
+      value: "const j = JSON.parse(output); const commitTodos = j.todos.filter(t => t.content.startsWith('Commit:')); const inProgressFailed = commitTodos.filter(t => t.status === 'completed' && t.activeForm.endsWith('(failed)')); const pendingNotAttempted = commitTodos.filter(t => t.status === 'pending' && t.activeForm.endsWith('(not attempted)')); !commitTodos.some(t => t.status === 'in_progress') && inProgressFailed.length >= 1 && pendingNotAttempted.length >= 1"
 
 # ship-todos.js: resume reconstruction — first pr substep becomes in_progress (default, no --substep)
 - description: "ship-todos.js: --event resume produces completed todos for prior steps and in_progress for nextPendingStep"

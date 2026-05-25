@@ -403,6 +403,38 @@ Configure execution guardrails via `/setup-sdlc --execution-guardrails`. See [pl
 
 ---
 
+## Context-Overflow Handling
+
+When a wave-runner Agent's context is exhausted before it can report all dispatched tasks, the returned `WAVE_SUMMARY` will be missing one or more task IDs. This is **CONTEXT_OVERFLOW** — a failure mode that previously caused silent success (the pipeline advanced as if all tasks completed).
+
+### Detection
+
+After each wave-runner returns, main context calls `lib/wave-summary.js parseWaveSummary(text, dispatchedIds)`. If `missingIds.length > 0` — IDs dispatched but absent from the `WAVE_SUMMARY` — the wave is classified as CONTEXT_OVERFLOW. Git diff is **not** used as a substitute: even if files changed, absent IDs mean the wave-runner did not confirm those tasks.
+
+### Auto-split-and-retry
+
+On CONTEXT_OVERFLOW, `lib/wave-split.js splitWave()` partitions the **full original dispatched set** (not just the missing IDs) into two roughly-equal halves. Each half is re-dispatched as an independent wave-runner with a freshly computed byte budget. Splitting the full set guards against re-overflow when in-wave task dependencies require co-presence.
+
+Split depth increments on each recursive split. After 3 splits (`maxSplitDepth: 3`), the pipeline escalates to the user with a structured list of unresolved task IDs via `AskUserQuestion`.
+
+The split decision is persisted to the execute state file (`wave-split` subcommand of `state/execute.js`) so a resume-after-crash replays the identical partition tree.
+
+### Bounded WAVE_SUMMARY schema
+
+Wave-runner Agents must emit a bounded `WAVE_SUMMARY` token as their final line. Per-task entries carry only `{id, status, sha, filesTouched[], errorCode?}` — verbose fields like `name`, `complexity`, `attempts[]` are dropped to keep the return small. The `errorCode` field is a bounded enum (`OVERFLOW | TIMEOUT | FAILED_TESTS | FAILED_BUILD | BLOCKED | NEEDS_CONTEXT`); free-text error strings are rejected by the parser.
+
+### Post-execution completeness invariant
+
+After all waves complete, `state/execute.js verify-completeness` checks that every planned task ID appears in state with status `completed`, `failed`, or `skipped-dependency`. If any task is unaccounted, the command exits 65 with structured JSON on stderr:
+
+```json
+{"missingIds": ["T5"], "totalPlanned": 8, "totalAccounted": 7}
+```
+
+The pipeline **halts before the commit step** on exit 65 — it does not silently advance. This gate is also wired into `ship-sdlc`'s execute-step finalization.
+
+---
+
 ## Related Skills
 
 - [`/plan-sdlc`](plan-sdlc.md) — writes the plans this skill executes

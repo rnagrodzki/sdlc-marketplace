@@ -738,6 +738,67 @@ function gcTempdirs({ prefix, ttlDays = 7, knownBranches = [], now, tmpdir } = {
 }
 
 // ---------------------------------------------------------------------------
+// priorWaveContext summarizer (R-BYTE-BUDGET / R-CONTEXT_OVERFLOW hardening, #432)
+// ---------------------------------------------------------------------------
+
+/**
+ * Return a bounded slice of the execution state's priorWaveContext fields.
+ *
+ * The priorWaveContext object accumulates `filesAdded`, `filesModified`,
+ * `interfacesCreated`, and `decisionsFromPriorWaves` monotonically with no
+ * cap. Passing an unbounded context object to each wave-runner agent inflates
+ * per-agent context proportionally with wave count. This function caps each
+ * field to the most-recent N entries so the byte footprint stays bounded.
+ *
+ * Defaults can be overridden via `.sdlc/config.json` under
+ * `execute.priorWaveContextCaps`:
+ *   { maxFiles: 20, maxDecisions: 10, maxInterfaces: 15 }
+ *
+ * @param {object} state                   - execute state object (from readState)
+ * @param {object} [opts]
+ * @param {number} [opts.maxFiles=20]       - max filesAdded + filesModified entries each
+ * @param {number} [opts.maxDecisions=10]   - max decisionsFromPriorWaves entries
+ * @param {number} [opts.maxInterfaces=15]  - max interfacesCreated entries
+ * @returns {{ planSummary: string, completedTaskIds: string[], filesAdded: string[], filesModified: string[], interfacesCreated: string[], decisionsFromPriorWaves: string[] }}
+ */
+function summarizePriorWaveContext(state, opts = {}) {
+  const ctx = (state && state.context) ? state.context : {};
+
+  // Load caps from config if available; fall back to opts then defaults
+  let configCaps = {};
+  try {
+    const { readSection, resolveSdlcRoot } = require('./config');
+    const execSection = readSection(resolveSdlcRoot(), 'execute') || {};
+    configCaps = execSection.priorWaveContextCaps || {};
+  } catch (_) {
+    // config not available or malformed — use defaults
+  }
+
+  const maxFiles      = opts.maxFiles      != null ? opts.maxFiles      : (configCaps.maxFiles      || 20);
+  const maxDecisions  = opts.maxDecisions  != null ? opts.maxDecisions  : (configCaps.maxDecisions  || 10);
+  const maxInterfaces = opts.maxInterfaces != null ? opts.maxInterfaces : (configCaps.maxInterfaces || 15);
+
+  /**
+   * Return the last N items from an array, or the full array if shorter.
+   * @param {any[]} arr
+   * @param {number} n
+   */
+  function tail(arr, n) {
+    if (!Array.isArray(arr)) return [];
+    return arr.slice(-n);
+  }
+
+  return {
+    planSummary:              ctx.planSummary              || '',
+    completedTaskIds:         Array.isArray(ctx.completedTaskIds) ? [...ctx.completedTaskIds] : [],
+    filesAdded:               tail(ctx.filesAdded,               maxFiles),
+    filesModified:            tail(ctx.filesModified,            maxFiles),
+    interfacesCreated:        tail(ctx.interfacesCreated,        maxInterfaces),
+    decisionsFromPriorWaves:  tail(ctx.decisionsFromPriorWaves,  maxDecisions),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -761,4 +822,5 @@ module.exports = {
   listBranches,
   readTtlDaysFromConfig,
   COMPACT_RECOVERY_TTL_MS,
+  summarizePriorWaveContext,
 };

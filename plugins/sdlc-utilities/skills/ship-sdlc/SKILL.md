@@ -635,7 +635,26 @@ node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan-file "$PLAN_FILE" --event e
 
 Where `$PLAN_FILE` is the resolved plan file path — the same path used when displaying the plan in Step 2 (resolved from `plansDirectory` in Claude Code settings, defaulting to `~/.claude/plans/`; the same file plan-sdlc wrote). The helper expands the `execute` step's placeholder substep to one substep per plan task (one `### Task N:` heading per substep). Parse JSON, call `TodoWrite`, echo `marker`.
 
-Then dispatch `execute-plan-sdlc` as below. On Agent return (success), run per-step-completion as above with `--mark-completed execute`. The parent does NOT receive per-task completion signals from the Agent; per-task todos all transition to `completed` atomically on return.
+Then dispatch `execute-plan-sdlc` as below. On Agent return (success), run the post-execution completeness invariant **before** marking the step complete (R-INVARIANT-COMPLETENESS, #432):
+
+```bash
+EXECUTE_STATE_SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/execute.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$EXECUTE_STATE_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/execute.js" ] && EXECUTE_STATE_SCRIPT="plugins/sdlc-utilities/scripts/state/execute.js"
+if [ -n "$EXECUTE_STATE_SCRIPT" ]; then
+  node "$EXECUTE_STATE_SCRIPT" verify-completeness
+  COMPLETENESS_EXIT=$?
+  if [ "$COMPLETENESS_EXIT" -ne 0 ]; then
+    echo "ERROR: execute-plan-sdlc returned but planned tasks are unaccounted. Pipeline halted." >&2
+    # Mark execute step failed and halt — do NOT advance to commit/review/version/pr
+    node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan-file "$PLAN_FILE" --event execute --fail-step execute
+    exit "$COMPLETENESS_EXIT"
+  fi
+fi
+```
+
+If `verify-completeness` exits 65, the pipeline MUST halt before commit. The missing task IDs appear on stderr as JSON `{missingIds, totalPlanned, totalAccounted}`. Do NOT advance to the commit step.
+
+Then run per-step-completion: `--mark-completed execute`. The parent does NOT receive per-task completion signals from the Agent; per-task todos all transition to `completed` atomically on return.
 
 Example dispatch sequence (use `step.invocation` for actual args):
 - Agent: execute-plan-sdlc, args: from `step.invocation` PLUS `--branch "$EXECUTE_BRANCH"` when `EXECUTE_BRANCH` is set (i.e. `WORKSPACE_MODE` is `branch` or `worktree`). When `WORKSPACE_MODE` is `continue`, omit `--branch` (execute handles its own isolation or runs on existing branch). Example: `"--quality balanced --branch feat/my-feature"`. This implements R60 step 5 — execute-plan-sdlc short-circuits its own Step 1 isolation in response (R30).
