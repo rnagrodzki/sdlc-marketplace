@@ -7,7 +7,7 @@
  * Reads a JSON envelope from stdin (Claude Code hook protocol):
  *   { tool_name, tool_input, ... }
  *
- * When tool_name === 'Agent' and tool_input.isolation === 'worktree',
+ * When tool_name === 'Task' and tool_input.isolation === 'worktree',
  * emits a blocking response (continue: false, stopReason, exit 2) that binds
  * under mode: bypassPermissions — unless the developer has opted out via
  * .sdlc/local.json hooks.agentIsolationGuard.enabled: false.
@@ -84,8 +84,8 @@ async function main() {
     return emitContinue();
   }
 
-  // Only act on Agent tool dispatches.
-  if (!envelope || envelope.tool_name !== 'Agent') {
+  // Only act on Task tool dispatches (Claude Code sub-agent dispatch tool).
+  if (!envelope || envelope.tool_name !== 'Task') {
     return emitContinue();
   }
 
@@ -104,11 +104,11 @@ async function main() {
   }
 
   return emitBlock(
-    'BLOCKED: isolation: "worktree" is forbidden on Agent dispatch. ' +
+    'BLOCKED: isolation: "worktree" is forbidden on Task dispatch. ' +
     'SDLC worktrees are managed by util/worktree-create.js (git CLI). ' +
     'Adding isolation: "worktree" here creates .claude/worktrees/agent-<id> ephemeral paths ' +
     'that are not the intended SDLC worktree — commits land in the wrong location. ' +
-    'Remove the isolation parameter from this Agent dispatch. ' +
+    'Remove the isolation parameter from this Task dispatch. ' +
     'To opt out per-developer, set `hooks.agentIsolationGuard.enabled: false` in ' +
     '.sdlc/local.json (or re-run /setup-sdlc and answer the prompt). ' +
     'See issues #370 #372.'

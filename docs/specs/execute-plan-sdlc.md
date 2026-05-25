@@ -14,6 +14,7 @@
 - A4: `--workspace branch|worktree|prompt` — workspace isolation mode when on default branch (default: prompt)
 - A5: `--rebase auto|prompt|skip` — rebase onto default branch before execution (default: skip)
 - A6: `--auto` — suppress interactive prompts; auto-resume, auto-approve high-risk gates, use `--quality` value (default: false). When `--auto` is set, `--quality` is required.
+- A7: `--plan-file <path>` — explicit path to the active plan markdown; when set, Step 1 (LOAD) uses this file directly and skips the conversation-context discovery heuristic. Forwarded by ship-sdlc from `context.planFile` for compaction stability. Users may also pass it directly for non-interactive invocations. (default: unset)
 
 ## Core Requirements
 
@@ -178,3 +179,13 @@
 - I11: OpenSpec — optional spec context for spec compliance review when plan is OpenSpec-sourced
 - I12: `lib/openspec.js` — `validateChangeStrict` helper for post-pipeline archive suggestion gating
 - I13: `lib/openspec.js::markTaskDone` — mutator called per completed-and-grouped plan task to flip OpenSpec `tasks.md` checkboxes (R37).
+
+## Additional Requirements
+
+- R-IDNORM: Task IDs in plan files are numeric (e.g., `1`, `2`, `3`). The `parseWaveSummary` function and `verify-completeness` block MUST normalize IDs before set comparisons by stripping a single leading `T` or `t` character (case-insensitive) and trimming whitespace. After normalization, IDs with the same numeric value MUST be treated as equal. Normalization is comparison-only — persisted IDs in state files retain their wire form. Examples that show `T<n>`-prefixed IDs in SKILL.md, wave-runner-template.md, or classifying-and-waving-tasks.md MUST use numeric-only IDs to match the plan parser's canonical output.
+
+- R-PRIORWAVE: The bounded prior-wave context object passed from main context to each wave-runner dispatch MUST use the key name `priorWaveSummary`. No other key names (e.g., `priorWaveContext`) are permitted. All SKILL.md prose, wave-runner prompt templates, and examples must use this name consistently.
+
+- R-FILESTOUCHED: The orchestrator's `--files-changed` argument in `task-done` state writes MUST be populated from `WAVE_SUMMARY.tasks[].filesTouched`. SKILL.md handoff text at the `--files-changed` call site MUST explicitly cite `WAVE_SUMMARY.tasks[].filesTouched` as the source field by name.
+
+- R-PLANFILE: When `--plan-file <path>` is passed, execute-plan-sdlc MUST use this path as the authoritative plan source and MUST skip the "plan in context" discovery heuristic in Step 1 (LOAD). Conversation context is NEVER consulted for plan content when `--plan-file` is set, even if plan text is present in context. Forwarded by ship-sdlc from `context.planFile` for compaction stability — ensures the same plan file is read across compaction boundaries. Acceptance: "Given `--plan-file /path/to/plan.md` is passed AND plan text is present in conversation context, Step 1 reads from the file path and ignores the context payload."

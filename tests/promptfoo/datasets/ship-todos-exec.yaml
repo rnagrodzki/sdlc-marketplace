@@ -1,0 +1,66 @@
+# Script execution tests for ship-todos.js — R-PLANFILE / R-SHIPTODOS-FAILLOUD (#task5).
+# Covers: (a) --event execute with valid plan file produces per-task substeps,
+#         (b) --event execute without --plan-file exits 2 with clear error,
+#         (c) --event commit without --plan-file succeeds (regression guard).
+
+# (a) --event execute with valid plan file produces ≥2 task-mirrored substeps.
+- description: "ship-todos (R-PLANFILE): --event execute with plan file mirrors task headings as substeps"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
+    script_args: "--state-file {{project_root}}/state-pre-execute.json --event execute --current-step execute --plan-file {{project_root}}/plan-3-tasks.md"
+    project_root: "file://fixtures-fs/ship-todos"
+  assert:
+    - type: javascript
+      value: |
+        const result = JSON.parse(output);
+        const todos = result.todos;
+        // Must contain task-mirrored substeps (not placeholder)
+        const task1 = todos.find(t => t.content && t.content.includes('Task 1:'));
+        const task2 = todos.find(t => t.content && t.content.includes('Task 2:'));
+        const task3 = todos.find(t => t.content && t.content.includes('Task 3:'));
+        if (!task1) return 'FAIL: Task 1 substep not found';
+        if (!task2) return 'FAIL: Task 2 substep not found';
+        if (!task3) return 'FAIL: Task 3 substep not found';
+        // Titles must match plan headings
+        if (!task1.content.includes('Foo')) return `FAIL: Task 1 missing title: ${task1.content}`;
+        if (!task2.content.includes('Bar')) return `FAIL: Task 2 missing title: ${task2.content}`;
+        if (!task3.content.includes('Baz')) return `FAIL: Task 3 missing title: ${task3.content}`;
+        // Placeholder must NOT appear
+        if (todos.some(t => t.content === 'execute plan')) return 'FAIL: placeholder "execute plan" present alongside task-mirrored substeps';
+        return true;
+
+# (b) --event execute without --plan-file exits 2 with descriptive error.
+- description: "ship-todos (R-SHIPTODOS-FAILLOUD): --event execute without --plan-file exits 2"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
+    script_args: "--state-file {{project_root}}/state-pre-execute.json --event execute"
+    project_root: "file://fixtures-fs/ship-todos"
+  assert:
+    - type: javascript
+      value: |
+        // Script exits 2 — the provider captures non-zero exit in output as an error marker.
+        // The error message should appear in stderr (captured via the provider's combined output).
+        return output.includes('--event execute requires --plan-file') ||
+               output.includes('exit code 2') ||
+               output.includes('ERROR');
+
+# (c) --event commit without --plan-file succeeds — regression guard for execute-only change.
+- description: "ship-todos (R-SHIPTODOS-FAILLOUD): --event step --current-step commit without --plan-file exits 0 with valid JSON"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
+    script_args: "--state-file {{project_root}}/state-pre-execute.json --event step --current-step commit"
+    project_root: "file://fixtures-fs/ship-todos"
+  assert:
+    - type: javascript
+      value: |
+        try {
+          const result = JSON.parse(output);
+          if (!Array.isArray(result.todos)) return 'FAIL: todos not an array';
+          if (typeof result.marker !== 'string') return 'FAIL: marker not a string';
+          // commit step must have its substeps present
+          const commitTodo = result.todos.find(t => t.content && t.content.includes('Commit:'));
+          if (!commitTodo) return 'FAIL: no commit substep found';
+          return true;
+        } catch (e) {
+          return `FAIL: JSON parse error: ${e.message}`;
+        }

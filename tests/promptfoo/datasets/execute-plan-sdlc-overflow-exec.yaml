@@ -11,14 +11,14 @@
 # task-factsheet.js — fact-sheet path determinism
 # ---------------------------------------------------------------------------
 
-- description: "execute-plan-sdlc/wave-runner-overflow/task-factsheet: path is deterministic for same runId+taskId"
+- description: "execute-plan-sdlc/wave-runner-overflow/task-factsheet: path is deterministic and T3/3 normalize to same file (R-IDNORM)"
   vars:
     script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
     script_args: "--op factsheet-path"
     project_root: "file://fixtures-fs/execute-overflow"
   assert:
     - type: javascript
-      value: "const r = JSON.parse(output); r.same === true && r.containsTaskId === true"
+      value: "const r = JSON.parse(output); r.same === true && r.containsTaskId === true && r.idNormSame === true"
 
 # ---------------------------------------------------------------------------
 # dispatch-budget.js — byte-budget computation
@@ -205,3 +205,34 @@
   assert:
     - type: javascript
       value: "output.includes('MaxSplitDepth') || output.includes('max split depth') || output.includes('split depth')"
+
+# ---------------------------------------------------------------------------
+# R-IDNORM: task-ID normalization (T-prefix stripping)
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc/wave-runner-overflow/idnorm: mixed T/t/numeric IDs all accounted after normalization"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op parse-idnorm-mixed"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.allAccounted === true && r.missingIds.length === 0 && r.extraIds.length === 0"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/idnorm: stale filesChanged field rejected by bounded schema"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op parse-stale-fileschanged"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.schemaOk === false && r.hasDroppedFieldViolation === true"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/idnorm: normalizeTaskId strips leading T/t prefix"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op normalize-task-id"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.t1 === '1' && r.t2 === '2' && r.n3 === '3' && r.tUpper === '10' && r.tLower === '10' && r.noPrefix === 'abc'"

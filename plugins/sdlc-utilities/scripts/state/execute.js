@@ -820,9 +820,21 @@ function cmdVerifyCompleteness(opts) {
     process.exit(2);
   }
 
+  // Normalize IDs for comparison (R-IDNORM): strip leading T/t so "T1" == "1".
+  // Comparison-only — persisted IDs in state retain their wire form.
+  function normalizeId(id) {
+    return typeof id === 'string' ? id.trim().replace(/^[Tt](?=\d)/, '') : id;
+  }
+
+  // Build a normalized lookup from the accounted map
+  const accountedByNormId = new Map();
+  for (const [id, status] of accountedById.entries()) {
+    accountedByNormId.set(normalizeId(id), status);
+  }
+
   // Find accounted and missing
   const accountedIds = plannedIds.filter(id => {
-    const status = accountedById.get(id);
+    const status = accountedByNormId.get(normalizeId(id));
     return status !== undefined && ACCOUNTED_STATUSES.has(status);
   });
   const missingIds = plannedIds.filter(id => !accountedIds.includes(id));

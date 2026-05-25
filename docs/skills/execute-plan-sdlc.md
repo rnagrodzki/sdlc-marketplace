@@ -35,6 +35,7 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 | `--rebase <auto\|skip\|prompt>` | Rebase onto the default branch before execution. `auto` rebases silently (aborts on conflict), `skip` skips, `prompt` asks. | Skip |
 | `--branch <name>` | **INTERNAL** — set by ship-sdlc in pipeline mode. Passes the pre-created branch name so execute-plan-sdlc skips its own Step 1 workspace-isolation logic and trusts the caller's branch/cwd. Do not pass this directly. (Implements R30, fixes #378, #379.) | unset |
 | `--commit-waves` | After each wave passes G9 (mechanical/filesystem verify) and G11 (post-wave guardrail check), commit the wave as `wip(execute): wave N — <task titles>` (subject truncated to 72 chars). Hooks always run — `--no-verify` is never passed. The small-plan direct-execution path (R5) NEVER triggers per-wave commits regardless of this flag. Pairs with commit-sdlc's WIP-squash path so the final feature commit subsumes WIP commits via soft-reset. (Fixes #392 / R35.) | Off |
+| `--plan-file <path>` | Explicit path to the active plan markdown. When set, Step 1 (LOAD) skips the conversation-context discovery heuristic and reads from this file directly — the compaction-stable plan source. Forwarded automatically by ship-sdlc from `context.planFile` so plan discovery survives compaction; users may also pass it directly for non-interactive invocations. (Implements R-PLANFILE.) | unset |
 
 ---
 

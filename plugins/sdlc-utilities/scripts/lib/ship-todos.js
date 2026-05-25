@@ -269,9 +269,43 @@ function main() {
     process.exit(2);
   }
 
-  // Optionally load plan tasks
+  // Optionally load plan tasks.
+  // R-SHIPTODOS-FAILLOUD: for --event execute, --plan-file is required and must
+  // parse to ≥1 task heading. Other events tolerate a missing/empty plan file.
   let planTasks = [];
-  if (args.planFile) {
+  if (args.event === 'execute') {
+    if (!args.planFile) {
+      process.stderr.write(
+        'ERROR: --event execute requires --plan-file pointing to a plan with at least one \'### Task N:\' heading\n'
+      );
+      process.exit(2);
+    }
+    if (!fs.existsSync(args.planFile)) {
+      process.stderr.write(
+        `ERROR: --event execute requires --plan-file pointing to a plan with at least one '### Task N:' heading\n` +
+        `plan-file not found: ${args.planFile}\n`
+      );
+      process.exit(2);
+    }
+    try {
+      const md = fs.readFileSync(args.planFile, 'utf8');
+      planTasks = parsePlanTasks(md);
+      if (planTasks.length === 0) {
+        process.stderr.write(
+          `ERROR: --event execute requires --plan-file pointing to a plan with at least one '### Task N:' heading\n` +
+          `plan-file parsed but no '### Task N:' headings found: ${args.planFile}\n`
+        );
+        process.exit(2);
+      }
+    } catch (e) {
+      process.stderr.write(
+        `ERROR: --event execute requires --plan-file pointing to a plan with at least one '### Task N:' heading\n` +
+        `failed to read plan file: ${e.message}\n`
+      );
+      process.exit(2);
+    }
+  } else if (args.planFile) {
+    // Non-execute events: plan file is optional; silently degrade on error.
     if (!fs.existsSync(args.planFile)) {
       process.stderr.write(`plan-file not found (falling back to placeholder): ${args.planFile}\n`);
     } else {

@@ -10,6 +10,20 @@
  * No I/O. Zero npm dependencies.
  */
 
+/**
+ * Normalize a task ID to its canonical numeric form (R-IDNORM).
+ * Strips a single leading 'T' or 't' and trims whitespace.
+ * "T1" → "1", "t2" → "2", "3" → "3".
+ * Comparison-only: persisted IDs retain their wire form.
+ *
+ * @param {string} id
+ * @returns {string}
+ */
+function normalizeTaskId(id) {
+  if (typeof id !== 'string') return id;
+  return id.trim().replace(/^[Tt](?=\d)/, '');
+}
+
 // Bounded errorCode enum (R-BOUNDED-RETURN, #432)
 const VALID_ERROR_CODES = new Set([
   'OVERFLOW',
@@ -183,13 +197,14 @@ function parseWaveSummary(text, dispatched = []) {
     .filter(t => typeof t.id === 'string' && t.id.length > 0)
     .map(t => t.id);
 
-  // Compute missing and extra IDs relative to dispatched set
+  // Compute missing and extra IDs relative to dispatched set.
+  // Normalize both sides (R-IDNORM): strip leading T/t so "T1" == "1".
   if (dispatched.length > 0) {
-    const dispatchedSet = new Set(dispatched);
-    const returnedSet = new Set(result.returned);
+    const dispatchedSet = new Set(dispatched.map(normalizeTaskId));
+    const returnedSet = new Set(result.returned.map(normalizeTaskId));
 
-    result.missingIds = dispatched.filter(id => !returnedSet.has(id));
-    result.extraIds = result.returned.filter(id => !dispatchedSet.has(id));
+    result.missingIds = dispatched.filter(id => !returnedSet.has(normalizeTaskId(id)));
+    result.extraIds = result.returned.filter(id => !dispatchedSet.has(normalizeTaskId(id)));
 
     // Missing IDs indicate CONTEXT_OVERFLOW — always a schema violation
     if (result.missingIds.length > 0) {
@@ -210,4 +225,4 @@ function parseWaveSummary(text, dispatched = []) {
   return result;
 }
 
-module.exports = { parseWaveSummary, VALID_ERROR_CODES, VALID_STATUSES, VALID_WAVE_STATUSES };
+module.exports = { parseWaveSummary, normalizeTaskId, VALID_ERROR_CODES, VALID_STATUSES, VALID_WAVE_STATUSES };

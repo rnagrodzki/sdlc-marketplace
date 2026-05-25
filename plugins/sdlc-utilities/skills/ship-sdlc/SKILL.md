@@ -627,13 +627,21 @@ Match the branch from the ship state file against worktree entries. If found and
 
 **Execute-step todo mirroring (R-todowrite-visibility clause 4):**
 
+Assign `PLAN_FILE` from the prepare output's `context.planFile` field (R-PLANFILE). This is resolved once by `skill/ship.js` using the priority order: CLI `--plan-file` → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → default `~/.claude/plans/` (most recent `*.md`). Do not re-derive the path here — use `context.planFile` verbatim:
+
+```bash
+PLAN_FILE=$(node -e "const d=require('fs').readFileSync(process.env.F,'utf8'); process.stdout.write(JSON.parse(d).context.planFile||'')" F="$SHIP_PREPARE_OUTPUT_FILE")
+```
+
+Where `$SHIP_PREPARE_OUTPUT_FILE` is the path to the temp file holding the `skill/ship.js` JSON output (same file used to read `flags`, `steps`, etc.). When `context.planFile` is null or empty, `PLAN_FILE` will be empty and the `ship-todos.js` execute event will exit 2 with a clear error — surface that error before dispatching.
+
 Before dispatching `execute-plan-sdlc`, run:
 
 ```bash
 node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan-file "$PLAN_FILE" --event execute --current-step execute
 ```
 
-Where `$PLAN_FILE` is the resolved plan file path — the same path used when displaying the plan in Step 2 (resolved from `plansDirectory` in Claude Code settings, defaulting to `~/.claude/plans/`; the same file plan-sdlc wrote). The helper expands the `execute` step's placeholder substep to one substep per plan task (one `### Task N:` heading per substep). Parse JSON, call `TodoWrite`, echo `marker`.
+`$PLAN_FILE` is sourced from `context.planFile` in the prepare output (R-PLANFILE). The helper expands the `execute` step's placeholder substep to one substep per plan task (one `### Task N:` heading per substep). Parse JSON, call `TodoWrite`, echo `marker`.
 
 Then dispatch `execute-plan-sdlc` as below. On Agent return (success), run the post-execution completeness invariant **before** marking the step complete (R-INVARIANT-COMPLETENESS, #432):
 

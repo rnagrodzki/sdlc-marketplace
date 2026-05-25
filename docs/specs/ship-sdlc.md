@@ -275,3 +275,9 @@
 - I13: `lib/openspec.js` — `validateChangeStrict`, `isArchived`, `runArchive` helpers for the `archive-openspec` step
 - I14 (issue #232): `lib/config-version.js::verifyAndMigrate` — invoked at pipeline entry once per role (project, local) before any step dispatch. Throws halt the pipeline before step 1.
 - I15 (issue #232): `lib/config-migrations.js` — registry consumed by `verifyAndMigrate`; ship-sdlc does not import it directly.
+
+## Additional Requirements
+
+- R-PLANFILE: The `ship.js` prepare script MUST resolve a `planFile` (absolute path to the active plan markdown) using this priority order: (1) CLI `--plan-file` flag if passed; (2) `plansDirectory` from project `.claude/settings.json`; (3) `plansDirectory` from global `~/.claude/settings.json`; (4) default `~/.claude/plans/` scanning for the most recently modified `*.md` file. The resolved path MUST be emitted as `context.planFile` in the prepare-output JSON. The `ship-sdlc/SKILL.md` execute block MUST assign `PLAN_FILE` via a single Bash command from `context.planFile` — no LLM-side path inference is permitted. The `ship.js` execute-step args assembly MUST append `--plan-file "$PLAN_FILE"` to the dispatched execute-plan-sdlc invocation.
+
+- R-SHIPTODOS-FAILLOUD: `lib/ship-todos.js` MUST exit with code 2 and write a clear message to stderr when invoked with `--event execute` and either: (a) `--plan-file` is not provided, or (b) the file at `--plan-file` parses to zero `### Task N:` headings. The silent fallback returning `['execute plan']` as the execute substep list MUST be removed. Other events (commit, version, pr, verify-pipeline) are unaffected and retain their existing behavior without requiring `--plan-file`.
