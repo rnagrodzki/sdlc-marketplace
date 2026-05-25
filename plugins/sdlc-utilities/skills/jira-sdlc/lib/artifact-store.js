@@ -170,18 +170,24 @@ function consumeArtifacts(hash) {
 /**
  * Delete any artifact older than TTL_MS regardless of hash. Used by the hook
  * to keep the directory bounded even when dispatches never happen.
+ *
+ * Also sweeps the sibling `jira-sdlc-debug/` directory (R21.2 deny-path
+ * diagnostic dumps written by `pre-tool-jira-write-guard.js`) using the same
+ * TTL_MS so debug dumps don't accumulate unbounded. No new sweep timer —
+ * this rides the existing post-success housekeeping.
  */
 function purgeStale() {
-  const dir = storeDir();
-  let entries;
-  try { entries = fs.readdirSync(dir); } catch { return; }
   const now = Date.now();
-  for (const name of entries) {
-    const full = path.join(dir, name);
-    try {
-      const st = fs.statSync(full);
-      if (now - st.mtimeMs > TTL_MS) fs.unlinkSync(full);
-    } catch { /* race with another process */ }
+  for (const dir of [storeDir(), path.join(TMPDIR_REAL, 'jira-sdlc-debug')]) {
+    let entries;
+    try { entries = fs.readdirSync(dir); } catch { continue; }
+    for (const name of entries) {
+      const full = path.join(dir, name);
+      try {
+        const st = fs.statSync(full);
+        if (now - st.mtimeMs > TTL_MS) fs.unlinkSync(full);
+      } catch { /* race with another process */ }
+    }
   }
 }
 
