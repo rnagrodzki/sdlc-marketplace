@@ -353,6 +353,7 @@ Skip this step for read operations (`search`, `view`). For every write operation
    const hash = payloadHash(toolInput);
    writeCritique(hash, { initial: '<one-line summary of initial draft>', findings: [...], final: '<one-line summary of final payload>' });
    ```
+   String values are normalized via `trimEnd` inside `canonicalize()` (R21.1) — callers do not need to strip trailing whitespace from file-sourced payloads (e.g., `fs.readFileSync` markdown bodies that end in `\n`).
 4. Surface the critique to the user as an `Initial:` / `Critique:` / `Final:` block — do not apply deltas silently.
 
 ## Step 2.6 — Approval (write-ops only, R17)

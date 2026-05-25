@@ -23,6 +23,8 @@ conditionally after Step 2 classifies the operation type.
 > 8. Post-op cache update
 >
 > Read operations (Search, View, GetTransitions) and metadata-discovery operations are exempt from steps 5–7.
+>
+> **Diagnosing hash mismatches:** when the hook denies a dispatch on artifact verification, it atomically writes a diagnostic dump to `${TMPDIR}/jira-sdlc-debug/<hookHashPrefix>.json` and the deny reason includes string-field lengths (`commentBody-len=<n>`, `description-len=<n>`, `fields.description-len=<n>`) plus the `dump=<path>` segment (R21.2). Diff the dump's `canonical_json` against the skill-side critique artifact to identify byte-level divergence without re-triggering the dispatch.
 
 ---
 

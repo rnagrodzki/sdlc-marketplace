@@ -19,12 +19,19 @@ const crypto = require('crypto');
  * so that MCP-harness defaulting (e.g., schema-default `commentVisibility: null`
  * injection) cannot desync skill-side and hook-side hashes.
  *
+ * String values are normalized via `.trimEnd()` (R21.1) so payloads assembled
+ * from files (which typically include a trailing `\n` from `fs.readFileSync`)
+ * hash identically to the same payload as serialized by Claude Code into
+ * `tool_input`. Leading whitespace is intentionally preserved — a leading-space
+ * diff signals real content divergence, not a serialization artifact.
+ *
  * @param {*} value
  * @returns {*}
  */
 function canonicalize(value) {
   if (value === null || value === undefined) return value;
   if (Array.isArray(value)) return value.map(canonicalize);
+  if (typeof value === 'string') return value.trimEnd();
   if (typeof value !== 'object') return value;
 
   const sortedKeys = Object.keys(value).sort();

@@ -23,9 +23,7 @@
  */
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
-const crypto = require('crypto');
 
 // Dependency resolution: the hook lives in plugins/.../hooks/, the helpers
 // live in plugins/.../skills/jira-sdlc/lib/. We always look up relative to
@@ -38,6 +36,8 @@ const {
   verifyArtifacts,
   consumeArtifacts,
   purgeStale,
+  debugDir,
+  atomicWrite,
 } = require(path.join(LIB_ROOT, 'artifact-store.js'));
 
 const WRITE_TOOLS = new Set([
@@ -383,24 +383,6 @@ async function main() {
   }
 
   // (c)+(d) artifact verification
-  // Env-gated diagnostic: when SDLC_DEBUG_DUMP=1, write the received tool_input
-  // and the canonical-JSON byte-string so the user can diff against the skill's
-  // critique artifact byte-for-byte after a hash mismatch denial. Diagnostic
-  // only — never affects the deny decision.
-  if (process.env.SDLC_DEBUG_DUMP === '1') {
-    try {
-      const dumpDir = path.join(fs.realpathSync(os.tmpdir()), 'jira-sdlc-debug');
-      fs.mkdirSync(dumpDir, { recursive: true, mode: 0o700 });
-      const canonical = JSON.stringify(canonicalize(toolInput));
-      const hashPrefix = crypto.createHash('sha256').update(canonical, 'utf8').digest('hex').slice(0, 12);
-      fs.writeFileSync(
-        path.join(dumpDir, `${hashPrefix}.json`),
-        JSON.stringify({ tool_input: toolInput, canonical_json: canonical }, null, 2),
-        { mode: 0o600 }
-      );
-    } catch { /* diagnostic only — never fail the hook on dump errors */ }
-  }
-
   let hash;
   try {
     hash = payloadHash(toolInput);
@@ -417,8 +399,67 @@ async function main() {
     const artifactHashStr = nearby.length
       ? nearby.map(h => `${h.slice(0, 12)}…`).join('|')
       : 'none';
+
+    // R21.2: always-on deny-path diagnostic dump. Writes the received
+    // tool_input, the canonical JSON byte-string, the hook-computed hash, and
+    // the same-prefix nearby artifact hashes so the user can diff against the
+    // skill's critique artifact byte-for-byte without re-triggering the
+    // dispatch. Dump-write failures are swallowed — the deny is still emitted.
+    // Uses `debugDir()` + `atomicWrite()` from artifact-store so the directory
+    // constant matches `purgeStale()` (single TMPDIR_REAL resolution) and so a
+    // crash mid-write cannot leave a partially written dump on disk.
+    let dumpPath = null;
+    const canonicalInput = canonicalize(toolInput);
+    const canonical = JSON.stringify(canonicalInput);
+    try {
+      const dumpDirPath = debugDir();
+      fs.mkdirSync(dumpDirPath, { recursive: true, mode: 0o700 });
+      dumpPath = path.join(dumpDirPath, `${hash.slice(0, 12)}.json`);
+      atomicWrite(
+        dumpPath,
+        JSON.stringify({
+          tool_input: toolInput,
+          canonical_json: canonical,
+          hook_hash: hash,
+          nearby_artifact_hashes: nearby,
+        }, null, 2),
+        { mode: 0o600 }
+      );
+    } catch { dumpPath = null; /* diagnostic only */ }
+
+    // R21.2: length hints for multi-line string fields. Helps the user
+    // recognize trailing-whitespace hash-mismatch failures from a single
+    // failed call instead of 3–5 trial-and-error retries. We emit BOTH the
+    // raw `tool_input` length and — when it differs — the canonicalized
+    // length (post-`trimEnd()`). Without this, a trailing-whitespace mismatch
+    // shows a hint of N while the hash was actually computed on N-k chars,
+    // misleading the user into hunting for a content diff that isn't there.
+    const lenHints = [];
+    const pushLen = (label, raw, canon) => {
+      if (typeof raw !== 'string') return;
+      lenHints.push(canon !== undefined && canon !== raw.length
+        ? `${label}-len=${raw.length} (canonical=${canon})`
+        : `${label}-len=${raw.length}`);
+    };
+    pushLen('commentBody', toolInput.commentBody,
+      typeof canonicalInput.commentBody === 'string' ? canonicalInput.commentBody.length : undefined);
+    pushLen('description', toolInput.description,
+      typeof canonicalInput.description === 'string' ? canonicalInput.description.length : undefined);
+    if (toolInput.fields && typeof toolInput.fields.description === 'string') {
+      const canonFD = canonicalInput.fields && typeof canonicalInput.fields.description === 'string'
+        ? canonicalInput.fields.description.length
+        : undefined;
+      pushLen('fields.description', toolInput.fields.description, canonFD);
+    }
+
+    const extras = [
+      `hook-hash=${hash.slice(0, 12)}…`,
+      `artifact-hash=${artifactHashStr}`,
+      ...(dumpPath ? [`dump=${dumpPath}`] : []),
+      ...lenHints,
+    ].join(', ');
     return emitDeny(
-      `R17/R20/R21: ${v.reason || 'artifact verification failed'} (hook-hash=${hash.slice(0, 12)}…, artifact-hash=${artifactHashStr})`
+      `R17/R20/R21: ${v.reason || 'artifact verification failed'} (${extras})`
     );
   }
 

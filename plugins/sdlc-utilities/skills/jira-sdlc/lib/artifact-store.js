@@ -31,6 +31,15 @@ function storeDir() {
   return path.join(TMPDIR_REAL, 'jira-sdlc');
 }
 
+/**
+ * R21.2 deny-path diagnostic dump directory. Exposed so the hook can write
+ * into the same constant that `purgeStale()` sweeps, instead of resolving
+ * `os.tmpdir()` a second time at deny-time.
+ */
+function debugDir() {
+  return path.join(TMPDIR_REAL, 'jira-sdlc-debug');
+}
+
 function ensureDir() {
   const dir = storeDir();
   fs.mkdirSync(dir, { recursive: true });
@@ -45,11 +54,14 @@ function approvalPath(hash) {
   return path.join(storeDir(), `approval-${hash}.token`);
 }
 
-function atomicWrite(targetPath, contents) {
+function atomicWrite(targetPath, contents, opts) {
   const dir = path.dirname(targetPath);
   fs.mkdirSync(dir, { recursive: true });
   const tmp = path.join(dir, `.tmp-${crypto.randomBytes(6).toString('hex')}`);
-  fs.writeFileSync(tmp, contents, 'utf8');
+  const writeOpts = opts && typeof opts.mode === 'number'
+    ? { encoding: 'utf8', mode: opts.mode }
+    : 'utf8';
+  fs.writeFileSync(tmp, contents, writeOpts);
   fs.renameSync(tmp, targetPath);
 }
 
@@ -170,24 +182,32 @@ function consumeArtifacts(hash) {
 /**
  * Delete any artifact older than TTL_MS regardless of hash. Used by the hook
  * to keep the directory bounded even when dispatches never happen.
+ *
+ * Also sweeps the sibling `jira-sdlc-debug/` directory (R21.2 deny-path
+ * diagnostic dumps written by `pre-tool-jira-write-guard.js`) using the same
+ * TTL_MS so debug dumps don't accumulate unbounded. No new sweep timer —
+ * this rides the existing post-success housekeeping.
  */
 function purgeStale() {
-  const dir = storeDir();
-  let entries;
-  try { entries = fs.readdirSync(dir); } catch { return; }
   const now = Date.now();
-  for (const name of entries) {
-    const full = path.join(dir, name);
-    try {
-      const st = fs.statSync(full);
-      if (now - st.mtimeMs > TTL_MS) fs.unlinkSync(full);
-    } catch { /* race with another process */ }
+  for (const dir of [storeDir(), debugDir()]) {
+    let entries;
+    try { entries = fs.readdirSync(dir); } catch { continue; }
+    for (const name of entries) {
+      const full = path.join(dir, name);
+      try {
+        const st = fs.statSync(full);
+        if (now - st.mtimeMs > TTL_MS) fs.unlinkSync(full);
+      } catch { /* race with another process */ }
+    }
   }
 }
 
 module.exports = {
   TTL_MS,
   storeDir,
+  debugDir,
+  atomicWrite,
   critiquePath,
   approvalPath,
   writeCritique,

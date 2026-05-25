@@ -13,6 +13,9 @@
  *   script_home  — (optional) HOME override; accepts relative (resolved against
  *                  script_cwd) or absolute path. Useful for tests depending on
  *                  ~/.sdlc-cache/... layouts.
+ *   script_env   — (optional) JSON string or object of extra env vars. Useful for
+ *                  per-test TMPDIR isolation when the hook writes diagnostic files
+ *                  to `os.tmpdir()` (e.g., jira-sdlc-debug dumps per R21.2).
  */
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -39,6 +42,13 @@ class HookRunnerProvider {
         ? vars.script_home
         : path.resolve(cwd || process.cwd(), vars.script_home);
       env.HOME = home;
+    }
+    if (vars.script_env) {
+      let extra = vars.script_env;
+      if (typeof extra === 'string') {
+        try { extra = JSON.parse(extra); } catch (_) { extra = {}; }
+      }
+      if (extra && typeof extra === 'object') Object.assign(env, extra);
     }
 
     const result = spawnSync('node', [scriptPath, ...scriptArgs], {
