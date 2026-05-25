@@ -811,11 +811,13 @@ function cmdVerifyCompleteness(opts) {
         : null);
 
   if (!plannedIds) {
-    // Cannot verify without planned task ID list — exit 0 (soft pass) with warning
+    // Cannot verify without planned task ID list — plannedTaskIds missing means the state is
+    // structurally incomplete (pre-#432 state or corrupted init). Hard-fail so ship-sdlc does
+    // not silently advance past an unverifiable execute step (R-INVARIANT-COMPLETENESS, #432).
     process.stderr.write(
-      'Warning: verify-completeness cannot find plannedTaskIds in state — skipping invariant check.\n'
+      'ERROR: verify-completeness cannot find plannedTaskIds in state — invariant check cannot run. Use --resume on a fresh execute run, or re-run without --resume to start over.\n'
     );
-    process.exit(0);
+    process.exit(2);
   }
 
   // Find accounted and missing

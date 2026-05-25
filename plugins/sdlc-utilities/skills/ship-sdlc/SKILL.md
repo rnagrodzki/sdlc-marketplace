@@ -640,15 +640,14 @@ Then dispatch `execute-plan-sdlc` as below. On Agent return (success), run the p
 ```bash
 EXECUTE_STATE_SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/execute.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$EXECUTE_STATE_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/execute.js" ] && EXECUTE_STATE_SCRIPT="plugins/sdlc-utilities/scripts/state/execute.js"
-if [ -n "$EXECUTE_STATE_SCRIPT" ]; then
-  node "$EXECUTE_STATE_SCRIPT" verify-completeness
-  COMPLETENESS_EXIT=$?
-  if [ "$COMPLETENESS_EXIT" -ne 0 ]; then
-    echo "ERROR: execute-plan-sdlc returned but planned tasks are unaccounted. Pipeline halted." >&2
-    # Mark execute step failed and halt — do NOT advance to commit/review/version/pr
-    node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan-file "$PLAN_FILE" --event execute --fail-step execute
-    exit "$COMPLETENESS_EXIT"
-  fi
+[ -z "$EXECUTE_STATE_SCRIPT" ] && { echo "ERROR: Cannot locate execute.js — completeness gate cannot run." >&2; exit 2; }
+node "$EXECUTE_STATE_SCRIPT" verify-completeness
+COMPLETENESS_EXIT=$?
+if [ "$COMPLETENESS_EXIT" -ne 0 ]; then
+  echo "ERROR: execute-plan-sdlc returned but planned tasks are unaccounted. Pipeline halted." >&2
+  # Mark execute step failed and halt — do NOT advance to commit/review/version/pr
+  node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan-file "$PLAN_FILE" --event execute --fail-step execute
+  exit "$COMPLETENESS_EXIT"
 fi
 ```
 

@@ -42,7 +42,11 @@ function staticCap(totalRemainingTasks) {
       return row.cap;
     }
   }
-  return 6; // fallback for counts > 16
+  // Note: the Infinity row above covers counts 1-3, and the final explicit row covers 16+.
+  // This fallback is unreachable given the current STATIC_CAP_TABLE (the last row uses
+  // maxTasks: Infinity, so every count ≥ 16 matches). Kept as a defensive guard in case
+  // the table is edited to use a finite upper bound in the future.
+  return 6; // unreachable with current table; defensive fallback
 }
 
 /**

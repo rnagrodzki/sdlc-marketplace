@@ -432,7 +432,9 @@ The wave-runner Agent handles in-wave per-task fan-out internally — it dispatc
 
    Read `schemaOk`, `missingIds`, `extraIds`, `violations`, and `parsed` from the result.
 
-   - If `!schemaOk && missingIds.length > 0` → **CONTEXT_OVERFLOW** (R-CONTEXT_OVERFLOW, #432): the wave-runner's context was exhausted before it could report all dispatched tasks. Invoke the auto-split-and-retry flow:
+   > **Note:** The `<<< "$WAVE_RUNNER_OUTPUT"` here-string is pseudocode illustrating the intent. In practice, write `$WAVE_RUNNER_OUTPUT` to a temp file and pass it via stdin redirect (`node -e "..." < "$TMPFILE"`), or inline the content via `process.env` — shell here-strings have byte limits and can silently truncate large wave outputs.
+
+   - If `missingIds.length > 0` → **CONTEXT_OVERFLOW** (R-CONTEXT_OVERFLOW, #432): the wave-runner's context was exhausted before it could report all dispatched tasks. This is the sole discriminant — a schema-valid partial response (where `schemaOk` is true but `missingIds` is non-empty) also triggers this path, because absent IDs mean unconfirmed tasks regardless of schema validity. Invoke the auto-split-and-retry flow:
 
      **CONTEXT_OVERFLOW auto-split-and-retry:**
      ```bash
@@ -447,9 +449,9 @@ The wave-runner Agent handles in-wave per-task fan-out internally — it dispatc
 
      **Critical:** do NOT use `git diff` as a substitute for missing per-task returns. Even if git diff shows file changes, absent IDs mean the wave-runner did not confirm those tasks — treat them as unaccounted and split.
 
-   - If `!schemaOk && missingIds.length === 0` (malformed token, bad errorCode, dropped-field violation) → re-dispatch the wave-runner once with a format reminder (counts as a wave-level retry).
+   - If `missingIds.length === 0 && !schemaOk` (malformed token, bad errorCode, dropped-field violation) → re-dispatch the wave-runner once with a format reminder (counts as a wave-level retry).
 
-   - If `schemaOk` → proceed to step 1. Per-task `status` and `filesTouched` (not `filesChanged`) come from `parsed.tasks[]`.
+   - If `missingIds.length === 0 && schemaOk` → proceed to step 1. Per-task `status` and `filesTouched` (not `filesChanged`) come from `parsed.tasks[]`.
 
 1. **Filesystem verification (mandatory, always first):** Run `git diff --stat` in the main context. For each task in `WAVE_SUMMARY.tasks`, confirm that the files in `filesChanged` actually appear in the diff. If the wave-runner reported success for a task but `git diff --stat` shows no changes to its expected files, classify this as a **phantom success** (see Step 6).
 
