@@ -25,20 +25,19 @@ batchedTrivialTemplate — full inline content of classifying-and-waving-tasks.m
                          Tasks Prompt Template (pasted verbatim; omitted when wave has < 2 Trivials)
 ```
 
-**Task object shape:**
+**Task object shape (R-FACT-SHEET-DISPATCH, #432):**
 ```json
 {
   "id": "string",
-  "name": "string",
   "complexity": "Trivial | Standard | Complex",
   "risk": "Low | Medium | High",
-  "files": ["path/to/file", ...],
-  "description": "full task text",
-  "acceptanceCriteria": ["..."],
+  "factSheetPath": "absolute path to the per-task fact sheet written by wave-start",
   "assignedModel": "haiku | sonnet | opus",
   "verifyToken": "optional — symbol in file"
 }
 ```
+
+Task name, description, files, and acceptance criteria live in the fact sheet at `factSheetPath`. Per-task Agents read the fact sheet directly — main context does NOT paste the full task body inline. This keeps the wave-runner's prompt byte-budget predictable regardless of task narrative length.
 
 **Prior-wave context shape:**
 ```json
@@ -64,8 +63,8 @@ If 2+ tasks have `complexity: Trivial`, group them into a single batch. The rema
 
 Send all Agent dispatches in one message:
 
-- One per-task Agent per Standard/Complex task, using `perTaskTemplate`. Fill the template placeholders with the full task text, file list, acceptance criteria, and prior-wave context.
-- One batch Agent for the trivial group (if 2+ Trivials), using `batchedTrivialTemplate`. Include ordering constraints if any trivials touch the same file.
+- One per-task Agent per Standard/Complex task, using `perTaskTemplate`. Fill the template placeholders with `task.id`, `task.complexity`, `task.risk`, `task.factSheetPath`, `task.verifyToken`, and prior-wave context. Do NOT inline the full task body — the per-task Agent reads the fact sheet at `factSheetPath`.
+- One batch Agent for the trivial group (if 2+ Trivials), using `batchedTrivialTemplate`. Pass the `factSheetPath` for each trivial task; include ordering constraints if any trivials touch the same file.
 - A single Trivial task (no batch) is dispatched as an individual per-task Agent using `perTaskTemplate`, same as a Standard task.
 - Pass `mode: bypassPermissions` and `model: <task.assignedModel>` on every sub-Agent dispatch. **`model:` is required on every dispatch — no exceptions.**
 - **DO NOT pass `isolation: "worktree"` (or any other `isolation` value) on any sub-Agent dispatch.** The SDLC `--workspace worktree` flag controls a separate concept (a sibling git worktree created via `util/worktree-create.js`). Adding `isolation` here creates ephemeral `.claude/worktrees/agent-<id>` paths that are not the intended SDLC worktree. Implements R-no-agent-sdk-isolation from spec. See issues #370 #372. (Mirrors ship-sdlc/SKILL.md anti-pattern section.)
@@ -113,7 +112,7 @@ The final line of the wave-runner Agent's response MUST be:
 WAVE_SUMMARY: <single-line-json>
 ```
 
-No trailing whitespace, no newline after the JSON. The JSON object MUST match this schema exactly:
+No trailing whitespace, no newline after the JSON. The JSON object MUST match this bounded schema exactly (R-BOUNDED-RETURN, #432):
 
 ```json
 {
@@ -122,37 +121,32 @@ No trailing whitespace, no newline after the JSON. The JSON object MUST match th
   "tasks": [
     {
       "id": "string",
-      "name": "string",
-      "complexity": "Trivial | Standard | Complex",
-      "risk": "Low | Medium | High",
       "status": "DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED | FAILED",
-      "filesChanged": ["path/to/file"],
-      "verifyToken": "optional — symbol in file",
-      "attempts": [
-        { "model": "haiku | sonnet | opus", "status": "DONE | FAILED | ...", "error": "optional" }
-      ],
-      "finalModel": "haiku | sonnet | opus",
-      "error": "optional — present on FAILED"
+      "sha": "optional — git sha of last commit if wave-runner committed; null otherwise",
+      "filesTouched": ["path/to/file"],
+      "errorCode": "optional — bounded enum: OVERFLOW | TIMEOUT | FAILED_TESTS | FAILED_BUILD | BLOCKED | NEEDS_CONTEXT"
     }
   ],
-  "verification": {
-    "ran": false,
-    "command": "optional — only when wave tasks specified a sub-Agent-runnable verify command",
-    "passed": null,
-    "errorExcerpt": "optional"
-  },
   "escalationsUsed": 0
 }
 ```
+
+**Bounded schema rationale (R-BOUNDED-RETURN, #432):**
+- Per-task entries carry only `{id, status, sha, filesTouched[], errorCode?}`. Fields `name`, `complexity`, `risk`, `finalModel`, `attempts[]` are dropped from the return — main context re-reads these from state by task ID, eliminating their per-task byte cost.
+- `errorCode` is a bounded enum. Free-text error strings MUST NOT appear in per-task entries — use `errorCode` to signal failure category. Main context maps errorCode to recovery strategy via `recovering-from-failures.md`.
+- `sha` is set only when the wave-runner itself committed (rare); for normal execution (no per-wave commits), set to `null`.
+- Missing `id` in `tasks[]` relative to the dispatched manifest indicates CONTEXT_OVERFLOW — main context detects this via `lib/wave-summary.js parseWaveSummary` and triggers auto-split-and-retry.
 
 **`status` field rules:**
 - `completed` — all tasks DONE or DONE_WITH_CONCERNS
 - `partial` — some tasks succeeded, at least one FAILED
 - `failed` — all tasks failed, or a blocking failure prevents any progress
 
-**`verification.ran`:** Set to `true` only when the wave's plan tasks explicitly specify a command the wave-runner sub-Agent can run (e.g., a targeted unit test). Main context re-verifies independently via `git diff --stat` and canary checks — do not skip or duplicate that work.
+**CONTEXT_OVERFLOW detection (R-CONTEXT_OVERFLOW, #432):** When your context is exhausted before reporting all dispatched tasks, emit `WAVE_SUMMARY` with whatever tasks you HAVE finished. Set `status: "partial"` and leave the unfinished task IDs absent from `tasks[]`. Main context compares returned IDs against dispatched IDs — missing IDs trigger CONTEXT_OVERFLOW auto-split, NOT a silent success.
 
-This schema preserves enough fidelity for Step 6 recovery and Step 5c filesystem/canary checks in main context to reconstruct what each per-task sub-agent did.
+**DO NOT** use git diff state as a substitute for missing per-task return entries. Even if you believe the files were written, if you cannot report a task's result, leave its ID absent from `tasks[]` so main context triggers proper recovery.
+
+The bounded schema enables `lib/wave-summary.js parseWaveSummary` in main context to detect truncation by comparing `tasks[].id` against the manifest-known dispatched ID set.
 
 ---
 
@@ -193,6 +187,8 @@ The `perTaskTemplate` and `batchedTrivialTemplate` inputs are the **full inline 
 
 The per-task and batched-trivial templates are NOT duplicated here — main context inlines their content at dispatch time. This file only documents the algorithm, contract, and constraints.
 
+**Fact-sheet dispatch (R-FACT-SHEET-DISPATCH, #432):** Per-task Agent prompts reference `task.factSheetPath` rather than inlining the full task body. Wave-runner passes `factSheetPath` as a template placeholder; the per-task template instructs the sub-Agent to `Read <factSheetPath>` at the start of its execution. Main context writes fact sheets via `node state/execute.js wave-start --tasks-json <json>` before dispatching wave-runner — the paths are available in the manifest by the time wave-runner runs.
+
 **Guardrail threading (Fixes #392 / R33):** The wave manifest carries a `guardrails: [{id, description, severity}]` array. Wave-runner MUST thread this array into the `{{guardrails}}` placeholder in every per-task AND every batched-trivial Agent prompt it constructs (including retry dispatches). When `guardrails` is empty/absent in the manifest, the template's conditional `## Project Guardrails` block renders nothing (no header, no stub). The block is byte-stable within a single execute-plan-sdlc invocation because `activeGuardrails` is loaded once in Step 1 LOAD and treated as immutable — this preserves the prompt-cache prefix across sibling per-task dispatches.
 
 The WAVE_SUMMARY schema is unchanged: main context handles the per-wave `expectedFiles` cross-check (Step 5c-bis) by comparing `git diff --stat` output against the wave manifest, not by reading anything new out of the runner's output.
@@ -202,5 +198,7 @@ The WAVE_SUMMARY schema is unchanged: main context handles the per-wave `expecte
 ## Example WAVE_SUMMARY (2 tasks, both complete)
 
 ```
-WAVE_SUMMARY: {"wave":2,"status":"completed","tasks":[{"id":"t3","name":"Add dispatchMode to ship.js","complexity":"Standard","risk":"Low","status":"DONE","filesChanged":["plugins/sdlc-utilities/scripts/skill/ship.js"],"verifyToken":"dispatchMode in plugins/sdlc-utilities/scripts/skill/ship.js","attempts":[{"model":"sonnet","status":"DONE"}],"finalModel":"sonnet"},{"id":"t4","name":"Add wave-runner template","complexity":"Standard","risk":"Medium","status":"DONE","filesChanged":["plugins/sdlc-utilities/skills/execute-plan-sdlc/wave-runner-template.md"],"verifyToken":"wave-runner-template in plugins/sdlc-utilities/skills/execute-plan-sdlc/wave-runner-template.md","attempts":[{"model":"sonnet","status":"DONE"}],"finalModel":"sonnet"}],"verification":{"ran":false},"escalationsUsed":0}
+WAVE_SUMMARY: {"wave":2,"status":"completed","tasks":[{"id":"t3","status":"DONE","sha":null,"filesTouched":["plugins/sdlc-utilities/scripts/skill/ship.js"]},{"id":"t4","status":"DONE","sha":null,"filesTouched":["plugins/sdlc-utilities/skills/execute-plan-sdlc/wave-runner-template.md"]}],"escalationsUsed":0}
 ```
+
+Note: `name`, `complexity`, `risk`, `finalModel`, `attempts[]`, `filesChanged`, `verification` are **dropped** from the bounded schema (R-BOUNDED-RETURN, #432). Main context re-reads these from state by task ID. Use `filesTouched` (not `filesChanged`) in per-task entries.

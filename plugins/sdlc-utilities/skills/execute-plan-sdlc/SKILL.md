@@ -368,7 +368,13 @@ Options:
 1. Read `./wave-runner-template.md` for the algorithm, contract, and constraints.
 2. Inline the full content of the per-task template from `./classifying-and-waving-tasks.md` (lines 109–187) as the `perTaskTemplate` input.
 3. When the wave contains 2+ Trivial tasks, also inline the batched-trivial template from `./classifying-and-waving-tasks.md` (lines 189–257) as the `batchedTrivialTemplate` input.
-4. Provide the complete wave manifest: `waveNumber`, `totalWaves`, `qualityTier`, `escalationBudget: 2`, and the full task array with `id`, `name`, `complexity`, `risk`, `files`, `description`, `acceptanceCriteria`, `assignedModel`, and `verifyToken` for each task.
+4. Provide the complete wave manifest: `waveNumber`, `totalWaves`, `qualityTier`, `escalationBudget: 2`, and the per-task array with `id`, `complexity`, `risk`, `factSheetPath`, `assignedModel`, and `verifyToken` for each task (R-FACT-SHEET-DISPATCH, #432).
+
+   **Fact-sheet dispatch (R-FACT-SHEET-DISPATCH, #432):** Before dispatching the wave-runner, write per-task fact sheets via:
+   ```bash
+   node "$STATE_SCRIPT" wave-start --wave <N> --tasks-json '<json-array-of-task-objects>' --run-id <run-id>
+   ```
+   This writes `<stateDir>/execution/<runId>/task-<id>.md` for each task. The printed JSON includes `factSheets: [...]` — the absolute paths to use as `factSheetPath` in the manifest. Task name, description, files, and acceptance criteria live in the fact sheet; do NOT inline them in the manifest.
 
    **Manifest extensions (Fixes #392 — R33/R34):** every wave manifest MUST additionally carry:
    - `guardrails: [{id, description, severity}]` — sourced verbatim from `activeGuardrails` loaded in Step 1 (Guardrail loading block above). When `activeGuardrails` is empty, the field is still present as `[]` (stable shape across waves — never omitted). Wave-runner threads this into the conditional `## Project Guardrails` block of every per-task and batched-trivial Agent prompt; when empty the block renders nothing.
@@ -383,7 +389,9 @@ Options:
      "totalWaves": 4,
      "qualityTier": "balanced",
      "escalationBudget": 2,
-     "tasks": [ /* … per-task entries with id/name/complexity/risk/files/description/acceptanceCriteria/assignedModel/verifyToken … */ ],
+     "tasks": [
+       { "id": "T3", "complexity": "Standard", "risk": "Low", "factSheetPath": "/abs/path/.sdlc/execution/run-id/task-T3.md", "assignedModel": "sonnet", "verifyToken": "dispatchMode in ship.js" }
+     ],
      "guardrails": [
        { "id": "no-direct-db-access", "description": "Do not import db client outside repo layer", "severity": "error" }
      ],
@@ -392,7 +400,11 @@ Options:
    }
    ```
 
-5. Provide `priorWaveContext` from the state: `planSummary`, `completedTaskIds`, `filesAdded`, `filesModified`, `interfacesCreated`, `decisionsFromPriorWaves`.
+5. Provide `priorWaveSummary` (bounded, not raw `priorWaveContext`) by running the summarizer between waves (R-BYTE-BUDGET, #432):
+   ```bash
+   node "$STATE_SCRIPT" summarize-prior-wave-context
+   ```
+   Pass the JSON output as `priorWaveSummary` in the wave-runner prompt. Main context MUST NOT accumulate unbounded per-task narrative across waves — use only the summarizer output for each wave dispatch. Fields: `planSummary`, `completedTaskIds`, `filesAdded`, `filesModified`, `interfacesCreated`, `decisionsFromPriorWaves` (each capped to the most-recent N entries).
 
 Dispatch with:
 - `model: <highest model among wave tasks>` — haiku if all tasks are Trivial; sonnet if any Standard; opus if any Complex.
@@ -404,7 +416,42 @@ The wave-runner Agent handles in-wave per-task fan-out internally — it dispatc
 
 **5c. Collect and verify** — After the wave-runner Agent returns:
 
-0. **Parse `WAVE_SUMMARY`:** Extract the `WAVE_SUMMARY: <json>` token from the wave-runner's final line. This provides per-task `filesChanged`, `verifyToken`, `status`, and `attempts`. If the token is missing or malformed, re-dispatch the wave-runner once with a format reminder (counts as a wave-level retry).
+0. **Parse `WAVE_SUMMARY` via `lib/wave-summary.js` (R-BOUNDED-RETURN, R-CONTEXT_OVERFLOW, #432):** Call `parseWaveSummary(text, dispatchedIds)` in a brief inline Node.js block, where `text` is the wave-runner's full response and `dispatchedIds` is the array of task IDs sent in the manifest:
+
+   ```bash
+   LIB=$(find ~/.claude/plugins -name "wave-summary.js" -path "*/sdlc*/scripts/lib/wave-summary.js" 2>/dev/null | sort -V | tail -1)
+   [ -z "$LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/wave-summary.js" ] && LIB="plugins/sdlc-utilities/scripts/lib/wave-summary.js"
+   PARSE_RESULT=$(node -e "
+   const { parseWaveSummary } = require('$LIB');
+   const text = require('fs').readFileSync('/dev/stdin','utf8');
+   const dispatched = JSON.parse(process.env.DISPATCHED_IDS || '[]');
+   const r = parseWaveSummary(text, dispatched);
+   process.stdout.write(JSON.stringify(r));
+   " <<< "$WAVE_RUNNER_OUTPUT")
+   ```
+
+   Read `schemaOk`, `missingIds`, `extraIds`, `violations`, and `parsed` from the result.
+
+   > **Note:** The `<<< "$WAVE_RUNNER_OUTPUT"` here-string is pseudocode illustrating the intent. In practice, write `$WAVE_RUNNER_OUTPUT` to a temp file and pass it via stdin redirect (`node -e "..." < "$TMPFILE"`), or inline the content via `process.env` — shell here-strings have byte limits and can silently truncate large wave outputs.
+
+   - If `missingIds.length > 0` → **CONTEXT_OVERFLOW** (R-CONTEXT_OVERFLOW, #432): the wave-runner's context was exhausted before it could report all dispatched tasks. This is the sole discriminant — a schema-valid partial response (where `schemaOk` is true but `missingIds` is non-empty) also triggers this path, because absent IDs mean unconfirmed tasks regardless of schema validity. Invoke the auto-split-and-retry flow:
+
+     **CONTEXT_OVERFLOW auto-split-and-retry:**
+     ```bash
+     node "$STATE_SCRIPT" wave-split \
+       --wave <N> \
+       --dispatched '<json-dispatched-ids>' \
+       --missing-ids '<json-missing-ids>' \
+       --split-depth <currentSplitDepth> \
+       --max-split-depth 3
+     ```
+     Read `halves[0].tasks` and `halves[1].tasks` from the output. Re-dispatch each half as an independent wave-runner with a fresh byte budget (recompute via `lib/dispatch-budget.js`). Each half gets its own fact sheets (already written — reuse existing paths). Depth increments on each recursive split; `MaxSplitDepthExceededError` (exit 2) means the task set cannot be further split — escalate to user with `AskUserQuestion` listing the unresolved task IDs.
+
+     **Critical:** do NOT use `git diff` as a substitute for missing per-task returns. Even if git diff shows file changes, absent IDs mean the wave-runner did not confirm those tasks — treat them as unaccounted and split.
+
+   - If `missingIds.length === 0 && !schemaOk` (malformed token, bad errorCode, dropped-field violation) → re-dispatch the wave-runner once with a format reminder (counts as a wave-level retry).
+
+   - If `missingIds.length === 0 && schemaOk` → proceed to step 1. Per-task `status` and `filesTouched` (not `filesChanged`) come from `parsed.tasks[]`.
 
 1. **Filesystem verification (mandatory, always first):** Run `git diff --stat` in the main context. For each task in `WAVE_SUMMARY.tasks`, confirm that the files in `filesChanged` actually appear in the diff. If the wave-runner reported success for a task but `git diff --stat` shows no changes to its expected files, classify this as a **phantom success** (see Step 6).
 
@@ -529,8 +576,9 @@ STATE_SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/
 
 On the very first wave dispatch, initialize the state file:
 ```bash
-node "$STATE_SCRIPT" init --branch <branch> --quality <X> --total-tasks <N>
+node "$STATE_SCRIPT" init --branch <branch> --quality <X> --total-tasks <N> --planned-task-ids '<json-array-of-all-task-ids>'
 ```
+Where `<json-array-of-all-task-ids>` is a JSON array of every task ID from the plan (e.g. `'["T1","T2","T3"]'`), parsed from the plan in Step 1. This seeds `plannedTaskIds` in the state file so the `verify-completeness` gate (Step 5f) can cross-check all planned IDs against accounted task records.
 
 Before each wave: `node "$STATE_SCRIPT" wave-start --wave <N>`
 After each task (sourced from `WAVE_SUMMARY.tasks[]`): `node "$STATE_SCRIPT" task-done --wave <N> --task <id> --name "<name>" --complexity <c> --risk <r> --files-changed '<json>'` (or `task-fail` when `task.status === 'FAILED'`)
@@ -589,7 +637,29 @@ On failure: preserve the state file for `--resume`.
 - If yes, update the next wave's task descriptions to reflect the actual (not planned) outputs.
 - When `openspecSpecs` is available: did any task's implementation contradict an OpenSpec delta spec requirement that was not explicitly captured in the task description? If so, flag it before proceeding to the next wave.
 
+**Between-wave `priorWaveSummary` refresh (R-BYTE-BUDGET, #432):** After state writes complete and before dispatching the next wave-runner, refresh the bounded prior-wave context:
+```bash
+node "$STATE_SCRIPT" summarize-prior-wave-context
+```
+Pass this output as `priorWaveSummary` to the next wave-runner — NOT the raw accumulated per-task output from all waves. Main context MUST NOT accumulate unbounded per-task narrative; the summarizer caps each field to the most-recent N entries so the byte footprint stays constant as wave count grows.
+
 **Context management** — Between waves, check context usage. If high, compact before dispatching the next wave: summarize completed wave results into a compact status block and discard the verbose agent output. This prevents context exhaustion on plans with 4+ waves.
+
+**5f. Post-execution completeness invariant (R-INVARIANT-COMPLETENESS, #432):** After the final wave completes (all waves done or no remaining waves), run the invariant check before marking the execute step complete:
+```bash
+node "$STATE_SCRIPT" verify-completeness
+COMPLETENESS_EXIT=$?
+if [ "$COMPLETENESS_EXIT" -ne 0 ]; then
+  # stderr JSON: {missingIds, totalPlanned, totalAccounted}
+  echo "ERROR: execute-plan-sdlc completed all waves but planned tasks are unaccounted." >&2
+  # Pipeline MUST halt here — do NOT advance to commit/review/version/pr
+  exit "$COMPLETENESS_EXIT"
+fi
+```
+
+Exit code 65 means one or more planned task IDs were never recorded as `completed`, `failed`, or `skipped-dependency` in any wave. This is a hard gate — the pipeline MUST NOT proceed to the commit step. Structured missing-IDs appear on stderr as `{missingIds, totalPlanned, totalAccounted}`.
+
+Gate phrasing invariant (no-opposite-logical-vectors): the "wave complete" condition throughout Step 5 is always `!missingIds.length` (no missing IDs) and its negation is always `missingIds.length > 0`. These two phrasings MUST NOT be mixed with alternative expressions like `returnedCount === dispatchedCount` or `parsed.status === "completed"` — use the `missingIds` array from `parseWaveSummary` as the single source of truth for completeness at the wave level.
 
 ## Step 6 (RECOVER): Error Recovery
 

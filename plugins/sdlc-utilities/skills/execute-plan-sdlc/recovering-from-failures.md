@@ -23,6 +23,7 @@ Maximum retries per task: **2**. After 2 failures on the same task, escalate to 
 | Agent status: NEEDS_CONTEXT | Agent completion checklist reports STATUS: NEEDS_CONTEXT | Low |
 | Agent status: BLOCKED | Agent completion checklist reports STATUS: BLOCKED | Medium–High |
 | Malformed completion checklist | Agent output is missing the COMPLETE:/VERIFY:/STATUS: block, or it cannot be parsed | Low |
+| CONTEXT_OVERFLOW | `WAVE_SUMMARY.tasks[].length < dispatched count` OR one or more dispatched task IDs are absent from `tasks[]` — detected by `lib/wave-summary.js parseWaveSummary` comparing returned IDs against the manifest-known dispatched set | High |
 
 ## Recovery Strategies
 
@@ -252,6 +253,25 @@ If found, follow the procedure with:
 - **Suggested investigation**: Review the task description for ambiguity; check whether the task's allowed file list is complete; inspect agent error output for root cause
 
 If not found, skip — the capability is not installed.
+
+### CONTEXT_OVERFLOW
+
+**Detection signal:** `WAVE_SUMMARY.tasks[].length < dispatched count` OR one or more dispatched task IDs are absent from `tasks[]`, as reported by `lib/wave-summary.js parseWaveSummary` (field `missingIds.length > 0`).
+
+**Critical constraint:** `git diff --stat` output is NOT a substitute for missing per-task return data on CONTEXT_OVERFLOW. The wave may have partially written files while the agent context truncated before reporting. Do not treat a non-empty diff as evidence that all dispatched tasks completed successfully.
+
+**Recovery — auto-split-and-retry:**
+
+1. Use `lib/wave-split.js splitWave({ dispatched, missingIds, splitDepth, maxSplitDepth: 3 })` to partition the ORIGINAL dispatched task set (not just the missing subset) into two halves.
+2. Re-dispatch each half as a separate sub-wave, recomputing the byte budget via `lib/dispatch-budget.js` before dispatch.
+3. Each sub-wave starts with a fresh retry budget (consistent with the "scope problem" recovery precedent above).
+4. If a sub-wave itself returns CONTEXT_OVERFLOW, recurse: call `splitWave` again with incremented `splitDepth`.
+5. **Maximum split depth: 3.** If `splitWave` throws `MaxSplitDepthExceededError`, do NOT split further. Escalate to the user with the full structured missing-IDs error: `{missingIds, totalPlanned, totalAccounted}`.
+
+**Why split the full dispatched set (not just missing IDs):**
+Splitting only the missing IDs risks re-overflowing if the dependencies or shared context for those tasks require the full set to be present in the wave. Splitting the original set guarantees each half fits in the model's context.
+
+**Maximum splits:** 3 depths per original wave. The max-depth ceiling prevents runaway recursive splitting when a single large task alone exceeds the byte budget (in that case, escalate to user rather than splitting infinitely).
 
 ## Rollback Strategy
 

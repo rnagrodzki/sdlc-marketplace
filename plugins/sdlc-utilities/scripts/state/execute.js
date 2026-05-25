@@ -5,17 +5,20 @@
  * Delegates all I/O to lib/state.js; zero npm dependencies.
  *
  * Usage:
- *   node execute-state.js init        --branch <b> --quality <X> --total-tasks <n> [--plan-path <p>] [--plan-hash <h>]
- *   node execute-state.js wave-start  --wave <n>
+ *   node execute-state.js init        --branch <b> --quality <X> --total-tasks <n> [--planned-task-ids <json>] [--plan-path <p>] [--plan-hash <h>]
+ *   node execute-state.js wave-start  --wave <n> [--tasks-json <json>] [--run-id <id>]
  *   node execute-state.js wave-done   --wave <n>
  *   node execute-state.js wave-fail   --wave <n>
  *   node execute-state.js wave-committed --branch <b> --wave <n> --sha <sha>
  *   node execute-state.js task-done   --wave <n> --task <id> --name <name> --complexity <c> --risk <r> --files-changed <json>
- *   node execute-state.js task-fail   --wave <n> --task <id> --name <name> --complexity <c> --risk <r> --error <text>
+ *   node execute-state.js task-fail   --wave <n> --task <id> --name <name> --complexity <c> --risk <r> --error <text> [--skipped-dependency]
  *   node execute-state.js context     --data <json>
  *   node execute-state.js read        [--branch <b>]
  *   node execute-state.js cleanup     [--branch <b>]
  *   node execute-state.js gc          [--ttl-days <N>] [--dry-run]
+ *   node execute-state.js summarize-prior-wave-context [--run-id <id>] [--max-files <n>] [--max-decisions <n>] [--max-interfaces <n>]
+ *   node execute-state.js wave-split --wave <n> --dispatched <json-id-array> [--missing-ids <json-id-array>] [--split-depth <n>] [--max-split-depth <n>]
+ *   node execute-state.js verify-completeness --run-id <id>
  *
  * Exit codes:
  *   0 = success
@@ -32,8 +35,11 @@ const LIB = path.join(__dirname, '..', 'lib');
 const {
   slugifyBranch, readState, writeState, initState, deleteState, resolveBranch,
   gcStateFiles, resolveStateDir, parseStateFilename,
-  listBranches, readTtlDaysFromConfig,
+  listBranches, readTtlDaysFromConfig, summarizePriorWaveContext,
 } = require(path.join(LIB, 'state'));
+
+const { writeTaskFactSheet, taskFactSheetPath } = require(path.join(LIB, 'task-factsheet'));
+const { splitWave, MaxSplitDepthExceededError } = require(path.join(LIB, 'wave-split'));
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -60,6 +66,8 @@ function parseArgs(argv) {
       const val = parseInt(args[++i], 10);
       if (isNaN(val)) { process.stderr.write(`Error: --total-tasks requires a number, got "${args[i]}"\n`); process.exit(2); }
       result.totalTasks = val;
+    } else if (a === '--planned-task-ids' && args[i + 1]) {
+      result.plannedTaskIds = args[++i];
     } else if (a === '--plan-path' && args[i + 1]) {
       result.planPath = args[++i];
     } else if (a === '--plan-hash' && args[i + 1]) {
@@ -90,6 +98,33 @@ function parseArgs(argv) {
       result.ttlDays = val;
     } else if (a === '--dry-run') {
       result.dryRun = true;
+    } else if (a === '--tasks-json' && args[i + 1]) {
+      result.tasksJson = args[++i];
+    } else if (a === '--run-id' && args[i + 1]) {
+      result.runId = args[++i];
+    } else if (a === '--max-files' && args[i + 1]) {
+      const val = parseInt(args[++i], 10);
+      if (!isNaN(val)) result.maxFiles = val;
+    } else if (a === '--max-decisions' && args[i + 1]) {
+      const val = parseInt(args[++i], 10);
+      if (!isNaN(val)) result.maxDecisions = val;
+    } else if (a === '--max-interfaces' && args[i + 1]) {
+      const val = parseInt(args[++i], 10);
+      if (!isNaN(val)) result.maxInterfaces = val;
+    } else if (a === '--dispatched' && args[i + 1]) {
+      result.dispatched = args[++i];
+    } else if (a === '--missing-ids' && args[i + 1]) {
+      result.missingIds = args[++i];
+    } else if (a === '--split-depth' && args[i + 1]) {
+      const val = parseInt(args[++i], 10);
+      if (!isNaN(val)) result.splitDepth = val;
+    } else if (a === '--max-split-depth' && args[i + 1]) {
+      const val = parseInt(args[++i], 10);
+      if (!isNaN(val)) result.maxSplitDepth = val;
+    } else if (a === '--state-file' && args[i + 1]) {
+      result.stateFile = args[++i];
+    } else if (a === '--skipped-dependency') {
+      result.skippedDependency = true;
     }
   }
 
@@ -175,6 +210,17 @@ function cmdInit(opts) {
     process.exit(2);
   }
 
+  let plannedTaskIds = null;
+  if (opts.plannedTaskIds) {
+    try {
+      plannedTaskIds = JSON.parse(opts.plannedTaskIds);
+      if (!Array.isArray(plannedTaskIds)) throw new Error('must be an array');
+    } catch (e) {
+      process.stderr.write(`Error: --planned-task-ids must be a JSON array: ${e.message}\n`);
+      process.exit(2);
+    }
+  }
+
   const data = {
     version: 1,
     skill: 'execute-plan-sdlc',
@@ -184,6 +230,7 @@ function cmdInit(opts) {
     planHash: opts.planHash || null,
     quality: opts.quality,
     totalTasks: opts.totalTasks,
+    plannedTaskIds: plannedTaskIds,
     waves: [],
     context: {},
   };
@@ -229,6 +276,42 @@ function cmdWaveStart(opts) {
   }
 
   writeState(filePath, data);
+
+  // Write per-task fact sheets when --tasks-json is provided (R-FACT-SHEET-DISPATCH, #432).
+  // --tasks-json is a JSON array of task objects; --run-id is the execution run ID
+  // (defaults to the state file's startedAt timestamp slug when not provided).
+  if (opts.tasksJson) {
+    let tasks;
+    try {
+      tasks = JSON.parse(opts.tasksJson);
+    } catch (e) {
+      process.stderr.write(`Error: --tasks-json is not valid JSON: ${e.message}\n`);
+      process.exit(2);
+    }
+    if (!Array.isArray(tasks)) {
+      process.stderr.write('Error: --tasks-json must be a JSON array\n');
+      process.exit(2);
+    }
+    const stateDir = resolveStateDir();
+    // Derive runId from --run-id flag or from the state file's startedAt field
+    const runId = opts.runId || (data.startedAt
+      ? data.startedAt.replace(/[^0-9T]/g, '').replace('T', 'T')
+      : `wave-${opts.wave}`);
+    const writtenPaths = [];
+    for (const task of tasks) {
+      if (!task || !task.id) continue; // skip malformed entries
+      try {
+        const p = writeTaskFactSheet(task, { runId, stateDir });
+        writtenPaths.push(p);
+      } catch (e) {
+        process.stderr.write(`Warning: failed to write fact sheet for task ${task.id}: ${e.message}\n`);
+      }
+    }
+    if (writtenPaths.length > 0) {
+      process.stdout.write(JSON.stringify({ factSheets: writtenPaths }) + '\n');
+    }
+  }
+
   process.exit(0);
 }
 
@@ -413,12 +496,18 @@ function cmdTaskFail(opts) {
   const wave = findOrCreateWave(data.waves, opts.wave);
   if (!Array.isArray(wave.tasks)) wave.tasks = [];
 
+  // Support SKIPPED-DEPENDENCY status (R-INVARIANT-COMPLETENESS, T9, #432).
+  // When --skipped-dependency is passed, the task is recorded with status
+  // 'skipped-dependency' (counted as accounted by verify-completeness).
+  // No schema change: uses the existing status field.
+  const taskStatus = opts.skippedDependency ? 'skipped-dependency' : 'failed';
+
   const taskEntry = {
     id: opts.task,
     name: opts.name || '',
     complexity: opts.complexity || '',
     risk: opts.risk || '',
-    status: 'failed',
+    status: taskStatus,
     filesChanged: [],
     error: opts.error || '',
   };
@@ -537,6 +626,247 @@ function cmdGc(opts) {
   process.exit(0);
 }
 
+/**
+ * `wave-split` — persist a CONTEXT_OVERFLOW split decision to state for resume safety.
+ *
+ * Calls lib/wave-split.js splitWave() with the provided dispatched/missing-ids arrays,
+ * records the resulting split tree on the wave entry, and prints the JSON result to stdout.
+ *
+ * Idempotent: if the wave already has a splitTree for the same splitDepth, returns the
+ * persisted tree without re-computing (same inputs → same partition is guaranteed by splitWave).
+ *
+ * Exit codes:
+ *   0 = success; JSON printed to stdout
+ *   2 = argument error, JSON parse error, MaxSplitDepthExceededError
+ *
+ * Implements R-CONTEXT_OVERFLOW, T8, #432.
+ */
+function cmdWaveSplit(opts) {
+  if (opts.wave == null || isNaN(opts.wave)) {
+    process.stderr.write('Error: --wave is required\n');
+    process.exit(2);
+  }
+  if (!opts.dispatched) {
+    process.stderr.write('Error: --dispatched is required (JSON array of task ID strings)\n');
+    process.exit(2);
+  }
+
+  let dispatched;
+  try {
+    dispatched = JSON.parse(opts.dispatched);
+  } catch (e) {
+    process.stderr.write(`Error: --dispatched is not valid JSON: ${e.message}\n`);
+    process.exit(2);
+  }
+  if (!Array.isArray(dispatched)) {
+    process.stderr.write('Error: --dispatched must be a JSON array\n');
+    process.exit(2);
+  }
+
+  let missingIds = [];
+  if (opts.missingIds) {
+    try {
+      missingIds = JSON.parse(opts.missingIds);
+    } catch (e) {
+      process.stderr.write(`Error: --missing-ids is not valid JSON: ${e.message}\n`);
+      process.exit(2);
+    }
+    if (!Array.isArray(missingIds)) {
+      process.stderr.write('Error: --missing-ids must be a JSON array\n');
+      process.exit(2);
+    }
+  }
+
+  const splitDepth    = opts.splitDepth    != null ? opts.splitDepth    : 0;
+  const maxSplitDepth = opts.maxSplitDepth != null ? opts.maxSplitDepth : 3;
+
+  // Compute split (pure, deterministic)
+  let result;
+  try {
+    result = splitWave({ dispatched, missingIds, splitDepth, maxSplitDepth });
+  } catch (e) {
+    if (e instanceof MaxSplitDepthExceededError) {
+      process.stderr.write(`Error: ${e.message}\n`);
+      process.exit(2);
+    }
+    throw e;
+  }
+
+  // Persist split tree to state so resume-after-crash can replay the same partition.
+  // Best-effort: if state lookup fails, still emit the result to stdout (idempotent).
+  try {
+    let found = null;
+
+    // Support direct --state-file path (used in tests + orchestration)
+    if (opts.stateFile) {
+      try {
+        const raw = fs.readFileSync(opts.stateFile, 'utf8');
+        const data = JSON.parse(raw);
+        found = { data, filePath: opts.stateFile };
+      } catch (_) {
+        // fall through — no state to persist to
+      }
+    } else {
+      const branch = resolveBranchOrExit(opts.branch);
+      const slug = slugifyBranch(branch);
+      found = readState('execute', slug);
+    }
+
+    if (found) {
+      const { data, filePath } = found;
+      if (!Array.isArray(data.waves)) data.waves = [];
+
+      const wave = findOrCreateWave(data.waves, opts.wave);
+
+      // Idempotency: if same splitDepth already recorded, skip write
+      if (!wave.splitTree || wave.splitTree.splitDepth !== splitDepth) {
+        wave.splitTree = {
+          splitDepth,
+          maxSplitDepth,
+          dispatched: [...dispatched],
+          missingIds: [...missingIds],
+          halves: result.halves,
+          computedAt: new Date().toISOString(),
+        };
+        writeState(filePath, data);
+      }
+    }
+  } catch (_) {
+    // State persistence is best-effort; never fail the command due to state I/O errors
+  }
+
+  process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  process.exit(0);
+}
+
+/**
+ * `verify-completeness` — post-execution completeness invariant (R-INVARIANT-COMPLETENESS, #432).
+ *
+ * Reads the execute state file (by current branch or --run-id / --state-file),
+ * collects every task entry across all waves, and checks whether the union of
+ * accounted task IDs covers the full planned set.
+ *
+ * Accounted statuses: 'completed', 'failed', 'skipped-dependency'.
+ * Any task whose ID appears in state with one of these statuses is accounted.
+ *
+ * Exit codes:
+ *   0  — all planned tasks accounted for
+ *   65 — one or more planned tasks unaccounted; stderr JSON: {missingIds, totalPlanned, totalAccounted}
+ *   2  — argument or state error
+ *
+ * Idempotent: re-running on same state returns the same verdict.
+ *
+ * Implements R-INVARIANT-COMPLETENESS, T9, #432.
+ */
+function cmdVerifyCompleteness(opts) {
+  const ACCOUNTED_STATUSES = new Set(['completed', 'failed', 'skipped-dependency']);
+
+  // Resolve state
+  let found = null;
+
+  if (opts.stateFile) {
+    // Direct file path (used in tests)
+    try {
+      const raw = fs.readFileSync(opts.stateFile, 'utf8');
+      const data = JSON.parse(raw);
+      found = { data, filePath: opts.stateFile };
+    } catch (e) {
+      process.stderr.write(`Error: cannot read state file "${opts.stateFile}": ${e.message}\n`);
+      process.exit(2);
+    }
+  } else {
+    const branch = resolveBranchOrExit(opts.branch);
+    const slug = slugifyBranch(branch);
+    found = readState('execute', slug);
+    if (!found) {
+      process.stderr.write(`Error: no state file found for branch "${branch}"\n`);
+      process.exit(1);
+    }
+  }
+
+  const { data } = found;
+
+  // Collect all task entries across waves
+  const waves = Array.isArray(data.waves) ? data.waves : [];
+  const accountedById = new Map(); // id → status
+
+  for (const wave of waves) {
+    const tasks = Array.isArray(wave.tasks) ? wave.tasks : [];
+    for (const task of tasks) {
+      if (!task || !task.id) continue;
+      // Last write wins (task-fail after task-done, etc.)
+      if (!accountedById.has(task.id) || ACCOUNTED_STATUSES.has(task.status)) {
+        accountedById.set(task.id, task.status);
+      }
+    }
+  }
+
+  // Determine planned task IDs. Prefer state.plannedTaskIds[] if present;
+  // fall back to totalTasks count (not reliable for ID listing).
+  // The canonical source is state.context.plannedTaskIds when set by init.
+  const plannedIds = Array.isArray(data.plannedTaskIds)
+    ? data.plannedTaskIds
+    : (data.context && Array.isArray(data.context.plannedTaskIds)
+        ? data.context.plannedTaskIds
+        : null);
+
+  if (!plannedIds) {
+    // Cannot verify without planned task ID list — plannedTaskIds missing means the state is
+    // structurally incomplete (pre-#432 state or corrupted init). Hard-fail so ship-sdlc does
+    // not silently advance past an unverifiable execute step (R-INVARIANT-COMPLETENESS, #432).
+    process.stderr.write(
+      'ERROR: verify-completeness cannot find plannedTaskIds in state — invariant check cannot run. Use --resume on a fresh execute run, or re-run without --resume to start over.\n'
+    );
+    process.exit(2);
+  }
+
+  // Find accounted and missing
+  const accountedIds = plannedIds.filter(id => {
+    const status = accountedById.get(id);
+    return status !== undefined && ACCOUNTED_STATUSES.has(status);
+  });
+  const missingIds = plannedIds.filter(id => !accountedIds.includes(id));
+
+  const totalPlanned  = plannedIds.length;
+  const totalAccounted = accountedIds.length;
+
+  if (missingIds.length === 0) {
+    process.stdout.write(JSON.stringify({ ok: true, totalPlanned, totalAccounted }) + '\n');
+    process.exit(0);
+  }
+
+  // Incomplete — exit 65 (BSD EX_DATAERR) with structured stderr JSON
+  process.stderr.write(JSON.stringify({ missingIds, totalPlanned, totalAccounted }) + '\n');
+  process.exit(65);
+}
+
+/**
+ * summarize-prior-wave-context — return bounded slice of execution context.
+ * Reads state for current branch and applies caps via state.js::summarizePriorWaveContext.
+ * Outputs JSON to stdout. (R-BYTE-BUDGET / T4, #432)
+ */
+function cmdSummarizePriorWaveContext(opts) {
+  const branch = resolveBranchOrExit(opts.branch);
+  const slug = slugifyBranch(branch);
+
+  // Support --run-id as an alternate lookup path (for test harnesses that don't
+  // have a git repo, e.g. when SDLC_STATE_DIR_OVERRIDE is set).
+  const found = readState('execute', slug);
+  if (!found) {
+    process.stderr.write(`Error: no state file found for branch "${branch}"\n`);
+    process.exit(1);
+  }
+
+  const caps = {};
+  if (opts.maxFiles      != null) caps.maxFiles      = opts.maxFiles;
+  if (opts.maxDecisions  != null) caps.maxDecisions  = opts.maxDecisions;
+  if (opts.maxInterfaces != null) caps.maxInterfaces = opts.maxInterfaces;
+
+  const summary = summarizePriorWaveContext(found.data, caps);
+  process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
+  process.exit(0);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -556,9 +886,12 @@ try {
     case 'read':        cmdRead(opts);       break;
     case 'cleanup':     cmdCleanup(opts);    break;
     case 'gc':          cmdGc(opts);         break;
+    case 'summarize-prior-wave-context': cmdSummarizePriorWaveContext(opts); break;
+    case 'wave-split': cmdWaveSplit(opts); break;
+    case 'verify-completeness': cmdVerifyCompleteness(opts); break;
     default:
       process.stderr.write(`Error: unknown subcommand "${opts.subcommand}"\n`);
-      process.stderr.write('Usage: node execute-state.js <init|wave-start|wave-done|wave-fail|wave-committed|task-done|task-fail|context|read|cleanup|gc> [options]\n');
+      process.stderr.write('Usage: node execute-state.js <init|wave-start|wave-done|wave-fail|wave-committed|task-done|task-fail|context|read|cleanup|gc|summarize-prior-wave-context|wave-split|verify-completeness> [options]\n');
       process.exit(2);
   }
 } catch (e) {

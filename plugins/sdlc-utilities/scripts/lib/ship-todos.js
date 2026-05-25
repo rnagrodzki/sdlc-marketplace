@@ -168,11 +168,19 @@ function renderTodos(state, opts = {}) {
         }
       }
 
-      // Fail-step override: rewrite all non-completed substeps → completed with " (failed)" suffix.
-      // Applies to every substep (in_progress or pending) so none linger after step failure.
+      // Fail-step override (T6 / R-TODOWRITE-TRUTHFUL, #432):
+      // - substeps that were in_progress when failure fired → completed "(failed)"
+      // - substeps that were pending (never dispatched) → remain pending "(not attempted)"
+      // - substeps that were already completed → untouched
       if (failStep && stepName === failStep && status !== 'completed') {
-        status     = 'completed';
-        activeForm = `${activeForm} (failed)`;
+        if (status === 'in_progress') {
+          status     = 'completed';
+          activeForm = `${activeForm} (failed)`;
+        } else {
+          // status === 'pending' — never dispatched; surface as not-attempted
+          status     = 'pending';
+          activeForm = `${activeForm} (not attempted)`;
+        }
       }
 
       todos.push({ content: labels.content, activeForm, status });

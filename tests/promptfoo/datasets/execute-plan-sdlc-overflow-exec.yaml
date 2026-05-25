@@ -1,0 +1,207 @@
+# Exec test cases for wave-runner context-overflow hardening (#432).
+# Tests run real scripts against fixture state files — no LLM involved.
+# All descriptions use the "execute-plan-sdlc/wave-runner-overflow/" prefix
+# so `--filter-pattern "execute-plan-sdlc/wave-runner-overflow"` matches.
+#
+# Covered modules: task-factsheet.js, dispatch-budget.js, state.js::summarizePriorWaveContext,
+#   wave-summary.js::parseWaveSummary, wave-split.js::splitWave,
+#   state/execute.js::verify-completeness, state/execute.js::wave-split subcommand.
+
+# ---------------------------------------------------------------------------
+# task-factsheet.js — fact-sheet path determinism
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc/wave-runner-overflow/task-factsheet: path is deterministic for same runId+taskId"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op factsheet-path"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.same === true && r.containsTaskId === true"
+
+# ---------------------------------------------------------------------------
+# dispatch-budget.js — byte-budget computation
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc/wave-runner-overflow/dispatch-budget: tight byte budget reduces maxConcurrentTasks"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op budget-tight"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.lessThanCap === true && r.maxConcurrentTasks >= 1"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/dispatch-budget: 3-task wave has no static cap"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op budget-uncapped"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.maxConcurrentTasks === 3"
+
+# ---------------------------------------------------------------------------
+# state.js::summarizePriorWaveContext — bounded slice
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc/wave-runner-overflow/summarizer: caps filesAdded to maxFiles returning tail"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op summarize-files"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.count === 20 && r.last === 'src/file-29.js'"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/summarizer: caps decisionsFromPriorWaves to maxDecisions"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op summarize-decisions"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.count === 10 && r.last === 'decision-24'"
+
+# ---------------------------------------------------------------------------
+# wave-summary.js::parseWaveSummary — CONTEXT_OVERFLOW detection
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-summary: complete wave passes schemaOk"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op parse-complete"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.schemaOk === true && r.missingIds.length === 0 && r.extraIds.length === 0"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-summary: 4-dispatched-2-returned triggers CONTEXT_OVERFLOW"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op parse-overflow"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.schemaOk === false && r.isOverflow === true && r.missingIds.length === 2"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-summary: free-text errorCode is rejected by bounded enum"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op parse-free-text-error"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.schemaOk === false && r.hasEnumViolation === true"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-summary: malformed JSON gives schemaOk=false"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op parse-malformed"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.schemaOk === false && r.tokenFound === true"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-summary: extra IDs detected when not in dispatched set"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op parse-extra-ids"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.schemaOk === false && r.extraIds.includes('T_EXTRA')"
+
+# ---------------------------------------------------------------------------
+# wave-split.js::splitWave — auto-split-and-retry
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-split: 4-task wave gives 2+2 split from full dispatched set"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op split-4task"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.total === 4 && r.half0 === 2 && r.half1 === 2 && r.depth === 1"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-split: all-missing uses full dispatched set not just missing"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op split-all-missing"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.total === 4 && r.depth === 2"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-split: depth-ceiling throws MaxSplitDepthExceededError"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op split-depth-ceiling"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.threw === true && r.errorName === 'MaxSplitDepthExceededError'"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-split: same inputs produce identical partition (idempotent)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op split-idempotent"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.same === true"
+
+# ---------------------------------------------------------------------------
+# state/execute.js verify-completeness subcommand
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc/wave-runner-overflow/verify-completeness: all-done state exits 0"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "verify-completeness --state-file {{project_root}}/state-all-done.json"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.ok === true && r.totalPlanned === 4 && r.totalAccounted === 4"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/verify-completeness: two-missing exits 65 with missingIds"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "verify-completeness --state-file {{project_root}}/state-missing-t3-t4.json"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.missingIds && r.missingIds.includes('T3') && r.missingIds.includes('T4') && r.totalPlanned === 4 && r.totalAccounted === 2"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/verify-completeness: all-skipped-dependency exits 0"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "verify-completeness --state-file {{project_root}}/state-skipped-deps.json"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.ok === true && r.totalPlanned === 4 && r.totalAccounted === 4"
+
+# ---------------------------------------------------------------------------
+# state/execute.js wave-split subcommand
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-split-cmd: wave-split subcommand returns 2+2 halves"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-split --wave 1 --dispatched [\"T1\",\"T2\",\"T3\",\"T4\"] --missing-ids [\"T3\",\"T4\"] --split-depth 0 --max-split-depth 3"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.halves && r.halves.length === 2 && (r.halves[0].tasks.length + r.halves[1].tasks.length) === 4"
+
+- description: "execute-plan-sdlc/wave-runner-overflow/wave-split-cmd: depth-ceiling exits 2 with MaxSplitDepthExceededError"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-split --wave 1 --dispatched [\"T1\",\"T2\"] --split-depth 3 --max-split-depth 3"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "output.includes('MaxSplitDepth') || output.includes('max split depth') || output.includes('split depth')"

@@ -479,6 +479,39 @@ Prunes every state file whose branch is absent from `git branch --list`, regardl
 
 ---
 
+## Post-execute completeness gate
+
+After `execute-plan-sdlc` returns and before ship-sdlc advances to the commit step, ship-sdlc runs a blocking invariant check: `state/execute.js verify-completeness`. This gate ensures that every task the execute agent was asked to complete is accounted for in the state file before the pipeline moves on.
+
+**What triggers it:**
+
+The gate runs automatically after every successful `execute-plan-sdlc` dispatch. It cannot be skipped.
+
+**Exit outcomes:**
+
+| Exit code | Meaning | Pipeline action |
+|-----------|---------|-----------------|
+| 0 | All planned task IDs accounted | Pipeline advances to commit |
+| 65 | One or more task IDs missing from state | Execute step marked `failed`; pipeline halts |
+| 2 | `plannedTaskIds` absent from state (pre-#432 state file or corrupted init), OR `execute.js` script not found | Pipeline halts with structural error |
+
+**What exit 65 looks like:**
+
+```
+ERROR: execute-plan-sdlc returned but planned tasks are unaccounted. Pipeline halted.
+{"missingIds":["T3","T7"],"totalPlanned":8,"totalAccounted":6}
+```
+
+The JSON on stderr names the exact task IDs that did not complete. The execute step is marked `failed` in the pipeline state file.
+
+**What to do:**
+
+- **Exit 65 (missing task IDs):** The execute agent completed but some tasks were not confirmed. Run `/ship-sdlc --resume` — ship resumes from the execute step, and execute-plan-sdlc will retry the unaccounted tasks.
+- **Exit 2 (plannedTaskIds missing):** The state file predates issue #432 (or init was interrupted). Start a fresh run without `--resume`; the new init will record `plannedTaskIds` correctly.
+- **Exit 2 (script not found):** The plugin installation is incomplete. Reinstall the plugin.
+
+---
+
 ## Terminal cleanup
 
 Every ship pipeline run ends with a deterministic `cleanup` step (after `pr`, `archive-openspec`, and `learnings-commit`). The step is added by `skill/ship.js`, is not user-configurable, and runs as a direct Bash invocation of `state/ship.js cleanup-pipeline` (not as an Agent). Behavior:

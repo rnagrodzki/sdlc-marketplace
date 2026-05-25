@@ -118,12 +118,16 @@ The `model:` parameter is REQUIRED on every Agent tool dispatch — no exception
 
 Complex tasks count as 2 toward the cap (they consume more context and are more likely to conflict).
 
-| Total remaining tasks | Max agents per wave |
+**Wave sizing is computed by `lib/dispatch-budget.js::computeWaveBudget()`** (R-BYTE-BUDGET, #432), not by a static table. The utility accounts for template scaffolding bytes, guardrails block bytes, per-task fact-sheet sizes, and prior-wave context bytes against the model's input budget. The result is always ≤ the static fallback cap:
+
+| Total remaining tasks | Static fallback cap |
 |---|---|
 | 1–3 | No cap (dispatch all) |
 | 4–8 | 4 |
 | 9–15 | 5 |
 | 16+ | 6 |
+
+The static table is the ceiling. When `computeWaveBudget` returns a lower value (e.g., large fact-sheets push the byte budget below the static cap), use the lower value. When `dispatch-budget.js` is unavailable, fall back to the static table.
 
 On resource-constrained systems or when tasks share mutable state (databases, caches, singletons), reduce to 2–3 regardless of the table.
 
@@ -131,7 +135,7 @@ On resource-constrained systems or when tasks share mutable state (databases, ca
 
 This template's content is inlined by execute-plan-sdlc Step 5b into the wave-runner Agent's prompt body as the `perTaskTemplate` input. It is no longer dispatched as a standalone Agent from main context — the wave-runner Agent uses it internally to fan out per-task sub-agents within its own context.
 
-Use this template for every per-task agent dispatch inside wave-runner. Fill all placeholders. Never abbreviate the task text or reference the plan file.
+Use this template for every per-task agent dispatch inside wave-runner. Fill all placeholders. The task body is loaded from the fact-sheet file — do NOT inline the full task text or reference the plan file directly.
 
 ```
 You are implementing a single task from a larger plan. Focus only on your assigned task.
@@ -154,7 +158,11 @@ You MUST respect these constraints while implementing. Violations will fail post
 {{/each}}
 
 ## Your Task
-{PASTE FULL TASK TEXT HERE — include title, description, acceptance criteria, and any notes from the plan. Never summarize or paraphrase.}
+Task ID: {TASK_ID}
+Complexity: {COMPLEXITY} | Risk: {RISK}
+
+Read your task specification from the fact sheet:
+  {FACT_SHEET_PATH}
 
 After implementation, list every file you actually modified — Step 5c-bis verifies your diff against the wave's `expectedFiles` manifest. Do not modify files outside the listed `Files You May Touch` set.
 
@@ -232,7 +240,7 @@ If you find issues during self-review, fix them before reporting.
 
 This template's content is inlined by execute-plan-sdlc Step 5b into the wave-runner Agent's prompt body as the `batchedTrivialTemplate` input. It is no longer dispatched as a standalone Agent from main context — the wave-runner Agent uses it internally when the wave has 2+ Trivial tasks.
 
-Use this template when dispatching 2+ trivial tasks as a single batch agent inside wave-runner. Fill all placeholders. Tasks are listed sequentially; the agent completes them in order.
+Use this template when dispatching 2+ trivial tasks as a single batch agent inside wave-runner. Fill all placeholders. Tasks are listed sequentially; the agent completes them in order. Each task body is loaded from its fact-sheet file — do NOT inline the full task text or reference the plan file directly.
 
 ~~~
 You are implementing a batch of trivial tasks from a larger plan. Complete all tasks in the order listed. Each task is small and self-contained.
@@ -256,7 +264,10 @@ After completing each task, list every file you actually modified — Step 5c-bi
 ## Tasks (complete in order)
 
 ### Task {N}: {TASK TITLE}
-{PASTE FULL TASK TEXT — include description, acceptance criteria, notes. Never summarize.}
+Task ID: {TASK_ID} | Complexity: Trivial | Risk: {RISK}
+
+Read your task specification from the fact sheet:
+  {FACT_SHEET_PATH_N}
 
 Files you may touch for this task:
 - path/to/file1
@@ -265,7 +276,10 @@ Files you may touch for this task:
 ---
 
 ### Task {N+1}: {TASK TITLE}
-{PASTE FULL TASK TEXT}
+Task ID: {TASK_ID_NEXT} | Complexity: Trivial | Risk: {RISK_NEXT}
+
+Read your task specification from the fact sheet:
+  {FACT_SHEET_PATH_N+1}
 
 Files you may touch for this task:
 - path/to/file3
