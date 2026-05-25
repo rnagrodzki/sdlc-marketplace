@@ -18,7 +18,7 @@ totalWaves       — integer
 qualityTier      — "full" | "balanced" | "minimal"
 escalationBudget — integer (max 2 retries per task; haiku→sonnet→opus)
 tasks            — array of task objects (see shape below)
-priorWaveContext — context from completed waves (see shape below)
+priorWaveSummary — context from completed waves (see shape below) (R-PRIORWAVE)
 perTaskTemplate  — full inline content of classifying-and-waving-tasks.md Agent Prompt Template
                    (pasted verbatim at dispatch time — do NOT Read the file)
 batchedTrivialTemplate — full inline content of classifying-and-waving-tasks.md Batched Trivial
@@ -43,7 +43,7 @@ Task name, description, files, and acceptance criteria live in the fact sheet at
 ```json
 {
   "planSummary": "2-3 sentence summary of the overall plan goal",
-  "completedTaskIds": ["t1", "t2", ...],
+  "completedTaskIds": ["1", "2", ...],
   "filesAdded": ["path/to/created/file", ...],
   "filesModified": ["path/to/modified/file", ...],
   "interfacesCreated": ["FunctionName in file", ...],
@@ -198,7 +198,7 @@ The WAVE_SUMMARY schema is unchanged: main context handles the per-wave `expecte
 ## Example WAVE_SUMMARY (2 tasks, both complete)
 
 ```
-WAVE_SUMMARY: {"wave":2,"status":"completed","tasks":[{"id":"t3","status":"DONE","sha":null,"filesTouched":["plugins/sdlc-utilities/scripts/skill/ship.js"]},{"id":"t4","status":"DONE","sha":null,"filesTouched":["plugins/sdlc-utilities/skills/execute-plan-sdlc/wave-runner-template.md"]}],"escalationsUsed":0}
+WAVE_SUMMARY: {"wave":2,"status":"completed","tasks":[{"id":"3","status":"DONE","sha":null,"filesTouched":["plugins/sdlc-utilities/scripts/skill/ship.js"]},{"id":"4","status":"DONE","sha":null,"filesTouched":["plugins/sdlc-utilities/skills/execute-plan-sdlc/wave-runner-template.md"]}],"escalationsUsed":0}
 ```
 
 Note: `name`, `complexity`, `risk`, `finalModel`, `attempts[]`, `filesChanged`, `verification` are **dropped** from the bounded schema (R-BOUNDED-RETURN, #432). Main context re-reads these from state by task ID. Use `filesTouched` (not `filesChanged`) in per-task entries.

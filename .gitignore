@@ -1,4 +1,5 @@
 .worktrees/
+.claude/worktrees/
 tests/promptfoo/.promptfoo-data/
 .evidences/
 

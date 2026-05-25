@@ -56,6 +56,19 @@ function renderFactSheet(task) {
 }
 
 /**
+ * Normalize a task ID to its canonical numeric form (R-IDNORM).
+ * Strips a single leading 'T' or 't' so "T1" and "1" map to the same file.
+ * Comparison-only: the caller's raw ID is unchanged.
+ *
+ * @param {string} taskId
+ * @returns {string}
+ */
+function normalizeTaskId(taskId) {
+  if (typeof taskId !== 'string') return taskId;
+  return taskId.trim().replace(/^[Tt](?=\d)/, '');
+}
+
+/**
  * Return the absolute path for a task's fact sheet.
  * @param {{ runId: string, taskId: string, stateDir: string }} opts
  * @returns {string}
@@ -64,7 +77,7 @@ function taskFactSheetPath({ runId, taskId, stateDir }) {
   if (!runId) throw new Error('taskFactSheetPath: runId is required');
   if (!taskId) throw new Error('taskFactSheetPath: taskId is required');
   if (!stateDir) throw new Error('taskFactSheetPath: stateDir is required');
-  return path.join(stateDir, runId, `task-${taskId}.md`);
+  return path.join(stateDir, runId, `task-${normalizeTaskId(taskId)}.md`);
 }
 
 /**
@@ -102,11 +115,11 @@ function writeTaskFactSheet(task, { runId, stateDir }) {
   // Atomic write via tmp→rename
   const crypto = require('node:crypto');
   const suffix = crypto.randomBytes(4).toString('hex');
-  const tmp = path.join(dir, `task-${task.id}.${suffix}.tmp`);
+  const tmp = path.join(dir, `task-${normalizeTaskId(task.id)}.${suffix}.tmp`);
   fs.writeFileSync(tmp, content, 'utf8');
   fs.renameSync(tmp, filePath);
 
   return filePath;
 }
 
-module.exports = { writeTaskFactSheet, taskFactSheetPath, renderFactSheet };
+module.exports = { writeTaskFactSheet, taskFactSheetPath, renderFactSheet, normalizeTaskId };

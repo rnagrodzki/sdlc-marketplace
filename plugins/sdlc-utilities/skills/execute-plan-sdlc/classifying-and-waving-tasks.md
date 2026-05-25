@@ -99,8 +99,8 @@ The `model:` parameter is REQUIRED on every Agent tool dispatch — no exception
    {
      "wave": 2,
      "tasks": [
-       { "id": "T7", "files": { "modify": ["src/auth/token.ts"], "test": ["src/auth/token.test.ts"] }, "verify": "npm test -- token" },
-       { "id": "T8", "files": { "modify": ["src/auth/token.ts", "src/auth/index.ts"] }, "verify": "npm test -- token" }
+       { "id": "7", "files": { "modify": ["src/auth/token.ts"], "test": ["src/auth/token.test.ts"] }, "verify": "npm test -- token" },
+       { "id": "8", "files": { "modify": ["src/auth/token.ts", "src/auth/index.ts"] }, "verify": "npm test -- token" }
      ],
      "expectedFiles": ["src/auth/token.ts", "src/auth/token.test.ts", "src/auth/index.ts"],
      "verificationHint": "npm test -- token",

@@ -1228,3 +1228,54 @@
       value: |
         const o = JSON.parse(output);
         return o.freshKept >= 1;
+
+# ---------------------------------------------------------------------------
+# R-PLANFILE (#task5): --plan-file CLI flag forwarded through context.planFile
+# and into execute step args.
+# Uses {{repo_root}} to reference the plan fixture file (absolute, no temp copy needed).
+# ---------------------------------------------------------------------------
+
+- description: "ship-prepare (R-PLANFILE): --plan-file sets context.planFile to absolute path"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --plan-file {{repo_root}}/tests/promptfoo/fixtures-fs/ship-todos/plan-3-tasks.md"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        // context.planFile must be an absolute path ending in plan-3-tasks.md
+        return typeof o.context.planFile === 'string' &&
+               o.context.planFile.endsWith('plan-3-tasks.md') &&
+               o.context.planFile.startsWith('/');
+
+- description: "ship-prepare (R-PLANFILE): --plan-file injected into execute step args"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --plan-file {{repo_root}}/tests/promptfoo/fixtures-fs/ship-todos/plan-3-tasks.md"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const exec = (o.steps || []).find(s => s.name === 'execute');
+        return exec !== undefined &&
+               typeof exec.args === 'string' &&
+               exec.args.includes('--plan-file') &&
+               exec.args.includes('plan-3-tasks.md');
+
+- description: "ship-prepare (R-PLANFILE): no --plan-file flag → context.planFile is string or null (fallback resolution)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        // planFile is either an absolute string or null — never undefined
+        return Object.prototype.hasOwnProperty.call(o.context, 'planFile') &&
+               (o.context.planFile === null || typeof o.context.planFile === 'string');

@@ -69,9 +69,11 @@ function out(obj) {
 switch (op) {
   case 'factsheet-path': {
     const { taskFactSheetPath } = require(path.join(LIB, 'task-factsheet'));
+    // R-IDNORM: T3 and 3 must resolve to the same file path
     const p1 = taskFactSheetPath({ runId: 'run-001', taskId: 'T3', stateDir: '/tmp/sdlc' });
     const p2 = taskFactSheetPath({ runId: 'run-001', taskId: 'T3', stateDir: '/tmp/sdlc' });
-    out({ same: p1 === p2, path: p1, containsTaskId: p1.includes('task-T3') });
+    const p3 = taskFactSheetPath({ runId: 'run-001', taskId: '3', stateDir: '/tmp/sdlc' });
+    out({ same: p1 === p2, path: p1, containsTaskId: p1.includes('task-3'), idNormSame: p1 === p3 });
     break;
   }
 
@@ -219,6 +221,40 @@ switch (op) {
     const r2 = splitWave({ dispatched: ['T4', 'T2', 'T3', 'T1'], splitDepth: 0 });
     const same = JSON.stringify(r1.halves) === JSON.stringify(r2.halves);
     out({ same });
+    break;
+  }
+
+  // R-IDNORM: mixed T-prefixed and numeric IDs are treated as equal after normalization
+  case 'parse-idnorm-mixed': {
+    const { parseWaveSummary } = require(path.join(LIB, 'wave-summary'));
+    // Dispatched: numeric ["1","2","3"]; returned: mixed ["T1","t2","3"] → all accounted
+    const text = 'WAVE_SUMMARY: {"wave":1,"status":"completed","tasks":[{"id":"T1","status":"DONE","sha":null,"filesTouched":["src/a.js"]},{"id":"t2","status":"DONE","sha":null,"filesTouched":["src/b.js"]},{"id":"3","status":"DONE","sha":null,"filesTouched":["src/c.js"]}],"escalationsUsed":0}';
+    const r = parseWaveSummary(text, ['1', '2', '3']);
+    out({ schemaOk: r.schemaOk, missingIds: r.missingIds, extraIds: r.extraIds, allAccounted: r.missingIds.length === 0 });
+    break;
+  }
+
+  // R-IDNORM: stale field 'filesChanged' is rejected by bounded schema (filesTouched is canonical)
+  case 'parse-stale-fileschanged': {
+    const { parseWaveSummary } = require(path.join(LIB, 'wave-summary'));
+    const text = 'WAVE_SUMMARY: {"wave":1,"status":"completed","tasks":[{"id":"1","status":"DONE","sha":null,"filesTouched":["src/a.js"],"filesChanged":["src/a.js"]}],"escalationsUsed":0}';
+    const r = parseWaveSummary(text, ['1']);
+    // filesChanged is a dropped field — should produce a schema violation
+    out({ schemaOk: r.schemaOk, hasDroppedFieldViolation: r.violations.some(v => v.includes('"filesChanged"')) });
+    break;
+  }
+
+  // R-IDNORM: normalizeTaskId exported correctly from wave-summary
+  case 'normalize-task-id': {
+    const { normalizeTaskId } = require(path.join(LIB, 'wave-summary'));
+    out({
+      t1: normalizeTaskId('T1'),
+      t2: normalizeTaskId('t2'),
+      n3: normalizeTaskId('3'),
+      tUpper: normalizeTaskId('T10'),
+      tLower: normalizeTaskId('t10'),
+      noPrefix: normalizeTaskId('abc'),
+    });
     break;
   }
 

@@ -178,3 +178,11 @@
 - I11: OpenSpec — optional spec context for spec compliance review when plan is OpenSpec-sourced
 - I12: `lib/openspec.js` — `validateChangeStrict` helper for post-pipeline archive suggestion gating
 - I13: `lib/openspec.js::markTaskDone` — mutator called per completed-and-grouped plan task to flip OpenSpec `tasks.md` checkboxes (R37).
+
+## Additional Requirements
+
+- R-IDNORM: Task IDs in plan files are numeric (e.g., `1`, `2`, `3`). The `parseWaveSummary` function and `verify-completeness` block MUST normalize IDs before set comparisons by stripping a single leading `T` or `t` character (case-insensitive) and trimming whitespace. After normalization, IDs with the same numeric value MUST be treated as equal. Normalization is comparison-only — persisted IDs in state files retain their wire form. Examples that show `T<n>`-prefixed IDs in SKILL.md, wave-runner-template.md, or classifying-and-waving-tasks.md MUST use numeric-only IDs to match the plan parser's canonical output.
+
+- R-PRIORWAVE: The bounded prior-wave context object passed from main context to each wave-runner dispatch MUST use the key name `priorWaveSummary`. No other key names (e.g., `priorWaveContext`) are permitted. All SKILL.md prose, wave-runner prompt templates, and examples must use this name consistently.
+
+- R-FILESTOUCHED: The orchestrator's `--files-changed` argument in `task-done` state writes MUST be populated from `WAVE_SUMMARY.tasks[].filesTouched`. SKILL.md handoff text at the `--files-changed` call site MUST explicitly cite `WAVE_SUMMARY.tasks[].filesTouched` as the source field by name.

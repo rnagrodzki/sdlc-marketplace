@@ -39,6 +39,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const os   = require('os');
 const { spawnSync } = require('child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
@@ -90,6 +91,8 @@ function parseArgs(argv) {
   // when no state file is found, the hook variant surfaces a structured
   // `implicitResumeNoState` error rather than silently starting fresh.
   let hookActivePipeline = false;
+  // R-PLANFILE: optional path to the active plan markdown (overrides plansDirectory scan)
+  let planFile = null;
   const errors = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -144,6 +147,8 @@ function parseArgs(argv) {
       } else {
         ttlDays = v;
       }
+    } else if (a === '--plan-file' && args[i + 1]) {
+      planFile = args[++i];
     } else if (a === '--hook-active-pipeline') {
       hookActivePipeline = true;
     } else if (a === '--verify-pipeline') {
@@ -165,7 +170,7 @@ function parseArgs(argv) {
     workspace = workspaceShortcut;
   }
 
-  return { hasPlan, auto, steps, quick, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, hookActivePipeline, planModeBlocked, errors };
+  return { hasPlan, auto, steps, quick, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, hookActivePipeline, planModeBlocked, planFile, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -407,7 +412,7 @@ function mergeFlags(cli, config) {
 // Step computation
 // ---------------------------------------------------------------------------
 
-function computeSteps(flags, flagSources, { openspecContext, expectedBranch } = {}) {
+function computeSteps(flags, flagSources, { openspecContext, expectedBranch, planFile } = {}) {
   // Steps[] is the canonical source of truth for which top-level steps run.
   // A step IS skipped when it is NOT in flags.steps. The provenance for an
   // exclusion is whatever determined the resolved steps[] (cli --steps /
@@ -450,6 +455,9 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch } = 
         // final feature commit subsumes per-wave WIP commits cleanly
         // (Fixes #392 / R35).
         flags.executeCommitWaves ? '--commit-waves' : '',
+        // R-PLANFILE: forward resolved plan file so execute-plan-sdlc skips
+        // conversation-context discovery (fragile under compaction).
+        planFile ? `--plan-file "${planFile}"` : '',
       ].filter(Boolean).join(' '),
       reason: !flags.hasPlan
         ? 'no plan in context'
@@ -1198,6 +1206,62 @@ function main() {
   }
 
   // Build context
+  // R-PLANFILE: resolve the active plan file path for execute-step task mirroring.
+  // Priority: (1) CLI --plan-file flag, (2) project .claude/settings.json plansDirectory,
+  // (3) global ~/.claude/settings.json plansDirectory, (4) default ~/.claude/plans/ (most recent *.md).
+  // Returns absolute path string or null if no plan file can be found.
+  function resolvePlanFile(cliPlanFile) {
+    if (cliPlanFile) {
+      return path.resolve(cliPlanFile);
+    }
+
+    const candidateDirs = [];
+
+    // Project settings (takes precedence)
+    const projectSettings = path.join(projectRoot, '.claude', 'settings.json');
+    if (fs.existsSync(projectSettings)) {
+      try {
+        const s = JSON.parse(fs.readFileSync(projectSettings, 'utf8'));
+        if (s.plansDirectory) candidateDirs.push(s.plansDirectory);
+      } catch (_) { /* ignore */ }
+    }
+
+    // Global settings
+    const globalSettings = path.join(os.homedir(), '.claude', 'settings.json');
+    if (fs.existsSync(globalSettings)) {
+      try {
+        const s = JSON.parse(fs.readFileSync(globalSettings, 'utf8'));
+        if (s.plansDirectory) candidateDirs.push(s.plansDirectory);
+      } catch (_) { /* ignore */ }
+    }
+
+    // Default fallback
+    candidateDirs.push(path.join(os.homedir(), '.claude', 'plans'));
+
+    for (const dir of candidateDirs) {
+      if (!fs.existsSync(dir)) continue;
+      try {
+        const entries = fs.readdirSync(dir)
+          .filter(f => f.endsWith('.md'))
+          .map(f => {
+            try {
+              const stat = fs.statSync(path.join(dir, f));
+              return { name: f, mtime: stat.mtimeMs };
+            } catch (_) { return null; }
+          })
+          .filter(Boolean)
+          .sort((a, b) => b.mtime - a.mtime);
+        if (entries.length > 0) {
+          return path.join(dir, entries[0].name);
+        }
+      } catch (_) { continue; }
+    }
+
+    return null;
+  }
+
+  const planFile = resolvePlanFile(cli.planFile || null);
+
   const context = {
     currentBranch: gitState.currentBranch,
     defaultBranch,
@@ -1221,6 +1285,7 @@ function main() {
     sdlcGitignored,
     worktree: worktreeInfo,
     expectedBranch,
+    planFile,
   };
 
   // Compute steps (pass openspec context for archive-openspec step)
@@ -1228,7 +1293,7 @@ function main() {
     branchMatch: openspecBranchMatch,
     isAlreadyArchived: openspecIsArchived,
   };
-  const steps = computeSteps(flags, flagSources, { openspecContext, expectedBranch });
+  const steps = computeSteps(flags, flagSources, { openspecContext, expectedBranch, planFile });
 
   // Run validation
   const validation = runValidation(flags, flagSources, steps, context);

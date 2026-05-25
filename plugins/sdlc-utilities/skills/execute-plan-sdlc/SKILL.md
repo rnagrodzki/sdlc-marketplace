@@ -2,7 +2,7 @@
 name: execute-plan-sdlc
 description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan. Also auto-triggered when the user accepts a plan from plan-sdlc (plan content is already in conversation context)."
 user-invocable: true
-argument-hint: "[plan-file-path] [--quality full|balanced|minimal] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto] [--branch <name>] [--commit-waves]"
+argument-hint: "[plan-file-path] [--quality full|balanced|minimal] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto] [--branch <name>] [--commit-waves] [--plan-file <path>]"
 model: sonnet
 ---
 
@@ -126,6 +126,8 @@ In addition to the explicit `--resume` flag, Step 0 MUST scan the SessionStart `
 The hook is layer-agnostic (it surfaces facts); this discriminator is the consumer-side decision. Implementation: see `hooks/session-start.js` for the source-aware emission.
 
 **Parse `--auto`:** If `--auto` was passed, store the flag. Auto mode suppresses interactive prompts: resume detection auto-resumes if state exists, high-risk gates auto-approve, and quality-tier selection uses the value from `--quality` (required when `--auto` is set).
+
+**Parse `--plan-file <path>` (R-PLANFILE):** If `--plan-file <path>` was passed, store it as `EXPLICIT_PLAN_FILE`. When set, Step 1 (LOAD) uses this path directly as the plan source and skips the conversation-context discovery path ("plan in context" heuristic). This flag is forwarded by ship-sdlc's `skill/ship.js` from `context.planFile` so plan discovery is stable across compaction. Users may also pass it directly for non-interactive invocations.
 
 **Parse `--commit-waves` (Fixes #392 / R35):** If `--commit-waves` was passed, store `commitWaves = true`. Default `false`. When set, Step 5d gates a per-wave WIP commit after G9+G11 pass (see "5d (per-wave commit)" below). The small-plan direct-execution path (R5, Step 2b) NEVER triggers per-wave commits regardless of this flag. Inline help summary:
 
@@ -390,7 +392,7 @@ Options:
      "qualityTier": "balanced",
      "escalationBudget": 2,
      "tasks": [
-       { "id": "T3", "complexity": "Standard", "risk": "Low", "factSheetPath": "/abs/path/.sdlc/execution/run-id/task-T3.md", "assignedModel": "sonnet", "verifyToken": "dispatchMode in ship.js" }
+       { "id": "3", "complexity": "Standard", "risk": "Low", "factSheetPath": "/abs/path/.sdlc/execution/run-id/task-3.md", "assignedModel": "sonnet", "verifyToken": "dispatchMode in ship.js" }
      ],
      "guardrails": [
        { "id": "no-direct-db-access", "description": "Do not import db client outside repo layer", "severity": "error" }
@@ -453,14 +455,14 @@ The wave-runner Agent handles in-wave per-task fan-out internally — it dispatc
 
    - If `missingIds.length === 0 && schemaOk` → proceed to step 1. Per-task `status` and `filesTouched` (not `filesChanged`) come from `parsed.tasks[]`.
 
-1. **Filesystem verification (mandatory, always first):** Run `git diff --stat` in the main context. For each task in `WAVE_SUMMARY.tasks`, confirm that the files in `filesChanged` actually appear in the diff. If the wave-runner reported success for a task but `git diff --stat` shows no changes to its expected files, classify this as a **phantom success** (see Step 6).
+1. **Filesystem verification (mandatory, always first):** Run `git diff --stat` in the main context. For each task in `WAVE_SUMMARY.tasks`, confirm that the files in `filesTouched` (R-FILESTOUCHED) actually appear in the diff. If the wave-runner reported success for a task but `git diff --stat` shows no changes to its expected files, classify this as a **phantom success** (see Step 6).
 
    **1a. `expectedFiles` cross-check (Fixes #392 / R34) — IN ADDITION to step 1, not a replacement.** Compute `diffFiles` from the same `git diff --stat` output (the file set with non-zero `+/-` lines). Compute `expectedSet = wave.expectedFiles` from the wave manifest.
    - If `expectedSet ≠ ∅` AND `diffFiles ∩ expectedSet === ∅`: **HARD FAILURE** — phantom success at the wave level (wave-runner reported done but touched zero expected files). Trigger the existing failure flow (escalation budget / retry / Step 6 recovery / user surface) — do NOT proceed to subsequent sub-steps.
    - If `diffFiles \ expectedSet ≠ ∅` (the diff touches files outside `expectedFiles`): **SOFT WARNING** — surface a single line `Wave N touched files outside expectedFiles: <comma-separated diff \ expected>` and CONTINUE to step 2. Do not block.
-   - If `expectedSet === ∅` (rare — wave produced no `expectedFiles` because every task lacks `Files:` declarations): skip 1a entirely. Step 1's existing `WAVE_SUMMARY.tasks[].filesChanged` check still runs.
+   - If `expectedSet === ∅` (rare — wave produced no `expectedFiles` because every task lacks `Files:` declarations): skip 1a entirely. Step 1's existing `WAVE_SUMMARY.tasks[].filesTouched` check still runs.
 
-   This check augments — never replaces — the per-task `filesChanged` check in step 1. They guard different invariants: step 1 catches per-task agent drift; step 1a catches wave-level scope drift (agent touched files outside what the plan declared).
+   This check augments — never replaces — the per-task `filesTouched` check in step 1. They guard different invariants: step 1 catches per-task agent drift; step 1a catches wave-level scope drift (agent touched files outside what the plan declared).
 
 2. **Canary check per task:** For each task with a `verifyToken` in the `WAVE_SUMMARY`, grep in the main context for the symbol (`VERIFY: <symbol> in <file>`). This catches cases where `git diff` shows the file changed but the actual edits were incomplete or overwritten.
 
@@ -484,7 +486,7 @@ Skip for waves containing only Trivial tasks. Skip if the Speed quality tier (`-
 
 After mechanical verification passes (Steps 5c.1–4), dispatch a single spec compliance reviewer (sonnet). At dispatch time, Read `./spec-compliance-reviewer.md` and use it as the prompt template. Provide:
 - Each non-trivial task's full specification text
-- The files each task's `WAVE_SUMMARY.tasks[].filesChanged` listed as modified
+- The files each task's `WAVE_SUMMARY.tasks[].filesTouched` listed as modified
 
 The reviewer reads actual code and returns per-task verdicts:
 - ✅ Task N: Spec compliant
@@ -566,7 +568,7 @@ Running verification... [status]
 Proceeding to Wave N+1 (N tasks)
 ```
 
-The progress report is rendered from `WAVE_SUMMARY` payload — per-task names, statuses, and `filesChanged` from the summary. State writes happen after wave-runner returns and main-context verification completes.
+The progress report is rendered from `WAVE_SUMMARY` payload — per-task names, statuses, and `filesTouched` (R-FILESTOUCHED) from the summary. State writes happen after wave-runner returns and main-context verification completes.
 
 **State persistence:** After each wave completes, update the execution state via `state/execute.js`. Locate the script:
 ```bash
@@ -578,10 +580,10 @@ On the very first wave dispatch, initialize the state file:
 ```bash
 node "$STATE_SCRIPT" init --branch <branch> --quality <X> --total-tasks <N> --planned-task-ids '<json-array-of-all-task-ids>'
 ```
-Where `<json-array-of-all-task-ids>` is a JSON array of every task ID from the plan (e.g. `'["T1","T2","T3"]'`), parsed from the plan in Step 1. This seeds `plannedTaskIds` in the state file so the `verify-completeness` gate (Step 5f) can cross-check all planned IDs against accounted task records.
+Where `<json-array-of-all-task-ids>` is a JSON array of every task ID from the plan (e.g. `'["1","2","3"]'`), parsed from the plan in Step 1. This seeds `plannedTaskIds` in the state file so the `verify-completeness` gate (Step 5f) can cross-check all planned IDs against accounted task records.
 
 Before each wave: `node "$STATE_SCRIPT" wave-start --wave <N>`
-After each task (sourced from `WAVE_SUMMARY.tasks[]`): `node "$STATE_SCRIPT" task-done --wave <N> --task <id> --name "<name>" --complexity <c> --risk <r> --files-changed '<json>'` (or `task-fail` when `task.status === 'FAILED'`)
+After each task (sourced from `WAVE_SUMMARY.tasks[]`): `node "$STATE_SCRIPT" task-done --wave <N> --task <id> --name "<name>" --complexity <c> --risk <r> --files-changed '<json>'` where `<json>` is `WAVE_SUMMARY.tasks[].filesTouched` (R-FILESTOUCHED) (or `task-fail` when `task.status === 'FAILED'`)
 After each wave: `node "$STATE_SCRIPT" wave-done --wave <N>` (or `wave-fail` when `WAVE_SUMMARY.status === 'failed'`)
 Update context: `node "$STATE_SCRIPT" context --data '<json>'`
 
