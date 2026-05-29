@@ -1033,3 +1033,54 @@
         marker. The response does NOT claim that sub-agent TodoWrite calls bubble up
         to the parent — it instead documents that main-thread calls are the source
         of task-tray visibility.
+
+# ---------------------------------------------------------------------------
+# verify-openspec step (#441) — ran-result vs text-fallback
+# ---------------------------------------------------------------------------
+
+- description: "ship-sdlc (#441): verify-openspec ran — report result, suppress fallback text"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-verify-openspec-step.md"
+    user_request: >
+      Using Scenario A from the context (verify-openspec is will_run with --change add-auth),
+      walk through the verify-openspec dispatch section. Show how ship-sdlc dispatches the step,
+      handles a "satisfied" verdict, and what appears in the REPORT section for OpenSpec.
+      Do not dispatch any sub-skills — describe the behavior based on SKILL.md prose.
+  assert:
+    - type: icontains
+      value: "verify-openspec"
+    - type: icontains
+      value: "satisfied"
+    - type: not-icontains
+      value: "→ Run /opsx:verify"
+    - type: llm-rubric
+      value: >
+        The response describes dispatching verify-openspec via the Agent protocol (Skill tool,
+        model sonnet) with the args from step.invocation (--change add-auth). It shows the
+        satisfied verdict path: logging "OpenSpec verify: satisfied" and proceeding to
+        archive-openspec. In the REPORT section, it prints the verify result (e.g.,
+        "OpenSpec verify: satisfied") and does NOT emit the "→ Run /opsx:verify" fallback
+        text, because the step ran. The response correctly cites step.status === 'will_run'
+        from the prepare output (not $ARGUMENTS) as the gate condition.
+
+- description: "ship-sdlc (#441): verify-openspec not configured — fallback text appears in REPORT"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-verify-openspec-step.md"
+    user_request: >
+      Using Scenario B from the context (verify-openspec is skipped with reason "not in steps[]"),
+      describe what ship-sdlc emits in the REPORT section for OpenSpec. The pipeline ran to
+      completion with archive-openspec executing successfully. Show exactly what OpenSpec-related
+      lines appear in REPORT. Do not dispatch any sub-skills.
+  assert:
+    - type: icontains
+      value: "→ Run /opsx:verify"
+    - type: llm-rubric
+      value: >
+        The response shows that when verify-openspec is not in flags.steps (Scenario B),
+        REPORT emits the "→ Run /opsx:verify to validate implementation completeness against
+        the spec" fallback text. It does NOT show a verify result because the step did not run.
+        The archive-openspec result (archived successfully) is reported separately. This
+        demonstrates the KD6 conditional text behavior: ran-result when the step executed,
+        fallback suggestion when it was absent from steps.

@@ -39,7 +39,7 @@ This skill is for **expert users working on projects with established quality gu
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
-| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `verify-pipeline` (opt-in), `await-remote-review` (opt-in), `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
+| `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `verify-openspec` (opt-in, OpenSpec-gated), `archive-openspec`, `pr`, `verify-pipeline` (opt-in), `await-remote-review` (opt-in), `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
 | `--quick` | Run the project's quick step profile (`ship.quick` in `.sdlc/local.json`) instead of `ship.steps[]`. Useful for fast local iterations (e.g. execute+commit+pr without review or versioning). Mutually exclusive with `--steps` (R-quick-5). Requires `ship.quick` to be configured (R-quick-6). | Off |
 | `--quality <full\|balanced\|minimal>` | Forwarded to execute-plan-sdlc as `--quality` (model tier). Only forwarded when the user explicitly passes `--quality` to ship; otherwise execute-plan-sdlc applies its own selection. (Renamed from `--preset` in #190 to disambiguate from `--steps`.) | Not forwarded |
 | `--bump patch\|minor\|major\|<label>` | Version bump type forwarded to version-sdlc. The `<label>` form (e.g. `--bump rc`, `--bump beta`) is forwarded verbatim and interpreted by version-sdlc as `--bump patch --pre <label>`. Labels must match `^[a-z][a-z0-9]*$` (lowercase, start with a letter, alphanumeric). Example: `ship-sdlc --bump rc` produces a `1.2.4-rc.1` style release. | `patch` (or `version.preRelease` from `.sdlc/config.json` when set and no CLI `--bump` is passed — see R63) |
@@ -55,7 +55,7 @@ This skill is for **expert users working on projects with established quality gu
 | `--ttl-days <N>` | TTL in days used by `--gc` and the terminal cleanup step. Files newer than this are kept regardless of branch existence (in-flight pipelines on detached HEAD or freshly-deleted branches must not be wiped). Configurable via `state.gc.ttlDays` in `.sdlc/config.json`; CLI overrides config. | `7` (or `state.gc.ttlDays`) |
 | `--plan-file <path>` | Explicit path to the active plan markdown; overrides the `plansDirectory` scan. Forwarded verbatim to execute-plan-sdlc as `--plan-file` so plan discovery is stable across compaction. Useful when multiple plan files exist or when the auto-scan would pick the wrong file. | auto (plansDirectory scan) |
 
-To enable post-PR CI verification, add `verify-pipeline` to `ship.steps` in `.sdlc/local.json` (or pass it via `--steps`). To await an automated reviewer's verdict, add `await-remote-review`. See R41 / R50 in `docs/specs/ship-sdlc.md`.
+To enable post-PR CI verification, add `verify-pipeline` to `ship.steps` in `.sdlc/local.json` (or pass it via `--steps`). To await an automated reviewer's verdict, add `await-remote-review`. See R41 / R50 in `docs/specs/ship-sdlc.md`. To validate implementation completeness against the spec before archiving, add `verify-openspec` between `version` and `archive-openspec` — requires a matched OpenSpec change (`flags.openspecChange` or branch-name match); the step is skipped with a clear reason when neither is present.
 
 
 **Removed (#190 hard-remove):** `--preset` and `--skip` are no longer accepted. Passing either produces an error pointing at `--steps <csv>` (for step composition) and `--quality <full|balanced|minimal>` (for the execute-plan-sdlc model tier). Legacy on-disk v1 configs (`ship.preset`/`ship.skip`) are still auto-migrated to v2 by `lib/config.js`.
@@ -66,7 +66,7 @@ To omit the `archive-openspec` step from a single run: `--steps <csv>` listing t
 
 ## How the Pipeline Works
 
-The pipeline runs 8 steps sequentially. Two steps are conditional on the review verdict, and two steps pause even in `--auto` mode because they require human sign-off. The final step (`learnings-commit`) is a no-op when no learnings were captured this run.
+The pipeline runs up to 10 canonical steps sequentially (depending on which opt-in steps are configured). Two steps are conditional on the review verdict, and two steps pause even in `--auto` mode because they require human sign-off. The final step (`learnings-commit`) is a no-op when no learnings were captured this run.
 
 ```
                           /ship-sdlc
@@ -124,6 +124,28 @@ plan-sdlc      (--auto if     (--committed)
                         |       (release approval)
                         |            |
                         +-----<------+
+                                     |
+                       [verify-openspec ∈ steps[]      (opt-in, OpenSpec-gated)
+                        AND matched change exists?]
+                                     |
+                                     v
+                                Step 5f-i:
+                                verify-openspec
+                                (Agent: /opsx:verify
+                                 --change <name>;
+                                 verdict: satisfied /
+                                 unsatisfied / error;
+                                 unsatisfied → AskUser
+                                 or warn+record under
+                                 --auto)
+                                     |
+                       [archive-openspec ∈ steps[]?]   (opt-in, OpenSpec-gated)
+                                     |
+                                     v
+                                Step 5f-ii:
+                                archive-openspec
+                                (inline Bash;
+                                 /opsx:archive)
                                      |
                                      v
                                 Step 5g:
@@ -544,7 +566,7 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `schemaVersion` (top-level) | `4` | `4` | Schema version literal. New configs MUST include `schemaVersion: 4`. Legacy configs are auto-migrated on read. |
-| `steps` | `string[]` | `["execute","commit","review","version","archive-openspec","pr","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `learnings-commit`. Replaces legacy `preset` / `skip`. |
+| `steps` | `string[]` | `["execute","commit","review","version","archive-openspec","pr","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `verify-openspec` (opt-in, OpenSpec-gated), `archive-openspec`, `pr`, `verify-pipeline` (opt-in), `await-remote-review` (opt-in), `learnings-commit`. Replaces legacy `preset` / `skip`. |
 | `quick` | `string[]` | unset | Optional shortened step list activated by `--quick`. Same allowed values as `steps`. Unset means `--quick` is unavailable (R-quick-1). |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type. |
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |

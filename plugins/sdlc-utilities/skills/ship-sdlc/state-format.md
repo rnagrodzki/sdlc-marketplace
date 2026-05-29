@@ -103,20 +103,28 @@ Each element represents one pipeline step in execution order.
 
 ### Step Names
 
-The pipeline runs these 7 steps in order:
+The pipeline runs these canonical steps in order (conditional and optional steps noted):
 
-| Name              | Description                                                                 |
-|-------------------|-----------------------------------------------------------------------------|
-| `execute`         | Run the execution plan (tasks, waves).                                      |
-| `commit`          | Commit all changes produced by `execute`.                                   |
-| `review`          | Run automated code review via `review-sdlc`.                                |
-| `received-review` | Conditional: process critical/high review findings and apply fixes.         |
-| `commit-fixes`    | Conditional: commit changes made during `received-review`.                  |
-| `version`         | Bump the version according to `--bump` or interactive selection.            |
-| `pr`              | Open or update a pull request.                                              |
+| Name                  | Description                                                                                      |
+|-----------------------|--------------------------------------------------------------------------------------------------|
+| `execute`             | Run the execution plan (tasks, waves).                                                           |
+| `commit`              | Commit all changes produced by `execute`.                                                        |
+| `review`              | Run automated code review via `review-sdlc`.                                                     |
+| `received-review`     | Conditional: process critical/high review findings and apply fixes.                              |
+| `commit-fixes`        | Conditional: commit changes made during `received-review`.                                       |
+| `version`             | Bump the version according to `--bump` or interactive selection.                                 |
+| `verify-openspec`     | Opt-in, OpenSpec-gated: Agent-dispatched `/opsx:verify` validates implementation completeness against the spec before archiving. Runs only when configured in `steps[]` and a matched OpenSpec change exists. |
+| `archive-openspec`    | Opt-in: archive the OpenSpec change and sync delta specs (inline Bash, OpenSpec-gated).          |
+| `pr`                  | Open or update a pull request.                                                                   |
+| `verify-pipeline`     | Opt-in: poll `gh pr checks` until CI converges after the PR is opened.                          |
+| `await-remote-review` | Opt-in: poll for an automated reviewer's (e.g. Copilot) verdict after the PR is opened.         |
+| `learnings-commit`    | Persist session learnings captured during the run (no-op when nothing was captured).            |
+| `cleanup`             | Always runs last (not user-configurable): deletes the state file on success, prunes stale orphans. |
 
-`received-review` only executes when `review` reports critical or high severity findings.
+`received-review` only executes when `review` reports findings at or above the configured `reviewThreshold`.
 `commit-fixes` only executes when `received-review` applied code changes.
+`verify-openspec` only runs when it is included in `steps[]` AND a matched OpenSpec change exists (`flags.openspecChange` or `openspecContext.branchMatch`).
+`archive-openspec` only runs when an OpenSpec change is detected for the current branch.
 
 ### Status Values
 
@@ -229,7 +237,7 @@ If multiple state files exist for the same branch (from multiple failed attempts
 
 ## Plan-Mode-Blocked Init
 
-When `/ship-sdlc` is invoked while plan mode is active, Step 0 calls `skill/ship.js --plan-mode-blocked` which invokes `state/ship.js init` to persist an init state file. The state file shape is **byte-identical** to a normal `cmdInit` write — all 7 steps with `status: "pending"`, plus `version`, `startedAt`, `branch`, `flags`, `decisions: []`, `deferredFindings: []`.
+When `/ship-sdlc` is invoked while plan mode is active, Step 0 calls `skill/ship.js --plan-mode-blocked` which invokes `state/ship.js init` to persist an init state file. The state file shape is **byte-identical** to a normal `cmdInit` write — all configured steps with `status: "pending"`, plus `version`, `startedAt`, `branch`, `flags`, `decisions: []`, `deferredFindings: []`.
 
 The `planModeBlocked` flag does NOT appear in the state file — it is an annotation in the prepare output only, telling SKILL.md what happened.
 

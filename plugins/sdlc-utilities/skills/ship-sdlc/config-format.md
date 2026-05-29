@@ -36,7 +36,7 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
   "$schema": "https://raw.githubusercontent.com/rnagrodzki/sdlc-marketplace/main/schemas/sdlc-local.schema.json",
   "schemaVersion": 4,
   "ship": {
-    "steps": ["execute", "commit", "review", "version", "archive-openspec", "pr", "verify-pipeline", "await-remote-review", "learnings-commit"],
+    "steps": ["execute", "commit", "review", "version", "verify-openspec", "archive-openspec", "pr", "verify-pipeline", "await-remote-review", "learnings-commit"],
     "quick": ["execute", "commit", "pr"],
     "bump": "patch",
     "draft": false,
@@ -54,7 +54,7 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
 }
 ```
 
-`verify-pipeline` and `await-remote-review` are opt-in members of `ship.steps[]`. Add them only when you want post-PR CI verification or to await an automated reviewer's verdict.
+`verify-pipeline` and `await-remote-review` are opt-in members of `ship.steps[]`. Add them only when you want post-PR CI verification or to await an automated reviewer's verdict. `verify-openspec` is an OpenSpec-gated opt-in — add it between `version` and `archive-openspec` when you want the pipeline to validate implementation completeness against the spec before archiving.
 
 ---
 
@@ -63,7 +63,7 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `schemaVersion` (top-level) | `4` | `4` | Schema version literal. Required for new configs; legacy files are auto-migrated. |
-| `steps` | `string[]` | `["execute","commit","review","version","archive-openspec","pr","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `verify-pipeline` (opt-in, R41), `await-remote-review` (opt-in, R50), `learnings-commit`. Replaces the legacy `preset` and `skip` fields. |
+| `steps` | `string[]` | `["execute","commit","review","version","archive-openspec","pr","learnings-commit"]` | Pipeline steps to run. Allowed values: `execute`, `commit`, `review`, `version`, `verify-openspec` (opt-in, OpenSpec-gated), `archive-openspec`, `pr`, `verify-pipeline` (opt-in, R41), `await-remote-review` (opt-in, R50), `learnings-commit`. Replaces the legacy `preset` and `skip` fields. |
 | `quick` | `string[]` | unset | Optional shortened step list activated by `--quick`. When set, `/ship-sdlc --quick` uses this list instead of `steps[]`. Unset means `--quick` is unavailable for this project. Same allowed values as `steps`. See R-quick-1. |
 | `bump` | `"patch"` \| `"minor"` \| `"major"` | `"patch"` | Default version bump type applied when the `version` step runs. Overridden by `--bump` on the CLI. |
 | `draft` | `boolean` | `false` | When `true`, PRs are created as drafts. Equivalent to `--draft`. |
@@ -121,7 +121,7 @@ A flag passed directly on the command line always wins. If no flag is given, the
 
 Running `ship-sdlc --init-config` launches an interactive sequence that writes the `ship` section to `.sdlc/local.json`. The steps are:
 
-1. **Steps to run** — Select the pipeline steps to run by default (multi-select). Choices: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`. Default: all six.
+1. **Steps to run** — Select the pipeline steps to run by default (multi-select). Choices: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, plus opt-in entries `verify-openspec` (OpenSpec-gated: validates implementation completeness before archiving), `verify-pipeline` (post-PR CI check), `await-remote-review` (wait for automated reviewer verdict), and `learnings-commit` (persist session learnings). Default: the six core steps.
 
 2. **Default bump type** — Choose the default version increment: `patch`, `minor`, or `major`.
 
