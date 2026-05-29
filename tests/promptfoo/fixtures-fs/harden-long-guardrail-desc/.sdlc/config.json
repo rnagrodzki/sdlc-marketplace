@@ -1,0 +1,11 @@
+{
+  "sdlc": "1.0.0",
+  "plan": {
+    "guardrails": [
+      { "id": "long-desc-guardrail", "description": "When a task modifies any prepare script under plugins/sdlc-utilities/scripts/skill, the plan must demonstrate that every contractual flag resolved by that script is consumed by name at each downstream decision site, that the resolved field is the single source of truth, and that no SKILL.md site re-derives the value via fallback logic, OR-ing of raw arguments, or re-parsing of the original CLI string; additionally the plan must cite grep evidence that the flag name does not collide with a differently-typed flag in any sibling user-invoked prepare script, and must describe behaviour under both branch and worktree workspace modes so that every state write routes through the shared resolver helper.", "severity": "error" }
+    ]
+  },
+  "execute": {
+    "guardrails": []
+  }
+}

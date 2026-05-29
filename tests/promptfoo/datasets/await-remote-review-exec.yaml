@@ -93,3 +93,32 @@
   assert:
     - type: contains
       value: '"status":null'
+
+# Regression tests for #439: copilot-pull-request-reviewer login normalisation (R56)
+# GitHub's REST `pulls/{pr}/reviews` returns the Copilot reviewer login as
+# `copilot-pull-request-reviewer` (not `copilot`/`copilot[bot]`). It must be
+# canonicalised to `copilot` before reviewer-set lookup; the bot guard still applies.
+
+- description: "await-remote-review: copilot-pull-request-reviewer COMMENTED Bot type returns actionable (#439)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
+    script_args: '--reviews [{"id":1,"state":"COMMENTED","authorLogin":"copilot-pull-request-reviewer","authorType":"Bot","submittedAt":"2025-01-01"}] --reviewers copilot'
+  assert:
+    - type: contains
+      value: '"status":"actionable"'
+
+- description: "await-remote-review: copilot-pull-request-reviewer[bot] APPROVED Bot type returns approved-clean (#439)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
+    script_args: '--reviews [{"id":1,"state":"APPROVED","authorLogin":"copilot-pull-request-reviewer[bot]","authorType":"Bot","submittedAt":"2025-01-01"}] --reviewers copilot'
+  assert:
+    - type: contains
+      value: '"status":"approved-clean"'
+
+- description: "await-remote-review: copilot-pull-request-reviewer CHANGES_REQUESTED non-Bot rejected by bot guard (#439)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-await-remote-review-evaluate.js"
+    script_args: '--reviews [{"id":1,"state":"CHANGES_REQUESTED","authorLogin":"copilot-pull-request-reviewer","authorType":"User","submittedAt":"2025-01-01"}] --reviewers copilot'
+  assert:
+    - type: contains
+      value: '"status":null'

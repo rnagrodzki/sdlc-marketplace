@@ -107,9 +107,9 @@ function validateGuardrail(guardrail, seenIds) {
     result.status = 'FAIL';
   }
 
-  // Validate description length <= 512
-  if (guardrail.description && guardrail.description.length > 512) {
-    errors.push(`description exceeds 512 characters (${guardrail.description.length} chars)`);
+  // Validate description length <= 1024
+  if (guardrail.description && guardrail.description.length > 1024) {
+    errors.push(`description exceeds 1024 characters (${guardrail.description.length} chars)`);
     result.status = 'FAIL';
   }
 
