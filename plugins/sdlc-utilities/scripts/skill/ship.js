@@ -550,6 +550,52 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
       isolation: null,
       dispatchMode: 'agent',
     },
+    // verify-openspec: Agent-dispatched opt-in step between version and archive-openspec (R-verify-openspec-1..5)
+    (() => {
+      const oc = openspecContext || {};
+      const changeName = flags.openspecChange || oc.branchMatch || null;
+
+      if (!isIn('verify-openspec')) {
+        return {
+          name: 'verify-openspec',
+          skill: 'opsx:verify',
+          model: 'sonnet',
+          status: 'skipped',
+          skipSource: skipSource('verify-openspec'),
+          args: '',
+          reason: 'not in steps[]',
+          pause: false,
+          isolation: null,
+          dispatchMode: 'agent',
+        };
+      }
+      if (!changeName) {
+        return {
+          name: 'verify-openspec',
+          skill: 'opsx:verify',
+          model: 'sonnet',
+          status: 'skipped',
+          skipSource: 'condition',
+          args: '',
+          reason: 'no matching openspec change for current branch',
+          pause: false,
+          isolation: null,
+          dispatchMode: 'agent',
+        };
+      }
+      return {
+        name: 'verify-openspec',
+        skill: 'opsx:verify',
+        model: 'sonnet',
+        status: 'will_run',
+        skipSource: 'none',
+        args: `--change ${changeName}${flags.auto ? ' --auto' : ''}`,
+        reason: `openspec change "${changeName}" ready for verify`,
+        pause: !flags.auto,
+        isolation: null,
+        dispatchMode: 'agent',
+      };
+    })(),
     // archive-openspec: conditional step between version and pr
     (() => {
       const oc = openspecContext || {};

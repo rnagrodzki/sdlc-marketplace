@@ -230,6 +230,7 @@ Auto-skip decisions (from skill/ship.js):
   received-review: conditional — depends on review verdict
   commit (fixes): conditional — depends on received-review changes
   version: skipped (auto) — auto-skipped — tags are repo-global
+  verify-openspec: skipped (default) — not in steps[]
   archive-openspec: conditional — openspec change ready for archive
   pr:      will_run — not in skip set
 ```
@@ -323,7 +324,7 @@ Pipeline validation:
 Validation checks:
 - `gh auth status` succeeds
 - Current branch is not the default branch (warn if it is — do not block)
-- All `--steps` values are recognized step names: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, `learnings-commit`
+- All `--steps` values are recognized step names: `execute`, `commit`, `review`, `version`, `verify-openspec`, `archive-openspec`, `pr`, `learnings-commit`
 - When `flags.sources.steps === 'quick'` in the prepare output, verify that `flags.steps` is non-empty (R-quick-6 error would have fired if `ship.quick` was missing — non-empty confirms the quick profile resolved correctly). Cite `flags.sources.steps`, NOT raw `--quick` or `$ARGUMENTS`, at all decision sites (R-quick-2, R-quick-3).
 - `--quick` and `--steps` are mutually exclusive — R-quick-5 error fires if both are present; surface from `errors[]` in prepare output, not re-checked independently.
 - At least one step will run
@@ -602,7 +603,7 @@ if [ "$WORKSPACE_MODE" = "worktree" ]; then
 fi
 ```
 
-**Cwd propagation contract:** The single `cd "$WORKTREE_PATH"` above sets the main-context shell cwd. Bash cwd persists across subsequent Bash invocations in the same agent context. Agent-tool dispatches inherit the parent's cwd — so commit-sdlc, review-sdlc, pr-sdlc, verify-pipeline-sdlc, version-sdlc, received-review-sdlc, learnings-commit, and archive-openspec all start in the new worktree automatically. No per-prompt `cd` prepend is needed. In branch mode there is nothing to cd into (HEAD shared with main worktree) — same cwd propagation applies trivially.
+**Cwd propagation contract:** The single `cd "$WORKTREE_PATH"` above sets the main-context shell cwd. Bash cwd persists across subsequent Bash invocations in the same agent context. Agent-tool dispatches inherit the parent's cwd — so commit-sdlc, review-sdlc, pr-sdlc, verify-pipeline-sdlc, version-sdlc, received-review-sdlc, learnings-commit, verify-openspec, and archive-openspec all start in the new worktree automatically. No per-prompt `cd` prepend is needed. In branch mode there is nothing to cd into (HEAD shared with main worktree) — same cwd propagation applies trivially.
 
 **Step 5:** Pass `--branch "$EXECUTE_BRANCH"` to execute-plan-sdlc in the execute dispatch (see "Execute step" section below). execute-plan-sdlc will short-circuit its own Step 1 isolation block (implements R30 from execute-plan-sdlc spec).
 
@@ -724,6 +725,38 @@ fi
 ```
 
 `NEW_TAG` is the tag string emitted by version-sdlc (e.g. `v1.2.3`). `EXECUTE_BRANCH` is the feature branch variable set during pre-execute workspace isolation (already available in the pipeline shell context). This gate is a **no-op when `NEW_TAG` is unset** (version step was skipped or not in `flags.steps`, e.g., under `workspace: worktree`). Works correctly under both `workspace: branch` and `workspace: worktree`.
+
+### Between version and archive-openspec — verify-openspec (Agent-dispatched, opt-in)
+
+If `step.status === 'will_run'` for the `verify-openspec` step (sourced from prepare output — NOT from `$ARGUMENTS`; implements R-verify-openspec-1..5):
+
+1. Dispatch `/opsx:verify` via the Agent protocol. Use `step.invocation` as the skill invocation verbatim (e.g., `opsx:verify --change <name>`). Pass `model: step.model` (sonnet). Never add `isolation`. The agent must return a verdict `{ status: "satisfied" | "unsatisfied" | "error", summary: string, gaps: string[] }`.
+
+   **Agent prompt (adapted for verdict contract):**
+   > Invoke the skill using the Skill tool with `step.invocation` verbatim as the invocation: `<step.invocation>`.
+   > After the skill completes, return a JSON verdict on the last line of your response in exactly this shape:
+   > `VERIFY_VERDICT: {"status":"satisfied"|"unsatisfied"|"error","summary":"<one sentence>","gaps":["<gap1>",...]}`
+   > — `satisfied`: all spec requirements are met.
+   > — `unsatisfied`: implementation gaps were found; populate `gaps[]` with one entry per gap.
+   > — `error`: the verify tool failed to run; `summary` should describe the tooling failure.
+
+2. Parse the `VERIFY_VERDICT` JSON from the agent's response.
+
+3. **Branch on verdict:**
+   - `status: "satisfied"` → log `verify-openspec: satisfied — <summary>`. Proceed to archive-openspec.
+   - `status: "error"` → log warning `verify-openspec: error — <summary>. Proceeding.`. Do not block the pipeline on tooling failure. Proceed to archive-openspec.
+   - `status: "unsatisfied"` AND `flags.auto === false` → present to user via `AskUserQuestion`:
+     > OpenSpec verify found N gap(s):
+     > - <gap1>
+     > - ...
+     >
+     > Options: **proceed** (continue to archive) | **abort** (save resume state, exit 1) | **open-as-finding** (record gaps in pipeline findings, continue)
+     - **proceed**: continue to archive-openspec.
+     - **abort**: write resume state via `state/ship.js fail`, exit 1.
+     - **open-as-finding**: append each gap to the existing ship-state findings collection — the same collection REPORT displays at the deferred-findings section (no new mechanism). Then proceed to archive-openspec.
+   - `status: "unsatisfied"` AND `flags.auto === true` → log warning `verify-openspec: unsatisfied — <N> gap(s). Recording as findings.`. Append gaps to the existing findings collection. Continue to archive-openspec.
+
+When `step.status !== 'will_run'` (skipped — not in steps[] or no matched change), skip this entire section.
 
 ### Between version and pr — archive-openspec (conditional)
 
@@ -1003,11 +1036,17 @@ Deferred review findings (2 medium):
 State file cleaned up: .sdlc/execution/ship-<branch>-<epoch>.json deleted
 ```
 
+If OpenSpec was detected in Step 1f and the `verify-openspec` step ran, append the verdict result:
+  `→ OpenSpec verify: <satisfied|unsatisfied> — <summary>`
+  (When unsatisfied and gaps were opened-as-finding or recorded, note: `N gap(s) recorded as pipeline findings.`)
+
+If OpenSpec was detected but `verify-openspec` is NOT in `flags.steps` (step was not configured), append:
+  `→ Run /opsx:verify to validate implementation completeness against the spec`
+
 If OpenSpec was detected in Step 1f and the archive-openspec step ran successfully, append:
   `→ OpenSpec change "<name>" archived and committed.`
 
-If OpenSpec was detected but archive-openspec was skipped or not triggered, append:
-  `→ Run /opsx:verify to validate implementation completeness against the spec`
+If OpenSpec was detected but `archive-openspec` is NOT in `flags.steps`, append:
   `→ Run /opsx:archive to archive the OpenSpec change and sync delta specs`
 
 ### Worktree cleanup
@@ -1155,8 +1194,8 @@ Format:
 
 After the pipeline completes, common follow-ups include:
 - `/received-review-sdlc` — address deferred medium/low findings
-- `/opsx:verify` — validate implementation against OpenSpec (if detected)
-- `/opsx:archive` — archive the OpenSpec change and sync delta specs (if detected)
+- `/opsx:verify` — validate implementation against OpenSpec (only suggest when `verify-openspec ∉ flags.steps`; when the step ran, the result is already in REPORT)
+- `/opsx:archive` — archive the OpenSpec change and sync delta specs (only suggest when `archive-openspec ∉ flags.steps`)
 
 ---
 
