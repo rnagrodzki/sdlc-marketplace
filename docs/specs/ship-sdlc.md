@@ -276,7 +276,7 @@
 - I9: `pr-sdlc` — step 7: pull request creation
 - I10: `setup-sdlc` — redirect target for `--init-config`
 - I11: `util/worktree-create.js` — worktree creation for workspace isolation
-- I12: `verify-openspec` step — opt-in, Agent-dispatched; runs `/opsx:verify` for a matched OpenSpec change between `version` and `archive-openspec`; verdict drives proceed/abort/open-as-finding branching; `→ Run /opsx:verify` text emitted only when step is not configured (KD6)
+- I12: `verify-openspec` step — opt-in, Agent-dispatched; runs `/opsx:verify` for a matched OpenSpec change between `version` and `archive-openspec`; verdict drives proceed/abort/open-as-finding branching; `→ Run /opsx:verify` text emitted only when step is not configured (KD6) (implements R-verify-openspec-1..5)
 - I13: `lib/openspec.js` — `validateChangeStrict`, `isArchived`, `runArchive` helpers for the `archive-openspec` step
 - I14 (issue #232): `lib/config-version.js::verifyAndMigrate` — invoked at pipeline entry once per role (project, local) before any step dispatch. Throws halt the pipeline before step 1.
 - I15 (issue #232): `lib/config-migrations.js` — registry consumed by `verifyAndMigrate`; ship-sdlc does not import it directly.

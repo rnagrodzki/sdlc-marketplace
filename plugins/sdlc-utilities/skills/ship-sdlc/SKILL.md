@@ -733,7 +733,7 @@ If `step.status === 'will_run'` for the `verify-openspec` step (sourced from pre
 1. Dispatch `/opsx:verify` via the Agent protocol. Use `step.invocation` as the skill invocation verbatim (e.g., `opsx:verify --change <name>`). Pass `model: step.model` (sonnet). Never add `isolation`. The agent must return a verdict `{ status: "satisfied" | "unsatisfied" | "error", summary: string, gaps: string[] }`.
 
    **Agent prompt (adapted for verdict contract):**
-   > Invoke /opsx:verify using the Skill tool with the following args: `<step.invocation arguments>`.
+   > Invoke the skill using the Skill tool with `step.invocation` verbatim as the invocation: `<step.invocation>`.
    > After the skill completes, return a JSON verdict on the last line of your response in exactly this shape:
    > `VERIFY_VERDICT: {"status":"satisfied"|"unsatisfied"|"error","summary":"<one sentence>","gaps":["<gap1>",...]}`
    > — `satisfied`: all spec requirements are met.
