@@ -82,3 +82,39 @@
     - type: not-icontains
       value: "gh issue view failed"
       description: "must short-circuit before invoking gh — the value-validation guard fires first"
+
+# #438: guardrail description limit raised 512 → 1024.
+# 704-char description (would have failed under the old 512 limit) MUST now pass pre-flight;
+# 1043-char description MUST still be rejected — proves the new boundary holds.
+
+- description: "harden-prepare #438: 704-char guardrail description passes pre-flight (limit raised to 1024)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/harden-prepare.js"
+    script_args: "--failure-text \"test failure\" --skill plan-sdlc"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/harden-long-guardrail-desc"
+    script_capture_stderr: true
+  assert:
+    # manifest assembled → pre-flight passed (clean fixtures emit pluginRepoUrl)
+    - type: icontains
+      value: "pluginRepoUrl"
+      description: "manifest must be assembled (pre-flight passed) for a 704-char guardrail description"
+    # no length-rejection error emitted
+    - type: not-icontains
+      value: "exceeds"
+      description: "no 'exceeds N characters' rejection for an in-range (513–1024) description"
+
+- description: "harden-prepare #438: 1043-char guardrail description still rejected (exceeds 1024)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/harden-prepare.js"
+    script_args: "--failure-text \"test failure\" --skill plan-sdlc"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/harden-overlong-guardrail-desc"
+    script_capture_stderr: true
+  assert:
+    - type: icontains
+      value: "exceeds 1024 characters"
+      description: "a >1024-char description must be rejected with the new limit in the message"
+    - type: icontains
+      value: "pre-flight validation failed"
+      description: "stderr must emit pre-flight validation failed (proves exit-1 code path)"

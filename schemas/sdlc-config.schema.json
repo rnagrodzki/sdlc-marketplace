@@ -253,7 +253,7 @@
         },
         "description": {
           "type": "string",
-          "maxLength": 512,
+          "maxLength": 1024,
           "description": "Natural-language rule."
         },
         "severity": {

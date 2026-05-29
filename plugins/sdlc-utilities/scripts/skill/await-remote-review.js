@@ -46,6 +46,11 @@ const { writeJsonLine } = require(path.join(LIB, 'output'));
  *     carry a trailing `[bot]` suffix (e.g. `copilot[bot]`). This suffix is
  *     stripped before comparison against the configured reviewers list so that
  *     a reviewer entry of `copilot` matches both `copilot` and `copilot[bot]`.
+ *   - Copilot reviewer variants are canonicalised after the `[bot]` strip:
+ *     `copilot-pull-request-reviewer` (the login GitHub actually returns for
+ *     Copilot reviews) collapses to `copilot` so a configured `copilot` entry
+ *     matches it (issue #439). Normalisation runs before the bot guard, so the
+ *     guard still applies.
  *   - When the normalised reviewer login is `copilot`, also requires
  *     authorType === 'Bot' as the authoritative bot-identity guard.
  *
@@ -65,7 +70,13 @@ function evaluateReviews(reviews, reviewers) {
 
   const matching = list.filter((r) => {
     if (!r || r.state === 'PENDING') return false;
-    const login = (r.authorLogin || '').toLowerCase().replace(/\[bot\]$/, '');
+    let login = (r.authorLogin || '').toLowerCase().replace(/\[bot\]$/, '');
+    // Canonicalise Copilot reviewer variants. GitHub's REST pulls/{pr}/reviews
+    // returns the Copilot reviewer login as `copilot-pull-request-reviewer`,
+    // while the configured reviewer is `copilot`. Collapse both to `copilot`
+    // BEFORE the reviewer-set lookup and the bot guard so the `login === 'copilot'`
+    // bot-identity check still fires (issue #439).
+    if (/^copilot(-pull-request-reviewer)?$/.test(login)) login = 'copilot';
     if (!reviewerSet.has(login)) return false;
     if (login === 'copilot' && r.authorType !== 'Bot') return false;
     return true;
