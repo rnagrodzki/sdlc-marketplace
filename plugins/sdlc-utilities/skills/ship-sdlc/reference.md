@@ -2,7 +2,7 @@
 
 On-demand companion for `ship-sdlc/SKILL.md` (implements R-progressive-disclosure). Reference material consulted only when the relevant situation arises (a failure, an unexpected behavior, end-of-pipeline learning capture). Read the relevant section on its trigger; never preemptively.
 
-## Error Recovery
+## Error Recovery (R-progressive-disclosure)
 
 > **Flow**: detect → diagnose → auto-recover (retry once if transient) → escalate to user for persistent failures.
 
@@ -26,7 +26,7 @@ To resume: /ship-sdlc --resume
 
 Each sub-skill has its own error recovery. ship-sdlc does not duplicate their recovery logic — it catches pipeline-level failures (sequencing, state, context) and delegates skill-level failures to the skill itself.
 
-## DO NOT
+## DO NOT (R-progressive-disclosure)
 
 - Deviate from `step.dispatchMode`. Every sub-skill step has `dispatchMode: 'agent'`; inline-Bash steps have `dispatchMode: null`. The LLM must not synthesize a `'skill'` value or invoke any step via the Skill tool from Step 5. Use Agent tool for all sub-skill steps, including `execute-plan-sdlc`.
 - Skip the critique step (Step 3) even when all checks seem obvious
@@ -44,7 +44,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Skip the post-version ancestry HARD GATE. The check is the only safeguard against tags landing on orphaned commits (issue #349). The gate is a no-op when `NEW_TAG` is unset — do not pre-empt it by skipping it when you believe the version step succeeded on the right branch.
 - Exit the plan-mode-blocked path (Step 0, steps 3–7) without running `rm -f "$PLAN_MODE_OUTPUT_FILE"` — the temp prepare output file is separate from the persistent state file in `.sdlc/execution/` and must be cleaned up on every exit branch.
 
-## Gotchas
+## Gotchas (R-progressive-disclosure)
 
 **Staging gap after execute.** execute-plan-sdlc creates and modifies files but does not stage them. ship-sdlc must run `git add -A -- ':!.sdlc/'` between execute and commit. Missing this produces an empty commit.
 
@@ -86,7 +86,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 
 **skipSource tracks provenance.** Each step's `skipSource` field records why a step was skipped: `"none"` (not skipped), `"cli"` (step omitted from CLI `--steps`), `"quick"` (step is canonical but absent from `ship.quick` under an active `--quick` run — R-quick-4), `"config"` (omitted from `ship.steps[]` in `.sdlc/local.json`), `"auto"` (auto-skipped by `computeSteps` logic), `"condition"` (conditional step not triggered), `"default"` (built-in defaults excluded the step). The per-step `skipSource` makes the exclusion provenance auditable per step.
 
-## Learning Capture
+## Learning Capture (R-progressive-disclosure)
 
 After completing the pipeline, append to `.sdlc/learnings/log.md`:
 

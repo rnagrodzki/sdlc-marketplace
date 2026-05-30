@@ -2,7 +2,7 @@
 
 On-demand companion for `ship-sdlc/SKILL.md` (implements R-progressive-disclosure). These handlers short-circuit the pipeline — they run instead of the normal `ship it` flow. Read this file only when the corresponding flag is passed; never preemptively.
 
-## --init-config handler
+## --init-config handler (R16, R-quick-7)
 
 If `--init-config` was passed:
 
@@ -25,8 +25,9 @@ echo "EXIT_CODE=$EXIT_CODE"
 # Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM.
 trap 'rm -f "$INIT_OUTPUT_FILE"' EXIT INT TERM
 ```
-3. Parse the output JSON from `$INIT_OUTPUT_FILE`:
-   - If `errors` is non-empty, display them and stop.
+3. Check `EXIT_CODE` first, then parse the output JSON from `$INIT_OUTPUT_FILE`:
+   - If `EXIT_CODE` is non-zero: exit code 1 → display the `errors` array from the JSON and stop; exit code 2 → show the script error message (stderr) and stop. Do not proceed to confirmation.
+   - If `EXIT_CODE` is 0 but `errors` is non-empty, display them and stop.
    - Otherwise display the `created` files list and `config` JSON for user confirmation.
 4. Stop. No pipeline execution.
 
@@ -37,6 +38,7 @@ If `--gc` (with optional `--ttl-days <N>`) was passed, run `skill/ship.js --gc` 
 ```bash
 SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
+[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
 PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --gc)  # add --ttl-days <N> when provided
 trap 'rm -f "$PREPARE_OUTPUT_FILE"' EXIT INT TERM
 ```
@@ -51,7 +53,7 @@ Print one line per file:
 
 Then stop. Do not proceed to step 1b. The pipeline does not run.
 
-## Dry-run mode
+## Dry-run mode (R15, R59)
 
 If `--dry-run`, display the full pipeline table and stop:
 ```

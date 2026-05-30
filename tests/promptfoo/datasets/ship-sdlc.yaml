@@ -1122,6 +1122,11 @@
   assert:
     - type: icontains
       value: "entry-modes.md"
+    # Structural: must reference the gc-specific surface (ship.js --gc), not init-config
+    - type: icontains
+      value: "ship.js"
+    - type: not-icontains
+      value: "ship-init.js"
     - type: llm-rubric
       value: >
         The --gc handler is dispatched by Reading ./entry-modes.md (the --gc
@@ -1138,6 +1143,9 @@
   assert:
     - type: icontains
       value: "entry-modes.md"
+    # Structural: must reference the init-config-specific surface (setup-sdlc redirect), not gc
+    - type: icontains
+      value: "setup-sdlc"
     - type: llm-rubric
       value: >
         The --init-config handler is dispatched by Reading ./entry-modes.md (the
