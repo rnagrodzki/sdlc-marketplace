@@ -46,63 +46,19 @@ All gates in steps 3–5 cite resolved fields from prepare output (`planModeBloc
 
 ### 1a. --init-config handler
 
-If `--init-config` was passed:
-
-**Redirect:** Suggest running `/setup-sdlc` instead for unified configuration. If user insists on `--init-config`, proceed with the existing walkthrough.
-
-1. Read `./config-format.md` and run the interactive walkthrough to collect the user's answers (steps multi-select, bump type, auto, threshold, workspace isolation).
-   After the `steps[]` selection, offer the optional `--quick` profile prompt (R-quick-7):
-   > "Would you like to define a `--quick` profile? Select steps that form your shortened pipeline, or skip to omit."
-   If the user selects steps, capture them. If the user skips, omit the `--quick` flag when calling `ship-init.js`.
-2. Locate and call `ship-init.js` via Bash with the collected answers (append `--quick <csv>` only when the user made a quick-profile selection):
-```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship-init.js" -path "*/sdlc*/scripts/util/ship-init.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/ship-init.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/ship-init.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate util/ship-init.js. Is the sdlc plugin installed?" >&2; exit 2; }
-
-INIT_OUTPUT_FILE=$(node "$SCRIPT" --output-file --steps execute,commit,review,archive-openspec,pr --bump patch --auto --threshold high --workspace prompt)
-EXIT_CODE=$?
-echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
-echo "EXIT_CODE=$EXIT_CODE"
-# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM.
-trap 'rm -f "$INIT_OUTPUT_FILE"' EXIT INT TERM
-```
-3. Parse the output JSON from `$INIT_OUTPUT_FILE`:
-   - If `errors` is non-empty, display them and stop.
-   - Otherwise display the `created` files list and `config` JSON for user confirmation.
-4. Stop. No pipeline execution.
+If `--init-config` was passed → Read `./entry-modes.md` (--init-config section) and follow it. Do not read preemptively. The handler short-circuits — no pipeline execution.
 
 ### 1a-gc. --gc handler (R39, issue #223)
 
-If `--gc` (with optional `--ttl-days <N>`) was passed, run `skill/ship.js --gc` and stop — no pipeline composition. The prepare script short-circuits: it scans `<main-worktree>/.sdlc/execution/` for stale ship- and execute- state files (older than TTL AND whose branch is no longer in `git branch --list`), removes them, and emits a JSON report.
-
-```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
-PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --gc)  # add --ttl-days <N> when provided
-trap 'rm -f "$PREPARE_OUTPUT_FILE"' EXIT INT TERM
-```
-
-Read the prepare output. The top-level `action` field will be `"gc"`; the `report` field contains `{ttlDays, ship: {deleted, kept}, execute: {deleted, kept}}`.
-
-Print one line per file:
-```
-[deleted] ship-deletedbranch-20240101T000000Z.json — stale+branch-gone
-[kept]    ship-main-20260505T120000Z.json — ttl-fresh
-```
-
-Then stop. Do not proceed to step 1b. The pipeline does not run.
+If `--gc` (with optional `--ttl-days <N>`) was passed → Read `./entry-modes.md` (--gc section) and follow it. Do not read preemptively. The handler short-circuits — the pipeline does not run.
 
 ### 1b. Load ship config
 
 **Hook context fast-path:** If the session-start system-reminder contains a `Ship config:` line, note it for display. The prepare script (`skill/ship.js`) remains the authoritative source for config values — the hook line is a user-facing heads-up, not a data source.
 
-Check for ship config via skill/ship.js output (reads from `.sdlc/local.json` → `ship` section, with legacy `.sdlc/ship-config.json` fallback). If found, read and merge. Print loaded config verbosely:
+Check for ship config via skill/ship.js output (reads from `.sdlc/local.json` → `ship` section, with legacy `.sdlc/ship-config.json` fallback). If found, read and merge. Print a single compact summary line, e.g.:
 ```
-Ship config loaded from .sdlc/local.json (schema v2)
-  steps: [execute, commit, review, archive-openspec, pr], draft: false, bump: patch
-  reviewThreshold: high
-  execute.commitWaves: false
+Ship config (schema v2): steps=[execute, commit, review, archive-openspec, pr], draft=false, bump=patch, reviewThreshold=high, execute.commitWaves=false
 ```
 
 The `execute.commitWaves` field (Fixes #392 / R35) controls per-wave WIP commits during the execute step. Default `false`. When set to `true` in ship config, `--commit-waves` is appended to the execute step's invocation; the execute-plan-sdlc skill then runs `git add -A && git commit -m "wip(execute): wave N — <titles>"` after each wave's G9 + G11 pass. The subsequent commit step (commit-sdlc) detects the `wip(execute):` commits since fork-point and squashes them via soft-reset into the final feature commit, so the user-facing PR history is unchanged. Resolution is centralized in `scripts/skill/ship.js` (per `scripts-over-llm-logic` and `flag-coherence-cross-skill` guardrails) — SKILL.md cites `step.invocation`, never raw `config.execute.commitWaves`.
@@ -118,37 +74,14 @@ SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/shi
 [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
 [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
 
-<!-- Implements A8d. Fixes #371. Workspace mode is intentionally omitted from this example so it falls back to `ship.workspace` config via `mergeFlags`; literal `--workspace <value>` here would override user config. -->
 PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto)
-# --bump is forwarded only when the user passes it; ship-prepare resolves bump from
-# config (version.preRelease) or default (patch) otherwise. Passing --bump here would
-# unconditionally override config, preventing pre-release trains from working (#394).
-# Workspace mode comes from `.sdlc/local.json` (`ship.workspace`) via config fallback.
-# Only pass `--workspace`, `--branch`, or `--tree` to override for a single run.
-# Example override: node "$SCRIPT" --output-file --has-plan --auto --tree
-# Pipeline composition (which steps run) comes from config `ship.steps[]`. To override
-# the resolved step list for a single run, pass `--steps <csv>` (e.g.
-# `--steps execute,commit,pr`). To set the model tier forwarded to execute-plan-sdlc,
-# pass `--quality <full|balanced|minimal>` — only forwarded when explicitly passed.
-# Legacy `--preset` and `--skip` are hard-removed (#190) and produce errors.
-# The config-level field is `steps[]` (top-level `schemaVersion: 4`); preset/skip are no longer persisted.
-#
-# Hook signal — R-implicit-resume (#359):
-# If the session-start system-reminder contains a line matching
+# Hook signal: if the session-start system-reminder contains a line matching
 # `/^Active pipeline: ship-sdlc/`, ALSO append `--hook-active-pipeline` to the
-# invocation above. The prepare script then inspects the ship state file for the
-# current branch and, when found+fresh, sets flags.implicitResume=true AND
-# flags.resume=true so subsequent steps treat this run as a resume without
-# requiring the user to type --resume. When no state file is found, prepare
-# emits errors[*].id === "implicitResumeNoState" (handled in Step 1e).
+# invocation above. When no state file is found, prepare emits
+# errors[*].id === "implicitResumeNoState" (handled in Step 1e).
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
-# Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM, so the
-# manifest is removed even if any pipeline step errors out, an Agent dispatch
-# crashes, or the user cancels. The 1a INIT trap (if previously set) is
-# replaced — the --init-config path exits before reaching 1c, so there is no
-# overlap in runtime lifecycle between the two manifest variables.
 trap 'rm -f "$PREPARE_OUTPUT_FILE"' EXIT INT TERM
 ```
 
@@ -297,11 +230,9 @@ After review-sdlc completes, parse the conversation for a `Verdict:` line. The v
 If the threshold is met → invoke received-review-sdlc (forward `"--auto"` when `flags.auto`).
 Otherwise → collect findings and defer to the pipeline summary report.
 
-Example run-banner lines (display-only — do NOT control dispatch):
+Example run-banner line (display-only — do NOT control dispatch):
 ```
 Review verdict: CHANGES REQUESTED (1 critical, 2 high)
-Review verdict: APPROVED WITH NOTES (3 medium, 1 low)
-Review verdict: APPROVED
 ```
 
 In `--auto` mode, dispatch is automatic and `received-review-sdlc --auto` is forwarded — no interactive pause.
@@ -336,23 +267,7 @@ Validation checks:
 
 ### Dry-run mode
 
-If `--dry-run`, display the full pipeline table and stop:
-```
-Ship Pipeline (dry run)
-────────────────────────────────────────────────────────────────
-Step  Skill                 Status       Args              Pause?
-────────────────────────────────────────────────────────────────
-1     execute-plan-sdlc     will run     (none)             no
-2     commit-sdlc           will run     --auto            no
-3     review-sdlc           will run     --committed       no
-4     received-review-sdlc  conditional  (if crit/high)    YES
-5     commit-sdlc (fixes)   conditional  --auto            no
-6     version-sdlc          skipped      —                 —
-7     pr-sdlc               will run     --auto --draft    no
-────────────────────────────────────────────────────────────────
-Review threshold: critical or high findings trigger fix loop
-Interactive pauses: received-review (if triggered)
-```
+If `--dry-run` was passed → Read `./entry-modes.md` (Dry-run mode section) and follow it. Do not read preemptively. Dry-run displays the full pipeline table and stops without executing.
 
 ### Auto mode
 
@@ -492,12 +407,11 @@ For ultra-short runs (`flags.steps.length < 2`), skip TodoWrite entirely.
 When NOT resuming, resolve workspace mode and enforce the default-branch guard before any workspace creation:
 
 ```bash
-# Resolve SDLC_LIB once — used by all subsequent node -e heredocs in this section.
 SDLC_LIB=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/scripts/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs -I {} dirname {})
 [ -z "$SDLC_LIB" ] && [ -d "plugins/sdlc-utilities/scripts/lib" ] && SDLC_LIB="plugins/sdlc-utilities/scripts/lib"
 [ -z "$SDLC_LIB" ] && { echo "ERROR: Could not locate scripts/lib (config.js). Is the sdlc plugin installed?" >&2; exit 2; }
 
-# R61: Resolve workspace mode — flag → config → fail-fast. No interactive prompt.
+# Resolve workspace mode: flag, then config, then fail-fast. No interactive prompt.
 if [ -z "$WORKSPACE_MODE_FLAG" ]; then
   WORKSPACE_MODE=$(node -e "
     const {readSection,resolveSdlcRoot}=require('$SDLC_LIB/config');
@@ -512,7 +426,7 @@ if [ -z "$WORKSPACE_MODE" ]; then
   exit 1
 fi
 
-# R62: Default-branch guard — reject --workspace continue on the repo default branch.
+# Default-branch guard: reject --workspace continue on the repo default branch.
 DEFAULT_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
 [ -z "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH="main"
 CURRENT_BRANCH=$(git branch --show-current)
@@ -531,8 +445,6 @@ Before any branch creation, state migration, or Agent dispatch, consume the `ass
 **Skip when resuming** (`flags.resume === true`) and when workspace mode is `worktree` or `continue` — the prepare script emits `assertions.requireMainWorktreeCwd: false` in those cases, so the assertion is a no-op below.
 
 ```bash
-# Read assertions from prepare output. Path is passed via env var (F) so that
-# embedded quotes/backslashes in the temp path cannot break the inline JS.
 REQUIRE_MAIN_CWD=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write(String((d.assertions&&d.assertions.requireMainWorktreeCwd)===true))")
 EXPECTED_ROOT=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write((d.assertions&&d.assertions.expectedMainWorktreeRoot)||'')")
 
@@ -563,8 +475,6 @@ When not resuming and `WORKSPACE_MODE` is `branch` or `worktree`, run the five-s
 
 ```bash
 # Step 1: Derive branch name from plan title via lib/branch-name.js (config-driven).
-#   Reads workspace.branch config (template, slugMaxLength, typeMap) via readSection.
-#   Same helper used by execute-plan-sdlc standalone path — no duplication.
 EXECUTE_BRANCH=$(node -e "
   const {resolveBranchName}=require('$SDLC_LIB/branch-name');
   const {readSection,resolveSdlcRoot}=require('$SDLC_LIB/config');
@@ -574,9 +484,7 @@ EXECUTE_BRANCH=$(node -e "
   process.stdout.write(resolveBranchName({type:'<logical-type>',slug:'<derived-slug>',config:cfg}));
 ")
 
-# Step 2: Pre-execute ship state migration (R37).
-#   Runs in main worktree cwd — state/ship.js read still resolves OLD slug filename here.
-#   BEFORE any branch creation (fixing #379: old post-execute block ran after cwd changed).
+# Step 2: Pre-execute ship state migration (runs in main worktree cwd, before branch creation).
 STATE_BRANCH=$(node "$SCRIPT" read 2>/dev/null | node -e "process.stdin.on('data',d=>{try{process.stdout.write(JSON.parse(d).branch||'')}catch(_){}})")
 if [ -n "$STATE_BRANCH" ] && [ "$EXECUTE_BRANCH" != "$STATE_BRANCH" ]; then
   FROM_SLUG=$(echo "$STATE_BRANCH" | sed 's|[^a-zA-Z0-9-]|-|g')
@@ -584,26 +492,15 @@ if [ -n "$STATE_BRANCH" ] && [ "$EXECUTE_BRANCH" != "$STATE_BRANCH" ]; then
   echo "State migrated: $FROM_SLUG → $EXECUTE_BRANCH"
 fi
 
-# Step 3a: --workspace branch — simple git checkout, no cd needed (HEAD shared with main worktree).
+# Step 3a: --workspace branch — git checkout (HEAD shared with main worktree).
 if [ "$WORKSPACE_MODE" = "branch" ]; then
   git checkout -b "$EXECUTE_BRANCH"
 fi
-
-# Step 3b: --workspace worktree — create worktree+branch, cd in main shell.
-if [ "$WORKSPACE_MODE" = "worktree" ]; then
-  WORKTREE_CREATE_SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/util/worktree-create.js" 2>/dev/null | sort -V | tail -1)
-  [ -z "$WORKTREE_CREATE_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/worktree-create.js" ] && WORKTREE_CREATE_SCRIPT="plugins/sdlc-utilities/scripts/util/worktree-create.js"
-  [ -z "$WORKTREE_CREATE_SCRIPT" ] && { echo "ERROR: Could not locate scripts/util/worktree-create.js. Is the sdlc plugin installed?" >&2; exit 2; }
-  result=$(node "$WORKTREE_CREATE_SCRIPT" --name "$EXECUTE_BRANCH")
-  WORKTREE_PATH=$(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
-  # worktree-create.js may collision-suffix; use the resolved branch name.
-  EXECUTE_BRANCH=$(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).branch)")
-  # Step 4: cd in main shell — Bash cwd persists; all subsequent dispatches inherit this path.
-  cd "$WORKTREE_PATH"
-fi
 ```
 
-**Cwd propagation contract:** The single `cd "$WORKTREE_PATH"` above sets the main-context shell cwd. Bash cwd persists across subsequent Bash invocations in the same agent context. Agent-tool dispatches inherit the parent's cwd — so commit-sdlc, review-sdlc, pr-sdlc, verify-pipeline-sdlc, version-sdlc, received-review-sdlc, learnings-commit, verify-openspec, and archive-openspec all start in the new worktree automatically. No per-prompt `cd` prepend is needed. In branch mode there is nothing to cd into (HEAD shared with main worktree) — same cwd propagation applies trivially.
+**Step 3b — worktree mode only:** When `WORKSPACE_MODE` is `worktree` → Read `./workspace-worktree.md` (Worktree create — Step 3b section) and run its bash in the main shell, then return here. Do not read preemptively. Branch mode skips this entirely (there is no worktree to create). The companion's bash sets `WORKTREE_PATH` and `cd`s into it so the cwd propagates to all subsequent dispatches.
+
+**Cwd propagation (branch mode):** In branch mode there is nothing to cd into — HEAD is shared with the main worktree, so all subsequent Bash invocations and Agent-tool dispatches run in the current cwd trivially. (Worktree-mode cwd propagation is covered by the companion above.)
 
 **Step 5:** Pass `--branch "$EXECUTE_BRANCH"` to execute-plan-sdlc in the execute dispatch (see "Execute step" section below). execute-plan-sdlc will short-circuit its own Step 1 isolation block (implements R30 from execute-plan-sdlc spec).
 
@@ -707,7 +604,7 @@ Then invoke commit-sdlc (step 5) for the fix commit.
 After the version step dispatches and returns, capture the new tag from the version-sdlc return value as `NEW_TAG`. When `NEW_TAG` is set (non-empty) AND `EXECUTE_BRANCH` is set (non-empty), run the ancestry check:
 
 ```bash
-# Post-version ancestry HARD GATE (R-post-version-ancestry, fixes #349)
+# Post-version ancestry HARD GATE
 VERIFY_SCRIPT=$(find ~/.claude/plugins -name "verify-tag-ancestry.js" -path "*/sdlc*/scripts/util/verify-tag-ancestry.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$VERIFY_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js" ] && VERIFY_SCRIPT="plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
 if [ -z "$VERIFY_SCRIPT" ]; then
@@ -1051,24 +948,7 @@ If OpenSpec was detected but `archive-openspec` is NOT in `flags.steps`, append:
 
 ### Worktree cleanup
 
-Detect if running in a linked worktree:
-```bash
-main_wt=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
-current=$(git rev-parse --show-toplevel)
-```
-If `$main_wt != $current`, a worktree is active.
-
-**Auto mode:** keep (default). Print path and action:
-```
-Worktree kept: <current path>
-  Branch: <branch name>
-  To remove later: cd <main_wt> && git worktree remove <current>
-```
-
-**Interactive mode:** Use AskUserQuestion — keep or remove.
-If remove: `cd "$main_wt" && git worktree remove "$current"`
-
-If `git worktree remove` fails, warn but don't fail the pipeline.
+When `WORKSPACE_MODE` is `worktree` → Read `./workspace-worktree.md` (Worktree cleanup section) and follow it. Do not read preemptively. Branch mode has no worktree to clean up — skip this section entirely.
 
 ### Post-pipeline advisory (when version was auto-skipped)
 
@@ -1083,110 +963,13 @@ This will tag the release and generate the changelog from all merged commits.
 
 ---
 
-## Error Recovery
+## Reference — Error Recovery, DO NOT, Gotchas, Learning Capture
 
-> **Flow**: detect → diagnose → auto-recover (retry once if transient) → escalate to user for persistent failures.
+Reference material lives in `./reference.md` (implements R-progressive-disclosure). Read the relevant section on its trigger; do not read preemptively:
 
-| Error | Recovery | Invoke error-report-sdlc? |
-|-------|----------|---------------------------|
-| Sub-skill fails (script crash) | Show error from sub-skill, stop pipeline, save state for `--resume` | Delegated — sub-skill handles its own error reporting |
-| `gh auth status` fails | Stop at validation (Step 3). Tell user to run `gh auth login` | No — user setup |
-| `git add -A -- ':!.sdlc/'` fails | Show error, stop pipeline | No — user action needed |
-| Network error (gh API) | Auto-retry via `retryExec` (3 attempts with exponential backoff). If exhausted, record failure + print resume instruction (see below) | No — transient |
-| State file write fails | Warn and continue — state persistence is best-effort | No |
-| Resume state file corrupt | Warn, start fresh | No |
-| Review verdict unparseable | Treat as APPROVED WITH NOTES, warn user, defer all findings | No |
-| Sub-skill times out | Stop pipeline, save state, inform user to `--resume` | No — transient |
-
-**Resume instruction format** (printed on step failure after retries exhausted or on any unrecoverable step error):
-```
-Step <N> (<name>) failed: <error summary>
-State saved to: <state file path>
-To resume: /ship-sdlc --resume
-```
-
-Each sub-skill has its own error recovery. ship-sdlc does not duplicate their recovery logic — it catches pipeline-level failures (sequencing, state, context) and delegates skill-level failures to the skill itself.
-
----
-
-## DO NOT
-
-- Deviate from `step.dispatchMode`. Every sub-skill step has `dispatchMode: 'agent'`; inline-Bash steps have `dispatchMode: null`. The LLM must not synthesize a `'skill'` value or invoke any step via the Skill tool from Step 5. Use Agent tool for all sub-skill steps, including `execute-plan-sdlc`.
-- Skip the critique step (Step 3) even when all checks seem obvious
-- Forward `--auto` to sub-skills that do not support it (see audit table)
-- Automatically resolve review findings — received-review-sdlc is always interactive
-- Run pipeline steps in parallel — the pipeline is strictly sequential
-- Delete the state file on failure — it is needed for `--resume`
-- Proceed past a failed sub-skill — stop, save state, inform user
-- Skip pipeline steps that were marked "will run" in the pipeline plan. The pipeline plan is a contract with the user. If a step was planned to run and the user confirmed the pipeline, it MUST run. The LLM does not have authority to skip planned steps based on its own assessment of change complexity or risk. Only the skip set and auto-skip rules (computed by skill/ship.js) control which steps run.
-- Copy example args from this document when dispatching sub-skill Agents — use the `invocation` field from the skill/ship.js output, which contains the exact computed args
-- Add `--steps` flags not present in the user's original invocation. Pipeline composition derives from CLI `--steps` > config `ship.steps[]` > built-in defaults. Legacy `--preset` and `--skip` are hard-removed (#190); passing them produces an error.
-- Dispatch pipeline step Agents without `model: step.model` — the model field is computed by skill/ship.js from each skill's spec. Omitting it defaults all steps to opus.
-- Add, remove, or change the `isolation` parameter on Agent dispatches — isolation comes verbatim from `step.isolation`. Adding `isolation: "worktree"` when `step.isolation` is null causes hidden Agent SDK worktrees that conflict with `--workspace branch` (issue #350).
-- Ignore cleanup validation failures — if `state/ship.js cleanup` exits with code 1, the pipeline contract was violated. Surface the violation and preserve state.
-- Skip the post-version ancestry HARD GATE. The check is the only safeguard against tags landing on orphaned commits (issue #349). The gate is a no-op when `NEW_TAG` is unset — do not pre-empt it by skipping it when you believe the version step succeeded on the right branch.
-- Exit the plan-mode-blocked path (Step 0, steps 3–7) without running `rm -f "$PLAN_MODE_OUTPUT_FILE"` — the temp prepare output file is separate from the persistent state file in `.sdlc/execution/` and must be cleaned up on every exit branch.
-
----
-
-## Gotchas
-
-**Staging gap after execute.** execute-plan-sdlc creates and modifies files but does not stage them. ship-sdlc must run `git add -A -- ':!.sdlc/'` between execute and commit. Missing this produces an empty commit.
-
-**Verdict detection is text-based.** Parse the conversation for a line matching `Verdict: <VERDICT>`. The review-sdlc orchestrator always emits this. If the conversation is compacted between review and verdict parsing, the verdict may be lost — treat missing verdict as APPROVED WITH NOTES and warn the user.
-
-**received-review-sdlc supports `--auto`.** When `--auto` is forwarded, both the Step 10 consent prompt and the Step 12 reply/resolve prompt are skipped. "Will fix" items are auto-implemented and their threads are auto-resolved via in-thread replies. "Disagree" and "won't fix" items are displayed but not auto-implemented; their threads are replied to but left open for the reviewer. Critique gates and verification still run. Without `--auto`, the pipeline pauses for human approval at both gates.
-
-**Double commit is intentional.** Feature commit (step 2) and review fix commit (step 5) are separate. This keeps feature work and review fixes distinct in git history. Do not squash them.
-
-**Version consent gate.** version-sdlc supports `--auto`. When forwarded, the release plan approval prompt is skipped but the plan is still displayed. Pre-condition checks (Steps 6–7) and critique gates (Steps 3–4) still run.
-
-**Config file is optional.** The pipeline runs with built-in defaults when no ship config exists in `.sdlc/local.json`. Do not error on missing config.
-
-**Step set validation matters.** Unrecognized values in `--steps` (e.g., `--steps reviw`) produce an error from `skill/ship.js parseArgs` and abort the run. The single source of truth for step composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. The legacy `--preset` and `--skip` flags are hard-removed (#190) and rejected with a migration-pointer error.
-
-**.sdlc/ must be gitignored.** The `.sdlc/` directory contains developer-local config (`local.json`) and ephemeral pipeline state (`execution/`). `--init-config` creates `.sdlc/.gitignore` automatically via `ship-init.js`. If `.sdlc/` is not gitignored, the staging command (`git add -A -- ':!.sdlc/'`) provides a fallback exclusion, but the gitignore is the primary defense.
-
-**Pipeline plan is binding.** The pipeline table displayed in Step 4 and confirmed by the user is a contract. Step statuses (`will_run`, `skipped`, `conditional`) are computed by `skill/ship.js` — the LLM follows them, it does not override them. Steps with `status: "will_run"` must be dispatched as Agents. This was added after an incident where the review step was skipped because the LLM judged the changes to be "just docs/config" (issue #68). The pipeline's value is precisely in catching cases where the developer thinks changes are low-risk but the review disagrees.
-
-**State files are script-managed.** Use state/ship.js / state/execute.js for all state operations. Don't hand-write JSON to `.sdlc/execution/`.
-
-**Worktree lifecycle uses git commands.** `git worktree add` to create (via util/worktree-create.js), `git worktree remove` to clean up. No EnterWorktree/ExitWorktree. No session-scoping issues.
-
-**Worktree state is not persisted.** Git is the source of truth. Branch name + `git worktree list --porcelain` = worktree path. No worktree fields in state files.
-
-**Resume re-enters via `cd`.** Match branch from state file against `git worktree list --porcelain`.
-
-**Rebase happens after all commits, before version.** This ensures the tag is placed on a commit that can merge cleanly. If rebase conflicts, the pipeline pauses — the user resolves in the worktree (main tree untouched) and resumes.
-
-**Rebase is skipped when main is already an ancestor.** `git merge-base --is-ancestor` is a fast check. No fetch + rebase overhead when the branch is already up to date.
-
-**Version step is auto-skipped in worktree mode.** `computeSteps` in skill/ship.js skips the version step when `workspace === 'worktree'`. Tags are repo-global — creating them from an isolated worktree risks collisions with parallel pipelines. The pipeline prints a post-merge advisory: run `/version-sdlc` on main after the PR merges. This also handles changelog — `version-sdlc` generates changelog from `previousTag..HEAD`, capturing all commits from all merged branches regardless of their source worktree.
-
-**Worktree PRs auto-label `skip-version-check`.** When `workspace === 'worktree'` causes the version step to be auto-skipped, `skill/ship.js` adds `--label skip-version-check` to the PR step args. The label is included in `gh pr create` from the start (not added post-creation), so `check-version-bump.yml` sees it on the `opened` event. Only fires for worktree auto-skip, not when `version` is omitted from `ship.steps[]`. Prerequisite: the label must exist in the repository (pr-sdlc creates it automatically if missing).
-
-**Auto mode does not auto-resume without --resume.** When `--auto` is set but `--resume` is not, the pipeline starts fresh even if a state file exists for the current branch. This prevents accidental continuation from stale state. The state file is preserved (not deleted) so the user can explicitly `--resume` later.
-
-**Sub-skill loading and agent isolation.** Each sub-skill's SKILL.md is 200–550 lines. All sub-skills (including `execute-plan-sdlc`) are Agent-dispatched so each loads SKILL.md in its own context and returns only a structured result (5–10 lines). The ship pipeline's context receives structured data, not sub-skill definitions. `execute-plan-sdlc` bounds its own context impact by dispatching one wave-runner Agent per wave rather than per task — its structured Step-9 result is what ship-sdlc consumes to continue the pipeline.
-
-**skipSource tracks provenance.** Each step's `skipSource` field records why a step was skipped: `"none"` (not skipped), `"cli"` (step omitted from CLI `--steps`), `"quick"` (step is canonical but absent from `ship.quick` under an active `--quick` run — R-quick-4), `"config"` (omitted from `ship.steps[]` in `.sdlc/local.json`), `"auto"` (auto-skipped by `computeSteps` logic), `"condition"` (conditional step not triggered), `"default"` (built-in defaults excluded the step). The per-step `skipSource` makes the exclusion provenance auditable per step.
-
----
-
-## Learning Capture
-
-After completing the pipeline, append to `.sdlc/learnings/log.md`:
-
-- Review verdicts that surprised (threshold too aggressive or too lenient)
-- Sub-skills that failed in unexpected ways during chaining
-- Config combinations that produced unintended pipeline shapes
-- Projects where the default `steps[]` behavior was wrong, or migrations from legacy v1 configs (`ship.preset`/`ship.skip`) that produced unexpected `steps[]` after auto-migration. CLI `--preset`/`--skip` are no longer accepted (#190 hard-remove); ship-sdlc emits a migration-pointer error if either is passed.
-
-Format:
-```
-## YYYY-MM-DD — ship-sdlc: <brief summary>
-<what was learned>
-```
+- **On any pipeline-level failure** → Read `./reference.md` (Error Recovery section) for the detect → diagnose → recover → escalate flow and the resume-instruction format.
+- **Before completing the pipeline (Learning Capture)** → Read `./reference.md` (Learning Capture section) to append pipeline learnings to `.sdlc/learnings/log.md`. This is triggered by the `learnings-commit` step (see "After pr — learnings-commit" above).
+- **When unsure about a prohibited action or an edge-case behavior** → Read `./reference.md` (DO NOT and Gotchas sections).
 
 ---
 

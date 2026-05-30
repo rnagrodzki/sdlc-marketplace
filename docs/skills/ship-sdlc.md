@@ -824,6 +824,22 @@ ship-sdlc also removes the intermediate prepare output file (`$PLAN_MODE_OUTPUT_
 
 ---
 
+## Skill File Structure
+
+To keep the resident context footprint of the loaded skill small, `ship-sdlc/SKILL.md` follows the progressive-disclosure pattern (spec `R-progressive-disclosure`): rarely-hit and reference branches live in on-demand companion docs that SKILL.md instructs the model to Read only at the point the branch is entered. A no-flag `ship it` run in branch mode (the common path) reads none of these.
+
+| Companion file | Read when | Contents |
+|----------------|-----------|----------|
+| `entry-modes.md` | `--init-config`, `--gc`, or `--dry-run` passed | The three entry-mode handlers, each of which short-circuits the pipeline. |
+| `reference.md` | A pipeline-level failure, the Learning Capture step, or an edge-case lookup | Error Recovery, DO NOT, Gotchas, and Learning Capture reference material. |
+| `workspace-worktree.md` | `flags.workspace === 'worktree'` | Worktree-create (Step 3b) and worktree-cleanup bash. Branch-mode runs never read it. |
+| `config-format.md` | `--init-config` walkthrough | Config schema and walkthrough questions. |
+| `state-format.md` | Resume from a saved state file | Ship state-file schema. |
+
+Branch-mode-active gates — the cwd-assertion diagnostic and the post-version ancestry HARD GATE — stay inline in SKILL.md (they fire on the default branch-mode path and must not be gated behind a worktree-only Read).
+
+---
+
 ## Related Skills
 
 - [`/execute-plan-sdlc`](execute-plan-sdlc.md) — plan execution with wave-based parallel dispatch
