@@ -1084,3 +1084,84 @@
         The archive-openspec result (archived successfully) is reported separately. This
         demonstrates the KD6 conditional text behavior: ran-result when the step executed,
         fallback suggestion when it was absent from steps.
+
+- description: "ship-sdlc (R-progressive-disclosure): common-path branch-mode run does not read cold/worktree companion files"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Ship it. No flags. A plan is in context, changes are committed, and the
+      project resolves to branch mode (workspace.mode: branch). Walk through the
+      pipeline steps you would take from Step 1 through Step 6, naming any
+      companion files you would Read. Do not actually dispatch sub-skills.
+  assert:
+    # Note: bare filenames (entry-modes.md etc.) legitimately appear in SKILL.md as
+    # gated pointers, so a not-icontains on the filename would false-fail when the model
+    # correctly explains "no --gc, so I skip the entry-modes.md handler." The rubric below
+    # checks the ACTION (did the model actually take a companion read?), not string presence.
+    - type: llm-rubric
+      value: >
+        The walkthrough proceeds through the common ship path (execute, commit,
+        review, version/skip, pr) WITHOUT actually performing a Read of any of
+        entry-modes.md, reference.md, or workspace-worktree.md. Those are on-demand
+        companions gated on --gc/--init-config/dry-run, a failure/edge case, or
+        worktree mode respectively — none of which apply to a no-flag branch-mode
+        run, so none should be read. Merely noting that a companion WOULD be read
+        under a flag that is not present (e.g. "no --gc, so the entry-modes.md gc
+        handler is skipped") is correct behavior and must PASS. Inline gates that
+        stay in SKILL.md (cwd-assertion, post-version ancestry HARD GATE) may be
+        mentioned — they are NOT companion reads.
+
+- description: "ship-sdlc (R-progressive-disclosure): --gc reads entry-modes.md gc section"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --gc. Describe the handler you would follow, naming any
+      companion file you Read. Do not run the pipeline.
+  assert:
+    - type: icontains
+      value: "entry-modes.md"
+    - type: llm-rubric
+      value: >
+        The --gc handler is dispatched by Reading ./entry-modes.md (the --gc
+        section) and following it. The handler short-circuits — the pipeline does
+        NOT run. The response should not walk through execute/commit/review/pr.
+
+- description: "ship-sdlc (R-progressive-disclosure): --init-config reads entry-modes.md init-config section"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      Run /ship-sdlc --init-config. Describe the handler you would follow, naming
+      any companion file you Read. Do not run the pipeline.
+  assert:
+    - type: icontains
+      value: "entry-modes.md"
+    - type: llm-rubric
+      value: >
+        The --init-config handler is dispatched by Reading ./entry-modes.md (the
+        --init-config section) and following it (which suggests /setup-sdlc and,
+        if the user insists, runs ship-init.js). The handler short-circuits — no
+        pipeline execution.
+
+- description: "ship-sdlc (R-progressive-disclosure): worktree mode reads workspace-worktree.md companion"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-config-present.md"
+    user_request: >
+      Run /ship-sdlc --workspace worktree --dry-run. Current branch is main, a plan
+      is in context. Walk through the pre-execute workspace isolation and any
+      worktree cleanup, naming the companion file you Read for the worktree-specific
+      bash. Do not dispatch sub-skills.
+  assert:
+    - type: icontains
+      value: "workspace-worktree.md"
+    - type: llm-rubric
+      value: >
+        In worktree mode the worktree-create (Step 3b) bash and the worktree
+        cleanup bash live in ./workspace-worktree.md, which is Read on the worktree
+        path. Steps 1 (branch-name derivation), 2 (state migration), and 3a
+        (git checkout -b for branch mode) remain inline in SKILL.md. The
+        worktree-create bash is run in the main shell so the cd propagates to
+        subsequent dispatches.
