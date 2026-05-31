@@ -17,7 +17,6 @@
 
 const path       = require('path');
 const fs         = require('fs');
-const os         = require('os');
 const { spawnSync } = require('child_process');
 
 const args = process.argv.slice(2);
@@ -88,15 +87,21 @@ try {
 const ctx = data.openspecContext || {};
 const iad = data.intakeAuditDispatch || null;
 
-const report = {
-  requirementsNull:          ctx.requirements === null || ctx.requirements === undefined,
-  requirementsErrorPresent:  typeof ctx.requirementsError === 'string' && ctx.requirementsError.length > 0,
-  requirementsArray:         Array.isArray(ctx.requirements),
-  requirementsCount:         Array.isArray(ctx.requirements) ? ctx.requirements.length : 0,
+const dispatchReport = {
   intakeAuditDispatchPresent: iad !== null && typeof iad === 'object',
   intakeAuditModel:           iad ? iad.model : null,
   intakeAuditSubagentType:    iad ? iad.subagentType : null,
   intakeAuditHasTemplatePath: iad ? ('promptTemplatePath' in iad) : false,
 };
+
+const report = checkDispatchOnly
+  ? dispatchReport
+  : {
+      requirementsNull:          ctx.requirements === null || ctx.requirements === undefined,
+      requirementsErrorPresent:  typeof ctx.requirementsError === 'string' && ctx.requirementsError.length > 0,
+      requirementsArray:         Array.isArray(ctx.requirements),
+      requirementsCount:         Array.isArray(ctx.requirements) ? ctx.requirements.length : 0,
+      ...dispatchReport,
+    };
 
 console.log(JSON.stringify(report, null, 2));

@@ -545,8 +545,9 @@ function main() {
 
     // 2b. Populate requirement inventory (R38 — Fixes #445).
     // Called inside the `if (fromOpenspec)` block; only runs when --from-openspec is active.
-    // Path-traversal guard already enforced above for the tasks.md block; fromOpenspec
-    // is validated by validateChange() before we reach this point.
+    // NOTE: The path-traversal guard (lines above) protects the tasks.md block (section 2a)
+    // only. getRequirementInventory() is NOT covered by that guard — it receives `fromOpenspec`
+    // which is validated by validateChange() before we reach this point.
     if (validation.valid) {
       const invResult = getRequirementInventory(projectRoot, fromOpenspec);
       if (invResult.ok) {

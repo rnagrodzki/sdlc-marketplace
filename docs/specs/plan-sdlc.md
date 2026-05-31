@@ -99,6 +99,8 @@
 
 ### Verification Scorecard (Gates A/B)
 
+Note: Gate A runs at Step 1 (pre-decomposition); Gate B runs at Step 5 (post-lens-merge).
+
 Gates A and B apply the per-check severity model from opsx:verify verbatim (CRITICAL / WARNING / SUGGESTION), not the per-dimension paraphrase. Severity is assigned per individual finding, not per dimension:
 
 - Incomplete `tasks.md` checkbox or requirement appearing unimplemented → **CRITICAL**
@@ -180,4 +182,4 @@ Gate A (intake audit, R39) runs before decomposition when `openspecContext.requi
 - I5: Plan reviewer subagent — cross-model review for plans with 5+ tasks
 - I6: ExitPlanMode — called at handoff when plan mode is active
 - I7: plan-sdlc writes `<!-- ref:<ref> -->` HTML comments to source tasks.md exactly once per line (idempotent, additive). The Markdown rendering of tasks.md is unchanged (HTML comments are invisible).
-- I8: `intake-verify-prompt.md` — Gate A intake audit agent prompt template (created by Task 3 of the #445 implementation). Sourced by `intakeAuditDispatch.promptTemplatePath` (P20). Inputs: `{PROPOSAL}`, `{DELTA_SPECS}`, `{TASKS_MD}`, `{DESIGN}`, `{REQUIREMENTS_JSON}`. Output: structured JSON with `findings`, `verdict`, `skipped`.
+- I8: `intake-verify-prompt.md` — Gate A intake audit agent prompt template. Sourced by `intakeAuditDispatch.promptTemplatePath` (P20). Inputs: `{PROPOSAL}`, `{DELTA_SPECS}`, `{TASKS_MD}`, `{DESIGN}`, `{REQUIREMENTS_JSON}`. Output: structured JSON with `findings`, `verdict`, `skipped`.

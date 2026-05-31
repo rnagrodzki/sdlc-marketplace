@@ -10,6 +10,6 @@ The existing token validation logic (`src/services/token.ts`) MUST be extended t
 ### Scenarios
 
 - Refresh token within TTL → valid; issuance timestamp updated
-- Refresh token beyond TTL → invalid; return `{ cliAvailable: false, error: "token_expired" }`
+- Refresh token beyond TTL → invalid; return `{ error: "token_expired" }`
 
 Implementation file: `src/services/token.ts`, `src/middleware/auth-guard.ts`
