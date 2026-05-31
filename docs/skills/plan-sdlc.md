@@ -368,6 +368,44 @@ At execute time, `execute-plan-sdlc` reads the `openspec-task` blocks and flips 
 
 For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R29, R30, G16.
 
+### Gate A — Intake Audit (R39 — Fixes #445)
+
+When `--from-openspec` is active and the delta-spec requirement inventory is available (see "Requirement Inventory" below), plan-sdlc dispatches a **Gate A intake audit** before task decomposition. Gate A audits the SOURCE change artifacts — not the plan — across three dimensions:
+
+| Dimension | What is checked |
+|---|---|
+| Completeness | Proposal↔delta-specs↔tasks.md alignment: every delta spec has a `tasks.md` entry; no orphan tasks without a spec |
+| Correctness | Each requirement is unambiguous and testable; no proposal-vs-delta contradiction |
+| Coherence | Design decisions consistent with proposal and delta specs; scope clear to a developer reading only tasks.md |
+
+Severity is assigned **per check** (not per dimension), matching the opsx:verify model verbatim:
+- Incomplete checkbox or unimplemented requirement → **CRITICAL**
+- Divergence from a requirement or uncovered scenario → **WARNING**
+- Design decision deviation or code-pattern note → **SUGGESTION**
+
+**CRITICAL findings block decomposition.** The user is presented with two options: (1) fix the source change artifacts and re-run, or (2) override and proceed with findings recorded as `## Intake Audit Caveats` in the plan. WARNING/SUGGESTION findings are recorded as caveats and execution continues.
+
+**Graceful degradation:** Gate A is skipped entirely for non-OpenSpec plans (no `openspecContext`). When individual artifacts are missing (proposal, delta specs, tasks.md), checks that depend on them are skipped and listed in the `skipped[]` audit response array. Gate A dispatch parameters (`model`, `subagentType`, `promptTemplatePath`) are sourced from `intakeAuditDispatch` (P20) in the prepare output — never hardcoded.
+
+### Gate B — Verification Scorecard (R40 — Fixes #445)
+
+At Step 5 (after the lens merge), plan-sdlc assembles a **`## Verification Scorecard`** section in the plan file. This is purely additive — the G1–G17 gate definitions, `buildLanes`, and the `{G1..G17}` union assertion are unchanged (R42). The scorecard contains:
+
+1. **Dimension table** — CRITICAL/WARNING/SUGGESTION/PASS counts by dimension (Completeness / Correctness / Coherence), aggregated from lens findings that carry severity tags.
+2. **Traceability matrix** — one row per requirement from the inventory (`openspecContext.requirements[]`), showing covering task(s) and status (covered / partial / uncovered). When the inventory is null (CLI absent), falls back to the Step 1 requirements checklist with a noted downgrade.
+3. **Go/no-go verdict** using the verbatim opsx:verify labels:
+   - Any CRITICAL → *"…Fix before archiving."*
+   - Warnings only → *"…Ready for archive (with noted improvements)."*
+   - Clean → *"All checks passed. Ready for archive."*
+
+The scorecard is **regenerated** (not appended) on each Step 5 iteration (R44). A CRITICAL verdict injects findings into the existing `Issues Found` loop (bounded by the 3-iteration cap) — no new loop. WARNING-only proceeds; caveats are preserved in the plan. At Step 7 Handoff, the verdict line is surfaced above the `ship` / `execute` / `done` menu.
+
+### Requirement Inventory (R38 — Fixes #445)
+
+When `--from-openspec` is active, `plan.js` calls `getRequirementInventory(projectRoot, changeName)` (in `scripts/lib/openspec.js`) to populate `openspecContext.requirements[]`. Each entry has `{ reqId, capability, type (ADDED/MODIFIED/REMOVED/RENAMED), name, scenarioCount }`, sourced from `openspec show <name> --json --deltas-only` (verb-first form). When the CLI is absent or the command fails, `requirements` is `null` and `requirementsError` describes the reason — both Gate A and Gate B degrade gracefully in this case.
+
+For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R38–R44.
+
 See [OpenSpec Integration Guide](../openspec-integration.md) for the full workflow.
 
 ---

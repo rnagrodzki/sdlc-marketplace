@@ -232,6 +232,28 @@ Identify constraints: language, framework, existing conventions, testing approac
 
 **Re-anchor:** Before leaving Step 1, re-read the plan file's Requirements section. This counters attention drift after many exploration calls.
 
+**Gate A — Intake Audit (implements R39 — Fixes #445):**
+
+When `openspecContext.requirements` is present (non-null) in the prepare output:
+
+1. Dispatch one Gate A audit Agent using `intakeAuditDispatch` parameters from the prepare output (P20). Source `subagentType`, `model`, and `promptTemplatePath` verbatim from `intakeAuditDispatch` — do NOT hardcode model or template path (`agent-dispatch-script-driven` guardrail). If `intakeAuditDispatch.promptTemplatePath` is null, skip Gate A and emit one note: `Gate A skipped — intake-verify-prompt.md not found.`
+
+2. Fill the prompt template variables:
+   - `{PROPOSAL}` — content of `openspec/changes/<name>/proposal.md` (already read in Step 0), or `"[artifact missing]"` if absent
+   - `{DELTA_SPECS}` — concatenated content of all `openspec/changes/<name>/specs/*.md` files (already read in Step 0), or `"[artifact missing]"` if none found
+   - `{TASKS_MD}` — content of `openspec/changes/<name>/tasks.md` (already read in Step 0), or `"[artifact missing]"` if absent
+   - `{DESIGN}` — content of `openspec/changes/<name>/design.md` if present, or `"[artifact missing]"`
+   - `{REQUIREMENTS_JSON}` — `JSON.stringify(openspecContext.requirements)` from prepare output, or `"null"` if null
+
+3. Parse the agent's JSON response `{ findings, verdict, skipped }`.
+
+4. Verdict handling:
+   - `verdict: "CRITICAL"` — **block decomposition**. Do NOT proceed to Step 2. Surface findings to user with E7 menu: (a) fix source change artifacts and re-run; (b) override (proceed anyway, recording the override in `## Intake Audit Caveats`). No `--auto` bypass for CRITICAL.
+   - `verdict: "WARNING"` or `"SUGGESTION"` — append a `## Intake Audit Caveats` section to the plan file listing the findings. Proceed to Step 2.
+   - `verdict: "PASS"` — proceed to Step 2 without any caveat section.
+
+5. When `openspecContext` is absent (non-OpenSpec plan), skip Gate A entirely. Emit one note: `Gate A skipped — plan is not OpenSpec-sourced.`
+
 ## Step 2 (PLAN): Decompose Into Tasks
 
 **Scope check:** If requirements span independent subsystems with no shared state, use AskUserQuestion:
@@ -421,6 +443,7 @@ For each `lensReviewers[i]` entry (i = 0..2):
   - `{BRIEF_FILE}` — absolute path to `discovery-brief.md`, or `"none — orchestrator skipped"`
   - `{OPENSPEC_TASKS}` — serialized JSON from `openspecContext.tasks[]`, or `"none — plan not from OpenSpec"`
   - `{GUARDRAILS}` — one guardrail per line (`- [id] (severity): description`), or `"none configured"`
+  - `{REQUIREMENTS_JSON}` — `JSON.stringify(openspecContext.requirements)` when present, or `"null"` (null-safe; lens prompts render `"null"` as `"none — inventory unavailable, use checklist"`)
 
 When `lensReviewers[i].promptTemplatePath` is null, skip that lens and log to `.sdlc/learnings/log.md`: `## YYYY-MM-DD — plan-sdlc: lens "<name>" skipped — promptTemplatePath null (template not found at prepare time)`. Continue with remaining lenses.
 
@@ -434,6 +457,28 @@ When `lensReviewers[i].promptTemplatePath` is null, skip that lens and log to `.
 
 **For plans with <5 tasks — Single reviewer (status quo):** Dispatch one reviewer with `{LENS}=all` using `./plan-reviewer-prompt.md` directly (same model acceptable). Status quo behavior preserved.
 
+**Gate B — Verification Scorecard (implements R40, R42, R44 — Fixes #445):**
+
+After the merge step, assemble the `## Verification Scorecard` section in the plan file. This is purely additive — it MUST NOT remove or alter any existing gate evaluation, G1–G17 definitions, `buildLanes`, or the `{G1..G17}` union assertion. The scorecard is regenerated (replaced, not appended) on each Step 5 iteration (R44).
+
+**Pass `{REQUIREMENTS_JSON}` to lens reviewers as a new template variable** (in addition to the existing variables above):
+- `{REQUIREMENTS_JSON}` — `JSON.stringify(openspecContext.requirements)` when the inventory is present; `"null"` when `openspecContext.requirements` is null (CLI absent or non-OpenSpec plan). This is null-safe: lens prompts render it as `"none — inventory unavailable, use checklist"` when null.
+
+**Scorecard assembly (in main context after lens merge, per iteration):**
+
+1. **Dimension table** — Aggregate CRITICAL/WARNING/SUGGESTION/PASS counts by dimension across all lens findings that carry a severity tag. Three rows: Completeness, Correctness, Coherence. Counts sourced from lens output; when a lens did not emit per-check severity tags, treat its findings as unclassified (exclude from counts).
+
+2. **Traceability matrix** — One row per requirement source:
+   - When `openspecContext.requirements[]` is present (non-null): use each `{ reqId, name }` as a row. For each row, map to covering Task(s) by matching task descriptions that reference the requirement (by `reqId`, `name`, or delta-spec section title). Status: `covered` (≥1 task), `partial` (task exists but incomplete per lens finding), `uncovered` (no task maps to this requirement).
+   - When `openspecContext.requirements` is null: build the matrix from the Step 1 requirements checklist instead. Note the downgrade in the scorecard header: `*(Matrix built from requirements checklist — requirement inventory unavailable)*`
+
+3. **Verdict** — Derived from the aggregate of all findings across lens outputs AND Gate A caveats (when present), using the verbatim opsx:verify labels (R40):
+   - Any finding with severity CRITICAL → verdict: *"…Fix before archiving."*
+   - No CRITICAL, any WARNING → verdict: *"…Ready for archive (with noted improvements)."*
+   - Only SUGGESTION or zero findings → verdict: *"All checks passed. Ready for archive."*
+
+4. **Write the scorecard section** to the plan file. Placement: immediately after the last Task block, or after `## Suggested Review Dimensions` when that section exists, or after `## Guardrail Compliance` if no Suggested Review Dimensions. REGENERATE (replace) on each iteration — do not append a second copy.
+
 **Review loop:**
 - Approved → Step 6 is a no-op, proceed to Step 7
 - Issues found → go to Step 6
@@ -442,6 +487,12 @@ When `lensReviewers[i].promptTemplatePath` is null, skip that lens and log to `.
 ## Step 6 (IMPROVE): Apply Review Fixes
 
 Fix each blocking issue identified by the reviewer. Rewrite the plan file with fixes applied.
+
+**Gate B verdict wiring (implements R41 — Fixes #445):** The Gate B Verification Scorecard verdict is treated as an additional blocking-issue source using the same `Issues Found` path. This avoids divergent gate phrasing (`no-opposite-logical-vectors` guardrail) — the CRITICAL verdict does not have a separate code path; it injects findings into the same blocking-issue set that the `Issues Found` path already processes.
+
+- When the Gate B verdict is CRITICAL: inject the scorecard CRITICAL findings into the blocking-issue list as if they were additional `Issues Found` findings. The plan enters Step 6 IMPROVE with these injected findings. The iteration counter (max 3) continues normally — Gate B CRITICAL does not create a new loop or counter.
+- When the Gate B verdict is WARNING or SUGGESTION: no injection into Step 6. Caveats remain in the plan file. Proceed to Step 6.5 / Step 7 normally.
+- When the Gate B verdict is PASS (clean): proceed normally.
 
 Re-dispatch the reviewer (back to Step 5 loop).
 
@@ -478,6 +529,12 @@ SCRIPT=$(find ~/.claude/plugins -name "plan-handoff-advisory.js" -path "*/sdlc*/
 ```
 
 The wrapper reads `$TMPDIR/sdlc-context-stats.json` (written by the `UserPromptSubmit` hook `hooks/context-stats.js`) and emits a `/compact` advisory only when transcript ≥60% of model budget. Pipeline state is preserved across `/compact` (PreCompact + SessionStart hooks), so re-invoking after compaction is safe.
+
+**Gate B scorecard pointer (implements R41 — Fixes #445):** Before the plan-mode or normal-mode branch below, when a `## Verification Scorecard` section exists in the plan file (i.e., Gate B ran during Step 5), surface a one-line verdict reference above the `ship` / `execute` / `done` menu:
+
+> Verification Scorecard: `<verdict line>` — see `## Verification Scorecard` in the plan for details.
+
+Where `<verdict line>` is the verbatim verdict label from the scorecard: *"All checks passed. Ready for archive."*, *"…Ready for archive (with noted improvements)."*, or *"…Fix before archiving."*. When no scorecard is present (non-OpenSpec plan or scorecard was not generated), omit this line entirely.
 
 **Plan mode:** Announce the plan path and propose execution. Prepend any advisory output from the wrapper above the `ship` / `execute` lines:
 
