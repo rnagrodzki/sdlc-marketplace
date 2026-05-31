@@ -17,6 +17,7 @@ You receive:
 - `{LENS_FOCUS}` — File paths, Verification strategy, Scope discipline, Guardrail compliance
 - `{GUARDRAILS}` — active guardrails, one per line (`- [id] (severity): description`), or `"none configured"`
 - `{BRIEF_FILE}` — absolute path to discovery-brief.md, or `"none — orchestrator skipped"` (for context)
+- `{REQUIREMENTS_JSON}` — JSON array of `{ reqId, capability, type, name, scenarioCount }` from the delta-spec inventory, or `"null"` when unavailable. Reference for context — risk lens does not produce traceability rows.
 
 Read the plan file at `{PLAN_FILE_PATH}` before evaluating.
 
@@ -47,12 +48,20 @@ Approve unless there are genuine blockers in your focus areas.
 
 ---
 
+## Per-Check Severity Classification (for scorecard, Gate B)
+
+For each issue you find, emit a severity tag on the issue line:
+`[SEVERITY: CRITICAL|WARNING|SUGGESTION] [DIMENSION: Completeness|Correctness|Coherence]`
+
+Risk findings typically map to Coherence (guardrail/scope violations) or Correctness (missing verification).
+This tag is used by the main context scorecard aggregator only — do not alter your Approved/Issues-Found status logic.
+
 ## Output
 
 **Status:** Approved | Issues Found
 
 **Issues (if any — list only execution blockers within risk focus areas):**
-- Task N: [specific issue] — [why this would cause execution failure]
+- Task N: [specific issue] — [why this would cause execution failure] [SEVERITY: WARNING] [DIMENSION: Coherence]
 
 **Recommendations (advisory, do not block approval):**
 - [optional suggestions within risk focus areas]

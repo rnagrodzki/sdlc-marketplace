@@ -337,3 +337,33 @@
           if (!lr.focusCategories || !Array.isArray(lr.focusCategories) || lr.focusCategories.length === 0) return `lensReviewer[${i}] missing or empty focusCategories`;
         }
         return true;
+
+# --- openspecContext.requirements (R38 — Fixes #445) ---
+
+- description: "plan-prepare: --from-openspec with CLI absent emits requirements null + requirementsError (graceful degradation)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-plan-requirements-field.js"
+    script_args: "--project-root {{project_root}} --change req-inventory-test --no-path"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-delta-inventory"
+  assert:
+    - type: icontains
+      value: '"requirementsNull": true'
+    - type: icontains
+      value: '"requirementsErrorPresent": true'
+    - type: icontains
+      value: '"intakeAuditDispatchPresent": true'
+
+- description: "plan-prepare: --from-openspec emits intakeAuditDispatch with expected shape (P20)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/test-plan-requirements-field.js"
+    script_args: "--project-root {{project_root}} --change req-inventory-test --no-path --check-dispatch-only"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-delta-inventory"
+  assert:
+    - type: icontains
+      value: '"intakeAuditDispatchPresent": true'
+    - type: icontains
+      value: '"intakeAuditModel": "sonnet"'
+    - type: icontains
+      value: '"intakeAuditSubagentType": "general-purpose"'

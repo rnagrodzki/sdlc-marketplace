@@ -18,6 +18,7 @@ You receive:
 - `{BRIEF_FILE}` — absolute path to discovery-brief.md, or `"none — orchestrator skipped"`
 - `{OPENSPEC_TASKS}` — serialized JSON array from `openspecContext.tasks[]`, or `"none — plan not from OpenSpec"`
 - `{GUARDRAILS}` — active guardrails (for context only — not your responsibility)
+- `{REQUIREMENTS_JSON}` — JSON array of `{ reqId, capability, type, name, scenarioCount }` from the delta-spec inventory, or `"null"` when the inventory is unavailable (CLI absent or non-OpenSpec plan)
 
 Read the plan file at `{PLAN_FILE_PATH}` before evaluating.
 
@@ -26,6 +27,8 @@ Read the plan file at `{PLAN_FILE_PATH}` before evaluating.
 ## Focus Areas (requirements lens only)
 
 **Requirements coverage:** Every requirement in `{REQUIREMENTS_CHECKLIST}` has at least one task. No orphan tasks without a traceable requirement. A requirement with no corresponding task is blocking.
+
+When `{REQUIREMENTS_JSON}` is NOT `"null"`, use the inventory as an anchor: for each `{ reqId, name }` entry, confirm ≥1 plan task covers it (by referencing the requirement in its description, via `openspec-task.ref`, or by covering the delta-spec section). Emit per-requirement traceability findings for scorecard aggregation (see Traceability Output below).
 
 **Metadata completeness:** Every task has all five metadata fields: Complexity, Risk, Depends on, Verify, and Files. A task missing any field is advisory.
 
@@ -51,12 +54,29 @@ Approve unless there are genuine blockers in your focus areas.
 
 ---
 
+## Traceability Output (for scorecard aggregation — Gate B, R40)
+
+When `{REQUIREMENTS_JSON}` is NOT `"null"`, emit a `## Traceability Rows` block after your standard output (do NOT omit this when the inventory is present). Each row covers one `reqId`:
+
+```
+TRACEABILITY: reqId=<id> name="<name>" status=covered|partial|uncovered covering_tasks=<comma-separated task numbers or "none">
+```
+
+When `{REQUIREMENTS_JSON}` is `"null"`, omit the Traceability Rows block entirely.
+
+Per-check severity classification (for scorecard dimension table):
+
+For each issue you find, additionally emit a severity tag on the issue line:
+`[SEVERITY: CRITICAL|WARNING|SUGGESTION] [DIMENSION: Completeness|Correctness|Coherence]`
+
+This is used by the main context to build the scorecard dimension counts. Do NOT add severity tags to findings that are clearly outside your requirements focus area.
+
 ## Output
 
 **Status:** Approved | Issues Found
 
 **Issues (if any — list only execution blockers within requirements focus areas):**
-- Task N: [specific issue] — [why this would cause execution failure]
+- Task N: [specific issue] — [why this would cause execution failure] [SEVERITY: CRITICAL] [DIMENSION: Completeness]
 
 **Recommendations (advisory, do not block approval):**
 - [optional suggestions within requirements focus areas]

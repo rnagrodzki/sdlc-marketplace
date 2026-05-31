@@ -687,3 +687,171 @@
         commands or re-derive the hosting flag — it consumes the value from P14 exactly
         once (flag-resolution-single-source guardrail). The G17 prompt also instructs the
         subagent not to re-derive this value.
+
+# --- Gate A intake audit (R39 — Fixes #445) ---
+
+- description: "plan-sdlc: Gate A dispatched and CRITICAL verdict blocks decomposition (R39)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-with-requirements.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. Step 1 (CONSUME) is
+      complete. openspecContext.requirements is present with 2 entries. The Gate A audit
+      agent returned: { findings: [{ severity: "CRITICAL", dimension: "Completeness",
+      statement: "tasks.md missing entry for req-2 (getIndicators data service method)",
+      evidence: "tasks.md:missing" }], verdict: "CRITICAL", skipped: [] }.
+      What happens next?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that a CRITICAL verdict from Gate A blocks decomposition —
+        plan-sdlc does NOT proceed to Step 2 (PLAN). Instead it surfaces the CRITICAL
+        findings to the user and presents two options: (1) fix the source change artifacts
+        and re-run, or (2) override and proceed anyway with the findings recorded in an
+        Intake Audit Caveats section. The response must NOT describe plan-sdlc proceeding
+        to task decomposition with a CRITICAL verdict active.
+
+- description: "plan-sdlc: Gate A skipped for non-OpenSpec plan with a note (R39 graceful degradation)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-lightweight-skip.md"
+    user_request: >
+      Run /plan-sdlc (no --from-openspec flag). openspecContext is not present in the
+      prepare output. Step 1 (CONSUME) has completed. What happens with Gate A?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that Gate A is skipped entirely because openspecContext is
+        absent (the plan is not OpenSpec-sourced). The skill emits one note indicating
+        Gate A was skipped, then proceeds directly to Step 2 (PLAN) for task decomposition.
+        No audit agent is dispatched. No caveat section is added.
+
+# --- Gate B scorecard/traceability/verdict (R40, R44 — Fixes #445) ---
+
+- description: "plan-sdlc: Gate B assembles Verification Scorecard with dimension table + traceability matrix + verdict (R40)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-with-requirements.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. Step 5 (CRITIQUE) has
+      just completed its lens fan-out merge. openspecContext.requirements contains 2
+      entries (req-1: ResourceIndicator UI, req-2: getIndicators method). Both lens
+      reviewers returned Approved with no CRITICAL findings. Describe what happens next
+      in Step 5 regarding the Verification Scorecard.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response describes that Gate B assembles a Verification Scorecard section
+        and writes it to the plan file after the lens merge. The scorecard must contain
+        all three elements: (1) a dimension table with Completeness/Correctness/Coherence
+        rows showing finding counts by severity, (2) a traceability matrix with one row
+        per requirement from the inventory (req-1 and req-2) showing covering tasks and
+        status (covered/partial/uncovered), and (3) a go/no-go verdict using the verbatim
+        opsx:verify labels. The response must NOT describe the scorecard as optional or
+        as only appearing when issues are found.
+
+- description: "plan-sdlc: Gate B traceability matrix degrades to checklist when requirements inventory is null (R43)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. openspecContext.requirements
+      is null (CLI absent) and openspecContext.requirementsError is set to "CLI not found".
+      Step 5 lens merge is complete. What source does the traceability matrix use?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that when openspecContext.requirements is null, the
+        traceability matrix falls back to the Step 1 requirements checklist instead of
+        the delta-spec inventory. The scorecard header notes the downgrade (e.g., matrix
+        built from checklist — requirement inventory unavailable). The scorecard is still
+        assembled and written to the plan file — the degradation is graceful, not a skip.
+
+- description: "plan-sdlc: Scorecard is regenerated on each Step 5 iteration, not appended (R44)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-with-requirements.md"
+    user_request: >
+      Run /plan-sdlc. It is the second iteration of Step 5 — the first iteration wrote
+      a Verification Scorecard section. The second iteration's lens merge is now complete.
+      What happens to the existing Verification Scorecard section?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that the existing Verification Scorecard section is replaced
+        (regenerated) in full on each Step 5 iteration — it is NOT appended to. Only one
+        Verification Scorecard section exists in the plan file at any time. The new section
+        overwrites the previous one with updated counts, matrix, and verdict based on the
+        current iteration's findings.
+
+- description: "plan-sdlc: Gate A uses intakeAuditDispatch params from prepare output (agent-dispatch-script-driven)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-with-requirements.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. Step 1 is complete.
+      openspecContext.requirements is present. How does SKILL.md determine which model
+      and subagentType to use when dispatching the Gate A audit agent?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that the model and subagentType are sourced verbatim from
+        the intakeAuditDispatch field in the prepare output (P20). SKILL.md does NOT
+        hardcode the model name or subagentType for Gate A — it reads the values from the
+        script output following the agent-dispatch-script-driven guardrail. Similarly,
+        the promptTemplatePath for intake-verify-prompt.md comes from
+        intakeAuditDispatch.promptTemplatePath in the prepare output.
+
+# --- Verdict→action wiring (R41 — Fixes #445) ---
+
+- description: "plan-sdlc: CRITICAL Gate B verdict routes to Step 6 IMPROVE via Issues Found path (R41, no-opposite-logical-vectors)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-with-requirements.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. Step 5 lens merge is
+      complete. The Verification Scorecard verdict is CRITICAL (one requirement uncovered).
+      What happens next? Does the plan enter Step 6?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that a CRITICAL Gate B verdict causes the CRITICAL findings
+        to be injected into the blocking-issue list, triggering Step 6 IMPROVE — the same
+        path used when lens reviewers return Issues Found. The verdict is treated as an
+        additional source of blocking issues, not a separate code path. The iteration
+        counter (max 3) continues normally. The response must make clear the CRITICAL
+        verdict does NOT create a new loop — it uses the existing Issues Found mechanism.
+
+- description: "plan-sdlc: WARNING Gate B verdict proceeds without entering Step 6 (R41)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-with-requirements.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. Step 5 lens merge is
+      Approved. The Verification Scorecard verdict is WARNING (one scenario uncovered).
+      No other blocking issues were found. What happens?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response explains that a WARNING-only Gate B verdict does NOT trigger Step 6
+        IMPROVE. The caveats remain in the plan file (already written in the scorecard
+        section). The plan proceeds to Step 6.5 (link verification) and then Step 7
+        (Handoff) normally. No re-dispatch of lens reviewers occurs for a WARNING-only
+        verdict.
+
+- description: "plan-sdlc: Scorecard verdict shown at Step 7 Handoff (R41)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-from-openspec-with-requirements.md"
+    user_request: >
+      Run /plan-sdlc --from-openspec add-resource-indicators. Step 6.5 link verification
+      passed. Step 7 Handoff is about to begin. The plan has a Verification Scorecard with
+      verdict "All checks passed. Ready for archive." Describe the Step 7 output.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response describes that Step 7 Handoff includes a verdict reference line above
+        the ship/execute/done menu. The verdict reference shows the verbatim scorecard
+        verdict ("All checks passed. Ready for archive.") and points to the Verification
+        Scorecard section in the plan. The scorecard pointer appears before the workflow
+        continuation menu options, not after them.

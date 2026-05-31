@@ -29,7 +29,7 @@ const fs   = require('node:fs');
 const { spawnSync } = require('node:child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { detectActiveChanges, validateChange, parseTasks } = require(path.join(LIB, 'openspec'));
+const { detectActiveChanges, validateChange, parseTasks, getRequirementInventory } = require(path.join(LIB, 'openspec'));
 const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
@@ -231,6 +231,20 @@ function resolveSkillTemplate(templateName) {
   }
 
   return null;
+}
+
+/**
+ * Build P20 intakeAuditDispatch metadata (R39 — Fixes #445).
+ * Resolves the Gate A intake audit prompt template via the same find cascade as
+ * resolveSkillTemplate(), following the agent-dispatch-script-driven guardrail.
+ * @returns {{ subagentType: string, model: string, promptTemplatePath: string|null }}
+ */
+function buildIntakeAuditDispatch() {
+  return {
+    subagentType: 'general-purpose',
+    model: 'sonnet',
+    promptTemplatePath: resolveSkillTemplate('intake-verify-prompt.md'),
+  };
 }
 
 /**
@@ -528,6 +542,27 @@ function main() {
         process.stderr.write(`[plan-prepare] tasks.md ref injection warning: ${err.message}\n`);
       }
     }
+
+    // 2b. Populate requirement inventory (R38 — Fixes #445).
+    // Called inside the `if (fromOpenspec)` block; only runs when --from-openspec is active.
+    // NOTE: The path-traversal guard (lines above) protects the tasks.md block (section 2a)
+    // only. getRequirementInventory() is NOT covered by that guard — it receives `fromOpenspec`
+    // which is validated by validateChange() before we reach this point.
+    if (validation.valid) {
+      const invResult = getRequirementInventory(projectRoot, fromOpenspec);
+      if (invResult.ok) {
+        openspecContext.requirements = invResult.requirements;
+        openspecContext.requirementsError = null;
+      } else {
+        openspecContext.requirements = null;
+        openspecContext.requirementsError = invResult.error;
+        if (!invResult.cliAvailable) {
+          process.stderr.write('[plan-prepare] openspec CLI not found — requirement inventory unavailable (graceful degradation)\n');
+        } else {
+          process.stderr.write(`[plan-prepare] requirement inventory warning: ${invResult.error}\n`);
+        }
+      }
+    }
   }
 
   // 3. Guardrail loading from plan config section
@@ -571,6 +606,12 @@ function main() {
     }
   });
 
+  // 7a. P20 — intake audit dispatch (R39 — Fixes #445)
+  const intakeAuditDispatch = buildIntakeAuditDispatch();
+  if (intakeAuditDispatch.promptTemplatePath === null) {
+    process.stderr.write('[plan-prepare] intakeAuditDispatch: intake-verify-prompt.md not found — Gate A unavailable\n');
+  }
+
   // 7. Output
   const output = {
     openspec,
@@ -580,6 +621,7 @@ function main() {
     explorePack,
     githubHosting,
     g17Dispatch: { subagentType: g17Dispatch.subagentType, model: g17Dispatch.model, promptTemplatePath: g17Dispatch.promptTemplatePath },
+    intakeAuditDispatch,
     lanes,
     lensReviewers,
     errors,

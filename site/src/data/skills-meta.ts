@@ -41,6 +41,8 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'save', label: 'Write plan document', type: 'script', description: 'Writes plan to plansDirectory with date prefix' },
       { id: 'openspec-annotate', label: 'Annotate OpenSpec tasks', type: 'script', description: 'Injects ref comments into tasks.md and annotates plan tasks with openspec-task blocks' },
       { id: 'plan-review', label: 'Cross-model review', type: 'dispatch', description: 'Dispatches a second model to review the written plan' },
+      { id: 'gate-a-intake', label: 'Gate A: Intake Audit', type: 'dispatch', description: 'opsx:verify-style audit of source OpenSpec change before decomposition (CRITICAL blocks; WARNING/SUGGESTION recorded as caveats)' },
+      { id: 'gate-b-scorecard', label: 'Gate B: Verification Scorecard', type: 'critique', description: 'Requirement-to-task traceability matrix + per-check severity scorecard + go/no-go verdict (additive layer over existing Step 5 lens results)' },
     ],
     connections: [
       { to: 'setup-sdlc', label: 'consumes guardrails from' },
