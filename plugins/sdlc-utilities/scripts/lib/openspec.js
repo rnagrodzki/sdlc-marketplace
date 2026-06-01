@@ -351,6 +351,86 @@ function runArchive(projectRoot, changeName, { yes = true } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Delta-spec requirement inventory (R38 — Fixes #445)
+// ---------------------------------------------------------------------------
+
+/**
+ * Retrieve a structured inventory of delta-spec requirements for an OpenSpec change
+ * by calling `openspec show <changeName> --json --deltas-only`.
+ *
+ * Uses the verb-first form ("openspec show …") to avoid the deprecation warning
+ * emitted by the legacy "change show …" alias.
+ *
+ * Return shape:
+ *   { ok: true,  cliAvailable: true,  requirements: Array<{ reqId, capability, type, name, scenarioCount }> }
+ *   { ok: false, cliAvailable: false, requirements: null, error: "CLI not found" }
+ *   { ok: false, cliAvailable: true,  requirements: null, error: <reason> }
+ *
+ * Never throws — all errors are caught and surfaced via the `error` field.
+ *
+ * @param {string} projectRoot  Absolute path to the project root
+ * @param {string} changeName   Name of the OpenSpec change directory
+ * @returns {{ ok: boolean, cliAvailable: boolean, requirements: Array|null, error: string|null }}
+ */
+function getRequirementInventory(projectRoot, changeName) {
+  let result;
+  try {
+    result = spawnSync('openspec', ['show', changeName, '--json', '--deltas-only'], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      timeout: 30000,
+    });
+  } catch (spawnErr) {
+    return { ok: false, cliAvailable: true, requirements: null, error: spawnErr.message };
+  }
+
+  if (result.error) {
+    if (result.error.code === 'ENOENT') {
+      return { ok: false, cliAvailable: false, requirements: null, error: 'openspec CLI not found on PATH' };
+    }
+    return { ok: false, cliAvailable: true, requirements: null, error: result.error.message };
+  }
+
+  if (result.status !== 0) {
+    const stderr = (result.stderr || '').trim();
+    const reason = stderr || `openspec exited with status ${result.status}`;
+    return { ok: false, cliAvailable: true, requirements: null, error: reason };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch (parseErr) {
+    return { ok: false, cliAvailable: true, requirements: null, error: `JSON parse error: ${parseErr.message}` };
+  }
+
+  // Normalize the CLI output into a stable shape.
+  // The CLI may return an array of requirement objects directly, or wrap them in a key.
+  // We try common shapes and fall back gracefully.
+  const raw = Array.isArray(parsed) ? parsed
+    : Array.isArray(parsed.requirements) ? parsed.requirements
+    : Array.isArray(parsed.deltas) ? parsed.deltas
+    : null;
+
+  if (!raw) {
+    return { ok: false, cliAvailable: true, requirements: null, error: 'Unexpected JSON shape from openspec CLI' };
+  }
+
+  const requirements = raw.map((entry, idx) => ({
+    reqId:         String(entry.reqId || entry.id || `req-${idx}`),
+    capability:    String(entry.capability || entry.description || entry.summary || ''),
+    type:          String(entry.type || entry.changeType || 'ADDED').toUpperCase(),
+    name:          String(entry.name || entry.title || entry.capability || ''),
+    scenarioCount: typeof entry.scenarioCount === 'number' ? entry.scenarioCount
+                 : typeof entry.scenarios === 'number' ? entry.scenarios
+                 : Array.isArray(entry.scenarios) ? entry.scenarios.length
+                 : 0,
+  }));
+
+  return { ok: true, cliAvailable: true, requirements, error: null };
+}
+
+// ---------------------------------------------------------------------------
 // Task-level parsing and mutation (R29/R37 — Fixes #414)
 // ---------------------------------------------------------------------------
 
@@ -540,6 +620,7 @@ module.exports = {
   validateChangeStrict,
   isArchived,
   runArchive,
+  getRequirementInventory,
   parseTasks,
   markTaskDone,
   STAGE_LABELS,

@@ -75,3 +75,41 @@
       value: '"hasDetectActiveChanges": true'
     - type: icontains
       value: '"hasValidateChange": true'
+
+# --- getRequirementInventory tests (R38 — Fixes #445) ---
+
+- description: "openspec-lib: getRequirementInventory is exported"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op exports"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: icontains
+      value: '"hasGetRequirementInventory": true'
+
+- description: "openspec-lib: getRequirementInventory returns cliAvailable false when openspec not on PATH"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op getRequirementInventory --project-root {{project_root}} --change req-inventory-test --no-path"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-delta-inventory"
+  assert:
+    - type: icontains
+      value: '"cliAvailable": false'
+    - type: icontains
+      value: '"ok": false'
+    - type: icontains
+      value: '"requirements": null'
+
+- description: "openspec-lib: getRequirementInventory returns ok false for nonexistent change when CLI absent"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op getRequirementInventory --project-root {{project_root}} --change nonexistent-change --no-path"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-delta-inventory"
+  assert:
+    - type: icontains
+      value: '"ok": false'
+    - type: icontains
+      value: '"requirements": null'

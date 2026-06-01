@@ -86,13 +86,14 @@ const lib = require(LIB_PATH);
 switch (op) {
   case 'exports': {
     console.log(JSON.stringify({
-      hasValidateChangeStrict:  typeof lib.validateChangeStrict === 'function',
-      hasIsArchived:            typeof lib.isArchived === 'function',
-      hasRunArchive:            typeof lib.runArchive === 'function',
-      hasDetectActiveChanges:   typeof lib.detectActiveChanges === 'function',
-      hasValidateChange:        typeof lib.validateChange === 'function',
-      hasParseTasks:            typeof lib.parseTasks === 'function',
-      hasMarkTaskDone:          typeof lib.markTaskDone === 'function',
+      hasValidateChangeStrict:    typeof lib.validateChangeStrict === 'function',
+      hasIsArchived:              typeof lib.isArchived === 'function',
+      hasRunArchive:              typeof lib.runArchive === 'function',
+      hasDetectActiveChanges:     typeof lib.detectActiveChanges === 'function',
+      hasValidateChange:          typeof lib.validateChange === 'function',
+      hasParseTasks:              typeof lib.parseTasks === 'function',
+      hasMarkTaskDone:            typeof lib.markTaskDone === 'function',
+      hasGetRequirementInventory: typeof lib.getRequirementInventory === 'function',
     }, null, 2));
     break;
   }
@@ -169,6 +170,16 @@ switch (op) {
       process.exit(1);
     }
     const result = lib.runArchive(projectRoot, changeName);
+    console.log(JSON.stringify(result, null, 2));
+    break;
+  }
+
+  case 'getRequirementInventory': {
+    if (!projectRoot || !changeName) {
+      console.error('--project-root and --change required for getRequirementInventory');
+      process.exit(1);
+    }
+    const result = lib.getRequirementInventory(projectRoot, changeName);
     console.log(JSON.stringify(result, null, 2));
     break;
   }

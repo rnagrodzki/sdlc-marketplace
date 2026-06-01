@@ -17,6 +17,7 @@ You receive:
 - `{LENS_FOCUS}` — Buildability, Task descriptions, Decision documentation, Dependency accuracy
 - `{BRIEF_FILE}` — absolute path to discovery-brief.md, or `"none — orchestrator skipped"`
 - `{GUARDRAILS}` — active guardrails (for context only — not your responsibility)
+- `{REQUIREMENTS_JSON}` — JSON array of `{ reqId, capability, type, name, scenarioCount }` from the delta-spec inventory, or `"null"` when unavailable. Reference for context — architecture lens does not produce traceability rows.
 
 Read the plan file at `{PLAN_FILE_PATH}` before evaluating.
 
@@ -46,12 +47,20 @@ Approve unless there are genuine blockers in your focus areas.
 
 ---
 
+## Per-Check Severity Classification (for scorecard, Gate B)
+
+For each issue you find, emit a severity tag on the issue line:
+`[SEVERITY: CRITICAL|WARNING|SUGGESTION] [DIMENSION: Completeness|Correctness|Coherence]`
+
+Architecture findings typically map to Correctness (design decisions) or Completeness (missing deps).
+This tag is used by the main context scorecard aggregator only — do not alter your Approved/Issues-Found status logic.
+
 ## Output
 
 **Status:** Approved | Issues Found
 
 **Issues (if any — list only execution blockers within architecture focus areas):**
-- Task N: [specific issue] — [why this would cause execution failure]
+- Task N: [specific issue] — [why this would cause execution failure] [SEVERITY: WARNING] [DIMENSION: Correctness]
 
 **Recommendations (advisory, do not block approval):**
 - [optional suggestions within architecture focus areas]

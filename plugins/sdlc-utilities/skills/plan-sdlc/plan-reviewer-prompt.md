@@ -13,6 +13,7 @@ Use this template in plan-sdlc Step 5 (CRITIQUE) when dispatching the plan revie
 - `{SOURCE_REQUIREMENTS}` — file path or inline text of the original spec/requirements (if available)
 - `{BRIEF_FILE}` — absolute path to `discovery-brief.md` produced by `plan-explore-orchestrator`, or `"none — orchestrator skipped"` when the lightweight path or fallback ran
 - `{OPENSPEC_TASKS}` — serialized JSON array from `openspecContext.tasks[]` when `--from-openspec` was active; `"none — plan not from OpenSpec"` otherwise
+- `{REQUIREMENTS_JSON}` — JSON array of `{ reqId, capability, type, name, scenarioCount }` from the delta-spec inventory, or `"null"` when unavailable (CLI absent or non-OpenSpec plan). When `{LENS}=all` (single-reviewer, <5 tasks), include this for traceability matrix building if present.
 - `{LENS}` — reviewer lens: one of `architecture`, `requirements`, `risk`, or `all`. When `{LENS}=all`, the reviewer evaluates all categories (status quo for plans <5 tasks). When `{LENS}` is one of the three specific values, the reviewer filters evaluation to the categories listed in `{LENS_FOCUS}`.
 - `{LENS_FOCUS}` — category subset for the lens, rendered as a bullet list (e.g., `- Buildability\n- Task descriptions\n- Decision documentation\n- Dependency accuracy`). When `{LENS}=all`, set to `"all categories below"`.
 
@@ -38,6 +39,7 @@ Task tool (general-purpose):
     **Plan guardrails:** {GUARDRAILS — one per line, or "none configured"}
     **Discovery brief:** {BRIEF_FILE — absolute path to discovery-brief.md, or "none — orchestrator skipped"}
     **openspecContext.tasks:** {OPENSPEC_TASKS — serialized JSON array from prepare output, or "none — plan not from OpenSpec"}
+    **Requirement inventory:** {REQUIREMENTS_JSON — JSON array from openspec show --json --deltas-only, or "null"}
 
     **Focus areas (this lens only):** {LENS_FOCUS}
     (When lens is `all`, evaluate all categories below. When lens is `architecture`, `requirements`, or `risk`, evaluate only the categories listed in Focus areas above — skip all other categories.)
