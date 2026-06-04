@@ -17,7 +17,7 @@ Your job: run the full review pipeline in isolation so the user's main context s
 
 ## Step 0 — Load Manifest and Resolve References
 
-Read the manifest JSON from `MANIFEST_FILE`.
+Read the manifest JSON from `MANIFEST_FILE`. It is a **thin index** (R-manifest-index-slices, #447): each `dimensions[]` entry carries only lightweight fields (`name`, `description`, `severity`, `model`, `status`, `requires_full_diff`, `truncated`, `matched_count`, `diff_file`, `slice_file`). The heavy per-dimension fields (`body`, `matched_files`, `file_context`, `warnings`) live in the dimension's `slice_file`, and the diff lives in `diff_file`. You MUST NOT read `slice_file` or `diff_file` contents into your own context — you forward their paths to each subagent (Step 2), and the subagent reads them. Your context scales with dimension count, not content.
 
 Resolve REFERENCE.md: Glob with `path: ~/.claude` and pattern `**/review-sdlc/REFERENCE.md`.
 If not found, retry Glob with `path: PROJECT_ROOT`. Store the resolved absolute path as
@@ -32,7 +32,7 @@ Display the review plan:
 Review Plan
   Scope:         {scope label — see below}
   {if scope is 'all', 'committed', or 'worktree'}: Base branch: {base_branch}
-  Changed files: {git.changed_files.length}
+  Changed files: {git.changed_files_count}
   Dimensions:    {summary.active_dimensions} active, {summary.skipped_dimensions} skipped
 
 | Dimension        | Files | Severity | Status   |
@@ -90,24 +90,12 @@ Use section 2 "Subagent Prompt Template" from REFERENCE.md.
 
 For each dimension with `status: "ACTIVE"` or `status: "TRUNCATED"`:
 
-1. Read the pre-computed diff: `Read(dimension.diff_file)`
-2. Build the subagent prompt using the template from REFERENCE.md section 2, filling:
+1. **Do NOT read `dimension.slice_file` or `dimension.diff_file`.** The subagent reads them itself (R-manifest-index-slices, #447). Reading them here would relocate the context overflow into your own context — exactly what this design avoids.
+2. Build the subagent prompt using the template from REFERENCE.md section 2, filling only the thin-index fields and the two **paths**:
    - `{dimension.name}`, `{dimension.description}`, `{dimension.severity}`
-   - `{dimension body}` → `dimension.body`
-   - `{list of matched files}` → `dimension.matched_files` (one per line)
-   - `{filtered diff}` → the content read from `dimension.diff_file`
-   - Add commit context section before the Output Format section:
-
-     ```text
-     ## Commit Context
-
-     Use these to understand the author's intent:
-
-     {for each entry in dimension.file_context where entry.commits.length > 0}
-     - `{entry.file}` — {entry.commits.map(c => `${c.hash}: ${c.subject}`).join('; ')}
-     {end for}
-     ```
-
+   - `{dimension.slice_file}` → the path string (the subagent reads it for `body`, `matched_files`, `file_context`, `warnings`)
+   - `{dimension.diff_file}` → the path string (the subagent reads it for the pre-filtered diff)
+   - Put these per-run paths in the **dynamic tail** of the prompt (after the static REFERENCE template prefix) for cache stability.
 3. Dispatch via Agent tool (subagent_type: general-purpose, model: dimension.model || manifest.subagent_model)
    - Per-dimension precedence: when a dimension declares a `model:` field in its
      manifest entry (sourced from its frontmatter, see R15), that value wins. Otherwise

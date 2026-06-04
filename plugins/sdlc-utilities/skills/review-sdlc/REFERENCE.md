@@ -20,11 +20,9 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
   "base_branch": "main",
   "current_branch": "feat/xyz",
   "uncommitted_changes": false,
-  "dirty_files": [],
   "git": {
     "commit_count": 5,
-    "commit_log": "abc1234 feat: add widget\n...",
-    "changed_files": ["src/a.ts", "src/b.ts"]
+    "changed_files_count": 2
   },
   "pr": {
     "exists": true,
@@ -38,21 +36,13 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
       "name": "security-review",
       "description": "...",
       "severity": "high",
-      "requires_full_diff": false,
       "model": "sonnet",
       "status": "ACTIVE",
-      "matched_files": ["src/auth/login.ts"],
-      "matched_count": 1,
+      "requires_full_diff": false,
       "truncated": false,
+      "matched_count": 1,
       "diff_file": "/tmp/sdlc-review-XXXXX/security-review.diff",
-      "body": "# Security Review\n...",
-      "file_context": [
-        {
-          "file": "src/auth/login.ts",
-          "commits": [{ "hash": "abc1234", "subject": "feat: add OAuth2 flow" }]
-        }
-      ],
-      "warnings": []
+      "slice_file": "/tmp/sdlc-review-XXXXX/security-review.slice.json"
     }
   ],
   "plan_critique": {
@@ -85,6 +75,26 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
 
 `status` values: `ACTIVE`, `SKIPPED`, `TRUNCATED`, `QUEUED`
 
+### Per-dimension slice file
+
+The `dimensions[]` array is a **thin index** — it carries no `body`, `matched_files`, `file_context`, or `warnings`. For each dispatched dimension (`status` ACTIVE/TRUNCATED), `review.js` writes a separate slice file into `diff_dir` and stores its path in `slice_file`. Non-dispatched dimensions (SKIPPED/QUEUED) have `slice_file: null`. This bounds the orchestrator's context by dimension **count**, not content — the orchestrator forwards `slice_file` + `diff_file` paths into each dispatch and never reads their contents itself.
+
+Each `${diff_dir}/${name}.slice.json` has this shape:
+
+```json
+{
+  "body": "# Security Review\n...",
+  "matched_files": ["src/auth/login.ts"],
+  "file_context": [
+    {
+      "file": "src/auth/login.ts",
+      "commits": [{ "hash": "abc1234", "subject": "feat: add OAuth2 flow" }]
+    }
+  ],
+  "warnings": []
+}
+```
+
 `scope` values:
 
 - `all` (default) — committed branch changes + staged changes (`git diff --cached {base}`)
@@ -93,9 +103,9 @@ See `EXAMPLES.md` (in this directory) for 5 copy-paste-ready example dimension f
 - `working` — all uncommitted changes vs HEAD, staged + unstaged (`git diff HEAD`)
 - `worktree` — full working tree vs base: committed + staged + unstaged (`git diff {base}`)
 
-When `scope` is `staged` or `working`: `base_branch` is `null`, `git.commit_count` is `0`, `git.commit_log` is `""`, and `file_context[].commits` arrays are empty. `pr` is `{ exists: false }`.
+When `scope` is `staged` or `working`: `base_branch` is `null`, `git.commit_count` is `0`, and `file_context[].commits` arrays (in each dimension's slice file) are empty. `pr` is `{ exists: false }`.
 
-When `scope` is `worktree`: `base_branch` is set, `git.commit_count` and `git.commit_log` reflect commits since base, and `file_context[].commits` arrays are populated. The diff additionally includes unstaged working tree changes. `pr` is populated if a PR exists. Note: untracked files (never `git add`-ed) are not included.
+When `scope` is `worktree`: `base_branch` is set, `git.commit_count` reflects commits since base, and `file_context[].commits` arrays (in each dimension's slice file) are populated. The diff additionally includes unstaged working tree changes. `pr` is populated if a PR exists. Note: untracked files (never `git add`-ed) are not included.
 
 ---
 
@@ -151,7 +161,7 @@ Recommended elements:
 
 ## 2. Subagent Prompt Template
 
-When the skill dispatches a review subagent for a dimension, it fills this template:
+When the orchestrator dispatches a review subagent for a dimension, it fills this template. The orchestrator forwards the dimension's `slice_file` and `diff_file` **paths** (from the thin manifest index) — it does NOT read their contents into its own context. The subagent reads them itself.
 
 ```
 # Code Review: {dimension.name}
@@ -159,26 +169,25 @@ When the skill dispatches a review subagent for a dimension, it fills this templ
 ## Your Role
 You are a code reviewer focused exclusively on: {dimension.description}
 
-## Review Instructions
-{dimension body — full Markdown content below the frontmatter}
+## Your Input Files
+You MUST read both of these files before reviewing:
 
-## Changed Files in Your Scope
-{list of matched files, one per line}
+- **Slice file** (JSON): `{dimension.slice_file}`
+  Read it and parse the JSON. It contains:
+  - `body` — your full review instructions (Markdown)
+  - `matched_files` — the list of changed files in your scope (review ONLY these)
+  - `file_context` — array of `{ file, commits: [{ hash, subject }] }` for author-intent context
+  - `warnings` — any prepare-time warnings (e.g., matched files with no diff content)
+- **Diff file**: `{dimension.diff_file}`
+  Read it for the pre-filtered diff hunks covering your matched files.
 
-## Commit Context
-
-{if any entry in file_context has commits.length > 0}
-Use these to understand the author's intent:
-
-{for each entry in file_context where entry.commits.length > 0}
-- `{entry.file}` — {entry.commits.map(c => `${c.hash}: ${c.subject}`).join('; ')}
-{end for}
-{else}
-No commit context available (reviewing {scope} changes — no commits to reference).
-{end if}
-
-## Diff to Review
-{content of dimension.diff_file — pre-computed by skill/review.js}
+## How to Use Them
+1. `Read({dimension.slice_file})` and parse the JSON.
+2. Treat the parsed `body` as your Review Instructions — follow it verbatim.
+3. Review ONLY the files in `matched_files`.
+4. For each `file_context` entry whose `commits` array is non-empty, use the commit hashes/subjects to understand the author's intent. When all `commits` arrays are empty, there is no commit context (e.g., reviewing staged/working changes).
+5. `Read({dimension.diff_file})` for the diff to review.
+6. Surface any `warnings` entries that affect your review (e.g., a matched file with no diff content).
 
 ## Default Severity
 Unless the review instructions specify otherwise, classify findings as: {dimension.severity}

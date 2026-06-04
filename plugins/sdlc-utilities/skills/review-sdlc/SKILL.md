@@ -54,7 +54,7 @@ Read `MANIFEST_FILE` and output **exactly** this format:
 Review Plan (dry run — no subagents dispatched)
 
   Base branch:    {manifest.base_branch}
-  Changed files:  {manifest.git.changed_files.length}
+  Changed files:  {manifest.git.changed_files_count}
   Dimensions:     {manifest.summary.active_dimensions} active, {manifest.summary.skipped_dimensions} skipped
 
 | Dimension | Files | Severity | Status |

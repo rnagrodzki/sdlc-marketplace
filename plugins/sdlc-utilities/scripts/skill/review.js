@@ -38,7 +38,6 @@ const {
   fetchBaseRef,
   buildBranchContribDiffCmd,
   getChangedFiles,
-  getCommitLog,
   getCommitCount,
   fetchPrMetadata,
   ensureGhAccount,
@@ -277,6 +276,51 @@ function writeDimensionDiffs(activeDimensions, fileDiffs, projectRoot) {
   return tmpDir;
 }
 
+/**
+ * Write one .slice.json file per dispatched dimension to tmpDir (R-manifest-index-slices, #447).
+ * Each slice carries the heavy per-dimension fields that the thin manifest index omits:
+ * { body, matched_files, file_context, warnings }. Mutates dim.slice_file on each dimension.
+ * Sibling to writeDimensionDiffs — kept single-responsibility (slices only, no diff logic).
+ */
+function writeDimensionSlices(activeDimensions, tmpDir) {
+  for (const dim of activeDimensions) {
+    const sliceFile = path.join(tmpDir, `${dim.name}.slice.json`);
+    fs.writeFileSync(sliceFile, JSON.stringify({
+      body:          dim.body,
+      matched_files: dim.matched_files,
+      file_context:  dim.file_context,
+      warnings:      dim.warnings,
+    }), 'utf8');
+    dim.slice_file = sliceFile;
+  }
+  return tmpDir;
+}
+
+/**
+ * Project a dimension object into a thin index entry (R-manifest-index-slices, #447).
+ * Strips the heavy fields (body, matched_files, file_context, warnings) — those live in
+ * the slice file (slice_file). The orchestrator reads only this thin shape.
+ */
+function toIndexEntry(dim) {
+  // Only dispatched dimensions (ACTIVE/TRUNCATED) carry a slice_file. refinePlan() may demote
+  // an ACTIVE dim to QUEUED *after* its slice was written — gate on status so QUEUED/SKIPPED
+  // always report slice_file: null, per R-manifest-index-slices (#447). A written-but-orphaned
+  // slice for a now-QUEUED dim is harmless (orchestrator never dispatches it).
+  const dispatched = dim.status === 'ACTIVE' || dim.status === 'TRUNCATED';
+  return {
+    name:               dim.name,
+    description:        dim.description,
+    severity:           dim.severity,
+    model:              dim.model,
+    status:             dim.status,
+    requires_full_diff: dim.requires_full_diff,
+    truncated:          dim.truncated,
+    matched_count:      dim.matched_count,
+    diff_file:          dim.diff_file,
+    slice_file:         dispatched ? (dim.slice_file != null ? dim.slice_file : null) : null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Plan critique and refinement
 // ---------------------------------------------------------------------------
@@ -452,6 +496,7 @@ function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
       matched_count:     effectiveMatched.length,
       truncated:         effectiveTruncated,
       diff_file:         null,
+      slice_file:        null,
       body,
       file_context:      [],
       warnings:          result.warnings,
@@ -560,6 +605,9 @@ function main() {
   const fileDiffs  = fetchAndSplitDiff(base, projectRoot, scope);
   const activeDims = dims.filter(d => d.status === 'ACTIVE' || d.status === 'TRUNCATED');
   const tmpDir     = writeDimensionDiffs(activeDims, fileDiffs, projectRoot);
+  // Per-dimension slice files (R-manifest-index-slices, #447): written after diffs so
+  // file_context is populated and diff-content warnings are appended into dim.warnings.
+  writeDimensionSlices(activeDims, tmpDir);
 
   // Plan critique and refinement
   const critique = critiquePlan(dims, changedFiles);
@@ -584,14 +632,12 @@ function main() {
     base_branch:    base || null,
     current_branch: gitState.currentBranch,
     uncommitted_changes: gitState.uncommittedChanges,
-    dirty_files:    gitState.dirtyFiles,
     git: {
-      commit_count:  !isLocalScope ? getCommitCount(base, projectRoot) : 0,
-      commit_log:    !isLocalScope ? getCommitLog(base, projectRoot)   : '',
-      changed_files: changedFiles,
+      commit_count:        !isLocalScope ? getCommitCount(base, projectRoot) : 0,
+      changed_files_count: changedFiles.length,
     },
     pr,
-    dimensions: dims,
+    dimensions: dims.map(toIndexEntry),
     plan_critique: {
       uncovered_files:        critique.uncoveredFiles,
       uncovered_suggestions:  critique.uncoveredSuggestions,
@@ -625,4 +671,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { globToRegex, matchFiles, loadAndMatchDimensions, analyzeUncoveredFiles, UNCOVERED_PATTERN_CATALOG };
+module.exports = { globToRegex, matchFiles, loadAndMatchDimensions, analyzeUncoveredFiles, UNCOVERED_PATTERN_CATALOG, writeDimensionSlices, toIndexEntry };

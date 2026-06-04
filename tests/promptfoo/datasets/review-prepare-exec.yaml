@@ -37,6 +37,26 @@
     - type: javascript
       value: "!JSON.parse(output).forced"
 
+- description: "review-prepare (#447): manifest-split — thin index excludes heavy fields and stays small while slices carry body/matched_files (issue #447)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-review-manifest-split.js"
+    script_args: "--project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-manifest-split"
+  assert:
+    # The thin index must NOT inline body/matched_files, must not carry the dropped commit_log,
+    # and must stay far below the synthesized total body size (8 dims x 4096 bytes = 32768 bytes
+    # of body alone) — proving the index scales with dimension COUNT, not content.
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        return r.index_has_body === false &&
+          r.index_has_matched_files === false &&
+          r.index_has_commit_log === false &&
+          r.slice_has_body === true &&
+          r.slice_has_matched_files === true &&
+          r.index_bytes < 8000;
+
 - description: "review-prepare (#363): manifest includes plugin_version matching semver or 'unknown'"
   vars:
     script_path: "repo://tests/promptfoo/scripts/run-review-plugin-version.js"
