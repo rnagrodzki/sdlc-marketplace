@@ -400,7 +400,7 @@ For ultra-short runs (`flags.steps.length < 2`), skip TodoWrite entirely.
 
 **Cross-skill note:** `execute-plan-sdlc`'s internal per-wave `TodoWrite` calls remain (Agent-context bookkeeping). They are NOT parent-visible — see `execute-plan-sdlc/SKILL.md` Progress signal section and `R-todowrite-visibility`, issue #427.
 
-### Workspace-mode resolution and default-branch guard (R61, R62 — fixes #378)
+### Workspace-mode resolution and default-branch guard (R61, R62 — fixes #378; R66 — worktree-in-place guard)
 
 **Skip on resume re-entry** (`flags.resume === true`) — the resume block below already handled mode/cwd.
 
@@ -424,6 +424,19 @@ fi
 if [ -z "$WORKSPACE_MODE" ]; then
   echo "Error: workspace mode not set. Pass --workspace branch|worktree|continue or set workspace.mode in .sdlc/local.json." >&2
   exit 1
+fi
+
+# Worktree-mode in-place guard (R66 — symmetric to the R65 branch-mode cwd-assertion):
+# when mode is 'worktree' but cwd is already a linked (non-main) worktree, downgrade to
+# 'continue' and run in place rather than creating a nested worktree. Same head-vs-toplevel
+# idiom as the worktree cleanup section. Skipped on resume re-entry.
+if [ "$WORKSPACE_MODE" = "worktree" ]; then
+  main_wt=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+  current=$(git rev-parse --show-toplevel)
+  if [ "$main_wt" != "$current" ]; then
+    WORKSPACE_MODE=continue
+    echo "Already inside linked worktree $current — running in place (workspace downgraded worktree → continue)."
+  fi
 fi
 
 # Default-branch guard: reject --workspace continue on the repo default branch.
