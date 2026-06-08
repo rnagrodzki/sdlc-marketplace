@@ -1,0 +1,31 @@
+#!/bin/bash
+set -e
+git init -q -b main
+git config user.email "test@test.com"
+git config user.name "Test"
+git config commit.gpgsign false
+
+echo "base" > base.txt
+git add base.txt
+git commit -q -m "chore: initial"
+
+git checkout -q -b feat/ship
+
+mkdir -p .sdlc/execution
+
+# Ship state for branch feat/ship: execute step in_progress BUT flags.auto = false.
+# stop-pipeline-continue MUST stay silent (interactive mode non-interference).
+# pipeline-continue still emits (it is auto-independent) — exercised separately.
+cat > .sdlc/execution/ship-feat-ship-20260608T120000Z.json <<'EOF'
+{
+  "version": 1,
+  "startedAt": "2026-06-08T12:00:00Z",
+  "branch": "feat/ship",
+  "flags": { "auto": false, "steps": ["execute", "commit", "pr"] },
+  "steps": [
+    { "name": "execute", "status": "in_progress" },
+    { "name": "commit", "status": "pending" },
+    { "name": "pr", "status": "pending" }
+  ]
+}
+EOF

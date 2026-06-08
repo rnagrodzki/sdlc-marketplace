@@ -43,6 +43,9 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Ignore cleanup validation failures — if `state/ship.js cleanup` exits with code 1, the pipeline contract was violated. Surface the violation and preserve state.
 - Skip the post-version ancestry HARD GATE. The check is the only safeguard against tags landing on orphaned commits (issue #349). The gate is a no-op when `NEW_TAG` is unset — do not pre-empt it by skipping it when you believe the version step succeeded on the right branch.
 - Exit the plan-mode-blocked path (Step 0, steps 3–7) without running `rm -f "$PLAN_MODE_OUTPUT_FILE"` — the temp prepare output file is separate from the persistent state file in `.sdlc/execution/` and must be cleaned up on every exit branch.
+- End your response turn between pipeline steps. Each step is part of a single dispatch loop. After every tool call result, check whether the current step is complete and proceed to the next action. Do not wait for a user message to continue.
+- Interpret tool call result processing as a natural stopping point. Processing a Bash or TodoWrite result is not the end of the pipeline — it is one action in a multi-action step. Continue to the next action immediately.
+- Treat the PostToolUse system-reminder ("Pipeline step N in_progress") as optional. When that context appears, you MUST complete the stated next action before ending your turn.
 
 ## Gotchas (R-progressive-disclosure)
 

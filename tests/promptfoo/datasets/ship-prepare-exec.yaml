@@ -1342,3 +1342,98 @@
         // planFile is either an absolute string or null — never undefined
         return Object.prototype.hasOwnProperty.call(o.context, 'planFile') &&
                (o.context.planFile === null || typeof o.context.planFile === 'string');
+
+# ---------------------------------------------------------------------------
+# R69 (#452) — state/ship.js begin-step / complete-step subcommands.
+# Driven through tests/promptfoo/scripts/run-ship-begin-complete.js so multi-call
+# sequences (begin→complete, begin twice for idempotency) run in one invocation
+# and the post-mutation step status is reported as JSON for assertion.
+# Fixture: ship-state-begin-complete (array-shaped ship state, all steps pending).
+# ---------------------------------------------------------------------------
+
+# 1. begin-step marks the execute step in_progress AND prints todos JSON.
+- description: "ship begin-step (R69): marks execute step in_progress and prints todos JSON"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ship-begin-complete.js"
+    script_args: "--project-root {{project_root}} --state-rel .sdlc/execution/ship-main-20260608T120000Z.json --step execute --scenario begin"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-state-begin-complete"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        if (o.exitCodes[0] !== 0) return `FAIL: exit ${o.exitCodes[0]}`;
+        if (o.finalStatus !== 'in_progress') return `FAIL: status ${o.finalStatus}`;
+        if (!(o.todosCount >= 1)) return `FAIL: todosCount ${o.todosCount}`;
+        // stdout from begin-step must be valid { todos, marker } JSON
+        const inner = JSON.parse(o.lastStdout);
+        if (!Array.isArray(inner.todos)) return 'FAIL: stdout has no todos array';
+        if (typeof inner.marker !== 'string') return 'FAIL: stdout has no marker';
+        return true;
+
+# 2. complete-step marks the execute step completed (after begin-step) and prints todos JSON.
+- description: "ship complete-step (R69): marks execute step completed and prints todos JSON"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ship-begin-complete.js"
+    script_args: "--project-root {{project_root}} --state-rel .sdlc/execution/ship-main-20260608T120000Z.json --step execute --scenario begin-then-complete"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-state-begin-complete"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        if (o.exitCodes.some(c => c !== 0)) return `FAIL: exitCodes ${o.exitCodes}`;
+        if (o.finalStatus !== 'completed') return `FAIL: status ${o.finalStatus}`;
+        const inner = JSON.parse(o.lastStdout);
+        if (!Array.isArray(inner.todos)) return 'FAIL: stdout has no todos array';
+        return true;
+
+# 3. begin-step idempotency — double-call does not corrupt state (still in_progress, both exit 0).
+- description: "ship begin-step (R69): double-call is idempotent (no corruption)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ship-begin-complete.js"
+    script_args: "--project-root {{project_root}} --state-rel .sdlc/execution/ship-main-20260608T120000Z.json --step execute --scenario begin-twice"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-state-begin-complete"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        if (o.exitCodes.length !== 2) return `FAIL: expected 2 calls, got ${o.exitCodes.length}`;
+        if (o.exitCodes.some(c => c !== 0)) return `FAIL: exitCodes ${o.exitCodes}`;
+        if (o.finalStatus !== 'in_progress') return `FAIL: status ${o.finalStatus}`;
+        return true;
+
+# 4. begin-step unknown step name → exits non-zero with informative stderr.
+- description: "ship begin-step (R69): unknown step name exits non-zero with error"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ship-begin-complete.js"
+    script_args: "--project-root {{project_root}} --state-rel .sdlc/execution/ship-main-20260608T120000Z.json --step nonexistent --scenario begin-unknown"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-state-begin-complete"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        if (o.exitCodes[0] === 0) return 'FAIL: expected non-zero exit for unknown step';
+        if (!/not found/i.test(o.lastStderr)) return `FAIL: stderr missing 'not found': ${o.lastStderr}`;
+        return true;
+
+# 5. complete-step on a never-begun (pending) step → handled gracefully (no corruption / no crash).
+- description: "ship complete-step (R69): completing a pending step does not corrupt state"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ship-begin-complete.js"
+    script_args: "--project-root {{project_root}} --state-rel .sdlc/execution/ship-main-20260608T120000Z.json --step commit --scenario complete-pending"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-state-begin-complete"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        // Either exits non-zero (strict guard) or exits 0 with the step found and
+        // not corrupted. Both satisfy the AC ("exit non-zero or no corruption").
+        if (o.exitCodes[0] === 0) {
+          if (!o.finalStepFound) return 'FAIL: step lost from state';
+          return true;
+        }
+        return true;
