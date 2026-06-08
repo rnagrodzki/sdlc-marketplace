@@ -208,6 +208,50 @@ function renderTodos(state, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Reusable step-transition helpers (R69, issue #452)
+//
+// These render the task-tray todos for a step transition / completion from an
+// already-loaded state object, mirroring the `--event step` CLI path. They are
+// pure (no file I/O, no process.exit) so state/ship.js begin-step/complete-step
+// can reuse them after mutating + persisting state — avoiding duplicated render
+// logic (DRY). The existing CLI `main()` continues to drive `renderTodos`
+// directly through the generic `--event` interface; these helpers do not change
+// that path.
+// ---------------------------------------------------------------------------
+
+/**
+ * Render the todos for marking `stepName` in_progress (the `--event step
+ * --current-step <stepName>` CLI shape). Caller is responsible for having
+ * already persisted status=in_progress to the state file.
+ * @param {object} state    parsed ship state object
+ * @param {string} stepName step to mark in_progress
+ * @returns {{ todos: Array<{id: string, content: string, status: string}>, marker: string }}
+ *   todos — the TodoWrite input array representing current pipeline step states;
+ *   marker — stdout audit string in the form "[task-tray] step <name>: pending=N, in_progress=M, completed=K".
+ */
+function stepTransition(state, stepName) {
+  return renderTodos(state, { event: 'step', currentStep: stepName });
+}
+
+/**
+ * Render the todos for marking `stepName` completed (the `--event step
+ * --current-step <stepName> --mark-completed <stepName>` CLI shape). Caller is
+ * responsible for having already persisted status=completed to the state file.
+ * @param {object} state    parsed ship state object
+ * @param {string} stepName step to mark completed
+ * @returns {{ todos: Array<{id: string, content: string, status: string}>, marker: string }}
+ *   todos — the TodoWrite input array representing current pipeline step states;
+ *   marker — stdout audit string in the form "[task-tray] step <name>: pending=N, in_progress=M, completed=K".
+ */
+function markCompleted(state, stepName) {
+  return renderTodos(state, {
+    event: 'step',
+    currentStep: stepName,
+    markCompleted: [stepName],
+  });
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
@@ -347,7 +391,7 @@ function main() {
 // ---------------------------------------------------------------------------
 // Module exports (for tests and direct require)
 // ---------------------------------------------------------------------------
-module.exports = { renderTodos, parseSubsteps, parsePlanTasks, SUBSTEP_MAP };
+module.exports = { renderTodos, parseSubsteps, parsePlanTasks, SUBSTEP_MAP, stepTransition, markCompleted };
 
 // Run CLI only when invoked directly (not when required as a module)
 if (require.main === module) {

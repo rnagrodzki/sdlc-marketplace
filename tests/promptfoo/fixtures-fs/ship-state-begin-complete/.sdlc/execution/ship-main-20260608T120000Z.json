@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "startedAt": "2026-06-08T12:00:00.000Z",
+  "branch": "main",
+  "flags": {
+    "auto": true,
+    "steps": ["execute", "commit", "pr"]
+  },
+  "steps": [
+    { "name": "execute", "status": "pending" },
+    { "name": "commit", "status": "pending" },
+    { "name": "pr", "status": "pending" }
+  ],
+  "decisions": [],
+  "deferredFindings": []
+}

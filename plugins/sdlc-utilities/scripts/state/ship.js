@@ -8,6 +8,8 @@
  *   node ship-state.js init               --branch <b> --flags <json>
  *   node ship-state.js start              --step <name>
  *   node ship-state.js complete           --step <name> --result <text>
+ *   node ship-state.js begin-step         --step <name> [--state-file <path>]          # mark in_progress + print todos JSON (R69)
+ *   node ship-state.js complete-step      --step <name> [--state-file <path>] [--result <text>]  # mark completed + print todos JSON (R69)
  *   node ship-state.js skip               --step <name> --reason <text>
  *   node ship-state.js fail               --step <name> --error <text>
  *   node ship-state.js decide             --step <name> --text <text>
@@ -53,6 +55,8 @@ function parseArgs(argv) {
       result.flags = args[++i];
     } else if (a === '--step' && args[i + 1]) {
       result.step = args[++i];
+    } else if (a === '--state-file' && args[i + 1]) {
+      result.stateFile = args[++i];
     } else if (a === '--result' && args[i + 1]) {
       result.result = args[++i];
     } else if (a === '--reason' && args[i + 1]) {
@@ -153,6 +157,40 @@ function cmdInit(opts) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Mutation cores (no process.exit, no I/O beyond the in-memory mutation) —
+// shared by the CLI wrappers (cmdStart/cmdComplete) and the begin-step/
+// complete-step subcommands (R69, issue #452). Returning a result object lets
+// begin-step/complete-step persist + render after mutation instead of exiting.
+// Idempotency: re-marking a step that is already in the target status is a
+// no-op for status (timestamps refresh) — no corruption.
+// ---------------------------------------------------------------------------
+
+/**
+ * Mark `stepName` in_progress in the given state data (mutates in place).
+ * @returns {{ ok: true, step } | { ok: false, error: string }}
+ */
+function startStepCore(data, stepName) {
+  const step = data.steps.find(s => s.name === stepName);
+  if (!step) return { ok: false, error: `step "${stepName}" not found` };
+  step.status = 'in_progress';
+  step.startedAt = new Date().toISOString();
+  return { ok: true, step };
+}
+
+/**
+ * Mark `stepName` completed in the given state data (mutates in place).
+ * @returns {{ ok: true, step } | { ok: false, error: string }}
+ */
+function completeStepCore(data, stepName, result) {
+  const step = data.steps.find(s => s.name === stepName);
+  if (!step) return { ok: false, error: `step "${stepName}" not found` };
+  step.status = 'completed';
+  step.completedAt = new Date().toISOString();
+  if (result !== undefined) step.result = result;
+  return { ok: true, step };
+}
+
 function cmdStart(opts) {
   if (!opts.step) {
     process.stderr.write('Error: --step is required\n');
@@ -168,14 +206,11 @@ function cmdStart(opts) {
   }
 
   const { data, filePath } = found;
-  const step = data.steps.find(s => s.name === opts.step);
-  if (!step) {
-    process.stderr.write(`Error: step "${opts.step}" not found\n`);
+  const res = startStepCore(data, opts.step);
+  if (!res.ok) {
+    process.stderr.write(`Error: ${res.error}\n`);
     process.exit(1);
   }
-
-  step.status = 'in_progress';
-  step.startedAt = new Date().toISOString();
 
   writeState(filePath, data);
   process.exit(0);
@@ -196,17 +231,96 @@ function cmdComplete(opts) {
   }
 
   const { data, filePath } = found;
-  const step = data.steps.find(s => s.name === opts.step);
-  if (!step) {
-    process.stderr.write(`Error: step "${opts.step}" not found\n`);
+  const res = completeStepCore(data, opts.step, opts.result);
+  if (!res.ok) {
+    process.stderr.write(`Error: ${res.error}\n`);
     process.exit(1);
   }
 
-  step.status = 'completed';
-  step.completedAt = new Date().toISOString();
-  if (opts.result !== undefined) step.result = opts.result;
-
   writeState(filePath, data);
+  process.exit(0);
+}
+
+// ---------------------------------------------------------------------------
+// begin-step / complete-step (R69, issue #452)
+//
+// Atomic per-step transitions that combine the state mutation (start/complete)
+// with the ship-todos render, printing the { todos, marker } JSON to stdout for
+// the caller's TodoWrite. They accept --state-file directly (the SKILL.md Step 5
+// contract) and fall back to branch resolution when --state-file is absent.
+// DRY: the render is delegated to lib/ship-todos.js stepTransition/markCompleted;
+// the mutation reuses startStepCore/completeStepCore (the same cores the legacy
+// start/complete subcommands use).
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve a ship state file for the new subcommands.
+ * Prefers --state-file (read directly); falls back to branch resolution.
+ * @returns {{ data: object, filePath: string }}
+ */
+function loadShipStateOrExit(opts) {
+  if (opts.stateFile) {
+    if (!fs.existsSync(opts.stateFile)) {
+      process.stderr.write(`Error: state-file not found: ${opts.stateFile}\n`);
+      process.exit(1);
+    }
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(opts.stateFile, 'utf8'));
+    } catch (e) {
+      process.stderr.write(`Error: failed to parse state file: ${e.message}\n`);
+      process.exit(2);
+    }
+    return { data, filePath: opts.stateFile };
+  }
+
+  const branch = resolveBranchOrExit(opts.branch);
+  const slug = slugifyBranch(branch);
+  const found = readState('ship', slug);
+  if (!found) {
+    process.stderr.write(`Error: no state file found for branch "${branch}"\n`);
+    process.exit(1);
+  }
+  return found;
+}
+
+function cmdBeginStep(opts) {
+  if (!opts.step) {
+    process.stderr.write('Error: --step is required\n');
+    process.exit(2);
+  }
+  const { stepTransition } = require(path.join(LIB, 'ship-todos'));
+  const { data, filePath } = loadShipStateOrExit(opts);
+
+  const res = startStepCore(data, opts.step);
+  if (!res.ok) {
+    process.stderr.write(`Error: ${res.error}\n`);
+    process.exit(1);
+  }
+  writeState(filePath, data);
+
+  const rendered = stepTransition(data, opts.step);
+  process.stdout.write(JSON.stringify(rendered, null, 2) + '\n');
+  process.exit(0);
+}
+
+function cmdCompleteStep(opts) {
+  if (!opts.step) {
+    process.stderr.write('Error: --step is required\n');
+    process.exit(2);
+  }
+  const { markCompleted } = require(path.join(LIB, 'ship-todos'));
+  const { data, filePath } = loadShipStateOrExit(opts);
+
+  const res = completeStepCore(data, opts.step, opts.result);
+  if (!res.ok) {
+    process.stderr.write(`Error: ${res.error}\n`);
+    process.exit(1);
+  }
+  writeState(filePath, data);
+
+  const rendered = markCompleted(data, opts.step);
+  process.stdout.write(JSON.stringify(rendered, null, 2) + '\n');
   process.exit(0);
 }
 
@@ -517,6 +631,8 @@ try {
     case 'init':     cmdInit(opts);     break;
     case 'start':    cmdStart(opts);    break;
     case 'complete': cmdComplete(opts); break;
+    case 'begin-step':    cmdBeginStep(opts);    break;
+    case 'complete-step': cmdCompleteStep(opts); break;
     case 'skip':     cmdSkip(opts);     break;
     case 'fail':     cmdFail(opts);     break;
     case 'decide':   cmdDecide(opts);   break;
@@ -528,7 +644,7 @@ try {
     case 'migrate':           cmdMigrate(opts);          break;
     default:
       process.stderr.write(`Error: unknown subcommand "${opts.subcommand}"\n`);
-      process.stderr.write('Usage: node ship-state.js <init|start|complete|skip|fail|decide|defer|read|cleanup|cleanup-pipeline|gc|migrate> [options]\n');
+      process.stderr.write('Usage: node ship-state.js <init|start|complete|begin-step|complete-step|skip|fail|decide|defer|read|cleanup|cleanup-pipeline|gc|migrate> [options]\n');
       process.exit(2);
   }
 } catch (e) {

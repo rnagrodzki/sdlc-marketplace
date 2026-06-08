@@ -324,7 +324,7 @@ For each step that will run, apply the dispatch protocol based on `step.dispatch
      Reason: --auto forwarded from ship --auto mode
    ```
 
-2. **Record step start** via state/ship.js.
+2. **Record step start** via `state/ship.js begin-step` (R70) — see the per-step transition block in "Main-thread TodoWrite orchestration" below; `begin-step` records `in_progress` and renders the task-tray todos in one call.
 
 3. **Dispatch Agent** with: skill name, args from `step.invocation`, model from `step.model`, and brief pipeline context (branch, previous step results needed for this step). Pass `model: step.model` to the Agent tool on every dispatch. When `step.isolation` is non-null, additionally pass `isolation: step.isolation`; when `step.isolation` is null, omit the `isolation` parameter entirely (the Agent tool schema does not accept `null` for `isolation`). The LLM must not add, remove, or change the `isolation` parameter from what `ship.js` computed (implements R-agent-isolation-script-driven, C15). Agent prompt template:
    ```
@@ -341,7 +341,7 @@ For each step that will run, apply the dispatch protocol based on `step.dispatch
      State saved to .sdlc/execution/ship-<branch>-<timestamp>.json
    ```
 
-5. **Record step completion/failure** via state/ship.js.
+5. **Record step completion/failure** via `state/ship.js complete-step` (R70) — see the per-step completion block in "Main-thread TodoWrite orchestration" below; `complete-step` records `completed` and renders the task-tray todos in one call. Failures still use `state/ship.js fail` + the ship-todos `--fail-step` render.
 
 6. **Use result to determine next step** (e.g., review verdict → received-review decision). Print decision reasoning:
    ```
@@ -363,6 +363,10 @@ ship-sdlc surfaces live pipeline progress in the Claude Code task tray via main-
 SHIP_TODOS=$(find ~/.claude/plugins -name "ship-todos.js" -path "*/sdlc*/scripts/lib/ship-todos.js" 2>/dev/null | sort -V | tail -1)
 [ -z "$SHIP_TODOS" ] && [ -f "plugins/sdlc-utilities/scripts/lib/ship-todos.js" ] && SHIP_TODOS="plugins/sdlc-utilities/scripts/lib/ship-todos.js"
 [ -z "$SHIP_TODOS" ] && { echo "ERROR: ship-todos.js not found"; exit 2; }
+
+STATE_SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/state/ship.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$STATE_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/ship.js" ] && STATE_SCRIPT="plugins/sdlc-utilities/scripts/state/ship.js"
+[ -z "$STATE_SCRIPT" ] && { echo "ERROR: state/ship.js not found"; exit 2; }
 ```
 
 **Setup (one-time, BEFORE the Step 5 dispatch loop, only when `flags.steps.length >= 2`):**
@@ -373,17 +377,19 @@ SHIP_TODOS=$(find ~/.claude/plugins -name "ship-todos.js" -path "*/sdlc*/scripts
 
 For ultra-short runs (`flags.steps.length < 2`), skip TodoWrite entirely.
 
-**Per-step transition (called at start of EACH Step 5 iteration, BEFORE the verbose progress header):**
+**Per-step transition + start (called at start of EACH Step 5 iteration, BEFORE the verbose progress header) — R69/R70:**
 
-1. Run: `node "$SHIP_TODOS" --state-file "$STATE_FILE" --event step --current-step <stepName>`.
-2. Parse JSON, call `TodoWrite`, echo `marker`.
+`begin-step` atomically marks the step `in_progress` (the former `state/ship.js start`) AND renders the task-tray todos (the former `ship-todos --event step`) in a single call, replacing the two prior separate invocations.
 
-**Per-step completion (called AFTER the Agent return and result print, AFTER `state/ship.js complete` records success):**
+1. Run: `node "$STATE_SCRIPT" begin-step --step <stepName> --state-file "$STATE_FILE"`.
+2. Parse JSON from stdout → call `TodoWrite` with the `todos` array, echo `marker`.
 
-<!-- Ordering required: `state/ship.js complete` must persist status=completed BEFORE this call;
-     ship-todos reads the state file to derive substep statuses, so completion must be on disk first. -->
-1. Run: `node "$SHIP_TODOS" --state-file "$STATE_FILE" --event step --current-step <stepName> --mark-completed <stepName>`.
-2. Parse JSON, call `TodoWrite`, echo `marker`.
+**Per-step completion (called AFTER the Agent return and result print) — R69/R70:**
+
+`complete-step` atomically marks the step `completed` (the former `state/ship.js complete`) AND renders the task-tray todos (the former `ship-todos --event step --mark-completed`) in a single call. Persisting completion and rendering happen in-process, so the ordering constraint that previously required two separate ordered calls is now internal to the subcommand.
+
+1. Run: `node "$STATE_SCRIPT" complete-step --step <stepName> --state-file "$STATE_FILE" --result "<summary>"`.
+2. Parse JSON from stdout → call `TodoWrite` with the `todos` array, echo `marker`.
 
 **Per-step failure (called when `state/ship.js fail` records a failure):**
 
