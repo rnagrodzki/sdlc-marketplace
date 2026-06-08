@@ -59,6 +59,24 @@
         if (r.stdout.trim() !== '') return `FAIL: expected empty stdout, got: ${r.stdout}`;
         return true;
 
+# 4. flags.auto=false + in_progress → still emits additionalContext (R67: fires regardless of flags.auto).
+- description: "pipeline-continue (R67): fires regardless of flags.auto (noauto fixture)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"Bash","tool_response":{}}'
+    project_root: "file://fixtures-fs/ship-pipeline-noauto"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        if (!inner.hookSpecificOutput) return 'FAIL: no hookSpecificOutput';
+        if (inner.hookSpecificOutput.hookEventName !== 'PostToolUse') return 'FAIL: wrong hookEventName';
+        if (!/in_progress/.test(inner.hookSpecificOutput.additionalContext || '')) return 'FAIL: additionalContext missing in_progress';
+        return true;
+
 # ---------------------------------------------------------------------------
 # stop-pipeline-continue.js (Stop, R68) — 5 cases (4 gate conditions + idempotency)
 # ---------------------------------------------------------------------------

@@ -18,7 +18,7 @@
  *   --state-rel <path>      State file path relative to project-root
  *   --step <name>           Step name to operate on
  *   --scenario <name>       One of: begin | begin-twice | begin-then-complete |
- *                           complete-unknown | begin-unknown | complete-pending
+ *                           begin-unknown | complete-unknown | complete-pending
  *
  * Output JSON:
  *   {
@@ -96,6 +96,9 @@ switch (scenario) {
     break;
   case 'begin-unknown':
     record(run(['begin-step', '--step', step, '--state-file', stateFile]));
+    break;
+  case 'complete-unknown':
+    record(run(['complete-step', '--step', step, '--state-file', stateFile, '--result', 'x']));
     break;
   case 'complete-pending':
     // complete-step on a step that was never begun (still pending). Should not

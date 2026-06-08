@@ -1419,7 +1419,22 @@
         if (!/not found/i.test(o.lastStderr)) return `FAIL: stderr missing 'not found': ${o.lastStderr}`;
         return true;
 
-# 5. complete-step on a never-begun (pending) step → handled gracefully (no corruption / no crash).
+# 5. complete-step unknown step name → exits non-zero with informative stderr.
+- description: "ship complete-step (R69): unknown step name exits non-zero with error"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ship-begin-complete.js"
+    script_args: "--project-root {{project_root}} --state-rel .sdlc/execution/ship-main-20260608T120000Z.json --step nonexistent --scenario complete-unknown"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-state-begin-complete"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        if (o.exitCodes[0] === 0) return 'FAIL: expected non-zero exit for unknown step';
+        if (!/not found/i.test(o.lastStderr)) return `FAIL: stderr missing 'not found': ${o.lastStderr}`;
+        return true;
+
+# 6. complete-step on a never-begun (pending) step → handled gracefully (no corruption / no crash).
 - description: "ship complete-step (R69): completing a pending step does not corrupt state"
   vars:
     script_path: "repo://tests/promptfoo/scripts/run-ship-begin-complete.js"

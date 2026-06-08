@@ -45,7 +45,7 @@ Each sub-skill has its own error recovery. ship-sdlc does not duplicate their re
 - Exit the plan-mode-blocked path (Step 0, steps 3–7) without running `rm -f "$PLAN_MODE_OUTPUT_FILE"` — the temp prepare output file is separate from the persistent state file in `.sdlc/execution/` and must be cleaned up on every exit branch.
 - End your response turn between pipeline steps. Each step is part of a single dispatch loop. After every tool call result, check whether the current step is complete and proceed to the next action. Do not wait for a user message to continue.
 - Interpret tool call result processing as a natural stopping point. Processing a Bash or TodoWrite result is not the end of the pipeline — it is one action in a multi-action step. Continue to the next action immediately.
-- Treat the PostToolUse system-reminder ("Pipeline step N in_progress") as optional. When that context appears, you MUST complete the stated next action before ending your turn.
+- Treat the PostToolUse `hookSpecificOutput.additionalContext` reminder ("Pipeline step N in_progress") as optional — it is a mandatory continuation signal. Complete the stated next action before ending your response turn.
 
 ## Gotchas (R-progressive-disclosure)
 

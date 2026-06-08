@@ -225,7 +225,9 @@ function renderTodos(state, opts = {}) {
  * already persisted status=in_progress to the state file.
  * @param {object} state    parsed ship state object
  * @param {string} stepName step to mark in_progress
- * @returns {{ todos: Array, marker: string }}
+ * @returns {{ todos: Array<{id: string, content: string, status: string}>, marker: string }}
+ *   todos — the TodoWrite input array representing current pipeline step states;
+ *   marker — stdout audit string in the form "[task-tray] step <name>: pending=N, in_progress=M, completed=K".
  */
 function stepTransition(state, stepName) {
   return renderTodos(state, { event: 'step', currentStep: stepName });
@@ -237,7 +239,9 @@ function stepTransition(state, stepName) {
  * responsible for having already persisted status=completed to the state file.
  * @param {object} state    parsed ship state object
  * @param {string} stepName step to mark completed
- * @returns {{ todos: Array, marker: string }}
+ * @returns {{ todos: Array<{id: string, content: string, status: string}>, marker: string }}
+ *   todos — the TodoWrite input array representing current pipeline step states;
+ *   marker — stdout audit string in the form "[task-tray] step <name>: pending=N, in_progress=M, completed=K".
  */
 function markCompleted(state, stepName) {
   return renderTodos(state, {

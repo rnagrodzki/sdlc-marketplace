@@ -216,7 +216,10 @@ plan-sdlc      (--auto if     (--committed)
 ship-sdlc surfaces live pipeline progress in the Claude Code task tray by
 issuing TodoWrite calls from the MAIN thread of `SKILL.md`. You'll see one
 todo per substep, transitioning `pending → in_progress → completed` as the
-pipeline advances:
+pipeline advances. Step 5 uses the atomic `state/ship.js begin-step` and
+`state/ship.js complete-step` subcommands (R69, R70) — each call atomically
+records the state transition and renders the TodoWrite payload in a single
+operation:
 
 - **commit** — stash unstaged, generate message, commit, restore stash
 - **review** — dispatch review dimensions, collect verdicts
@@ -822,6 +825,8 @@ ship-sdlc also removes the intermediate prepare output file (`$PLAN_MODE_OUTPUT_
 | Git tag | Created by version-sdlc if the version step runs. |
 | GitHub PR | Opened or updated by pr-sdlc as the final step. |
 | Step 1 context-heaviness advisory | When the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget), Step 1 emits a `/compact` advisory before the pipeline begins. Sidecar is written by the `UserPromptSubmit` hook `hooks/context-stats.js`. Surfaced through the `contextAdvisory` field of `skill/ship.js` output. Implementation: [`scripts/lib/context-advisory.js`](../../plugins/sdlc-utilities/scripts/lib/context-advisory.js). Pipeline state survives `/compact` (PreCompact + SessionStart hooks). |
+| `hooks/pipeline-continue.js` (PostToolUse, R67) | Fires after every `Bash` or `TodoWrite` tool call. When a ship state file for the current branch has any step with status `in_progress`, emits `hookSpecificOutput.additionalContext` reminding the model which step is in progress and that the response turn must continue. Silent (no stdout) when no state file exists, no step is `in_progress`, or git/state resolution fails. Fires regardless of `flags.auto`. |
+| `hooks/stop-pipeline-continue.js` (Stop, R68) | Fires on every Stop event. Returns `decision: "block"` when all four conditions hold: a ship state file exists for the current branch, any step is `in_progress`, `flags.auto === true` in the state file, and `stop_hook_active !== true` on stdin. Silent in all other cases (non-auto, no state file, all resolved, `stop_hook_active === true`). Read-only — never mutates state. |
 
 ---
 
