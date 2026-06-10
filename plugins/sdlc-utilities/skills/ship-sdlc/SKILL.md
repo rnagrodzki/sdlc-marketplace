@@ -441,6 +441,7 @@ if [ "$WORKSPACE" = "branch" ]; then
 
   # Step 2: Pre-execute ship state migration (R37) — runs in the main worktree cwd,
   # BEFORE branch creation, so `state/ship.js read` still resolves the OLD slug filename.
+  # $SCRIPT is resolved above in the workspace block (find ~/.claude/plugins … state/ship.js).
   STATE_BRANCH=$(node "$SCRIPT" read 2>/dev/null | node -e "process.stdin.on('data',d=>{try{process.stdout.write(JSON.parse(d).branch||'')}catch(_){}})")
   if [ -n "$STATE_BRANCH" ] && [ "$EXECUTE_BRANCH" != "$STATE_BRANCH" ]; then
     FROM_SLUG=$(echo "$STATE_BRANCH" | sed 's|[^a-zA-Z0-9-]|-|g')

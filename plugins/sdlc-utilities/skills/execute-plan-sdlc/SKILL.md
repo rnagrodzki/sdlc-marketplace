@@ -139,7 +139,7 @@ The hook is layer-agnostic (it surfaces facts); this discriminator is the consum
 
 **Parse `--branch`:** If `--branch <name>` was passed as an argument, capture it as `EXECUTE_NEW_BRANCH` immediately. This is an **INTERNAL flag set by ship-sdlc in pipeline mode**. When present, skip the entire Workspace isolation check below — the caller's branch/cwd are trusted as authoritative. Users do not pass this directly. Implements R30 (fixes #378, #379).
 
-When ship-sdlc invokes execute-plan-sdlc inside the ship pipeline, `--branch` is always set unless the user selected "Continue on current branch" — Step 1's isolation logic does not fire in that case. Standalone `/execute-plan-sdlc` invocations have no `--branch` flag and use the standalone derivation path below.
+When ship-sdlc invokes execute-plan-sdlc inside the ship pipeline, `--branch` is **not** passed. ship-sdlc establishes the feature branch by running `git checkout -b <name>` before dispatching execute, so execute's own workspace derivation encounters a non-default branch and yields `continue` (run in place) — Step 1's isolation logic does not fire. The `--branch` flag is reserved for explicit caller override only. Standalone `/execute-plan-sdlc` invocations have no `--branch` flag and always use the standalone derivation path below. (Implements R30, spec updated per auto-detection model.)
 
 **Workspace auto-detection (R16, R30 — no flag, no prompt):** After plan validation, derive the workspace from cwd + current branch. Workspace is **not** user-selectable — there is no `--workspace` flag (it is a removed flag).
 
@@ -813,6 +813,7 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 - Evaluate warning-severity guardrails pre-wave — warnings are assessed post-wave against actual changes, not intent
 - Dispatch agents without the `model:` parameter — every agent dispatch must include `model: "<X>"` per the quality-tier table. Omitting it defaults to opus, defeating the cost optimization of the quality-tier system.
 - Touch `ship-*` state files or invoke `state/ship.js` — ship-sdlc owns the entire ship-state lifecycle (implements R32, addresses #379). Use `state/execute.js` for execute-state operations only.
+- Expect a `post-failure-error-report.js` Stop hook to run on execution failure — that hook was intentionally removed from `hooks.json`. Failure surfacing is now the skill's own responsibility: Step 6 RECOVER emits structured failure output and Step 9 REPORT surfaces the final state. Do not add failure-reporting hooks back; the skill-owned path avoids the double-reporting and exit-code ambiguity the hook introduced.
 
 ## Gotchas
 

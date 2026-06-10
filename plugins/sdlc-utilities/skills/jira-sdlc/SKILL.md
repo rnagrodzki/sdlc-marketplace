@@ -592,6 +592,7 @@ Also call `--telemetry` on every retry (even successful ones) to maintain a per-
 - Fill `[bracketed prose]` or `{name}` placeholders from inference — every `low`-confidence marker requires explicit user resolution (R19)
 - Apply critique deltas silently — always surface the `Initial:` / `Critique:` / `Final:` block (R20)
 - Bypass `lib/artifact-store.js` with direct `fs.writeFile` calls — direct writes break the canonical hash contract the hook verifies (R21)
+- Dispatch any write MCP tool without an `AskUserQuestion` approval gate (Step 2.6) — the `pre-tool-jira-write-guard.js` PreToolUse hook was intentionally removed from `hooks.json` (design decision documented in spec R21); the Step 2.6 `AskUserQuestion` prompt is now the sole enforcement boundary for write dispatch. Never skip it, even when invoked from another skill or pipeline context
 - Write prose paragraphs in description sections — bullet lists, numbered lists, or sub-headings only (R25)
 - Write acceptance criteria as sentences — every item is `- [ ] <discrete criterion>` (R25)
 - Add filler transitional sentences between description sections (`This ticket covers…`, `The goal of…`, `In summary…`) (R25)
