@@ -53,7 +53,8 @@
 
 const { SHIP_FIELDS } = require('./ship-fields');
 const { parseRemoteOwner, detectBaseBranchSafe } = require('./git');
-const { WORKSPACE_FIELDS } = require('./workspace-fields');
+// workspace-fields removed (issue #378, #379): workspace is auto-detected — no
+// placement wizard / workspace section.
 const { resolveSdlcRoot } = require('./config');
 
 // ---------------------------------------------------------------------------
@@ -178,7 +179,6 @@ function summarizeShip(cfg) {
   const parts = [];
   if (Array.isArray(cfg.steps)) parts.push(`steps: ${cfg.steps.join(',')}`);
   if (cfg.bump) parts.push(`bump: ${cfg.bump}`);
-  if (cfg.workspace) parts.push(`workspace: ${cfg.workspace}`);
   // R57 tunables — render only when configured (silent when absent)
   if (cfg.verifyPipelineTimeout != null) parts.push(`verifyPipelineTimeout: ${cfg.verifyPipelineTimeout}`);
   if (cfg.verifyPipelineInterval != null) parts.push(`verifyPipelineInterval: ${cfg.verifyPipelineInterval}`);
@@ -281,28 +281,12 @@ function summarizeOpenspecBlock(_cfg, detected) {
   return `managed-block v${v}`;
 }
 
-function summarizeHooks(cfg) {
-  if (!cfg || cfg.agentIsolationGuard == null) return '';
-  const enabled = cfg.agentIsolationGuard?.enabled ?? true;
-  return `agentIsolationGuard: ${enabled ? 'enabled' : 'disabled'}`;
-}
-
-function summarizeWorkspace(cfg) {
-  if (!cfg || !cfg.worktree) return '';
-  const wt = cfg.worktree;
-  const parts = [];
-  if (wt.layout) parts.push(`layout: ${wt.layout}`);
-  if (wt.nameTemplate && wt.nameTemplate !== '{slug}') parts.push(`name: ${wt.nameTemplate}`);
-  if (wt.base) parts.push(`base: ${wt.base}`);
-  if (wt.template) {
-    const t = wt.template.length > 30 ? wt.template.slice(0, 27) + '...' : wt.template;
-    parts.push(`template: ${t}`);
-  }
-  return parts.join('  ');
-}
+// summarizeHooks + summarizeWorkspace removed (issue #378, #379, #370, #372):
+// the agentIsolationGuard `hooks` section and the workspace placement section
+// are both gone (workspace auto-detected; all 3 PreToolUse guards deleted).
 
 // ---------------------------------------------------------------------------
-// SETUP_SECTIONS — 13 entries, ordered by typical setup flow
+// SETUP_SECTIONS — ordered by typical setup flow
 // ---------------------------------------------------------------------------
 
 const SETUP_SECTIONS = [
@@ -375,20 +359,6 @@ const SETUP_SECTIONS = [
     confirmDetected: false,
     fields: RECEIVED_REVIEW_FIELDS,
     summarize: summarizeReceivedReview,
-  },
-  {
-    id: 'workspace',
-    label: 'workspace',
-    purpose: 'Developer-local worktree placement preferences for /worktree-create, /execute-plan-sdlc, and /ship-sdlc. Configures where git worktrees are placed (inside repo, sibling to repo, central store, or custom template), the name pattern, and whether .claude/worktrees/ is auto-added to .gitignore. Stored in .sdlc/local.json (gitignored) so each developer can choose their own worktree layout without affecting teammates.',
-    configFile: '.sdlc/local.json',
-    configPath: 'workspace',
-    consumedBy: ['worktree-create', 'execute-plan-sdlc', 'ship-sdlc'],
-    filesModified: ['.sdlc/local.json'],
-    optional: true,
-    delegatedTo: null,
-    confirmDetected: false,
-    fields: WORKSPACE_FIELDS,
-    summarize: summarizeWorkspace,
   },
   {
     id: 'commit',
@@ -525,29 +495,8 @@ const SETUP_SECTIONS = [
     fields: [],
     summarize: summarizeOpenspecBlock,
   },
-  {
-    id: 'hooks',
-    label: 'hooks',
-    purpose: 'Developer-local plugin hook configuration. Controls whether the pre-tool-agent-isolation-guard.js PreToolUse hook blocks Agent SDK isolation: "worktree" dispatches (issues #370 #372). Stored in .sdlc/local.json (gitignored) so each developer can opt out independently without affecting teammates.',
-    configFile: '.sdlc/local.json',
-    configPath: 'hooks',
-    consumedBy: ['execute-plan-sdlc', 'ship-sdlc'],
-    filesModified: ['.sdlc/local.json'],
-    optional: true,
-    delegatedTo: null,
-    confirmDetected: false,
-    fields: [
-      {
-        name: 'agentIsolationGuard.enabled',
-        label: 'Block Agent SDK isolation: "worktree"?',
-        type: 'boolean',
-        options: [true, false],
-        default: true,
-        description: 'When true (default, recommended), the plugin\'s pre-tool-agent-isolation-guard.js hook blocks Agent dispatches with isolation: "worktree" — prevents commits from landing in ephemeral .claude/worktrees/agent-<id> paths instead of the intended SDLC worktree. Set to false to opt out per-developer. See issues #370 #372.',
-      },
-    ],
-    summarize: summarizeHooks,
-  },
+  // `hooks` section removed (issue #370, #372): the agentIsolationGuard config
+  // key and its PreToolUse hook are deleted along with all 3 PreToolUse guards.
 ];
 
 // Identity sanity check: id: 'ship' MUST re-export SHIP_FIELDS by reference,

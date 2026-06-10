@@ -1,21 +1,25 @@
 #!/usr/bin/env node
 /**
  * pipeline-continue.js
- * PostToolUse hook (matcher Bash|TodoWrite) — implements R67 (issue #452).
+ * PostToolUse hook (matcher Bash|TodoWrite) — implements R67 (issue #452, broadened).
  *
- * Emits hookSpecificOutput.additionalContext when a ship state file for the
- * current branch has any step with status `in_progress`. The emitted context
- * is factual (descriptive, not an imperative system command): it states which
- * step is in_progress and that the response turn should continue.
- *
- * Fires regardless of flags.auto — the nudge is harmless in interactive mode.
+ * Consumes the shared `pipelineAdvancing(data)` predicate (R-advancing-predicate,
+ * lib/state.js) against the ship state file for the current branch:
+ *   - in_progress step present  → emit "continue this step" context, MODE-INDEPENDENT
+ *     (fires regardless of flags.auto).
+ *   - advancing via a between-steps `pending` step (none in_progress) → emit a
+ *     forward "advance to next step" context ONLY when flags.auto === true;
+ *     otherwise exit 0 silently (interactive between-step review preserved).
+ *   - advancing false (all terminal, or failed without a terminal cleanup pending)
+ *     → exit 0 silently.
+ *   - no ship state file / git or state resolution failure → exit 0 silently.
  *
  * Lazy-loads ../scripts/lib/state.js and ../scripts/lib/git.js. Requires only
  * Node.js built-ins plus those two lib files — no new npm dependencies.
  *
  * Exit codes:
- *   0 = always (graceful degradation — emits context only when an in_progress
- *       ship step is found; otherwise exits 0 silently).
+ *   0 = always (graceful degradation — emits context only per the rules above;
+ *       otherwise exits 0 silently).
  */
 
 'use strict';
@@ -36,9 +40,9 @@ function main() {
   void payload.tool_name;
   void payload.tool_response;
 
-  let slugifyBranch, findStateFile, readState, exec;
+  let slugifyBranch, findStateFile, readState, pipelineAdvancing, exec;
   try {
-    ({ slugifyBranch, findStateFile, readState } = require('../scripts/lib/state'));
+    ({ slugifyBranch, findStateFile, readState, pipelineAdvancing } = require('../scripts/lib/state'));
     ({ exec } = require('../scripts/lib/git'));
   } catch {
     process.exit(0);
@@ -65,20 +69,37 @@ function main() {
   }
   const steps = result.data.steps;
 
-  // 5. Find first in_progress step. If none, exit 0 silently.
-  const inProgress = steps.find((s) => s.status === 'in_progress');
-  if (!inProgress) process.exit(0);
+  // 5. Evaluate the shared advancing predicate. If not advancing, exit 0 silently.
+  const { advancing, step, index } = pipelineAdvancing(result.data);
+  if (!advancing || !step) process.exit(0);
 
-  // 6. Emit additionalContext + exit 0.
-  const stepIndex = steps.indexOf(inProgress) + 1;
-  const stepName = inProgress.name || inProgress.id || 'unknown';
+  const auto = !!(result.data.flags && result.data.flags.auto);
+  const stepIndex = index + 1;
+  const stepName = step.name || step.id || 'unknown';
+
+  // 6. Two cases:
+  //   (a) in_progress step → emit "continue this step", MODE-INDEPENDENT.
+  //   (b) between-steps pending (no in_progress) → emit forward context ONLY in
+  //       --auto; non-auto exits silently to preserve interactive review.
+  let additionalContext;
+  if (step.status === 'in_progress') {
+    additionalContext =
+      `Ship pipeline: step ${stepIndex} of ${steps.length} (${stepName}) is in_progress. ` +
+      'Continue executing this step — do not end the response turn. ' +
+      'Next action: record the step result and advance to the next step.';
+  } else {
+    // between-steps pending — auto-gated
+    if (!auto) process.exit(0);
+    additionalContext =
+      `Ship pipeline: the next step is step ${stepIndex} of ${steps.length} (${stepName}), pending. ` +
+      'In --auto mode, advance to it now — do not end the response turn. ' +
+      'Next action: begin the next step.';
+  }
+
   const output = {
     hookSpecificOutput: {
       hookEventName: 'PostToolUse',
-      additionalContext:
-        `Ship pipeline: step ${stepIndex} of ${steps.length} (${stepName}) is in_progress. ` +
-        'Continue executing this step — do not end the response turn. ' +
-        'Next action: record the step result and advance to the next step.',
+      additionalContext,
     },
   };
   console.log(JSON.stringify(output));

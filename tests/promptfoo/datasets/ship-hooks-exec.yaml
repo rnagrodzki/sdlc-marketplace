@@ -1,66 +1,30 @@
-# Script execution tests for the ship pipeline-continuation hooks (R67, R68 — #452).
-# Run via the hook-runner provider (returns {stdout, stderr, exitCode} JSON) so
-# both stdout content and exit code can be asserted. No LLM.
+# Script execution tests for the ship pipeline-continuation hooks (R67, R68 — #452,
+# broadened to consume the shared pipelineAdvancing predicate). Run via the
+# hook-runner provider (returns {stdout, stderr, exitCode} JSON) so both stdout
+# content and exit code can be asserted. No LLM.
 #
 # Branch-keyed resolution: each fixture's setup.sh git-inits a repo and checks out
 # branch `feat/ship` (slug `feat-ship`), then writes a matching ship state file.
 # The hooks resolve state via `git branch --show-current` + findStateFile, so the
 # fixture's own git branch drives resolution (mirrors session-start.js exec tests).
+#
+# Fixtures:
+#   ship-pipeline-inprogress      — execute in_progress, auto:true
+#   ship-pipeline-noauto          — execute in_progress, auto:false
+#   ship-pipeline-between-auto    — execute completed, commit pending (no in_progress), auto:true
+#   ship-pipeline-between-noauto  — execute completed, commit pending (no in_progress), auto:false
+#   ship-pipeline-failed-cleanup  — commit failed, cleanup pending, auto:true  (R38 case)
+#   ship-pipeline-failed-nocleanup— commit failed, no cleanup, auto:true
+#   ship-pipeline-resolved        — all steps completed
+#   ship-pipeline-nostate         — no ship state file
 
 # ---------------------------------------------------------------------------
-# pipeline-continue.js (PostToolUse, R67) — 3 cases
+# pipeline-continue.js (PostToolUse, R67 broadened) — 6 cases
 # ---------------------------------------------------------------------------
 
-# 1. in_progress step → emits additionalContext, exit 0.
-- description: "pipeline-continue (R67): in_progress ship step emits additionalContext"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
-    script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"Bash","tool_response":{}}'
-    project_root: "file://fixtures-fs/ship-pipeline-inprogress"
-  assert:
-    - type: javascript
-      value: |
-        const r = JSON.parse(output);
-        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
-        const inner = JSON.parse(r.stdout);
-        if (!inner.hookSpecificOutput) return 'FAIL: no hookSpecificOutput';
-        if (inner.hookSpecificOutput.hookEventName !== 'PostToolUse') return 'FAIL: wrong hookEventName';
-        if (!/in_progress/.test(inner.hookSpecificOutput.additionalContext || '')) return 'FAIL: additionalContext missing in_progress';
-        return true;
-
-# 2. all steps resolved → exits silently (empty stdout), exit 0.
-- description: "pipeline-continue (R67): all resolved exits silently"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
-    script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"Bash"}'
-    project_root: "file://fixtures-fs/ship-pipeline-resolved"
-  assert:
-    - type: javascript
-      value: |
-        const r = JSON.parse(output);
-        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
-        if (r.stdout.trim() !== '') return `FAIL: expected empty stdout, got: ${r.stdout}`;
-        return true;
-
-# 3. no ship state file for the branch → exits silently, exit 0.
-- description: "pipeline-continue (R67): no state file exits silently"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
-    script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"Bash"}'
-    project_root: "file://fixtures-fs/ship-pipeline-nostate"
-  assert:
-    - type: javascript
-      value: |
-        const r = JSON.parse(output);
-        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
-        if (r.stdout.trim() !== '') return `FAIL: expected empty stdout, got: ${r.stdout}`;
-        return true;
-
-# 4. flags.auto=false + in_progress → still emits additionalContext (R67: fires regardless of flags.auto).
-- description: "pipeline-continue (R67): fires regardless of flags.auto (noauto fixture)"
+# 1. in_progress step → emits additionalContext, MODE-INDEPENDENT (fires even though
+#    we use the auto fixture; the noauto in_progress case is covered below).
+- description: "pipeline-continue (R67): in_progress ship step emits additionalContext (mode-independent)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
     script_cwd: "{{project_root}}"
@@ -77,11 +41,91 @@
         if (!/in_progress/.test(inner.hookSpecificOutput.additionalContext || '')) return 'FAIL: additionalContext missing in_progress';
         return true;
 
+# 2. auto + between-steps pending (none in_progress) → emit forward additionalContext.
+- description: "pipeline-continue (R67): auto between-steps pending emits forward additionalContext"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"Bash","tool_response":{}}'
+    project_root: "file://fixtures-fs/ship-pipeline-between-auto"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        if (!inner.hookSpecificOutput) return 'FAIL: no hookSpecificOutput';
+        if (!/pending/.test(inner.hookSpecificOutput.additionalContext || '')) return 'FAIL: forward context missing pending';
+        if (!/commit/.test(inner.hookSpecificOutput.additionalContext || '')) return 'FAIL: forward context missing next step name';
+        return true;
+
+# 3. non-auto + between-steps pending → exits silently (interactive review preserved).
+- description: "pipeline-continue (R67): non-auto between-steps pending exits silently"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"Bash"}'
+    project_root: "file://fixtures-fs/ship-pipeline-between-noauto"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
+        return true;
+
+# 4. failed + pending cleanup, auto → emit forward (R38 exception).
+- description: "pipeline-continue (R67): failed+pending-cleanup emits forward in auto (R38)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"Bash","tool_response":{}}'
+    project_root: "file://fixtures-fs/ship-pipeline-failed-cleanup"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        if (!inner.hookSpecificOutput) return 'FAIL: no hookSpecificOutput';
+        if (!/cleanup/.test(inner.hookSpecificOutput.additionalContext || '')) return 'FAIL: forward context missing cleanup';
+        return true;
+
+# 5. all steps resolved → exits silently (empty stdout), exit 0.
+- description: "pipeline-continue (R67): all resolved exits silently"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"Bash"}'
+    project_root: "file://fixtures-fs/ship-pipeline-resolved"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected empty stdout, got: ${r.stdout}`;
+        return true;
+
+# 6. no ship state file for the branch → exits silently, exit 0.
+- description: "pipeline-continue (R67): no state file exits silently"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"Bash"}'
+    project_root: "file://fixtures-fs/ship-pipeline-nostate"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected empty stdout, got: ${r.stdout}`;
+        return true;
+
 # ---------------------------------------------------------------------------
-# stop-pipeline-continue.js (Stop, R68) — 5 cases (4 gate conditions + idempotency)
+# stop-pipeline-continue.js (Stop, R68 broadened) — 7 cases
 # ---------------------------------------------------------------------------
 
-# 4. auto=true + in_progress + stop_hook_active=false → decision:block, exit 0.
+# 1. auto + in_progress + stop_hook_active=false → decision:block, exit 0.
 - description: "stop-pipeline-continue (R68): auto+in_progress+stop_hook_active=false blocks"
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
@@ -98,7 +142,24 @@
         if (typeof inner.reason !== 'string' || !inner.reason) return 'FAIL: missing reason';
         return true;
 
-# 5. auto=false + in_progress → silent (interactive non-interference), exit 0.
+# 2. auto + between-steps pending + stop_hook_active=false → decision:block (broadened).
+- description: "stop-pipeline-continue (R68): auto+between-steps-pending+stop_hook_active=false blocks"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"stop_hook_active":false}'
+    project_root: "file://fixtures-fs/ship-pipeline-between-auto"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.decision !== 'block') return `FAIL: decision ${inner.decision}`;
+        if (!/pending/.test(inner.reason || '')) return 'FAIL: reason missing pending';
+        return true;
+
+# 3. auto=false + (in_progress or between-steps) → silent (interactive non-interference).
 - description: "stop-pipeline-continue (R68): auto=false stays silent"
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
@@ -113,7 +174,22 @@
         if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
         return true;
 
-# 6. stop_hook_active=true → silent (8-cap avoidance), exit 0.
+# 4. failed-without-cleanup, auto → silent (advancing predicate returns false).
+- description: "stop-pipeline-continue (R68): failed-without-cleanup stays silent"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"stop_hook_active":false}'
+    project_root: "file://fixtures-fs/ship-pipeline-failed-nocleanup"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
+        return true;
+
+# 5. stop_hook_active=true → silent (8-cap avoidance), exit 0.
 - description: "stop-pipeline-continue (R68): stop_hook_active=true stays silent"
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
@@ -128,7 +204,7 @@
         if (r.stdout.trim() !== '') return `FAIL: expected silent (cap avoidance), got: ${r.stdout}`;
         return true;
 
-# 7. all steps resolved → silent (no in_progress), exit 0.
+# 6. all steps resolved → silent (advancing false), exit 0.
 - description: "stop-pipeline-continue (R68): all resolved stays silent"
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
@@ -143,10 +219,8 @@
         if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
         return true;
 
-# 8. Idempotency — the hook is pure-read (never mutates state). Running it on the
-#    same in_progress state returns the same block decision every time. We assert
-#    the block here; combined with case 4 (same fixture, same input, same output)
-#    this proves no state mutation between invocations.
+# 7. Idempotency — the hook is pure-read (never mutates state). Running it on the
+#    same in_progress state returns the same block decision every time.
 - description: "stop-pipeline-continue (R68): idempotent block on repeated invocation (no state mutation)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"

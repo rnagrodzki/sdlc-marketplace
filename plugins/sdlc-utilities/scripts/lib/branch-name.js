@@ -7,7 +7,6 @@
  *
  * Zero npm dependencies — Node.js built-ins only.
  *
- * Mirrors lib/worktree-path.js shape.
  * Consumed by ship-sdlc pre-execute block and execute-plan-sdlc standalone Step 1.
  * Config driven by workspace.branch section in .sdlc/local.json.
  */

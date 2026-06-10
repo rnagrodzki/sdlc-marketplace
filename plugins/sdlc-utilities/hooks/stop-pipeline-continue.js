@@ -1,21 +1,25 @@
 #!/usr/bin/env node
 /**
  * stop-pipeline-continue.js
- * Stop hook (no matcher) — implements R68 (issue #452).
+ * Stop hook (no matcher) — implements R68 (issue #452, broadened).
  *
  * Returns `decision: "block"` with a factual `reason` ONLY when ALL four
  * conditions hold:
  *   (a) a ship state file exists for the current branch,
- *   (b) any step has status `in_progress`,
+ *   (b) `pipelineAdvancing(data).advancing === true` (R-advancing-predicate,
+ *       lib/state.js — covers both an `in_progress` step AND the between-steps
+ *       `pending` gap, incl. the R38 failed+terminal-`cleanup` case),
  *   (c) `flags.auto === true` in the state file, AND
  *   (d) `stop_hook_active !== true` on stdin.
  *
- * In every other condition (non-auto, no state file, all steps resolved,
+ * In every other condition (non-auto, no state file, advancing false,
  * stop_hook_active === true) the hook exits 0 silently with no stdout.
  *
- * The `stop_hook_active === true` early-exit avoids contributing to the Claude
- * Code 8-consecutive-continuation cap. The hook never mutates state, so repeated
- * invocations on the same in_progress state return the same block (idempotent).
+ * The between-steps forward behavior is `flags.auto`-gated (same gate as R67 —
+ * no-opposite-logical-vectors); non-auto review is preserved. The
+ * `stop_hook_active === true` early-exit avoids contributing to the Claude Code
+ * 8-consecutive-continuation cap. The hook never mutates state, so repeated
+ * invocations on the same advancing state return the same block (idempotent).
  *
  * Lazy-loads ../scripts/lib/state.js and ../scripts/lib/git.js. Requires only
  * Node.js built-ins plus those two lib files — no new npm dependencies.
@@ -42,9 +46,9 @@ function main() {
   // (d) stop_hook_active === true → exit 0 silently (cap avoidance).
   if (payload.stop_hook_active === true) process.exit(0);
 
-  let slugifyBranch, findStateFile, readState, exec;
+  let slugifyBranch, findStateFile, readState, pipelineAdvancing, exec;
   try {
-    ({ slugifyBranch, findStateFile, readState } = require('../scripts/lib/state'));
+    ({ slugifyBranch, findStateFile, readState, pipelineAdvancing } = require('../scripts/lib/state'));
     ({ exec } = require('../scripts/lib/git'));
   } catch {
     process.exit(0);
@@ -73,18 +77,20 @@ function main() {
   // (c) flags.auto === true.
   if (!data.flags || data.flags.auto !== true) process.exit(0);
 
-  // (b) any step in_progress.
+  // (b) pipeline is advancing (in_progress step OR a between-steps pending step,
+  //     incl. the R38 failed+terminal-cleanup case).
   const steps = data.steps;
-  const inProgress = steps.find((s) => s.status === 'in_progress');
-  if (!inProgress) process.exit(0);
+  const { advancing, step, index } = pipelineAdvancing(data);
+  if (!advancing || !step) process.exit(0);
 
   // All four conditions hold → block.
-  const stepIndex = steps.indexOf(inProgress) + 1;
-  const stepName = inProgress.name || inProgress.id || 'unknown';
+  const stepIndex = index + 1;
+  const stepName = step.name || step.id || 'unknown';
+  const stateWord = step.status === 'in_progress' ? 'is in_progress' : 'is pending';
   const output = {
     decision: 'block',
     reason:
-      `Ship pipeline step ${stepIndex} of ${steps.length} (${stepName}) is in_progress and ` +
+      `Ship pipeline step ${stepIndex} of ${steps.length} (${stepName}) ${stateWord} and ` +
       'has not been completed. Record the step result and continue to the next pipeline step.',
   };
   console.log(JSON.stringify(output));

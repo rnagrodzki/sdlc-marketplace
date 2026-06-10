@@ -23,7 +23,7 @@
     - type: javascript
       value: |
         const names = JSON.parse(output).shipFields.map(f => f.name);
-        const expected = ['steps','bump','draft','auto','workspace','rebase','reviewThreshold','verifyPipelineTimeout','verifyPipelineInterval','verifyPipelineMaxIterations','awaitRemoteReviewTimeout','awaitRemoteReviewInterval','awaitRemoteReviewers'];
+        const expected = ['steps','quick','bump','draft','auto','rebase','reviewThreshold','verifyPipelineTimeout','verifyPipelineInterval','verifyPipelineMaxIterations','awaitRemoteReviewTimeout','awaitRemoteReviewInterval','awaitRemoteReviewers'];
         return JSON.stringify(names) === JSON.stringify(expected)
 
 - description: "setup-prepare: shipFields entries have the full 6-key descriptor shape"
@@ -267,10 +267,11 @@
         return out.menuInputContract && out.menuInputContract.defaultToken === 'not-set'
 
 # ---------------------------------------------------------------------------
-# Issue #351 — workspace section in sections array
+# Workspace + hooks sections removed (#378, #379, #370, #372): workspace is
+# auto-detected (no placement wizard) and the agentIsolationGuard hook is deleted.
 # ---------------------------------------------------------------------------
 
-- description: "setup-prepare (#351): workspace section present in sections[] with correct shape"
+- description: "setup-prepare (#378): workspace section is absent from sections[]"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
     script_cwd: "{{project_root}}"
@@ -280,43 +281,9 @@
       value: |
         const out = JSON.parse(output);
         const ws = out.sections && out.sections.find(s => s.id === 'workspace');
-        return Boolean(ws) && ws.configFile === '.sdlc/local.json' && ws.configPath === 'workspace'
+        return ws === undefined ? true : 'FAIL: workspace section still present';
 
-- description: "setup-prepare (#351): workspace section has context with previewPaths, consumerCommitsClaude, existingWorktrees, mismatchesByLayout"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-setup-empty"
-  assert:
-    - type: javascript
-      value: |
-        const out = JSON.parse(output);
-        const ws = out.sections && out.sections.find(s => s.id === 'workspace');
-        return ws && ws.context && typeof ws.context.consumerCommitsClaude === 'boolean' &&
-               ws.context.previewPaths && typeof ws.context.previewPaths.inside === 'string' &&
-               typeof ws.context.previewPaths.sibling === 'string' &&
-               Array.isArray(ws.context.existingWorktrees) &&
-               ws.context.mismatchesByLayout &&
-               Array.isArray(ws.context.mismatchesByLayout.inside) &&
-               Array.isArray(ws.context.mismatchesByLayout.sibling) &&
-               Array.isArray(ws.context.mismatchesByLayout.central)
-
-- description: "setup-prepare (#351): workspace section has 5 fields (layout/base/template/ensureGitignore/nameTemplate)"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-setup-empty"
-  assert:
-    - type: javascript
-      value: |
-        const out = JSON.parse(output);
-        const ws = out.sections && out.sections.find(s => s.id === 'workspace');
-        if (!ws || !ws.fields) return false;
-        const names = ws.fields.map(f => f.name);
-        const expected = ['layout', 'base', 'template', 'ensureGitignore', 'nameTemplate'];
-        return JSON.stringify(names) === JSON.stringify(expected)
-
-- description: "setup-prepare (#370 #372): hooks section appears in sections list with correct configPath"
+- description: "setup-prepare (#370 #372): hooks section is absent from sections[]"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
     script_cwd: "{{project_root}}"
@@ -326,30 +293,4 @@
       value: |
         const out = JSON.parse(output);
         const hooks = out.sections && out.sections.find(s => s.id === 'hooks');
-        return Boolean(hooks) && hooks.configFile === '.sdlc/local.json' && hooks.configPath === 'hooks'
-
-- description: "setup-prepare (#370 #372): hooks section has agentIsolationGuard.enabled field with default true"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-setup-empty"
-  assert:
-    - type: javascript
-      value: |
-        const out = JSON.parse(output);
-        const hooks = out.sections && out.sections.find(s => s.id === 'hooks');
-        if (!hooks || !hooks.fields) return false;
-        const field = hooks.fields.find(f => f.name === 'agentIsolationGuard.enabled');
-        return Boolean(field) && field.default === true
-
-- description: "setup-prepare (#370 #372): hooks section summary reflects enabled:false when local.json has opt-out"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/setup.js"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/setup-hooks-opt-out"
-  assert:
-    - type: javascript
-      value: |
-        const out = JSON.parse(output);
-        const hooks = out.sections && out.sections.find(s => s.id === 'hooks');
-        return Boolean(hooks) && typeof hooks.summary === 'string' && hooks.summary.includes('disabled')
+        return hooks === undefined ? true : 'FAIL: hooks section still present';

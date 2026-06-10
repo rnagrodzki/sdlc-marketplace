@@ -15,7 +15,7 @@
  *   --draft                     Mark PR as draft (default: false)
  *   --auto                      Skip interactive approval prompts (default: false)
  *   --threshold critical|high|medium  Review threshold (default: high)
- *   --workspace branch|worktree|prompt  Workspace isolation mode (default: prompt)
+ *   (workspace is auto-detected from cwd + branch — no --workspace flag)
  *   --rebase auto|skip|prompt   Rebase strategy (default: auto)
  *
  * Exit codes:
@@ -48,7 +48,6 @@ function parseArgs(argv) {
   let draft     = false;
   let auto      = false;
   let threshold = 'high';
-  let workspace = 'prompt';
   let rebase    = 'auto';
   const warnings = [];
   const errors   = [];
@@ -80,14 +79,16 @@ function parseArgs(argv) {
       auto = true;
     } else if (a === '--threshold' && args[i + 1]) {
       threshold = args[++i];
-    } else if (a === '--workspace' && args[i + 1]) {
-      workspace = args[++i];
     } else if (a === '--rebase' && args[i + 1]) {
       rebase = args[++i];
+    } else if (a === '--workspace') {
+      // Removed (#378, #379): workspace is auto-detected, not a config field.
+      if (args[i + 1] && !args[i + 1].startsWith('--')) i++;
+      errors.push('--workspace is no longer accepted: workspace is auto-detected from cwd + current branch.');
     }
   }
 
-  return { steps, quick, bump, draft, auto, threshold, workspace, rebase, warnings, parseErrors: errors };
+  return { steps, quick, bump, draft, auto, threshold, rebase, warnings, parseErrors: errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +97,6 @@ function parseArgs(argv) {
 
 const VALID_BUMPS     = ['patch', 'minor', 'major'];
 const VALID_THRESHOLD = ['critical', 'high', 'medium'];
-const VALID_WORKSPACE = ['branch', 'worktree', 'prompt'];
 const VALID_REBASE    = ['auto', 'skip', 'prompt'];
 
 function validate(parsed) {
@@ -129,10 +129,6 @@ function validate(parsed) {
     errors.push(`--threshold must be one of: ${VALID_THRESHOLD.join(', ')}. Got: "${parsed.threshold}"`);
   }
 
-  if (!VALID_WORKSPACE.includes(parsed.workspace)) {
-    errors.push(`--workspace must be one of: ${VALID_WORKSPACE.join(', ')}. Got: "${parsed.workspace}"`);
-  }
-
   if (!VALID_REBASE.includes(parsed.rebase)) {
     errors.push(`--rebase must be one of: ${VALID_REBASE.join(', ')}. Got: "${parsed.rebase}"`);
   }
@@ -147,7 +143,7 @@ function validate(parsed) {
 function main() {
   const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
   const parsed = parseArgs(process.argv);
-  const { steps, quick, bump, draft, auto, threshold, workspace, rebase, warnings: parseWarnings, parseErrors } = parsed;
+  const { steps, quick, bump, draft, auto, threshold, rebase, warnings: parseWarnings, parseErrors } = parsed;
 
   const errors   = [...parseErrors];
   const warnings = [...parseWarnings];
@@ -158,7 +154,7 @@ function main() {
   }
 
   // Validate inputs
-  const validationErrors = validate({ steps, quick, bump, draft, auto, threshold, workspace, rebase });
+  const validationErrors = validate({ steps, quick, bump, draft, auto, threshold, rebase });
   if (validationErrors.length > 0) {
     errors.push(...validationErrors);
     writeOutput({ errors, warnings }, 'ship-init', 1);
@@ -189,7 +185,6 @@ function main() {
     draft,
     auto,
     reviewThreshold: threshold,
-    workspace,
     rebase,
   };
 

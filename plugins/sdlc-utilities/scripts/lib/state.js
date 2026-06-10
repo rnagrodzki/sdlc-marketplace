@@ -799,6 +799,49 @@ function summarizePriorWaveContext(state, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Pipeline advancing predicate (R-advancing-predicate, issue #452)
+// ---------------------------------------------------------------------------
+
+/**
+ * Pure predicate: does the ship pipeline still have forward motion?
+ * Shared verbatim by both continuation hooks (R67 pipeline-continue.js,
+ * R68 stop-pipeline-continue.js) so neither inlines a duplicate (DRY).
+ *
+ * @param {object} data - parsed ship state object (must carry `steps[]`)
+ * @returns {{advancing: boolean, step: (object|null), index: number}}
+ *   `advancing` — true when a step is in_progress, OR a non-terminal pending
+ *     step remains and either nothing failed or that pending step is the
+ *     terminal R38 `cleanup` step.
+ *   `step` — the step the hook names (in_progress step if present, else the
+ *     pending step); null when not advancing.
+ *   `index` — index of `step` in `steps[]`, or -1.
+ * No I/O, no mutation.
+ */
+function pipelineAdvancing(data) {
+  const steps = data && Array.isArray(data.steps) ? data.steps : [];
+  const inProgressIndex = steps.findIndex(s => s && s.status === 'in_progress');
+  const inProgress = inProgressIndex >= 0 ? steps[inProgressIndex] : null;
+  const failed = steps.some(s => s && s.status === 'failed');
+  // `pending` MUST exclude `failed` (a terminal status here) so a failed step
+  // at an earlier index does not shadow a later `cleanup` step in the search —
+  // otherwise the R38 cleanup-after-failure path is stranded.
+  const pendingIndex = steps.findIndex(
+    s => s && s.status !== 'completed' && s.status !== 'skipped' && s.status !== 'failed'
+  );
+  const pending = pendingIndex >= 0 ? steps[pendingIndex] : null;
+  const pendingIsCleanup = !!pending && pending.name === 'cleanup';
+  const advancing = !!inProgress || (!!pending && (!failed || pendingIsCleanup));
+
+  let step = null;
+  let index = -1;
+  if (advancing) {
+    if (inProgress) { step = inProgress; index = inProgressIndex; }
+    else { step = pending; index = pendingIndex; }
+  }
+  return { advancing, step, index };
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -823,4 +866,5 @@ module.exports = {
   readTtlDaysFromConfig,
   COMPACT_RECOVERY_TTL_MS,
   summarizePriorWaveContext,
+  pipelineAdvancing,
 };

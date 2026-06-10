@@ -222,35 +222,8 @@
         const data = JSON.parse(output);
         return Array.isArray(data.errors) && data.errors.some(e => e.includes('"cleanup"') && e.includes('reserved'));
 
-# ---------------------------------------------------------------------------
-# hooks/context-stats.js: usage path produces transcript-usage source
-# ---------------------------------------------------------------------------
-
-- description: "context-stats hook with usage record emits tokenSource:transcript-usage and tokensApprox:60000"
-  vars:
-    script_path: "repo://tests/promptfoo/scripts/run-context-stats.js"
-    script_args: "{{project_root}}"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-context-advisory-real-transcript"
-  assert:
-    - type: contains
-      value: '"tokenSource": "transcript-usage"'
-    - type: contains
-      value: '"tokensApprox": 60000'
-    - type: contains
-      value: '"percent": 30'
-
-- description: "context-stats hook with empty transcript falls back to heuristic-bytes"
-  vars:
-    script_path: "repo://tests/promptfoo/scripts/run-context-stats.js"
-    script_args: "{{project_root}}"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-context-advisory-empty-transcript"
-  assert:
-    - type: contains
-      value: '"tokenSource": "heuristic-bytes"'
-    - type: contains
-      value: '"tokensApprox": 0'
+# context-stats hook cases removed (#378, #379): the context-stats.js hook and its
+# run-context-stats.js runner are deleted (sidecar no longer written).
 
 # ---------------------------------------------------------------------------
 # state/ship.js init: orphan prune (issue #255, R-ship-init-prune)

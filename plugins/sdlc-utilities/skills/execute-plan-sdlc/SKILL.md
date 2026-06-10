@@ -2,7 +2,7 @@
 name: execute-plan-sdlc
 description: "Use when the user wants to execute an implementation plan with adaptive intelligence — classifies tasks by complexity and risk, builds optimized dependency waves, critiques wave structure before dispatch, verifies results after each wave, and recovers from failures without stopping. Self-contained: no external sub-skills required. Triggers on: execute plan, run plan, implement plan, autonomous execution, execute this plan. Also auto-triggered when the user accepts a plan from plan-sdlc (plan content is already in conversation context)."
 user-invocable: true
-argument-hint: "[plan-file-path] [--quality full|balanced|minimal] [--resume] [--workspace branch|worktree|prompt] [--rebase auto|skip|prompt] [--auto] [--branch <name>] [--commit-waves] [--plan-file <path>]"
+argument-hint: "[plan-file-path] [--quality full|balanced|minimal] [--resume] [--rebase auto|skip|prompt] [--auto] [--branch <name>] [--commit-waves] [--plan-file <path>]"
 model: sonnet
 ---
 
@@ -139,22 +139,21 @@ The hook is layer-agnostic (it surfaces facts); this discriminator is the consum
 
 **Parse `--branch`:** If `--branch <name>` was passed as an argument, capture it as `EXECUTE_NEW_BRANCH` immediately. This is an **INTERNAL flag set by ship-sdlc in pipeline mode**. When present, skip the entire Workspace isolation check below — the caller's branch/cwd are trusted as authoritative. Users do not pass this directly. Implements R30 (fixes #378, #379).
 
-When ship-sdlc invokes execute-plan-sdlc inside the ship pipeline, `--branch` is always set unless the user selected "Continue on current branch" — Step 1's isolation logic does not fire in that case. Standalone `/execute-plan-sdlc` invocations have no `--branch` flag and use the standalone derivation path below.
+When ship-sdlc invokes execute-plan-sdlc inside the ship pipeline, `--branch` is **not** passed. ship-sdlc establishes the feature branch by running `git checkout -b <name>` before dispatching execute, so execute's own workspace derivation encounters a non-default branch and yields `continue` (run in place) — Step 1's isolation logic does not fire. The `--branch` flag is reserved for explicit caller override only. Standalone `/execute-plan-sdlc` invocations have no `--branch` flag and always use the standalone derivation path below. (Implements R30, spec updated per auto-detection model.)
 
-**Parse `--workspace`:** If `--workspace branch|worktree|prompt` was passed as an argument, store the mode. If absent, default to `prompt`. When `--workspace` is explicitly set to `branch` or `worktree`, the corresponding action is taken automatically without prompting (steps 3a-3c below).
+**Workspace auto-detection (R16, R30 — no flag, no prompt):** After plan validation, derive the workspace from cwd + current branch. Workspace is **not** user-selectable — there is no `--workspace` flag (it is a removed flag).
 
-**Workspace isolation check:** After plan validation, check whether execution should happen on a separate branch or in a worktree.
+**If `--branch <name>` was passed:** `EXECUTE_NEW_BRANCH` is already captured above — skip this entire section (the caller's branch/cwd are authoritative). Proceed directly to Pre-execution rebase.
 
-**If `--branch <name>` was passed:** `EXECUTE_NEW_BRANCH` is already captured above — skip this entire section. Proceed directly to Pre-execution rebase.
+**If `--branch` was NOT passed (standalone invocation):** Derive the workspace as a 2-way decision:
 
-**If `--branch` was NOT passed (standalone invocation):**
+1. Detect whether cwd is a **linked (non-main) worktree**: compare `git worktree list --porcelain | head -1 | sed 's/^worktree //'` (the main worktree path) against `git rev-parse --show-toplevel` (the current toplevel). They differ ⇒ linked worktree.
+2. Detect the current branch (`git branch --show-current`) and the default branch (`git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'`, fallback `main`).
 
-1. Detect the current branch: `git branch --show-current`
-2. Determine the default branch: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'`. Fallback to `main` if the symbolic ref is not set.
-
-   **Do NOT use the `gitStatus` snapshot from conversation context.** The `gitStatus` block in system-reminder tags is captured once at conversation start and is not updated during the session. If the user switched branches after the conversation began, `gitStatus` will report the old branch. Always run the `git branch --show-current` command above via Bash at execution time.
-3. If the current branch matches the default branch:
-   - Derive a branch name using `lib/branch-name.js` driven by `workspace.branch` config (config-driven; no hardcoded type-map in SKILL.md prose):
+   **Do NOT use the `gitStatus` snapshot from conversation context** — it is captured once at conversation start and is not updated during the session. Always run `git branch --show-current` via Bash at execution time.
+3. **Derive (`lib/git.js::deriveWorkspace` logic, inline 2-branch decision):**
+   - **`continue`** — cwd is a linked worktree, OR the current branch is NOT the default branch. Run in place: do nothing, leave `EXECUTE_NEW_BRANCH` unset, proceed to rebase. There is **no worktree creation**.
+   - **`branch`** — cwd is the main worktree AND the current branch IS the default branch. Derive a feature-branch name and run `git checkout -b`:
 
      ```bash
      SDLC_LIB=$(find ~/.claude/plugins -name "branch-name.js" -path "*/sdlc*/scripts/lib/branch-name.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
@@ -169,36 +168,12 @@ When ship-sdlc invokes execute-plan-sdlc inside the ship pipeline, `--branch` is
        // typeMap in config translates logical type to branch prefix (defaults: feat/fix/chore/docs/refactor).
        process.stdout.write(resolveBranchName({type:'<logical-type>',slug:'<derived-slug>',config:cfg}));
      ")
+     git checkout -b "$EXECUTE_NEW_BRANCH"
      ```
 
-     Branch name is derived by `lib/branch-name.js` from `workspace.branch` config. Defaults: `template={type}/{slug}`, `slugMaxLength=50`, `typeMap={feature:'feat', bugfix:'fix', chore:'chore', docs:'docs', refactor:'refactor'}`. Override in `.sdlc/local.json` under `workspace.branch`. The logical type and slug are inferred from the plan title as before (feature/bugfix/chore/docs/refactor). Implements R30.
+     Branch name is derived by `lib/branch-name.js` from `workspace.branch` config. Defaults: `template={type}/{slug}`, `slugMaxLength=50`, `typeMap={feature:'feat', bugfix:'fix', chore:'chore', docs:'docs', refactor:'refactor'}`. Override in `.sdlc/local.json` under `workspace.branch`. The logical type and slug are inferred from the plan title (feature/bugfix/chore/docs/refactor). Print the branch name. Implements R30.
 
-   - **If `--workspace branch`:** Run `git checkout -b "$EXECUTE_NEW_BRANCH"` directly without prompting. Print the branch name. Set `WORKTREE_PATH` to unset (branch mode: no worktree).
-
-   - **If `--workspace worktree`:** Create worktree without prompting:
-     ```bash
-     SCRIPT=$(find ~/.claude/plugins -name "worktree-create.js" -path "*/sdlc*/scripts/util/worktree-create.js" 2>/dev/null | sort -V | tail -1)
-     [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/worktree-create.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/worktree-create.js"
-     result=$(node "$SCRIPT" --name "$EXECUTE_NEW_BRANCH")
-     WORKTREE_PATH=$(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).path)")
-     # worktree-create.js may collision-suffix; refresh EXECUTE_NEW_BRANCH with resolved name.
-     EXECUTE_NEW_BRANCH=$(echo "$result" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).branch)")
-     cd "$WORKTREE_PATH"
-     ```
-     Print the branch and path from the script output. The branch may differ from the derived name if a collision suffix was added.
-
-   - **If `--workspace prompt` or absent:** Use AskUserQuestion:
-     > You're on the default branch (`<branch>`). Working directly on it is not recommended.
-     >
-     > Suggested: `<EXECUTE_NEW_BRANCH>`
-     >
-     > 1. Create branch `<EXECUTE_NEW_BRANCH>` (or provide a custom name)
-     > 2. Create a worktree for isolated execution
-     > 3. Continue on `<branch>` anyway
-   - **Option 1:** Run `git checkout -b <name>`. If the user provides a custom name, use it instead of the suggestion. Set `EXECUTE_NEW_BRANCH` to the chosen name.
-   - **Option 2:** Create worktree using `util/worktree-create.js` as shown above. Set `WORKTREE_PATH` and update `EXECUTE_NEW_BRANCH` from JSON output.
-   - **Option 3:** Proceed without changes. `EXECUTE_NEW_BRANCH` remains unset.
-4. If the current branch is NOT the default branch, skip this check entirely — no warning, no prompt. `EXECUTE_NEW_BRANCH` and `WORKTREE_PATH` remain unset.
+There is no `WORKTREE_PATH` — execute-plan-sdlc never creates a worktree. (In ship-sdlc pipeline mode, ship establishes the feature branch before dispatching execute, so the derive yields `continue` anyway; `--branch` makes that short-circuit explicit.)
 
 **Pre-execution rebase:** If `--rebase auto` was passed, rebase onto the default branch before executing the plan. This ensures tasks run against the latest code.
 
@@ -414,7 +389,7 @@ Dispatch with:
 - `model: <highest model among wave tasks>` — haiku if all tasks are Trivial; sonnet if any Standard; opus if any Complex.
 - `mode: bypassPermissions`
 - **`model:` is REQUIRED — no exceptions.** Omitting it causes the wave-runner to inherit the parent model (opus), defeating the quality-tier system.
-- **DO NOT pass `isolation: "worktree"` (or any other `isolation` value) to the Agent tool.** The SDLC `--workspace worktree` flag controls a separate concept (a sibling git worktree created via `util/worktree-create.js`). Adding `isolation` here creates ephemeral `.claude/worktrees/agent-<id>` paths that are not the intended SDLC worktree. Implements R-no-agent-sdk-isolation from spec. See issues #370 #372. (Mirrors the R-agent-isolation-script-driven constraint in ship-sdlc/SKILL.md.)
+- **DO NOT pass `isolation: "worktree"` (or any other `isolation` value) to the Agent tool.** execute-plan-sdlc never creates a git worktree (workspace is auto-detected `branch`/`continue`). The Agent SDK `isolation: "worktree"` parameter creates ephemeral `.claude/worktrees/agent-<id>` paths that break `.sdlc/` anchoring and cause commits to land in the wrong location. Implements R-no-agent-sdk-isolation from spec. See issues #370 #372. (Mirrors the R-agent-isolation-script-driven constraint in ship-sdlc/SKILL.md.)
 
 The wave-runner Agent handles in-wave per-task fan-out internally — it dispatches one per-task Agent per Standard/Complex task and one batch-haiku Agent for any 2+ Trivials, all within its own context. A single Trivial in a wave is dispatched by the wave-runner as an inline single-agent, not a batch. Per-task retries (haiku→sonnet→opus, budget 2) are the wave-runner's responsibility.
 
@@ -559,7 +534,7 @@ When `commitWaves === true`:
      ```
    - For the soft-success path above, omit `--sha` (or pass `--sha ""`): the subcommand persists `committedSha: null`.
 
-5. Workspace-mode compatibility (R workspace-mode-compatibility): state writes route through `resolveStateDir()` (already the case in `state/execute.js`); the `git commit` runs in the active worktree (current cwd). When invoked from ship-sdlc pipeline mode with `--workspace worktree`, both the diff and the commit land in the sibling worktree exactly as for the rest of the wave's writes.
+5. Workspace compatibility: state writes route through `resolveStateDir()` (already the case in `state/execute.js`); the `git commit` runs in the active checkout (current cwd). When invoked from a manual git worktree (derived `continue`), both the diff and the commit land in that worktree, while `.sdlc/` state stays anchored to the main worktree via `resolveStateDir()`.
 
 **5d. Progress report** — After each wave:
 ```
@@ -777,16 +752,11 @@ OpenSpec sync warnings:
 ```
 When the array is empty (the happy path), omit the section entirely.
 
-**Branch/worktree emission (R31, fixes #378, #379):** When `EXECUTE_NEW_BRANCH` is set (either from `--branch` flag or from Step 1 self-creation), append to the report:
+**Branch emission (R31, fixes #378, #379):** When `EXECUTE_NEW_BRANCH` is set (either from `--branch` flag or from Step 1's derived `branch` outcome), append to the report:
 ```
 Branch:   <EXECUTE_NEW_BRANCH>
 ```
-Additionally, when Step 1 self-created a worktree (`WORKTREE_PATH` is set — i.e. `--branch` was NOT passed AND `--workspace worktree` was selected in standalone path), prepend the worktree path line:
-```
-Worktree: <WORKTREE_PATH>
-Branch:   <EXECUTE_NEW_BRANCH>
-```
-When `EXECUTE_NEW_BRANCH` is unset (user selected "Continue on current branch", or current branch was already non-default and no creation occurred), emit neither line.
+There is no `Worktree:` line — execute-plan-sdlc never creates a worktree. When `EXECUTE_NEW_BRANCH` is unset (the derive yielded `continue` — a linked worktree or an existing feature branch), emit nothing.
 
 **State file cleanup:** On successful completion (all tasks completed), delete the execution state file. Print:
 `State file cleaned up.`
@@ -834,7 +804,7 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 - Skip final verification
 - Reference the plan file inside an agent prompt — paste the full task text
 - Execute more than 2 retries on any single task
-- Automatically commit or push — workspace isolation (branching/worktree) is controlled by the `--workspace` flag, not ad-hoc decisions
+- Automatically commit or push — workspace is auto-detected (`branch` → `git checkout -b`; `continue` → run in place), not an ad-hoc decision; committing/pushing is a separate follow-up step
 - Reference external sub-skills by name — this skill is fully self-contained
 - Dispatch one Agent per task from main context — Step 5b dispatches one wave-runner Agent per wave. Per-task fan-out (including trivial batching) is the wave-runner's internal responsibility. The only exception is the pre-wave trivial batch, which is dispatched directly from main context before the wave loop begins.
 - Delete the execution state file on failure or interruption — it is needed for `--resume`
@@ -843,6 +813,7 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 - Evaluate warning-severity guardrails pre-wave — warnings are assessed post-wave against actual changes, not intent
 - Dispatch agents without the `model:` parameter — every agent dispatch must include `model: "<X>"` per the quality-tier table. Omitting it defaults to opus, defeating the cost optimization of the quality-tier system.
 - Touch `ship-*` state files or invoke `state/ship.js` — ship-sdlc owns the entire ship-state lifecycle (implements R32, addresses #379). Use `state/execute.js` for execute-state operations only.
+- Expect a `post-failure-error-report.js` Stop hook to run on execution failure — that hook was intentionally removed from `hooks.json`. Failure surfacing is now the skill's own responsibility: Step 6 RECOVER emits structured failure output and Step 9 REPORT surfaces the final state. Do not add failure-reporting hooks back; the skill-owned path avoids the double-reporting and exit-code ambiguity the hook introduced.
 
 ## Gotchas
 
@@ -870,9 +841,9 @@ On failure or interruption (not all tasks completed), preserve the state file. P
 
 **Agents may bypass the Edit tool.** Agents sometimes use bash `sed`, `awk`, Python scripts, or compiled programs in `/tmp` to modify files instead of the Edit tool. These approaches are fragile (wrong line numbers, regex mismatches, wrong working directory) and silently fail — the agent reports success, but the file is unchanged or corrupted. The Hard Constraints in the agent prompt forbid this, but the filesystem verification in Step 5c catches cases where the constraint was ignored.
 
-**Workspace isolation can use a stale branch.** The conversation-level `gitStatus` snapshot is frozen at session start. If the user switches branches mid-session, `gitStatus` still reports the original branch. The workspace isolation check in Step 1 must run `git branch --show-current` via Bash — never read the branch from `gitStatus` or any other cached context.
+**Workspace detection can use a stale branch.** The conversation-level `gitStatus` snapshot is frozen at session start. If the user switches branches mid-session, `gitStatus` still reports the original branch. The workspace derivation in Step 1 must run `git branch --show-current` via Bash — never read the branch from `gitStatus` or any other cached context.
 
-**Worktree lifecycle uses git commands, not harness tools.** `util/worktree-create.js` for creation (handles branch collision), `git worktree remove` for cleanup. No EnterWorktree/ExitWorktree. When invoked from ship-sdlc, skip cleanup — ship-sdlc owns the worktree lifecycle.
+**No worktree lifecycle.** execute-plan-sdlc never creates a git worktree — workspace is auto-detected (`branch`/`continue`). Running inside a user's manual worktree is a `continue` outcome (run in place); `.sdlc/` stays anchored to the main worktree via `resolveStateDir()`. There is nothing to create and nothing to clean up.
 
 **State files are script-managed.** Use state/execute.js for all state operations. Don't hand-write JSON to `.sdlc/execution/`.
 
@@ -955,7 +926,7 @@ If `openspecSpecs` was loaded in Step 1 (the plan was OpenSpec-sourced), also su
 
 The archive suggestion is **never auto-executed** — this skill is the "execute only" entry point. Archival is deferred to `/ship-sdlc` or manual invocation.
 
-If execution started in a worktree (Step 1 workspace isolation) and running standalone (not invoked from ship-sdlc), clean up with `git worktree remove <path>` from the main worktree. When invoked from ship-sdlc, skip cleanup — ship-sdlc owns the worktree lifecycle.
+There is no worktree cleanup — execute-plan-sdlc never creates a worktree (workspace is auto-detected). If you ran inside a manual worktree (`continue`), it remains exactly as you left it.
 
 ## See Also
 

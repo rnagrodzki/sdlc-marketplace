@@ -1,39 +1,7 @@
 # Script execution tests for ship-prepare.js.
 # These tests run ship-prepare.js directly against fixture directories (no LLM).
-# Covers: sdlcGitignored fix (#99), auto-mode workspace override (#104), and
-# R65 cwd-assertion diagnostic (#405).
-
-# Issue #405 — R65 cwd-assertion: ship-prepare invoked under workspace: branch
-# from a stale linked worktree path must emit assertions.requireMainWorktreeCwd
-# = true with expectedMainWorktreeRoot set to the MAIN worktree root. SKILL.md
-# consumes this field and aborts the pipeline before any branch creation.
-- description: "ship-prepare (#405): linked-worktree + workspace=branch emits cwd-assertion with main worktree root"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --workspace branch --auto"
-    script_cwd: "{{project_root}}/worktrees/wt1"
-    project_root: "file://fixtures-fs/project-linked-worktree-staged"
-  assert:
-    - type: icontains
-      value: '"requireMainWorktreeCwd": true'
-    - type: icontains
-      value: '"expectedMainWorktreeRoot"'
-    # The expected root must NOT include the worktrees/wt1 sub-path — it must be the main worktree root.
-    - type: not-icontains
-      value: 'worktrees/wt1"'
-
-# Issue #405 — companion: ship-prepare invoked under workspace: worktree from
-# the same linked-worktree fixture must emit assertions.requireMainWorktreeCwd
-# = false. The diagnostic is gated on workspace=branch only.
-- description: "ship-prepare (#405): workspace=worktree disables cwd-assertion"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --workspace worktree"
-    script_cwd: "{{project_root}}/worktrees/wt1"
-    project_root: "file://fixtures-fs/project-linked-worktree-staged"
-  assert:
-    - type: icontains
-      value: '"requireMainWorktreeCwd": false'
+# Covers: sdlcGitignored fix (#99), workspace auto-detection (#378, #379), the
+# pipelineAdvancing predicate (#452), and removed-flag rejection.
 
 - description: "ship-prepare: .sdlc/.gitignore inner pattern sets sdlcGitignored true"
   vars:
@@ -45,35 +13,39 @@
     - type: icontains
       value: '"sdlcGitignored": true'
 
-- description: "ship-prepare: --auto defaults workspace to branch"
+# Workspace auto-detection (#378, #379): the removed flags --workspace/--branch/--tree
+# are each rejected as removed flags. Workspace is derived, never selected.
+- description: "ship-prepare: --workspace is rejected as a removed flag"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --auto"
+    script_args: "--has-plan --workspace branch"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
     - type: icontains
-      value: '"workspace": "branch"'
+      value: "no longer accepted"
+    - type: icontains
+      value: "auto-detected"
 
-- description: "ship-prepare: --auto with explicit --workspace prompt keeps prompt"
+- description: "ship-prepare: --branch is rejected as a removed flag"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --auto --workspace prompt"
+    script_args: "--has-plan --branch"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
     - type: icontains
-      value: '"workspace": "prompt"'
+      value: "no longer accepted"
 
-- description: "ship-prepare: --auto with config workspace=worktree keeps config value"
+- description: "ship-prepare: --tree is rejected as a removed flag"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --auto"
+    script_args: "--has-plan --tree"
     script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-ship-auto-workspace"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
     - type: icontains
-      value: '"workspace": "worktree"'
+      value: "no longer accepted"
 
 # --preset / --skip hard-removal (issue #190)
 # CLI --preset and --skip are no longer accepted by ship-sdlc — they expand to
@@ -115,20 +87,6 @@
       value: |
         const o = JSON.parse(output);
         return Array.isArray(o.flags.steps) && o.flags.steps.length > 0
-
-# Auto-mode workspace override for config source (issue #133)
-
-- description: "ship-prepare: --auto with config workspace=prompt overrides to branch"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --auto"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-ship-config-workspace-prompt"
-  assert:
-    - type: icontains
-      value: '"workspace": "branch"'
-    - type: icontains
-      value: "config (auto)"
 
 # Bump+steps coherence (issue #146; updated #190)
 # When --bump is set on CLI but the resolved steps[] excludes the version step,
@@ -228,8 +186,6 @@
       value: '"auto": false'
     - type: icontains
       value: '"reviewThreshold": "high"'
-    - type: icontains
-      value: '"workspace": "prompt"'
     - type: icontains
       value: '"rebase": "auto"'
 
@@ -736,55 +692,71 @@
         const cleanup = (o.steps || []).find(s => s.name === 'cleanup');
         return cleanup !== undefined && Object.prototype.hasOwnProperty.call(cleanup, 'isolation') && cleanup.isolation === null;
 
-# Workspace shortcuts (issue #350)
+# pipelineAdvancing predicate (R-advancing-predicate, #452) — pure helper in
+# lib/state.js, exercised via the pipeline-advancing-test.js runner (no fixture).
+# The five cases match the spec acceptance list verbatim.
 
-- description: "ship-prepare: --branch shortcut sets workspace=branch"
+- description: "pipelineAdvancing: in_progress step advancing"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/pipeline-advancing-test.js"
+    script_args: '--data {"steps":[{"name":"execute","status":"completed"},{"name":"commit","status":"in_progress"},{"name":"pr","status":"pending"}]}'
+  assert:
+    - type: contains
+      value: '"advancing":true'
+    - type: contains
+      value: '"step":"commit"'
+
+- description: "pipelineAdvancing: completed+pending (none in_progress, none failed) advancing"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/pipeline-advancing-test.js"
+    script_args: '--data {"steps":[{"name":"execute","status":"completed"},{"name":"commit","status":"pending"}]}'
+  assert:
+    - type: contains
+      value: '"advancing":true'
+    - type: contains
+      value: '"step":"commit"'
+
+- description: "pipelineAdvancing: all terminal not advancing"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/pipeline-advancing-test.js"
+    script_args: '--data {"steps":[{"name":"execute","status":"completed"},{"name":"commit","status":"skipped"}]}'
+  assert:
+    - type: contains
+      value: '"advancing":false'
+
+- description: "pipelineAdvancing: failed without pending cleanup not advancing"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/pipeline-advancing-test.js"
+    script_args: '--data {"steps":[{"name":"execute","status":"completed"},{"name":"commit","status":"failed"}]}'
+  assert:
+    - type: contains
+      value: '"advancing":false'
+
+- description: "pipelineAdvancing: failed with terminal cleanup pending advancing (R38)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/pipeline-advancing-test.js"
+    script_args: '--data {"steps":[{"name":"execute","status":"completed"},{"name":"commit","status":"failed"},{"name":"cleanup","status":"pending"}]}'
+  assert:
+    - type: contains
+      value: '"advancing":true'
+    - type: contains
+      value: '"step":"cleanup"'
+
+# Version always runs in steps[] regardless of checkout (#378, #379) — no
+# worktree-mode auto-skip. When version is in the resolved steps, it is will_run.
+- description: "ship-prepare: version step will_run when in --steps (no worktree-mode skip, #378)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --branch"
+    script_args: "--has-plan --steps execute,commit,version,pr"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
-    - type: icontains
-      value: '"workspace": "branch"'
-    - type: icontains
-      value: '"workspace": "cli"'
-
-- description: "ship-prepare: --tree shortcut sets workspace=worktree"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --tree"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
-  assert:
-    - type: icontains
-      value: '"workspace": "worktree"'
-    - type: icontains
-      value: '"workspace": "cli"'
-
-- description: "ship-prepare: --branch and --tree together is an error"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --branch --tree"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
-  assert:
-    - type: icontains
-      value: 'Cannot combine --branch and --tree'
-    - type: icontains
-      value: '"errors"'
-
-- description: "ship-prepare: --workspace with --tree is an error"
-  vars:
-    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --workspace worktree --tree"
-    script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
-  assert:
-    - type: icontains
-      value: 'Cannot combine --workspace with --tree'
-    - type: icontains
-      value: '"errors"'
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const v = o.steps.find(s => s.name === 'version');
+        if (!v) return 'FAIL: no version step';
+        return v.status === 'will_run' ? true : `FAIL: version status=${v.status}`;
 
 # Issue #366 — execute-plan-sdlc Agent dispatch: all sub-skill steps use dispatchMode=agent
 # (Fixes #366; reverts #353 Skill-tool exception for execute)

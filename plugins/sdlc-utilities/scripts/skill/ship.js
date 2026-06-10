@@ -19,9 +19,7 @@
  *   --draft                 Mark PR as draft
  *   --dry-run               Print plan without executing
  *   --resume                Resume from last checkpoint
- *   --workspace branch|worktree|prompt  Workspace isolation mode
- *   --branch                Shortcut for --workspace branch
- *   --tree                  Shortcut for --workspace worktree
+ *   (workspace is auto-detected from cwd + branch; --workspace/--branch/--tree removed)
  *
  * Removed (legacy CLI sugar — passing these now produces a hard error):
  *   --preset                Use --steps <csv> instead.
@@ -43,7 +41,7 @@ const os   = require('os');
 const { spawnSync } = require('child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { exec, checkGitState, detectBaseBranch, parseRemoteOwner, probeGhAuth, formatAccountMismatch, probeRepoAccess, formatAccessDenied } = require(path.join(LIB, 'git'));
+const { exec, checkGitState, detectBaseBranch, deriveWorkspace, parseRemoteOwner, probeGhAuth, formatAccountMismatch, probeRepoAccess, formatAccessDenied } = require(path.join(LIB, 'git'));
 const { resolveMainWorktree, detectResumeState: detectResumeStateLib, readState, slugifyBranch } = require(path.join(LIB, 'state'));
 const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
@@ -78,8 +76,6 @@ function parseArgs(argv) {
   let draft     = false;
   let dryRun    = false;
   let resume    = false;
-  let workspace       = null;
-  let workspaceShortcut = null;
   let rebase          = null;
   let openspecChange  = null;
   let gc              = false;
@@ -126,12 +122,12 @@ function parseArgs(argv) {
       dryRun = true;
     } else if (a === '--resume') {
       resume = true;
-    } else if (a === '--workspace' && args[i + 1]) {
-      workspace = args[++i];
-    } else if (a === '--branch') {
-      workspaceShortcut = workspaceShortcut ? 'conflict' : 'branch';
-    } else if (a === '--tree') {
-      workspaceShortcut = workspaceShortcut ? 'conflict' : 'worktree';
+    } else if (a === '--workspace' || a === '--branch' || a === '--tree') {
+      // Removed (issue #378, #379): workspace is auto-detected from cwd + branch
+      // (deriveWorkspace in lib/git.js). Consume a value arg for --workspace so it
+      // is not mis-parsed as a positional, then error.
+      if (a === '--workspace' && args[i + 1] && !args[i + 1].startsWith('--')) i++;
+      errors.push(`${a} is no longer accepted: workspace is auto-detected from cwd + current branch (main worktree on the default branch → new feature branch; otherwise run in place). Remove the flag.`);
     } else if (a === '--rebase' && args[i + 1]) {
       rebase = args[++i]; // 'auto' | 'skip' | 'prompt'
     } else if (a === '--openspec-change' && args[i + 1]) {
@@ -162,15 +158,7 @@ function parseArgs(argv) {
     }
   }
 
-  if (workspaceShortcut === 'conflict') {
-    errors.push('Cannot combine --branch and --tree; use only one shortcut.');
-  } else if (workspaceShortcut && workspace) {
-    errors.push(`Cannot combine --workspace with --${workspaceShortcut === 'branch' ? 'branch' : 'tree'}; use one or the other.`);
-  } else if (workspaceShortcut) {
-    workspace = workspaceShortcut;
-  }
-
-  return { hasPlan, auto, steps, quick, quality, bump, draft, dryRun, resume, workspace, rebase, openspecChange, gc, ttlDays, hookActivePipeline, planModeBlocked, planFile, errors };
+  return { hasPlan, auto, steps, quick, quality, bump, draft, dryRun, resume, rebase, openspecChange, gc, ttlDays, hookActivePipeline, planModeBlocked, planFile, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +207,7 @@ function mergeFlags(cli, config) {
   }
 
   // Value flags
-  for (const key of ['bump', 'workspace']) {
+  for (const key of ['bump']) {
     if (cli[key] !== null && cli[key] !== undefined) {
       merged[key]  = cli[key];
       sources[key] = 'cli';
@@ -448,7 +436,9 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
         // explicitly passed --quality to ship. Otherwise execute-plan-sdlc
         // applies its own selection logic (interactive or its own default).
         flags.quality ? `--quality ${flags.quality}` : '',
-        flags.workspace !== 'prompt' ? `--workspace ${flags.workspace}` : '',
+        // No --workspace forward (issue #378, #379): ship establishes the feature
+        // branch BEFORE dispatching execute, so execute's own deriveWorkspace yields
+        // `continue` (run in place). No workspace value crosses the boundary.
         flags.rebase !== 'prompt' ? `--rebase ${flags.rebase}` : '',
         // Forward --commit-waves when ship config sets execute.commitWaves:
         // true. Pairs with commit-sdlc's wip(execute): squash path so the
@@ -526,12 +516,11 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
       name: 'version',
       skill: 'version-sdlc',
       model: 'sonnet',
-      status: (!isIn('version') || flags.workspace === 'worktree') ? 'skipped' : 'will_run',
-      skipSource: !isIn('version')
-        ? skipSource('version')
-        : flags.workspace === 'worktree'
-          ? 'auto'
-          : 'none',
+      // Version always runs when in steps[] regardless of checkout (issue #378,
+      // #379): tags are repo-global and writable from any worktree, so there is
+      // no worktree-mode auto-skip.
+      status: !isIn('version') ? 'skipped' : 'will_run',
+      skipSource: !isIn('version') ? skipSource('version') : 'none',
       // R-bump-forward (#358): forward bump as the named `--bump <value>`
       // flag (NOT a positional). version-sdlc treats --bump as authoritative
       // over the positional, so this wire shape prevents silent promotion
@@ -541,11 +530,7 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
         flags.auto ? '--auto' : '',
         expectedBranch ? `--expected-branch ${expectedBranch}` : '',
       ].filter(Boolean).join(' '),
-      reason: !isIn('version')
-        ? 'not in steps[]'
-        : flags.workspace === 'worktree'
-          ? 'auto-skipped — tags are repo-global, not safe from worktrees'
-          : 'in steps[]',
+      reason: !isIn('version') ? 'not in steps[]' : 'in steps[]',
       pause: true,
       isolation: null,
       dispatchMode: 'agent',
@@ -651,17 +636,14 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
       model: 'sonnet',
       status: isIn('pr') ? 'will_run' : 'skipped',
       skipSource: skipSource('pr'),
+      // No skip-version-check label (issue #378, #379): version always runs in
+      // all checkouts now, so the worktree-mode auto-skip label is gone.
       args: [
         flags.auto ? '--auto' : '',
         flags.draft ? '--draft' : '',
-        flags.workspace === 'worktree' ? '--label skip-version-check' : '',
         expectedBranch ? `--expected-branch ${expectedBranch}` : '',
       ].filter(Boolean).join(' '),
-      reason: !isIn('pr')
-        ? 'not in steps[]'
-        : flags.workspace === 'worktree'
-          ? 'in steps[]; --label skip-version-check added (version auto-skipped)'
-          : 'in steps[]',
+      reason: !isIn('pr') ? 'not in steps[]' : 'in steps[]',
       pause: false,
       isolation: null,
       dispatchMode: 'agent',
@@ -1098,11 +1080,8 @@ function main() {
     flagSources.bump = 'config (version.preRelease)';
   }
 
-  // Auto mode: override workspace default/config from 'prompt' to 'branch'
-  if (flags.auto && flags.workspace === 'prompt' && flagSources.workspace !== 'cli') {
-    flags.workspace = 'branch';
-    flagSources.workspace = `${flagSources.workspace} (auto)`;
-  }
+  // (workspace is auto-detected later from cwd + branch — no --auto override needed;
+  // the derive runs after gitState/worktreeInfo/defaultBranch are known.)
 
   // Check git state
   let gitState;
@@ -1228,6 +1207,18 @@ function main() {
 
   // Detect worktree context
   const worktreeInfo = detectWorktree(projectRoot);
+
+  // Workspace auto-detection (issue #378, #379): workspace is derived from cwd +
+  // current branch, NOT a user flag. `branch` → ship auto-creates a feature branch;
+  // `continue` → run in place. Computed once here from already-available data and
+  // threaded into flags.workspace so computeSteps (version gating) reads the derived
+  // value. See lib/git.js::deriveWorkspace, ship-sdlc spec R60.
+  flags.workspace = deriveWorkspace({
+    inLinkedWorktree: worktreeInfo.inLinkedWorktree,
+    currentBranch: gitState.currentBranch,
+    defaultBranch,
+  });
+  flagSources.workspace = 'derived';
 
   // Compute openspec archive actionability
   const openspecBranchMatch = openspecResult.branchMatch || null;
@@ -1383,31 +1374,10 @@ function main() {
   // threshold. Surfaced verbatim by SKILL.md Step 1c when non-null.
   const contextAdvisory = getAdvisory({ skill: 'ship-sdlc' });
 
-  // R65 (#405): cwd-assertion diagnostic. When workspace mode is `branch` AND
-  // the pipeline is NOT resuming, surface the expected main worktree root so
-  // SKILL.md can compare against `git rev-parse --show-toplevel` BEFORE
-  // dispatching execute. The check is diagnostic — it aborts the pipeline
-  // when ship-sdlc was launched from inside a linked worktree under a
-  // `workspace: branch` configuration (real failure mode observed in #405).
-  // For `worktree` or `continue`, the field is `false` (a stale linked
-  // worktree is irrelevant under those modes).
-  let assertions = { requireMainWorktreeCwd: false, expectedMainWorktreeRoot: null };
-  const notResuming = !(flags.resume === true || flags.implicitResume === true);
-  if (flags.workspace === 'branch' && notResuming) {
-    let mainWorktreeRoot = null;
-    try {
-      const wtList = exec('git worktree list --porcelain', { cwd: process.cwd() }) || '';
-      const firstLine = wtList.split('\n').find(l => l.startsWith('worktree '));
-      if (firstLine) mainWorktreeRoot = firstLine.slice('worktree '.length).trim();
-    } catch (err) {
-      // SKILL.md treats null mainWorktreeRoot as "no assertion". Emit a hint
-      // to stderr so the silent degradation is at least observable.
-      process.stderr.write(`ship-prepare: worktree-list probe failed (${err.message}) — cwd assertion degraded to no-op.\n`);
-    }
-    if (mainWorktreeRoot) {
-      assertions = { requireMainWorktreeCwd: true, expectedMainWorktreeRoot: mainWorktreeRoot };
-    }
-  }
+  // R65 removed (issue #378, #379): the cwd-assertion diagnostic is gone. Under
+  // workspace auto-detection, the derive returns `branch` ONLY when cwd is already
+  // the main worktree on the default branch, so branch creation can never fire from
+  // the wrong cwd — the assertion is unreachable by construction.
 
   // Build config values for output
   const configValues = {};
@@ -1472,8 +1442,6 @@ function main() {
     },
     resume,
     contextAdvisory,
-    // R65 (#405): cwd-assertion diagnostic emitted to SKILL.md.
-    assertions,
   };
 
   // Exit with 1 if there are fatal errors, 0 otherwise
