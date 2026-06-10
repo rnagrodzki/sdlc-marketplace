@@ -68,14 +68,6 @@ const SHIP_FIELDS = [
     description: 'Skip interactive approval prompts throughout the ship pipeline',
   },
   {
-    name: 'workspace',
-    label: 'Working environment',
-    type: 'enum',
-    options: ['branch', 'worktree', 'prompt'],
-    default: 'branch',
-    description: 'branch (current branch), worktree (isolated git worktree), prompt (ask each time)',
-  },
-  {
     name: 'rebase',
     label: 'Rebase before shipping?',
     type: 'enum',
@@ -157,13 +149,10 @@ const VALID_SKIP = VALID_STEPS;
 
 // Runtime resolver defaults consumed by ship.js mergeDefaults().
 //
-// Three fields intentionally diverge from SHIP_FIELDS[i].default:
+// Two fields intentionally diverge from SHIP_FIELDS[i].default:
 //   - rebase: `true` here (legacy boolean, mapped to 'auto' by ship.js
 //     line 191-192) vs 'auto' in SHIP_FIELDS (user-facing question default).
 //     Same effective value, different storage form.
-//   - workspace: 'prompt' here (runtime fallback — ask each time if no
-//     config) vs 'branch' in SHIP_FIELDS (user-facing question default).
-//     Different intents — don't collapse these without migration analysis.
 //   - steps: PRESET_TO_STEPS.balanced here (runtime fallback when no config
 //     exists — spec A3 says default is 'balanced') vs CANONICAL_STEPS in
 //     SHIP_FIELDS (questionnaire default shows all six so users can pick).
@@ -175,7 +164,6 @@ const BUILT_IN_DEFAULTS = {
   draft: false,
   auto: false,
   reviewThreshold: 'high',
-  workspace: 'prompt',
   rebase: true,
   verifyPipelineTimeout: 1200,
   verifyPipelineInterval: 60,

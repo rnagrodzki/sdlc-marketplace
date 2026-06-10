@@ -288,13 +288,17 @@ After the critique block, the full final payload (the exact bytes the MCP call w
 - **change `<what>`** — describe the desired change; the skill loops back through the critique pass with a revised draft and new artifacts
 - **cancel** — abort without dispatching
 
-On `approve`, an approval token is written to `$TMPDIR/jira-sdlc/approval-<hash>.token`. No write MCP call is dispatched without this token.
+On `approve`, the skill proceeds to dispatch the write MCP call. Approval is the explicit `AskUserQuestion` gate — there is no token-file handshake.
 
-### Hook enforcement (R21)
+### Validation (R21 — LLM-prose only)
 
-A `PreToolUse` hook (`hooks/pre-tool-jira-write-guard.js`) re-derives the payload hash from the tool input at dispatch time, verifies both artifacts exist and are under 10 minutes old, and **blocks dispatch** if either check fails. If dispatch is blocked, the hook's `permissionDecisionReason` is surfaced verbatim — the skill does not retry by guessing what changed.
+The former `pre-tool-jira-write-guard.js` PreToolUse hook has been removed (along with all PreToolUse guards). Jira-write validation is now **LLM-prose-only** as a second line of defense, performed by the skill at author time:
 
-Canonicalization strips `null`-valued keys recursively (in addition to `undefined`) so that MCP-harness defaulting (e.g., schema-default `commentVisibility: null` injection between artifact write and hook read) cannot desync the skill-side and hook-side hashes.
+- Zero unfilled template placeholders remain in payload string fields and ADF text nodes (C13 check).
+- For `createJiraIssue` / `editJiraIssue` with a description, payload `## ` headings stay a subset of the resolved template's heading set.
+- Explicit `AskUserQuestion` approval is obtained before dispatching any write MCP call.
+
+There is no payload-hash / critique-token / approval-token artifact handshake and no deterministic dispatch block — the skill's Plan→Critique→Improve→Present→Approve flow is the enforcement.
 
 ### Terse ticket content (R25)
 
@@ -306,9 +310,8 @@ Every `createJiraIssue` and `editJiraIssue` that touches `description` is requir
 - **No filler transitions.** Sentences such as `This ticket covers…`, `In summary…`, or `The purpose of this issue is…` between sections are omitted.
 - **Release Notes exception (R25.5).** The `## Release Notes` section (Bug, Story templates) may be a single sentence — release notes are changelog-bound and bullet form is awkward in that context. Two or more sentences in this section fail the constraint.
 
-**Enforcement layers:**
-- The Step 2.5 critique pass checks descriptions for prose paragraphs, filler tokens, and non-checklist acceptance criteria — findings appear in the `Critique:` block before the approval prompt.
-- The `hooks/pre-tool-jira-write-guard.js` PreToolUse hook deterministically blocks dispatch when the `## Acceptance Criteria` section contains any non-checklist lines. The deny reason cites R25/G15 and quotes the offending line.
+**Enforcement (LLM-prose only):**
+- The Step 2.5 critique pass checks descriptions for prose paragraphs, filler tokens, and non-checklist acceptance criteria — findings appear in the `Critique:` block before the approval prompt. This is the sole enforcement: the former deterministic `pre-tool-jira-write-guard.js` checklist gate has been removed.
 
 ### Diagnostics
 

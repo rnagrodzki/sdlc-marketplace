@@ -130,6 +130,30 @@ function detectBaseBranchSafe(projectRoot) {
 }
 
 /**
+ * Pure workspace derivation (issue #378, #379). Workspace is NOT user-selectable —
+ * it is derived from cwd + current branch. No I/O.
+ *
+ * Two outcomes:
+ *   - 'branch'   — cwd is the main worktree AND HEAD is the default branch.
+ *                  The caller auto-creates a feature branch (git checkout -b).
+ *   - 'continue' — every other case: a linked (non-main) worktree, OR the main
+ *                  worktree already on a feature branch. The caller runs in place.
+ *
+ * Replaces the former --workspace flag (branch|worktree|prompt) and the worktree
+ * creation fork. See ship-sdlc spec R60, execute-plan-sdlc spec R16.
+ *
+ * @param {object} input
+ * @param {boolean} input.inLinkedWorktree - true when cwd is a linked (non-main) worktree
+ * @param {string} input.currentBranch - branch HEAD currently points at
+ * @param {string} input.defaultBranch - repo default branch (e.g. 'main')
+ * @returns {'branch'|'continue'}
+ */
+function deriveWorkspace({ inLinkedWorktree, currentBranch, defaultBranch }) {
+  if (inLinkedWorktree) return 'continue';
+  return currentBranch === defaultBranch ? 'branch' : 'continue';
+}
+
+/**
  * Best-effort fetch of the base branch from origin to fast-forward the local ref.
  *
  * Used before computing branch-contribution diffs (review-sdlc, pr-sdlc — issue #239)
@@ -1286,6 +1310,7 @@ module.exports = {
   checkGitState,
   detectBaseBranch,
   detectBaseBranchSafe,
+  deriveWorkspace,
   fetchBaseRef,
   buildBranchContribDiffCmd,
   getChangedFiles,

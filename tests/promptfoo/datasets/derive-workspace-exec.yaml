@@ -1,0 +1,41 @@
+# Script execution tests for lib/git.js::deriveWorkspace — issue #378, #379.
+# Pure function (no I/O): runs the real export via a tiny runner (no LLM, no git fixture).
+# Matrix covers all four cwd × branch combinations.
+
+# main worktree + on default branch → branch (auto-create a feature branch)
+- description: "derive-workspace: main worktree + default branch → branch"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/derive-workspace-test.js"
+    script_args: "--linked false --current main --default main"
+  assert:
+    - type: contains
+      value: '"ok":true'
+    - type: contains
+      value: '"workspace":"branch"'
+
+# main worktree + on a feature branch → continue (run in place)
+- description: "derive-workspace: main worktree + feature branch → continue"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/derive-workspace-test.js"
+    script_args: "--linked false --current feat/x --default main"
+  assert:
+    - type: contains
+      value: '"workspace":"continue"'
+
+# linked worktree + on default branch → continue (run in place)
+- description: "derive-workspace: linked worktree + default branch → continue"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/derive-workspace-test.js"
+    script_args: "--linked true --current main --default main"
+  assert:
+    - type: contains
+      value: '"workspace":"continue"'
+
+# linked worktree + on a feature branch → continue (run in place)
+- description: "derive-workspace: linked worktree + feature branch → continue"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/derive-workspace-test.js"
+    script_args: "--linked true --current feat/x --default main"
+  assert:
+    - type: contains
+      value: '"workspace":"continue"'

@@ -34,7 +34,7 @@ sdlc-marketplace/
 │           ├── state/                 # State persistence CLIs
 │           │   ├── execute.js, ship.js
 │           ├── util/                  # Action utilities
-│           │   ├── ship-init.js, worktree-create.js
+│           │   ├── ship-init.js
 │           └── lib/                   # Shared modules (git, config, state, ...)
 └── docs/                         # Documentation
 ```
@@ -137,11 +137,7 @@ Hooks are defined in `plugins/<plugin>/hooks/hooks.json`. Available hook points:
 
 See [adding-hooks.md](adding-hooks.md) for the complete list of hook events.
 
-#### PreToolUse Agent Guard
-
-The `pre-tool-agent-isolation-guard.js` hook (registered with `matcher: "Agent"`) blocks Agent SDK `isolation: "worktree"` dispatches. SDLC manages its own worktrees via `util/worktree-create.js` (git CLI); the Agent SDK's `isolation: "worktree"` creates ephemeral `.claude/worktrees/agent-<id>` paths that are not the intended SDLC worktree, causing commits to land in the wrong location (fixes #370, #372).
-
-Per-developer opt-out: set `hooks.agentIsolationGuard.enabled: false` in `.sdlc/local.json` (gitignored). This key is surfaced during `/setup-sdlc` initialization with a recommended default of `true` (blocking enabled). When the key is absent or the file is unreadable, the hook defaults to enabled (fails closed).
+> **Note (#378, #379):** The former `pre-tool-agent-isolation-guard.js` PreToolUse hook has been removed (along with all PreToolUse guards). The Agent-SDK `isolation: "worktree"` anti-pattern is still avoided, but it is now documented as skill-prose guidance in the per-task and wave-runner templates rather than enforced by a harness hook. SDLC no longer creates git worktrees — workspace is auto-detected (`branch`/`continue`).
 
 ### Cost Tiers
 

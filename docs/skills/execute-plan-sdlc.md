@@ -31,9 +31,8 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 | `--quality <full\|balanced\|minimal>` | Auto-select the model quality tier, skipping the interactive selection prompt. `full` = Speed, `balanced` = Balanced, `minimal` = Quality. Invalid values fall back to interactive selection. (Renamed from `--preset` in #190 to disambiguate from ship-sdlc's `--steps` step-selection flag.) When invoked from ship-sdlc, `--quality` is forwarded only when the user explicitly passed `--quality` to ship. | Interactive prompt |
 | `--auto` | Suppress interactive prompts: auto-resume if state exists, auto-approve high-risk gates, use `--quality` value (required when `--auto` is set). | Off |
 | `--resume` | Resume from the most recent execution state file for the current branch. Completed waves are skipped; in-progress waves are retried. If the plan has changed since execution started, you are prompted to resume or restart. | Off |
-| `--workspace <branch\|worktree\|prompt>` | Workspace isolation mode when on the default branch. `branch` creates a feature branch, `worktree` creates a git worktree, `prompt` asks interactively. | `prompt` |
 | `--rebase <auto\|skip\|prompt>` | Rebase onto the default branch before execution. `auto` rebases silently (aborts on conflict), `skip` skips, `prompt` asks. | Skip |
-| `--branch <name>` | **INTERNAL** — set by ship-sdlc in pipeline mode. Passes the pre-created branch name so execute-plan-sdlc skips its own Step 1 workspace-isolation logic and trusts the caller's branch/cwd. Do not pass this directly. (Implements R30, fixes #378, #379.) | unset |
+| `--branch <name>` | **INTERNAL** — set by ship-sdlc in pipeline mode. Passes the pre-created branch name so execute-plan-sdlc skips its own Step 1 workspace derivation and trusts the caller's branch/cwd. Do not pass this directly. (Implements R30, fixes #378, #379.) | unset |
 | `--commit-waves` | After each wave passes G9 (mechanical/filesystem verify) and G11 (post-wave guardrail check), commit the wave as `wip(execute): wave N — <task titles>` (subject truncated to 72 chars). Hooks always run — `--no-verify` is never passed. The small-plan direct-execution path (R5) NEVER triggers per-wave commits regardless of this flag. Pairs with commit-sdlc's WIP-squash path so the final feature commit subsumes WIP commits via soft-reset. (Fixes #392 / R35.) | Off |
 | `--plan-file <path>` | Explicit path to the active plan markdown. When set, Step 1 (LOAD) skips the conversation-context discovery heuristic and reads from this file directly — the compaction-stable plan source. Forwarded automatically by ship-sdlc from `context.planFile` so plan discovery survives compaction; users may also pass it directly for non-interactive invocations. (Implements R-PLANFILE.) | unset |
 
@@ -104,21 +103,14 @@ The 1a check augments — never replaces — the existing per-task `filesChanged
 
 ---
 
-## Workspace Isolation
+## Workspace (Auto-Detected)
 
-When you invoke `/execute-plan-sdlc` while on the repository's default branch (typically `main`), the skill detects this and prompts before executing:
+Workspace is **auto-detected** — there is no flag and no prompt. Step 1 (LOAD) derives the workspace from your cwd and current branch via `lib/git.js::deriveWorkspace`, with two outcomes:
 
-```
-You're on the default branch (main). Working directly on it is not recommended.
+- **`branch`** — cwd is the **main** worktree AND HEAD is the **default** branch (typically `main`). The skill derives a feature-branch name from the plan title and runs `git checkout -b <name>`, then executes on the new branch.
+- **`continue`** — every other case: you are inside a manual (linked) git worktree, OR already on a feature branch in the main worktree. The skill runs in place on the current branch — no branch creation, no worktree creation.
 
-Suggested: feat/add-jwt-authentication
-
-  1. Create branch feat/add-jwt-authentication (or provide a custom name)
-  2. Create a worktree for isolated execution
-  3. Continue on main anyway
-```
-
-**Branch name derivation:** The type prefix is determined from the plan's nature:
+**Branch name derivation (for the `branch` outcome):** The type prefix is determined from the plan's nature:
 
 | Plan nature | Prefix |
 |---|---|
@@ -127,21 +119,11 @@ Suggested: feat/add-jwt-authentication
 | Refactor, cleanup, tooling, config | `chore/` |
 | Documentation | `docs/` |
 
-The slug is derived from the plan title (lowercase, hyphenated, max 50 characters). You can override both the prefix and slug by providing a custom name.
-
-**Option 1 — Create branch:** Runs `git checkout -b <name>` and continues execution on the new branch. Lightweight and familiar. When `--workspace branch` is passed, this option is selected automatically without prompting.
-
-**Option 2 — Create worktree:** Creates an isolated copy of the repository using `worktree-create.js`. All execution happens in the worktree. After execution and any follow-up actions (commit, PR), clean up with `git worktree remove <path>` from the main worktree. When `--workspace worktree` is passed, this option is selected automatically without prompting.
-
-**Option 3 — Continue:** Proceeds without changes. This is the user's decision — the check is a suggestion, not a block.
-
-The check is skipped entirely when you are already on a non-default branch.
-
-Pass `--workspace branch` or `--workspace worktree` to bypass the interactive prompt and have the skill act immediately. Pass `--workspace prompt` (the default) to always be asked.
+The slug is derived from the plan title (lowercase, hyphenated, max 50 characters). The prefix/slug rules are configurable via `workspace.branch` in `.sdlc/local.json`.
 
 **Note:** Branch detection always runs `git branch --show-current` at execution time. It does not use the session-level `gitStatus` snapshot, which may be stale if you switched branches after starting the conversation.
 
-**Note on Agent SDK `isolation` parameter:** The SDLC `--workspace worktree` flag creates a sibling git worktree via `util/worktree-create.js` (git CLI). This is distinct from the Agent SDK's `isolation: "worktree"` parameter. The plugin's `pre-tool-agent-isolation-guard.js` PreToolUse hook blocks Agent SDK `isolation: "worktree"` dispatches by default, preventing commits from landing in ephemeral `.claude/worktrees/agent-<id>` paths instead of the intended SDLC worktree (fixes #370, #372). To opt out per-developer, set `hooks.agentIsolationGuard.enabled: false` in `.sdlc/local.json`.
+**Note on Agent SDK `isolation` parameter:** execute-plan-sdlc never creates a git worktree (workspace is auto-detected). Agent dispatches must **not** pass the Agent SDK `isolation: "worktree"` parameter — it creates ephemeral `.claude/worktrees/agent-<id>` paths that break `.sdlc/` anchoring and cause commits to land in the wrong location. This is enforced by skill-prose Hard Constraints in the per-task and wave-runner templates (the former `pre-tool-agent-isolation-guard.js` harness hook has been removed). See issues #370, #372.
 
 ---
 
@@ -219,20 +201,13 @@ After each wave completes, execution state is written to `.sdlc/execution/execut
 
 Plans with 3 or fewer simple tasks (small-plan direct execution) do not write state files.
 
-**Step 9 structured output (R31, fixes #378, #379):** When a new branch was created during execution, Step 9's summary report includes additional lines for downstream consumers (e.g., ship-sdlc):
+**Step 9 structured output (R31, fixes #378, #379):** When a new branch was created during execution (derived `branch` outcome, or `--branch <name>` passed by ship-sdlc), Step 9's summary report includes a `Branch:` line for downstream consumers (e.g., ship-sdlc):
 
 ```
 Branch:   feat/my-feature
 ```
 
-When a worktree was self-created (standalone `--workspace worktree` mode, no `--branch` flag), both lines appear:
-
-```
-Worktree: /path/to/worktree
-Branch:   feat/my-feature
-```
-
-These lines are omitted when the user selected "Continue on current branch" or when the branch was already non-default and no creation occurred. In pipeline mode (`--branch` was passed by ship-sdlc), the `Worktree:` line is not emitted — ship-sdlc already knows the path.
+There is no `Worktree:` line — execute-plan-sdlc never creates a worktree. The `Branch:` line is omitted when the derive yielded `continue` (run in place — a linked worktree, or an existing feature branch).
 
 ---
 
@@ -360,7 +335,6 @@ Guardrails:       3/3 passed (1 warning, 0 overridden)
 | Source code files | Files created or modified as specified by plan tasks |
 | `.sdlc/learnings/log.md` | Execution learnings appended after completion (classification accuracy, wave conflicts, recovery outcomes) |
 | `.sdlc/execution/execute-<branch>-<timestamp>.json` | Execution state file written after each wave; enables cross-session resume via --resume. Deleted on success, preserved on failure. |
-| Step 1 context-heaviness advisory | When the latest transcript stats sidecar at `$TMPDIR/sdlc-context-stats.json` indicates `heavy: true` (transcript ≥60% of model budget), Step 1 emits a `/compact` advisory to stderr before guardrail loading. Sidecar is written by the `UserPromptSubmit` hook `hooks/context-stats.js`. Implementation: [`scripts/lib/context-advisory.js`](../../plugins/sdlc-utilities/scripts/lib/context-advisory.js). Distinct from R21 between-wave compaction. Pipeline state survives `/compact` (PreCompact + SessionStart hooks). |
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.
 

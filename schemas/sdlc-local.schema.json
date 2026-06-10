@@ -74,11 +74,6 @@
           "enum": ["critical", "high", "medium", "low"],
           "description": "Minimum severity level that blocks the pipeline."
         },
-        "workspace": {
-          "type": "string",
-          "enum": ["branch", "worktree", "prompt"],
-          "description": "How to set up the working environment for the ship run."
-        },
         "rebase": {
           "description": "Whether to rebase before shipping, or prompt the user.",
           "oneOf": [
@@ -136,43 +131,8 @@
     },
     "workspaceSection": {
       "type": "object",
-      "description": "User-local workspace preferences (worktree layout, path, gitignore). Written by /setup-sdlc workspace section and consumed by worktree-create, execute-plan-sdlc, and ship-sdlc.",
+      "description": "User-local workspace preferences. Workspace itself is auto-detected (branch/continue) — this section only carries branch-name derivation knobs consumed by lib/branch-name.js. The former worktree-placement and mode keys are removed (workspace is no longer user-selectable; fixes #378, #379).",
       "properties": {
-        "worktree": {
-          "type": "object",
-          "description": "Controls where git worktrees are created.",
-          "properties": {
-            "layout": {
-              "type": "string",
-              "enum": ["inside", "sibling", "central", "template"],
-              "description": "Worktree placement strategy. `inside` places under .claude/worktrees/ (default); `sibling` places next to the repo; `central` places under ~/.sdlc/worktrees/<repoName>/; `template` uses a custom path template."
-            },
-            "base": {
-              "type": "string",
-              "description": "Override base directory for inside/sibling/central layouts. Accepts absolute paths and ~/paths. Relative paths and .. traversal are rejected."
-            },
-            "template": {
-              "type": "string",
-              "description": "Path template for `template` layout. Must contain at least one of {slug} or {branch}. Available placeholders: {repo}, {slug}, {branch}."
-            },
-            "ensureGitignore": {
-              "type": "boolean",
-              "description": "Auto-add .claude/worktrees/ to root .gitignore managed block. Only relevant for `inside` layout. Default true.",
-              "default": true
-            },
-            "nameTemplate": {
-              "type": "string",
-              "default": "{slug}",
-              "description": "Worktree directory name pattern (final segment only, separate from placement). Placeholders: {slug} (default, branch slugified), {branch} (raw branch with / replaced by -), {date} (YYYY-MM-DD local tz), {issue} (first digit-run in branch name; throws if branch has no digits)."
-            }
-          },
-          "additionalProperties": false
-        },
-        "mode": {
-          "type": "string",
-          "enum": ["branch", "worktree", "continue"],
-          "description": "Default workspace isolation mode for ship-sdlc. Resolution order: --workspace flag → workspace.mode config → fail-fast error. When neither flag nor config sets a value, ship-sdlc exits non-zero with a clear error. No default — an explicit choice is required (fixes #378)."
-        },
         "branch": {
           "type": "object",
           "description": "Branch-name derivation knobs consumed by lib/branch-name.js. Mirrors workspace.worktree shape. Drives config-driven branch naming in both ship-sdlc pre-execute block and execute-plan-sdlc standalone Step 1 (fixes #378, #379).",
@@ -200,25 +160,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "hooksSection": {
-      "type": "object",
-      "description": "User-local hook configuration. Written by /setup-sdlc hooks section and consumed by plugin PreToolUse hooks.",
-      "properties": {
-        "agentIsolationGuard": {
-          "type": "object",
-          "description": "Controls the pre-tool-agent-isolation-guard.js PreToolUse hook.",
-          "properties": {
-            "enabled": {
-              "type": "boolean",
-              "default": true,
-              "description": "When true (default), blocks Agent SDK isolation: \"worktree\" dispatches. Set to false to opt out per-developer. See issues #370 #372."
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
     }
   },
   "properties": {
@@ -242,9 +183,6 @@
     },
     "workspace": {
       "$ref": "#/$defs/workspaceSection"
-    },
-    "hooks": {
-      "$ref": "#/$defs/hooksSection"
     }
   },
   "additionalProperties": false

@@ -2,7 +2,7 @@
 name: ship-sdlc
 description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Dispatches every sub-skill (including execute-plan-sdlc) as an Agent for context isolation, with structured return values driving the pipeline state machine. Arguments: [--auto] [--steps <csv>] [--quick] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config]. The `<label>` form for --bump (e.g. `--bump rc`) is forwarded to version-sdlc, where it is interpreted as `--bump patch --pre <label>`; labels must match `^[a-z][a-z0-9]*$`. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
-argument-hint: "[--auto] [--steps <csv>] [--quick] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--workspace branch|worktree|prompt] [--branch | --tree] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
+argument-hint: "[--auto] [--steps <csv>] [--quick] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
 model: sonnet
 ---
 
@@ -349,6 +349,8 @@ For each step that will run, apply the dispatch protocol based on `step.dispatch
      Decision: CONTINUING — no critical/high issues found
    ```
 
+> **`--auto` continuation (R67/R68/R70 — descriptive, not a competing imperative):** In `--auto` mode the pipeline advances to the next step's `begin-step` within the same response turn. This is reinforced by two hooks consuming the shared `pipelineAdvancing` predicate (`lib/state.js`): the `pipeline-continue.js` PostToolUse hook (R67) emits forward `additionalContext` between steps, and the `stop-pipeline-continue.js` Stop hook (R68) returns `decision: "block"` so the turn does not end mid-pipeline. Both are `flags.auto`-gated for the between-steps case — interactive (non-`auto`) review between steps is preserved. The `begin-step` → `complete-step` sequence (R70) is unchanged.
+
 ---
 
 Ship-sdlc retains full control of: pipeline table display, validation output, step progress headers, result formatting, state persistence messages, verdict-based flow decisions, and the final summary report. Sub-skills only execute their skill and return structured data — they do not print pipeline-level output.
@@ -406,122 +408,53 @@ For ultra-short runs (`flags.steps.length < 2`), skip TodoWrite entirely.
 
 **Cross-skill note:** `execute-plan-sdlc`'s internal per-wave `TodoWrite` calls remain (Agent-context bookkeeping). They are NOT parent-visible — see `execute-plan-sdlc/SKILL.md` Progress signal section and `R-todowrite-visibility`, issue #427.
 
-### Workspace-mode resolution and default-branch guard (R61, R62 — fixes #378; R66 — worktree-in-place guard)
+### Pre-execute workspace auto-detection (R60, R37 — fixes #378, #379)
 
-**Skip on resume re-entry** (`flags.resume === true`) — the resume block below already handled mode/cwd.
+Workspace is **auto-detected**, not selected — there is no flag and no prompt. The prepare script (`ship.js`) emits the derived value as `context.workspace`:
 
-When NOT resuming, resolve workspace mode and enforce the default-branch guard before any workspace creation:
+- **`branch`** — cwd is the main worktree AND HEAD is the default branch. ship-sdlc auto-creates a feature branch before dispatching execute.
+- **`continue`** — a linked worktree, OR the main worktree already on a feature branch. ship-sdlc runs the pipeline in place; no branch is created.
+
+The default-branch warning emitted by the prepare script is **advisory** (a preflight warning, not a halt): on the default branch the derive returns `branch` and a feature branch is auto-created, so the warning never strands a run.
+
+**Skip when resuming** (`flags.resume === true`) — the resume block already handled the workspace.
+
+When not resuming, consume the derived workspace and act:
 
 ```bash
 SDLC_LIB=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/scripts/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs -I {} dirname {})
 [ -z "$SDLC_LIB" ] && [ -d "plugins/sdlc-utilities/scripts/lib" ] && SDLC_LIB="plugins/sdlc-utilities/scripts/lib"
 [ -z "$SDLC_LIB" ] && { echo "ERROR: Could not locate scripts/lib (config.js). Is the sdlc plugin installed?" >&2; exit 2; }
 
-# Resolve workspace mode: flag, then config, then fail-fast. No interactive prompt.
-if [ -z "$WORKSPACE_MODE_FLAG" ]; then
-  WORKSPACE_MODE=$(node -e "
+WORKSPACE=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write((d.context&&d.context.workspace)||'continue')")
+
+if [ "$WORKSPACE" = "branch" ]; then
+  # Step 1: Derive branch name from plan title via lib/branch-name.js (config-driven).
+  EXECUTE_BRANCH=$(node -e "
+    const {resolveBranchName}=require('$SDLC_LIB/branch-name');
     const {readSection,resolveSdlcRoot}=require('$SDLC_LIB/config');
-    const ws=readSection(resolveSdlcRoot(),'workspace')||{};
-    process.stdout.write(ws.mode||'');
+    const cfg=(readSection(resolveSdlcRoot(),'workspace')||{}).branch||{};
+    // Logical type and slug derived from plan title (feature/bugfix/chore/docs/refactor).
+    // typeMap in config maps logical → branch prefix (defaults: feat/fix/chore/docs/refactor).
+    process.stdout.write(resolveBranchName({type:'<logical-type>',slug:'<derived-slug>',config:cfg}));
   ")
-else
-  WORKSPACE_MODE="$WORKSPACE_MODE_FLAG"
-fi
-if [ -z "$WORKSPACE_MODE" ]; then
-  echo "Error: workspace mode not set. Pass --workspace branch|worktree|continue or set workspace.mode in .sdlc/local.json." >&2
-  exit 1
-fi
 
-# Worktree-mode in-place guard (R66 — symmetric to the R65 branch-mode cwd-assertion):
-# when mode is 'worktree' but cwd is already a linked (non-main) worktree, downgrade to
-# 'continue' and run in place rather than creating a nested worktree. Same head-vs-toplevel
-# idiom as the worktree cleanup section. Skipped on resume re-entry.
-if [ "$WORKSPACE_MODE" = "worktree" ]; then
-  main_wt=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
-  current=$(git rev-parse --show-toplevel)
-  if [ "$main_wt" != "$current" ]; then
-    WORKSPACE_MODE=continue
-    echo "Already inside linked worktree $current — running in place (workspace downgraded worktree → continue)."
+  # Step 2: Pre-execute ship state migration (R37) — runs in the main worktree cwd,
+  # BEFORE branch creation, so `state/ship.js read` still resolves the OLD slug filename.
+  STATE_BRANCH=$(node "$SCRIPT" read 2>/dev/null | node -e "process.stdin.on('data',d=>{try{process.stdout.write(JSON.parse(d).branch||'')}catch(_){}})")
+  if [ -n "$STATE_BRANCH" ] && [ "$EXECUTE_BRANCH" != "$STATE_BRANCH" ]; then
+    FROM_SLUG=$(echo "$STATE_BRANCH" | sed 's|[^a-zA-Z0-9-]|-|g')
+    result=$(node "$SCRIPT" migrate --from "$FROM_SLUG" --to "$EXECUTE_BRANCH" 2>&1)
+    echo "State migrated: $FROM_SLUG → $EXECUTE_BRANCH"
   fi
-fi
 
-# Default-branch guard: reject --workspace continue on the repo default branch.
-DEFAULT_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
-[ -z "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH="main"
-CURRENT_BRANCH=$(git branch --show-current)
-if [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ] && [ "$WORKSPACE_MODE" = "continue" ]; then
-  echo "Error: cannot ship on default branch '$DEFAULT_BRANCH'. Pass --workspace branch or --workspace worktree." >&2
-  exit 1
-fi
-```
-
-`WORKSPACE_MODE_FLAG` is set from the `--workspace` CLI flag parsed by the prepare script. `SDLC_LIB` is the directory containing `config.js` and `branch-name.js`, resolved via the standard plugin path search above (or the in-repo fallback when developing this plugin). The variable persists across all subsequent Bash invocations in this section.
-
-### Cwd-assertion diagnostic (R65 — fixes #405)
-
-Before any branch creation, state migration, or Agent dispatch, consume the `assertions` field from the prepare output and verify the current working directory is the main worktree root when workspace mode is `branch`. This is a diagnostic gate — it aborts the pipeline with a four-field diagnostic so the failure mode (ship-sdlc launched from inside a stale linked worktree under `workspace: branch`) surfaces with structured evidence on next reproduction.
-
-**Skip when resuming** (`flags.resume === true`) and when workspace mode is `worktree` or `continue` — the prepare script emits `assertions.requireMainWorktreeCwd: false` in those cases, so the assertion is a no-op below.
-
-```bash
-REQUIRE_MAIN_CWD=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write(String((d.assertions&&d.assertions.requireMainWorktreeCwd)===true))")
-EXPECTED_ROOT=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write((d.assertions&&d.assertions.expectedMainWorktreeRoot)||'')")
-
-if [ "$REQUIRE_MAIN_CWD" = "true" ] && [ -n "$EXPECTED_ROOT" ]; then
-  ACTUAL_CWD=$(git rev-parse --show-toplevel 2>/dev/null)
-  if [ "$ACTUAL_CWD" != "$EXPECTED_ROOT" ]; then
-    echo "ERROR: ship-sdlc cwd assertion failed (R65, #405)." >&2
-    echo "  actual cwd:    $ACTUAL_CWD" >&2
-    echo "  expected root: $EXPECTED_ROOT" >&2
-    echo "  ship.workspace: $WORKSPACE_MODE" >&2
-    echo "  git worktree list --porcelain:" >&2
-    git worktree list --porcelain | sed 's/^/    /' >&2
-    echo "" >&2
-    echo "ship-sdlc was launched from inside a linked worktree but workspace mode is 'branch'." >&2
-    echo "Re-run from the main worktree root, or pass --workspace worktree." >&2
-    exit 1
-  fi
-fi
-```
-
-The assertion runs unconditionally on every non-resume invocation — when `REQUIRE_MAIN_CWD` is `false` (worktree/continue modes or resume re-entry) the inner block is skipped. `$WORKSPACE_MODE` is already resolved from the section above.
-
-### Pre-execute workspace isolation (R60, R37 — fixes #378, #379)
-
-**Skip when `WORKSPACE_MODE = continue` or when resuming** — no isolation setup needed.
-
-When not resuming and `WORKSPACE_MODE` is `branch` or `worktree`, run the five-step skeleton before dispatching execute-plan-sdlc. This is the single workspace-creation site for the entire pipeline (implements spec I8, R60):
-
-```bash
-# Step 1: Derive branch name from plan title via lib/branch-name.js (config-driven).
-EXECUTE_BRANCH=$(node -e "
-  const {resolveBranchName}=require('$SDLC_LIB/branch-name');
-  const {readSection,resolveSdlcRoot}=require('$SDLC_LIB/config');
-  const cfg=(readSection(resolveSdlcRoot(),'workspace')||{}).branch||{};
-  // Logical type and slug derived from plan title (feature/bugfix/chore/docs/refactor).
-  // typeMap in config maps logical → branch prefix (defaults: feat/fix/chore/docs/refactor).
-  process.stdout.write(resolveBranchName({type:'<logical-type>',slug:'<derived-slug>',config:cfg}));
-")
-
-# Step 2: Pre-execute ship state migration (runs in main worktree cwd, before branch creation).
-STATE_BRANCH=$(node "$SCRIPT" read 2>/dev/null | node -e "process.stdin.on('data',d=>{try{process.stdout.write(JSON.parse(d).branch||'')}catch(_){}})")
-if [ -n "$STATE_BRANCH" ] && [ "$EXECUTE_BRANCH" != "$STATE_BRANCH" ]; then
-  FROM_SLUG=$(echo "$STATE_BRANCH" | sed 's|[^a-zA-Z0-9-]|-|g')
-  result=$(node "$SCRIPT" migrate --from "$FROM_SLUG" --to "$EXECUTE_BRANCH" 2>&1)
-  echo "State migrated: $FROM_SLUG → $EXECUTE_BRANCH"
-fi
-
-# Step 3a: --workspace branch — git checkout (HEAD shared with main worktree).
-if [ "$WORKSPACE_MODE" = "branch" ]; then
+  # Step 3: Create the feature branch (HEAD shared with main worktree).
   git checkout -b "$EXECUTE_BRANCH"
 fi
+# When WORKSPACE = continue: EXECUTE_BRANCH stays unset, no migration, no checkout — run in place.
 ```
 
-**Step 3b — worktree mode only:** When `WORKSPACE_MODE` is `worktree` → Read `./workspace-worktree.md` (Worktree create — Step 3b section) and run its bash in the main shell, then return here. Do not read preemptively. Branch mode skips this entirely (there is no worktree to create). The companion's bash sets `WORKTREE_PATH` and `cd`s into it so the cwd propagates to all subsequent dispatches.
-
-**Cwd propagation (branch mode):** In branch mode there is nothing to cd into — HEAD is shared with the main worktree, so all subsequent Bash invocations and Agent-tool dispatches run in the current cwd trivially. (Worktree-mode cwd propagation is covered by the companion above.)
-
-**Step 5:** Pass `--branch "$EXECUTE_BRANCH"` to execute-plan-sdlc in the execute dispatch (see "Execute step" section below). execute-plan-sdlc will short-circuit its own Step 1 isolation block (implements R30 from execute-plan-sdlc spec).
+After `git checkout -b` the cwd is the main worktree on the new feature branch, so all subsequent Bash invocations and Agent-tool dispatches run in the current cwd trivially. There is **no `--branch` forward to execute** — by the time execute is dispatched, cwd is on the feature branch, so execute-plan-sdlc's own derive yields `continue` (run in place) and no value crosses the boundary. `EXECUTE_BRANCH` is still used by the post-version ancestry gate (see "Execute step" / version section); under `continue` it is unset and that gate is a no-op.
 
 The `migrate` subcommand renames `ship-<oldSlug>-<ts>.json` → `ship-<newSlug>-<ts>.json` and updates `data.branch`. On `migrated: false` (e.g. no state file yet, slug already correct), warn and continue — do not abort; the orphaned file (if any) will be cleaned by the terminal `cleanup` step or by `--gc`.
 
@@ -581,7 +514,7 @@ If `verify-completeness` exits 65, the pipeline MUST halt before commit. The mis
 Then run per-step-completion: `--mark-completed execute`. The parent does NOT receive per-task completion signals from the Agent; per-task todos all transition to `completed` atomically on return.
 
 Example dispatch sequence (use `step.invocation` for actual args):
-- Agent: execute-plan-sdlc, args: from `step.invocation` PLUS `--branch "$EXECUTE_BRANCH"` when `EXECUTE_BRANCH` is set (i.e. `WORKSPACE_MODE` is `branch` or `worktree`). When `WORKSPACE_MODE` is `continue`, omit `--branch` (execute handles its own isolation or runs on existing branch). Example: `"--quality balanced --branch feat/my-feature"`. This implements R60 step 5 — execute-plan-sdlc short-circuits its own Step 1 isolation in response (R30).
+- Agent: execute-plan-sdlc, args: from `step.invocation` verbatim. **No `--branch` forward** (R60, fixes #378, #379): when the derive was `branch`, ship already ran `git checkout -b` before this dispatch, so cwd is on the feature branch and execute-plan-sdlc's own derive yields `continue` (run in place). When the derive was `continue`, ship never created a branch — execute also runs in place. Either way no workspace value crosses the boundary. Example: `"--quality balanced --rebase auto"`.
 - Agent: commit-sdlc, args: `"--auto"`
 - Agent: review-sdlc, args: `"--committed"`
 - Agent: received-review-sdlc, args: `"--auto"` (when `flags.auto`; otherwise no args)
@@ -640,7 +573,7 @@ if [ -n "$VERIFY_SCRIPT" ] && [ -n "$NEW_TAG" ] && [ -n "$EXECUTE_BRANCH" ]; the
 fi
 ```
 
-`NEW_TAG` is the tag string emitted by version-sdlc (e.g. `v1.2.3`). `EXECUTE_BRANCH` is the feature branch variable set during pre-execute workspace isolation (already available in the pipeline shell context). This gate is a **no-op when `NEW_TAG` is unset** (version step was skipped or not in `flags.steps`, e.g., under `workspace: worktree`). Works correctly under both `workspace: branch` and `workspace: worktree`.
+`NEW_TAG` is the tag string emitted by version-sdlc (e.g. `v1.2.3`). `EXECUTE_BRANCH` is the feature branch variable set during pre-execute workspace auto-detection when the derive was `branch` (already available in the pipeline shell context; unset when the derive was `continue`). This gate is a **no-op when `NEW_TAG` is unset** (version step not in `flags.steps`) **or when `EXECUTE_BRANCH` is unset** (`continue` — run in place). Version always runs when in `steps[]` regardless of checkout (tags are repo-global).
 
 ### Between version and archive-openspec — verify-openspec (Agent-dispatched, opt-in)
 
@@ -967,7 +900,7 @@ If OpenSpec was detected but `archive-openspec` is NOT in `flags.steps`, append:
 
 ### Worktree cleanup
 
-When `WORKSPACE_MODE` is `worktree` → Read `./workspace-worktree.md` (Worktree cleanup section) and follow it. Do not read preemptively. Branch mode has no worktree to clean up — skip this section entirely.
+(removed — ship-sdlc never creates a git worktree. Workspace is auto-detected `branch`/`continue`; there is nothing to clean up. R60, fixes #378, #379.)
 
 ### Post-pipeline advisory (when version was auto-skipped)
 

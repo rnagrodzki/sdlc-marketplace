@@ -14,9 +14,5 @@ defaultTest:
     transformVars: "file://scripts/extract-skill-content.js"
 
 tests:
-  - file://datasets/hook-git-guard-exec.yaml
-  - file://datasets/hook-error-report-exec.yaml
-  - file://datasets/jira-sdlc-hook-exec.yaml
   - file://datasets/hook-stop-plan-integrity-exec.yaml
-  - file://datasets/agent-isolation-guard-exec.yaml
   - file://datasets/ship-hooks-exec.yaml

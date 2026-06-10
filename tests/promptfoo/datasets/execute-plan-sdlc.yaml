@@ -280,26 +280,26 @@
         Agent itself does NOT fire the high-risk gate — that is a main-context
         responsibility.
 
-- description: "execute-plan-sdlc (#378): --branch flag short-circuits Step 1 workspace isolation"
+- description: "execute-plan-sdlc (#378): --branch flag short-circuits Step 1 workspace derivation"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
     project_context: "file://fixtures/plan-execution-complete.md"
     user_request: >
       The skill is invoked with `/execute-plan-sdlc --branch feat/fix-login`.
-      Describe what happens in Step 1's workspace isolation block.
-      Specifically: does the skill run `git checkout -b`? Does it invoke
-      `util/worktree-create.js`? Does it show an interactive workspace prompt?
+      Describe what happens in Step 1's workspace derivation.
+      Specifically: does the skill run `git checkout -b`? Does it create a worktree?
+      Does it show an interactive workspace prompt?
       What variable is set and what is its value?
   assert:
     - type: llm-rubric
       value: >
         The response must state that when `--branch feat/fix-login` is passed,
         execute-plan-sdlc captures `EXECUTE_NEW_BRANCH="feat/fix-login"` and
-        skips ALL workspace-isolation logic in Step 1 — no `git checkout -b`,
-        no `worktree-create.js` invocation, no interactive workspace prompt.
-        The skill trusts the caller's branch/cwd as authoritative.
-        The response should reference R30 or the --branch short-circuit behaviour
-        (implements R30, fixes #378, #379).
+        skips the workspace derivation in Step 1 — no `git checkout -b`,
+        no worktree creation (execute-plan-sdlc never creates a worktree),
+        no interactive workspace prompt. The skill trusts the caller's branch/cwd
+        as authoritative. The response should reference R30 or the --branch
+        short-circuit behaviour (implements R30, fixes #378, #379).
 
 - description: "execute-plan-sdlc (#378): Step 9 emits Branch line under --branch, no Worktree line"
   vars:
@@ -315,35 +315,33 @@
       value: >
         The response must state that Step 9 emits a `Branch: feat/fix-login` line
         because EXECUTE_NEW_BRANCH is set. It must also state that a `Worktree:`
-        line is NOT emitted — because `--branch` was passed by the caller (pipeline
-        mode) and the worktree was not self-created by execute-plan-sdlc.
+        line is NEVER emitted — execute-plan-sdlc never creates a worktree.
         The response should reference R31 (fixes #378, #379).
 
-- description: "execute-plan-sdlc (#378): Step 9 emits both Worktree and Branch under self-creation worktree mode"
+- description: "execute-plan-sdlc (#378): standalone on default branch derives branch and emits only a Branch line"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
     project_context: "file://fixtures/plan-execution-complete.md"
     user_request: >
-      The skill is invoked standalone with `/execute-plan-sdlc --workspace worktree`
-      (no --branch flag). The skill creates a new worktree at /home/user/repos/myapp-feat-login
-      for branch feat/fix-login. After all waves complete, what does Step 9's REPORT
-      output include regarding branch and worktree?
+      The skill is invoked standalone with `/execute-plan-sdlc` (no --branch flag)
+      from the main worktree while on the default branch `main`. Describe what
+      Step 1 derives, whether a worktree is created, and what Step 9's REPORT
+      output includes regarding branch and worktree.
   assert:
     - type: llm-rubric
       value: >
-        The response must state that Step 9 emits BOTH a `Worktree:` line and a
-        `Branch:` line — because `--branch` was NOT passed and Step 1 self-created
-        the worktree. The `Worktree:` line contains the absolute path of the
-        self-created worktree. The `Branch:` line contains the derived branch name.
-        The Worktree line appears directly above the Branch line.
-        The response should reference R31 (fixes #378, #379).
+        The response must state that the workspace derives to `branch` (main
+        worktree + default branch), so Step 1 runs `git checkout -b` on a derived
+        feature-branch name — NO worktree is created (execute-plan-sdlc never
+        creates a worktree). Step 9 emits a `Branch:` line with the derived name
+        and NO `Worktree:` line. The response should reference R16/R30/R31
+        (workspace auto-detection, fixes #378, #379).
 
 - description: "execute-plan-sdlc (#370): wave-runner Agent dispatch must omit isolation parameter"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
     project_context: "file://fixtures/plan-execution-complete.md"
     user_request: >
-      The project has ship.workspace: "worktree" configured in .sdlc/local.json.
       When execute-plan-sdlc dispatches the wave-runner Agent in Step 5b,
       describe the exact Agent tool call parameters — specifically, which
       parameters are included and whether isolation: "worktree" appears.
@@ -353,9 +351,10 @@
         The response must state that the Agent dispatch in Step 5b includes
         `model:` and `mode: bypassPermissions` but does NOT include an
         `isolation` parameter (not `isolation: "worktree"` nor any other
-        isolation value). The SDLC workspace worktree flag is handled via
-        util/worktree-create.js, not the Agent SDK isolation parameter.
-        The response must reference the DO NOT note in Step 5b or R-no-agent-sdk-isolation.
+        isolation value). execute-plan-sdlc never creates a git worktree
+        (workspace is auto-detected); the Agent SDK isolation parameter would
+        break .sdlc/ anchoring. The response must reference the DO NOT note in
+        Step 5b or R-no-agent-sdk-isolation.
 
 # ---------------------------------------------------------------------------
 # Fixes #392 — Track B behavioral cases
