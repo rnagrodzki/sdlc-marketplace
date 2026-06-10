@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.21.0] - 2026-06-10
+
+### Added
+- ship-sdlc: workspace auto-detected from cwd and current branch — removed `--workspace`/`--branch`/`--tree` flags; six hooks deleted, reducing total hook count to 7
+- ship-sdlc: `--auto` continuation broadened via `pipelineAdvancing()` predicate so the pipeline advances across steps in a single turn
+
+### Fixed
+- ship-sdlc: corrected stale `--branch` prose in execute-plan-sdlc docs and SKILL.md; added jira-sdlc DO NOT note reinforcing `AskUserQuestion` gate after hook removal
+
 ## [0.20.36] - 2026-06-08
 
 ### Added
