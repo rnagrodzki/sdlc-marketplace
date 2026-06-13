@@ -35,6 +35,7 @@ const { spawnSync } = require('node:child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
 const { resolveSdlcRoot }                       = require(path.join(LIB, 'config'));
+const { resolveActiveWorktreeSafe }             = require(path.join(LIB, 'worktree'));
 const { writeOutput }                           = require(path.join(LIB, 'output'));
 const { slugifyBranch }                         = require(path.join(LIB, 'state'));
 const { exec, detectBaseBranch, getChangedFiles } = require(path.join(LIB, 'git'));
@@ -313,6 +314,7 @@ function main() {
     projectRoot = resolveSdlcRoot({ cwd: process.cwd() });
   } catch (err) {
     // workspace-mode-compatibility: resolveSdlcRoot walks back to main worktree
+    // (correct for .sdlc/ config reads — issue #351). Content scans use contentRoot below.
     const output = {
       manifestPath: null,
       outDir: null,
@@ -324,15 +326,20 @@ function main() {
     return;
   }
 
+  // issue #457: content scans (git diff, openspec artifacts, keyword grep, active branch)
+  // live in the active worktree, not main. resolveActiveWorktreeSafe returns the active
+  // checkout's top level (= projectRoot in the single-worktree case).
+  const contentRoot = resolveActiveWorktreeSafe(process.cwd());
+
   try {
     // 1. Git scope files
-    const gitFiles = getGitScopeFiles(projectRoot);
+    const gitFiles = getGitScopeFiles(contentRoot);
 
     // 2. OpenSpec backtick paths
-    const openspecFiles = fromOpenspec ? getOpenSpecPaths(projectRoot, fromOpenspec) : [];
+    const openspecFiles = fromOpenspec ? getOpenSpecPaths(contentRoot, fromOpenspec) : [];
 
     // 3. Keyword grep files
-    const keywordFiles = getKeywordScopeFiles(userPrompt, projectRoot);
+    const keywordFiles = getKeywordScopeFiles(userPrompt, contentRoot);
 
     // Merge and cap scope-hint set
     const scopeHintSet = new Set([...gitFiles, ...openspecFiles, ...keywordFiles]);
@@ -351,7 +358,7 @@ function main() {
     // 7. Get current branch slug for tempdir naming
     let branchSlug = 'unknown';
     try {
-      const branch = exec('git branch --show-current', { cwd: projectRoot });
+      const branch = exec('git branch --show-current', { cwd: contentRoot });
       if (branch) branchSlug = slugifyBranch(branch);
     } catch (_) { /* use default */ }
 

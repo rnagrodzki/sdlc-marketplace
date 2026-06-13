@@ -1424,3 +1424,19 @@
           return true;
         }
         return true;
+
+# --- contentRoot routing: linked-worktree OpenSpec detection (#457) ---
+# Fixture: main worktree has NO openspec; linked worktree worktrees/wt1 (feat/my-feature)
+# carries an active openspec change. Running ship.js from the linked-worktree cwd must detect
+# the linked tree's openspec change via contentRoot, not main's empty state via projectRoot.
+- description: "ship-prepare (#457): linked-worktree — openspec detection uses active worktree"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}/worktrees/wt1"
+    project_root: "file://fixtures-fs/worktree-linked-openspec-plan"
+  assert:
+    - type: icontains
+      value: '"openspecDetected": true'
+    - type: icontains
+      value: '"openspecBranchMatch": "my-feature"'
