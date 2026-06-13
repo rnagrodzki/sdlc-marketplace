@@ -13,6 +13,7 @@ set -e
 git init -q
 git config user.email "test@test.com"
 git config user.name "Test"
+git config commit.gpgsign false
 
 # Minimal valid .sdlc/config.json on main — resolveSdlcRoot() walks back to the main
 # worktree for config reads (issue #351), so this MUST live in the main tree.
