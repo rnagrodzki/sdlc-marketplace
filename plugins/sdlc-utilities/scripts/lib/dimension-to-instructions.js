@@ -168,7 +168,8 @@ function dimensionToInstructions(dimensionContent) {
 function readStdin() {
   try {
     return require('node:fs').readFileSync(0, 'utf8');
-  } catch {
+  } catch (e) {
+    process.stderr.write('Error reading stdin: ' + e.message + '\n');
     return '';
   }
 }
