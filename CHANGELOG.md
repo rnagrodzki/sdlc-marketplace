@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.21.1] - 2026-06-14
+
+### Added
+- ship-sdlc: WIP commit squashing — the pipeline now detects and squashes execute-plan-sdlc work-in-progress commits, allowing continuation to subsequent steps (#454)
+- harden-sdlc: dimension-to-instructions generator for Copilot path-specific instructions (Step 5b, R45-R52) (#454)
+
+### Fixed
+- harden-sdlc: mirror gate clarified — "already exists" branch covers only manually pre-seeded mirrors; normal add-flow and strengthen proposals are excluded (#456)
+- dimension-to-instructions: `readStdin` catch block now writes errors to stderr instead of silently swallowing them (#456)
+
 ## [0.21.0] - 2026-06-10
 
 ### Added
