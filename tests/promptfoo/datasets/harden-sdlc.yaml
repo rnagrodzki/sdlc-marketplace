@@ -83,6 +83,41 @@
         behind AskUserQuestion before any file write, and validated via
         lib/dimensions.js validateDimensionFile before write.
 
+- description: "harden-sdlc R-copilot-mirror (#456): creating a NEW review dimension also writes the matching .github/instructions mirror in the same approved write step"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-new-dimension-context.md"
+    user_request: >
+      The user dispatched /harden-sdlc after review-sdlc missed an uncovered failure
+      class — no existing review dimension targets the project's GraphQL resolver
+      files. The failure context is above. Walk through Step 5 and describe exactly
+      what files are written when the user approves the new-dimension proposal.
+  assert:
+    # Must propose ADDING a new review-dimensions file under .sdlc/review-dimensions/
+    - type: regex
+      value: "(review-dimensions|\\.sdlc/review-dimensions|add.*dimension|new.*dimension)"
+    # Must reference writing the matching Copilot mirror under .github/instructions/
+    - type: regex
+      value: "(\\.github/instructions|instructions\\.md|copilot mirror|mirror)"
+    # Must use the deterministic generator, not hand-authored mirror prose
+    - type: regex
+      value: "(dimension-to-instructions|generator|scripts/lib/dimension-to-instructions\\.js)"
+    # Must gate behind approval (no silent write) and create both in the SAME step
+    - type: regex
+      value: "(AskUserQuestion|approv|same.*(step|write)|same approved write)"
+    # Behavioral: both artifacts written together via the generator, halt-on-partial
+    - type: llm-rubric
+      value: >
+        The response describes Step 5 proposing the creation of a NEW review
+        dimension file under .sdlc/review-dimensions/ (for the uncovered GraphQL
+        resolver pattern), and — in the SAME approved write step — generating and
+        writing the matching .github/instructions/<name>.instructions.md Copilot
+        mirror using the dimension-to-instructions.js generator (NOT hand-authored
+        prose). It mentions ensuring .github/instructions/ exists, and that if the
+        mirror write fails after the dimension write succeeded, harden halts and
+        surfaces the partial state (R-copilot-mirror / R-iteration-write rule 4).
+        The whole thing is gated behind AskUserQuestion — no silent write.
+
 - description: "harden-sdlc: plugin-defect classification → routes to error-report-sdlc, no surface proposals"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"

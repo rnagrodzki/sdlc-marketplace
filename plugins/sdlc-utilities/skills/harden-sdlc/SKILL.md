@@ -245,6 +245,31 @@ Use Edit (preferred) or Write to apply the approved, validated change to
 Applied {action} on {surface} → {targetFile}
 ```
 
+**Copilot mirror for NEW review dimensions (R-copilot-mirror, issue #456) — same atomic, approved write step.** Immediately after the dimension write above (still inside this 5b iteration, before advancing to the next proposal), gate on BOTH: (a) `proposal.surface === "review-dimensions"` AND `proposal.targetFile` is under `.sdlc/review-dimensions/`, AND (b) `proposal.action === "add"` (a NEW dimension — existing dimensions are NOT retroactively mirrored per R8/C9; `strengthen` actions on an already-mirrored dimension do not re-run this). When the gate does not hold, skip this block entirely.
+
+When it holds, derive `<name>` from the dimension filename (`.sdlc/review-dimensions/<name>.md` → `<name>.instructions.md`) and:
+
+1. **Generate the mirror deterministically** (NEVER hand-author the mirror — `scripts-over-llm-logic`). Resolve and run the generator on the just-written dimension file, capturing stdout:
+
+   ```bash
+   GEN=$(find ~/.claude/plugins -name "dimension-to-instructions.js" -path "*/sdlc*/scripts/lib/dimension-to-instructions.js" 2>/dev/null | sort -V | tail -1)
+   [ -z "$GEN" ] && [ -f "plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js" ] && GEN="plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+   [ -z "$GEN" ] && { echo "ERROR: Could not locate dimension-to-instructions.js. Is the sdlc plugin installed?" >&2; exit 2; }
+   MIRROR=$(node "$GEN" --file ".sdlc/review-dimensions/<name>.md")
+   GEN_EXIT=$?
+   ```
+   A non-zero `GEN_EXIT` (unparseable dimension) is a hard failure — halt per R-iteration-write rule 4 (see step 4) and surface the partial state (dimension written, mirror not).
+
+2. **Ensure the mirror directory exists:** `mkdir -p .github/instructions` (R-copilot-mirror: create if missing).
+
+3. **Write or patch the mirror** at `.github/instructions/<name>.instructions.md`:
+   - If the mirror does NOT exist → Write the generator's `$MIRROR` output verbatim (via the native Write tool — subprocess FS writes do not persist).
+   - If the mirror ALREADY exists → patch it **strengthen-only** (R-copilot-mirror / R8/C9): apply only additive checklist/severity-guide rows and tightened `applyTo`/severity from `$MIRROR`; never remove existing checklist items or lower a severity. Use Edit to merge, not a blind overwrite. (A brand-new dimension's mirror normally won't pre-exist — the orchestrator only *reads* existing surfaces, so no separate copilot-instructions proposal targets a not-yet-created dimension's mirror; this branch covers a manually pre-seeded mirror.)
+
+4. **Halt on partial-write failure (R-iteration-write rule 4):** if the dimension write in 5b succeeded but the generator (step 1) or the mirror Write/Edit (step 3) fails, do NOT silently advance to the next proposal. Halt this iteration and surface the partial state explicitly: `Dimension written to .sdlc/review-dimensions/<name>.md but the Copilot mirror .github/instructions/<name>.instructions.md could not be created — resolve manually before continuing.`
+
+5. Display a one-line confirmation on success: `Mirrored review dimension → .github/instructions/<name>.instructions.md`.
+
 Severity vocabulary per surface is canonical in `lib/dimensions.js` (`VALID_SEVERITIES`, `GUARDRAIL_SEVERITIES`); see spec R10 + R17. The orchestrator already chose the correct vocabulary in its proposal — never substitute one for the other.
 
 **When `proposal.action === "consolidate"` (R15):** the proposal targets an existing guardrail by id. Read the current `.sdlc/config.json` from disk, locate the guardrail in `<section>.guardrails[]` by the id specified in the proposal's `patch`, and replace its fields with the proposal's merged values (description, severity). Do NOT remove fields; do NOT lower severity (strengthen-only invariant — see spec R8 / C9). If no guardrail with the target id exists in the current file, treat the proposal as malformed and surface to the user.
