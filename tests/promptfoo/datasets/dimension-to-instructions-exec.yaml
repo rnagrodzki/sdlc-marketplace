@@ -1,0 +1,126 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js
+# (issue #456, R-copilot-mirror). These run the generator CLI directly against
+# fixture dimension files (no LLM) and assert the enumerated transform PROPERTIES
+# (correct applyTo join, H1 form, severity default, checklist checkbox stripping,
+# Note built from skip-when). They deliberately do NOT assert byte-equality against
+# any live `.github/instructions/*.instructions.md` — those may carry hand-edits/drift
+# (e.g. an extra "Canonical pattern" section); the format authority is the
+# setup-dimensions.md Step 8 template, not a possibly-drifted ground-truth file.
+#
+# Fixtures (tests/promptfoo/fixtures-fs/dimension-to-instructions/):
+#   full-dimension.md        — triggers(2) + description + severity:high + skip-when(2) + Checklist + Severity Guide
+#   no-severity-dimension.md — triggers(1) + description, NO severity (→ default medium), NO skip-when, NO Severity Guide
+#   overflow-dimension.md    — large dimension whose mirror exceeds 4000 chars (overflow warning)
+
+# 1. Full dimension → correct applyTo (triggers joined by comma).
+- description: "dimension-to-instructions (#456): joins triggers into applyTo with comma"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+    script_args: "--file {{project_root}}/full-dimension.md"
+    project_root: "file://fixtures-fs/dimension-to-instructions"
+  assert:
+    - type: contains
+      value: 'applyTo: "**/commands/*.md,**/skills/**/SKILL.md"'
+
+# 2. Full dimension → H1 uses the frontmatter `name` (not the body H1) with the
+#    "— Review Instructions" suffix.
+- description: "dimension-to-instructions (#456): H1 derives from frontmatter name"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+    script_args: "--file {{project_root}}/full-dimension.md"
+    project_root: "file://fixtures-fs/dimension-to-instructions"
+  assert:
+    - type: contains
+      value: "# example-dimension — Review Instructions"
+    # The dimension body's own H1 ("# Example Review") must NOT carry through.
+    - type: not-contains
+      value: "# Example Review"
+
+# 3. Full dimension → description used as opening paragraph; severity emitted;
+#    checklist checkboxes stripped to plain list items.
+- description: "dimension-to-instructions (#456): description + severity + checkbox stripping"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+    script_args: "--file {{project_root}}/full-dimension.md"
+    project_root: "file://fixtures-fs/dimension-to-instructions"
+  assert:
+    - type: contains
+      value: "Reviews example patterns for correctness across contexts"
+    - type: contains
+      value: "Default severity: high"
+    # Checkbox prefix is stripped: "- [ ] First check" → "- First check".
+    - type: contains
+      value: "- First check uses the two-step pattern"
+    - type: not-contains
+      value: "- [ ] First check uses the two-step pattern"
+    # Severity Guide section carries through verbatim.
+    - type: contains
+      value: "## Severity Guide"
+    # skip-when produces the Note advisory.
+    - type: contains
+      value: "## Note"
+    - type: contains
+      value: "files matching these patterns are excluded: **/node_modules/**, docs/**"
+    # omitted frontmatter fields do not leak into the mirror.
+    - type: not-contains
+      value: "model: sonnet"
+
+# 4. Missing severity defaults to "medium"; no skip-when → no Note section;
+#    no Severity Guide in body → no Severity Guide section emitted.
+- description: "dimension-to-instructions (#456): missing severity defaults to medium; no skip-when omits Note"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+    script_args: "--file {{project_root}}/no-severity-dimension.md"
+    project_root: "file://fixtures-fs/dimension-to-instructions"
+  assert:
+    - type: contains
+      value: "Default severity: medium"
+    - type: contains
+      value: 'applyTo: "src/**/*.ts"'
+    - type: not-contains
+      value: "## Note"
+    - type: not-contains
+      value: "## Severity Guide"
+
+# 5. Overflow → warns to stderr but does NOT condense (exit 0, full content still emitted).
+- description: "dimension-to-instructions (#456): overflow warns to stderr, does not condense"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+    script_args: "--file {{project_root}}/overflow-dimension.md"
+    project_root: "file://fixtures-fs/dimension-to-instructions"
+    script_capture_stderr: true
+  assert:
+    # The stderr warning is appended to output by the provider when capture is on.
+    - type: contains
+      value: "exceeding the 4000-char Copilot limit"
+    # Not condensed: the last checklist item (#40) is still present in stdout.
+    - type: contains
+      value: "Checklist item number 40"
+    # No truncation marker is emitted (yagni — generator never condenses).
+    - type: not-contains
+      value: "truncated"
+
+# 6. Stdin path works (no --file): a piped dimension produces the same applyTo.
+- description: "dimension-to-instructions (#456): reads dimension from stdin"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+    script_stdin: "---\nname: stdin-dim\ndescription: \"From stdin\"\ntriggers:\n  - \"lib/**/*.js\"\n---\n\n# Body H1\n\n## Checklist\n\n- [ ] piped check\n"
+    project_root: "file://fixtures-fs/dimension-to-instructions"
+  assert:
+    - type: contains
+      value: "# stdin-dim — Review Instructions"
+    - type: contains
+      value: 'applyTo: "lib/**/*.js"'
+    - type: contains
+      value: "- piped check"
+
+# 7. Missing frontmatter → usage error, exit 2.
+- description: "dimension-to-instructions (#456): unparseable input (no frontmatter) exits 2"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+    script_stdin: "# Just a heading, no frontmatter\n\nsome text\n"
+    script_capture_stderr: true
+    project_root: "file://fixtures-fs/dimension-to-instructions"
+  assert:
+    - type: contains
+      value: "missing YAML frontmatter"

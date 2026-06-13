@@ -326,6 +326,8 @@ For each step that will run, apply the dispatch protocol based on `step.dispatch
 
 2. **Record step start** via `state/ship.js begin-step` (R70) — see the per-step transition block in "Main-thread TodoWrite orchestration" below; `begin-step` records `in_progress` and renders the task-tray todos in one call.
 
+   > **Do NOT end the response turn here (R70/#454).** Once `begin-step` has marked the step `in_progress`, the turn MUST continue directly into the Agent dispatch in step 3 — recording the step start and dispatching its Agent are a single uninterrupted sequence. A turn that ends after `begin-step` but before the Agent dispatch leaves the step stranded `in_progress` and requires a user message to resume (the recurrence of #452 / #454 that the `stop-pipeline-continue.js` Stop hook now guards against mode-independently). Immediately proceed to step 3.
+
 3. **Dispatch Agent** with: skill name, args from `step.invocation`, model from `step.model`, and brief pipeline context (branch, previous step results needed for this step). Pass `model: step.model` to the Agent tool on every dispatch. When `step.isolation` is non-null, additionally pass `isolation: step.isolation`; when `step.isolation` is null, omit the `isolation` parameter entirely (the Agent tool schema does not accept `null` for `isolation`). The LLM must not add, remove, or change the `isolation` parameter from what `ship.js` computed (implements R-agent-isolation-script-driven, C15). Agent prompt template:
    ```
    You are executing the <skill-name> skill. Invoke `/<skill-name> <args>` using the Skill tool — this loads the SKILL.md automatically. Return a structured result:

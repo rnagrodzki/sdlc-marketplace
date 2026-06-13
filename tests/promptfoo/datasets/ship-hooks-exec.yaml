@@ -159,13 +159,34 @@
         if (!/pending/.test(inner.reason || '')) return 'FAIL: reason missing pending';
         return true;
 
-# 3. auto=false + (in_progress or between-steps) → silent (interactive non-interference).
-- description: "stop-pipeline-continue (R68): auto=false stays silent"
+# 3. auto=false + in_progress → decision:block, MODE-INDEPENDENT
+#    (R-stop-inprogress-mode-independent, #454: a mid-step in_progress gap is never a
+#    valid pause; the Stop hook blocks regardless of flags.auto).
+- description: "stop-pipeline-continue (R-stop-inprogress-mode-independent, #454): non-auto in_progress blocks (mode-independent)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
     script_cwd: "{{project_root}}"
     script_stdin: '{"stop_hook_active":false}'
     project_root: "file://fixtures-fs/ship-pipeline-noauto"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.decision !== 'block') return `FAIL: decision ${inner.decision}`;
+        if (typeof inner.reason !== 'string' || !inner.reason) return 'FAIL: missing reason';
+        return true;
+
+# 3b. auto=false + between-steps pending → silent (interactive review between steps is a
+#     legitimate pause; the pending case stays flags.auto-gated — preserves the asymmetry
+#     with the in_progress case above, R-stop-inprogress-mode-independent #454).
+- description: "stop-pipeline-continue (R-stop-inprogress-mode-independent, #454): non-auto between-steps pending stays silent"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"stop_hook_active":false}'
+    project_root: "file://fixtures-fs/ship-pipeline-between-noauto"
   assert:
     - type: javascript
       value: |
