@@ -31,6 +31,7 @@ const LIB = path.join(__dirname, '..', 'lib');
 
 const { detectActiveChanges, validateChange, parseTasks, getRequirementInventory } = require(path.join(LIB, 'openspec'));
 const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
+const { resolveActiveWorktreeSafe } = require(path.join(LIB, 'worktree'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { initState, findStateFile, readState, writeState, slugifyBranch, pruneStateFiles } = require(path.join(LIB, 'state'));
@@ -439,6 +440,9 @@ function main() {
   }
 
   const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
+  // issue #457: OpenSpec content scans (openspec/changes/, openspec/specs/) live on the
+  // active branch in the active worktree — route them through contentRoot, NOT projectRoot.
+  const contentRoot = resolveActiveWorktreeSafe();
   const errors = [];
 
   // Issue #232: verifyAndMigrate gate (CLI > env > default false).
@@ -467,7 +471,7 @@ function main() {
   }
 
   // 1. OpenSpec detection
-  const openspec = detectActiveChanges(projectRoot);
+  const openspec = detectActiveChanges(contentRoot);
 
   // Add authoritative evidence when OpenSpec is present
   if (openspec.present) {
@@ -481,7 +485,7 @@ function main() {
   let fromOpenspecResult = null;
   let openspecContext = { tasks: null, tasksUpdated: 0 };
   if (fromOpenspec) {
-    const validation = validateChange(projectRoot, fromOpenspec);
+    const validation = validateChange(contentRoot, fromOpenspec);
     fromOpenspecResult = {
       valid: validation.valid,
       changeName: fromOpenspec,
@@ -517,7 +521,7 @@ function main() {
       !fromOpenspec.includes('..') &&
       !fromOpenspec.includes('\0')
     ) {
-      const tasksPath = path.join(projectRoot, 'openspec', 'changes', fromOpenspec, 'tasks.md');
+      const tasksPath = path.join(contentRoot, 'openspec', 'changes', fromOpenspec, 'tasks.md');
       try {
         const original = fs.readFileSync(tasksPath, 'utf8');
         const parsed = parseTasks(original);
@@ -549,7 +553,7 @@ function main() {
     // only. getRequirementInventory() is NOT covered by that guard — it receives `fromOpenspec`
     // which is validated by validateChange() before we reach this point.
     if (validation.valid) {
-      const invResult = getRequirementInventory(projectRoot, fromOpenspec);
+      const invResult = getRequirementInventory(contentRoot, fromOpenspec);
       if (invResult.ok) {
         openspecContext.requirements = invResult.requirements;
         openspecContext.requirementsError = null;

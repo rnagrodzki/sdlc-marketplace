@@ -367,3 +367,38 @@
       value: '"intakeAuditModel": "sonnet"'
     - type: icontains
       value: '"intakeAuditSubagentType": "general-purpose"'
+
+# --- contentRoot routing: linked-worktree OpenSpec detection (#457) ---
+# Fixture: main worktree has NO openspec; linked worktree worktrees/wt1 (feat/my-feature)
+# carries an active openspec change "my-feature". Running plan.js from the linked-worktree
+# cwd must detect the linked tree's change, not main's empty state. Proves the scan routes
+# through contentRoot (active worktree), not projectRoot (main worktree).
+- description: "plan-prepare (#457): linked-worktree — detects active worktree's openspec change, not main's"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_args: "--output-file"
+    script_cwd: "{{project_root}}/worktrees/wt1"
+    project_root: "file://fixtures-fs/worktree-linked-openspec-plan"
+  assert:
+    - type: icontains
+      value: '"present": true'
+    - type: icontains
+      value: '"branchMatch": "my-feature"'
+    - type: not-icontains
+      value: '"present": false'
+
+# tasks.md ref-injection write must land in the LINKED worktree, not main. tasksUpdated == 1
+# is only reachable when validateChange + the tasks.md path both resolve through contentRoot
+# (= worktrees/wt1); if routing fell back to main, the change dir would not exist and
+# tasksUpdated would stay 0.
+- description: "plan-prepare (#457): linked-worktree — tasks.md ref-injection writes to active worktree path"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_args: "--from-openspec my-feature --output-file"
+    script_cwd: "{{project_root}}/worktrees/wt1"
+    project_root: "file://fixtures-fs/worktree-linked-openspec-plan"
+  assert:
+    - type: icontains
+      value: '"tasksUpdated": 1'
+    - type: icontains
+      value: '"valid": true'

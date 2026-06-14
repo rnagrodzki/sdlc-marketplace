@@ -74,6 +74,44 @@ function resolveMainWorktreeSafe(cwd) {
   }
 }
 
+/**
+ * Return the absolute path of the ACTIVE worktree's top level — the root of the
+ * working tree for the current checkout, even when invoked from a subdirectory.
+ *
+ * Unlike resolveMainWorktreeSafe (which always walks back to the primary
+ * worktree for .sdlc/ config/state anchoring per issue #351), this resolves the
+ * tree on the active branch — correct for content scans (openspec/changes/,
+ * openspec/specs/) that live on the active branch in a linked worktree (#457).
+ *
+ * When not in a linked worktree, `git rev-parse --show-toplevel` returns the
+ * main worktree path — identical to resolveSdlcRoot() — so callers see
+ * `contentRoot === projectRoot` in the single-worktree case (no behavior change).
+ *
+ * Never throws. On failure: writes a warning to stderr ONLY when SDLC_DEBUG is
+ * set, then returns `cwd` as the fallback. Silent by default to avoid polluting
+ * prepare-script output in non-git fixtures and first-time setup runs.
+ *
+ * @param {string} [cwd=process.cwd()] Working directory for the git command.
+ * @returns {string} Active worktree top-level path, or `cwd` on failure.
+ */
+function resolveActiveWorktreeSafe(cwd) {
+  const workingDir = cwd || process.cwd();
+  try {
+    const out = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: workingDir,
+      encoding: 'utf8',
+    });
+    return out.trim();
+  } catch (_) {
+    if (process.env.SDLC_DEBUG) {
+      process.stderr.write(
+        `[sdlc] could not resolve active worktree from cwd ${workingDir}; using cwd as fallback\n`
+      );
+    }
+    return workingDir;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
@@ -81,4 +119,5 @@ function resolveMainWorktreeSafe(cwd) {
 module.exports = {
   resolveMainWorktree,
   resolveMainWorktreeSafe,
+  resolveActiveWorktreeSafe,
 };

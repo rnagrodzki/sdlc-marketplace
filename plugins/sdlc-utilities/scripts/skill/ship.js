@@ -49,6 +49,7 @@ const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, '
 const { VALID_STEPS, BUILT_IN_DEFAULTS, CANONICAL_STEPS, RESERVED_STEPS } = require(path.join(LIB, 'ship-fields'));
 const { gcStateFiles, gcTempdirs } = require(path.join(LIB, 'state'));
 const { detectActiveChanges, isArchived } = require(path.join(LIB, 'openspec'));
+const { resolveActiveWorktreeSafe } = require(path.join(LIB, 'worktree'));
 const { getAdvisory } = require(path.join(LIB, 'context-advisory'));
 const { PRE_RELEASE_LABEL_RE } = require(path.join(LIB, 'version'));
 
@@ -976,6 +977,9 @@ function detectResumeState(_projectRoot, currentBranch) {
 
 function main() {
   const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
+  // issue #457: OpenSpec content scans live on the active branch in the active worktree —
+  // route detectActiveChanges/isArchived through contentRoot, NOT projectRoot.
+  const contentRoot = resolveActiveWorktreeSafe();
   const cli = parseArgs(process.argv);
 
   const errors   = [];
@@ -1192,7 +1196,7 @@ function main() {
   }
 
   // Check OpenSpec (use shared lib for consistent detection)
-  const openspecResult = detectActiveChanges(projectRoot);
+  const openspecResult = detectActiveChanges(contentRoot);
   const openspecDetected = openspecResult.present;
   const openspecAuthoritative = openspecResult.present
     ? { path: 'openspec/config.yaml', specsCount: openspecResult.specsCount }
@@ -1224,7 +1228,7 @@ function main() {
   const openspecBranchMatch = openspecResult.branchMatch || null;
   const openspecChangeName  = flags.openspecChange || openspecBranchMatch;
   const openspecIsArchived  = openspecChangeName
-    ? isArchived(projectRoot, openspecChangeName)
+    ? isArchived(contentRoot, openspecChangeName)
     : false;
 
   // R-expected-branch-injection (issues #347, #348, #349): resolve the feature branch
