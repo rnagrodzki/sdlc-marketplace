@@ -355,6 +355,8 @@ Options:
    ```
    This writes `<stateDir>/execution/<runId>/task-<id>.md` for each task. The printed JSON includes `factSheets: [...]` — the absolute paths to use as `factSheetPath` in the manifest. Task name, description, files, and acceptance criteria live in the fact sheet; do NOT inline them in the manifest.
 
+   **Contract consumption (R-CONTRACT, #459):** When a plan task carries a `Contract:` block, include its verbatim content as the `contract` field in that task's object passed to `--tasks-json`. `renderFactSheet` emits it as a `## Contract` section in the fact sheet. The per-task agent MUST consume the decided Contract verbatim and MUST NOT re-derive any design decision it pins — a decision settled in the Contract is closed, not reopened.
+
    **Manifest extensions (Fixes #392 — R33/R34):** every wave manifest MUST additionally carry:
    - `guardrails: [{id, description, severity}]` — sourced verbatim from `activeGuardrails` loaded in Step 1 (Guardrail loading block above). When `activeGuardrails` is empty, the field is still present as `[]` (stable shape across waves — never omitted). Wave-runner threads this into the conditional `## Project Guardrails` block of every per-task and batched-trivial Agent prompt; when empty the block renders nothing.
    - `expectedFiles: string[]` — deterministic union of every `Files: Create:` / `Files: Modify:` / `Files: Test:` path declared across the wave's tasks (computed by main context during wave build per `classifying-and-waving-tasks.md` step 6b). Used by Step 5c-bis to cross-check `git diff --stat` output.

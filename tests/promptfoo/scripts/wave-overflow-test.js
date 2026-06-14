@@ -77,6 +77,34 @@ switch (op) {
     break;
   }
 
+  case 'render-contract': {
+    const { renderFactSheet } = require(path.join(LIB, 'task-factsheet'));
+    // R-CONTRACT (#459): a contract-bearing task renders a `## Contract` section;
+    // a no-contract task omits it entirely.
+    const withContract = renderFactSheet({
+      id: '1',
+      name: 'Contract-bearing task',
+      description: 'Implement the thing.',
+      acceptanceCriteria: ['It works'],
+      files: ['src/thing.ts'],
+      contract: '- shape (code): `doThing(x: number): string`\n- names: `doThing`',
+    });
+    const withoutContract = renderFactSheet({
+      id: '2',
+      name: 'No-contract task',
+      description: 'Implement another thing.',
+      acceptanceCriteria: ['It also works'],
+      files: ['src/other.ts'],
+    });
+    out({
+      hasContractSection: withContract.includes('## Contract'),
+      contractBeforeAcceptance:
+        withContract.indexOf('## Contract') < withContract.indexOf('## Acceptance Criteria'),
+      noContractSection: !withoutContract.includes('## Contract'),
+    });
+    break;
+  }
+
   case 'budget-tight': {
     const { computeWaveBudget } = require(path.join(LIB, 'dispatch-budget'));
     // 25KB total, 5KB template overhead, 4 tasks × 5KB each → only 4 fit in (25-5)=20KB, 4×5=20 exactly

@@ -18,7 +18,7 @@ const path = require('node:path');
 
 /**
  * Render a task as compact markdown.
- * @param {{ id: string, name: string, description: string, acceptanceCriteria: string[], files: string[] }} task
+ * @param {{ id: string, name: string, description: string, acceptanceCriteria: string[], files: string[], contract?: string }} task
  * @returns {string}
  */
 function renderFactSheet(task) {
@@ -31,6 +31,13 @@ function renderFactSheet(task) {
     lines.push('## Description');
     lines.push('');
     lines.push(task.description.trim());
+    lines.push('');
+  }
+
+  if (task.contract && task.contract.trim()) {
+    lines.push('## Contract');
+    lines.push('');
+    lines.push(task.contract.trim());
     lines.push('');
   }
 
@@ -85,7 +92,7 @@ function taskFactSheetPath({ runId, taskId, stateDir }) {
  * exists with identical content, the mtime is unchanged (no write performed).
  * If content differs, the file is atomically rewritten.
  *
- * @param {{ id: string, name: string, description: string, acceptanceCriteria: string[], files: string[] }} task
+ * @param {{ id: string, name: string, description: string, acceptanceCriteria: string[], files: string[], contract?: string }} task
  * @param {{ runId: string, stateDir: string }} opts
  * @returns {string} Absolute path of the written fact sheet
  */

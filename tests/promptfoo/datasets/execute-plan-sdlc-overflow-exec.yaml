@@ -20,6 +20,15 @@
     - type: javascript
       value: "const r = JSON.parse(output); r.same === true && r.containsTaskId === true && r.idNormSame === true"
 
+- description: "execute-plan-sdlc/wave-runner-overflow/task-factsheet: renderFactSheet emits ## Contract for a contract-bearing task and omits it otherwise (R-CONTRACT, #459)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op render-contract"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.hasContractSection === true && r.contractBeforeAcceptance === true && r.noContractSection === true"
+
 # ---------------------------------------------------------------------------
 # dispatch-budget.js — byte-budget computation
 # ---------------------------------------------------------------------------

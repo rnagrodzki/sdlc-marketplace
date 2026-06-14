@@ -2,7 +2,7 @@
 
 ## Overview
 
-Writes an implementation plan from requirements, a spec, or a user description. Operates primarily in Plan Mode — the plan file is the single source of truth, built incrementally: a skeleton header is written at the start, then filled with requirements, tasks, and critique fixes as the pipeline progresses. Produces plans in the format consumed by `execute-plan-sdlc` — with per-task complexity, risk, and dependency metadata embedded. Follows a PCIDCI pipeline: analyzes requirements and codebase, decomposes into classified tasks, self-critiques, presents for user approval, and runs a cross-model plan review loop.
+Writes an implementation plan from requirements, a spec, or a user description. Operates primarily in Plan Mode — the plan file is the single source of truth, built incrementally: a skeleton header is written at the start, then filled with requirements, tasks, and critique fixes as the pipeline progresses. Produces plans in the format consumed by `execute-plan-sdlc` — with per-task complexity, risk, dependency, and `Contract:` (decided-shape) metadata embedded. Follows a PCIDCI pipeline: analyzes requirements and codebase, decomposes into classified tasks, self-critiques, presents for user approval, and runs a cross-model plan review loop.
 
 ---
 
@@ -71,7 +71,7 @@ For 4+ file scopes, plan-sdlc dispatches a parallel dynamic-dimension orchestrat
 
 **Step 2 — Decompose.** Same as today, but each Standard/Complex task must cite ≥1 `F-<DIM>-<n>` ID or be marked "out-of-scope addition" with rationale. Trivial tasks exempt. When web/hybrid ran, Key Decisions explicitly **ADOPTS**, **REJECTS-with-rationale**, or marks **NOT-APPLICABLE** each web finding by ID.
 
-**Step 3 — Critique (5-lane parallelized).** All 17 quality gates (G1–G17) are partitioned across five lanes and dispatched in a single message as parallel Agent calls — one subagent per lane. The lanes run concurrently; Step 3 completes only after **all five lanes have returned** (JOIN barrier). One new gate row (G15): brief-citation coverage. Error severity when brief was produced; not-applicable when fallback ran. Lane 3 is the guardrail-compliance lane — `guardrailsEvaluated` fires when lane 3 returns. `critiqueRan` fires after all five lanes join.
+**Step 3 — Critique (5-lane parallelized).** All 18 quality gates (G1–G18) are partitioned across five lanes and dispatched in a single message as parallel Agent calls — one subagent per lane. The lanes run concurrently; Step 3 completes only after **all five lanes have returned** (JOIN barrier). One new gate row (G15): brief-citation coverage. Error severity when brief was produced; not-applicable when fallback ran. Lane 3 is the guardrail-compliance lane — `guardrailsEvaluated` fires when lane 3 returns. `critiqueRan` fires after all five lanes join.
 
 **Step 5 — Reviewer.** plan-reviewer-prompt gains a `{BRIEF_FILE}` input plus two gate rows: *exploration provenance* (uncited Standard/Complex tasks blocking) and *best-practice traceability* (silent omission of a web finding blocking). The reviewer also uses the multi-lens fan-out (R36): review dimensions are dispatched in parallel across the same five-lane structure, with each lane receiving `{REQUIREMENTS_SUMMARY}` (the numbered requirements list captured from the Step 1 CONSUME pass) so independent lenses can check requirement coverage without repeating work.
 
@@ -367,6 +367,32 @@ At execute time, `execute-plan-sdlc` reads the `openspec-task` blocks and flips 
 
 For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R29, R30, G16.
 
+### Per-task `Contract:` block and the G18 settlement gate (R45, G18 — Fixes #459)
+
+Every artifact-touching task carries a **`Contract:`** block — the decided shape that execution renders verbatim instead of redesigning (or stalling BLOCKED) on a decision planning already closed. It sits beneath the acceptance criteria and uses an indented `- key: value` list:
+
+| Key | What it pins |
+|---|---|
+| `shape` | The type-aware decided shape (see below). |
+| `names` | Exact symbols / IDs / headings / fields the deliverable introduces or touches. |
+| `mirror` | The existing artifact this mirrors, with line anchors — the source of truth to copy structure from. |
+| `decisions` | Per-task decided choices bound to this deliverable (distinct from ambient `## Key Decisions`). |
+| `sync` | Sibling artifacts that must stay byte-consistent with this deliverable. |
+
+`shape` is **type-aware** — the plan type is derived from the task's `Files:` paths, and the decided shape follows that type's column:
+
+| Plan type | `Files:` signal | `shape` pins |
+|---|---|---|
+| code | source files (`.js`/`.ts`/etc.), `SKILL.md` | signatures / types / flags / error-cases / import-paths |
+| docs | `docs/**`, reference `*.md` | template + section list + audience + cross-links |
+| openspec / spec | `docs/specs/**`, `openspec/**` | requirement IDs ADD/MODIFY/REMOVE + delta text + numbering + downstream obligations |
+
+A mixed-artifact task is judged against its dominant artifact's column.
+
+**G18 — Settlement / contract concreteness.** A new **error-severity** gate owned by the **content-coverage** lane. It flags any artifact-touching task whose `Contract:` is absent or merely restates "update X to do Y" without a concrete type-appropriate shape. The gate derives the task's plan type from its `Files:` paths (no explicit `kind:` discriminator). Because it is error-severity, an unsettled task blocks plan approval until its Contract pins the decided shape.
+
+For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R45, G18.
+
 ### Gate A — Intake Audit (R39 — Fixes #445)
 
 When `--from-openspec` is active and the delta-spec requirement inventory is available (see "Requirement Inventory" below), plan-sdlc dispatches a **Gate A intake audit** before task decomposition. Gate A audits the SOURCE change artifacts — not the plan — across three dimensions:
@@ -388,7 +414,7 @@ Severity is assigned **per check** (not per dimension), matching the opsx:verify
 
 ### Gate B — Verification Scorecard (R40 — Fixes #445)
 
-At Step 5 (after the lens merge), plan-sdlc assembles a **`## Verification Scorecard`** section in the plan file. This is purely additive — the G1–G17 gate definitions, `buildLanes`, and the `{G1..G17}` union assertion are unchanged (R42). The scorecard contains:
+At Step 5 (after the lens merge), plan-sdlc assembles a **`## Verification Scorecard`** section in the plan file. This is purely additive — the G1–G18 gate definitions, `buildLanes`, and the `{G1..G18}` union assertion are unchanged (R42). The scorecard contains:
 
 1. **Dimension table** — CRITICAL/WARNING/SUGGESTION/PASS counts by dimension (Completeness / Correctness / Coherence), aggregated from lens findings that carry severity tags.
 2. **Traceability matrix** — one row per requirement from the inventory (`openspecContext.requirements[]`), showing covering task(s) and status (covered / partial / uncovered). When the inventory is null (CLI absent), falls back to the Step 1 requirements checklist with a noted downgrade.

@@ -196,7 +196,7 @@ For `VERIFY`, use the primary symbol you added or modified (function name, class
 It is always OK to stop and report BLOCKED. Bad work is worse than no work.
 
 **STOP and report BLOCKED when:**
-- The task requires architectural decisions with multiple valid approaches
+- The task requires architectural decisions with multiple valid approaches — UNLESS the decision is already settled in the task's `## Contract` section. A Contract pins the decided shape; render it verbatim and do NOT reopen it as a BLOCKED-worthy architectural choice (R-CONTRACT).
 - You need to understand code beyond what was provided and can't find clarity
 - You feel uncertain about whether your approach is correct
 - You've been reading files trying to understand the system without progress

@@ -62,6 +62,6 @@ Produce the `## Guardrail Compliance` table with per-guardrail Status (PASS/FAIL
 
 **When `{ACTIVE_GUARDRAILS}` is empty:** Issues = `[]`, passes = `["G14"]`, laneStatus = `"ok"`, guardrailCompliancePayload = `"No active guardrails configured."`.
 
-**Do not evaluate G1–G13, G15–G17 — those belong to other lanes.**
+**Do not evaluate G1–G13, G15–G18 — those belong to other lanes.**
 
 Output the JSON object as the last content in your response.
