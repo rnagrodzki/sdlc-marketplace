@@ -335,6 +335,7 @@ Guardrails:       3/3 passed (1 warning, 0 overridden)
 | Source code files | Files created or modified as specified by plan tasks |
 | `.sdlc/learnings/log.md` | Execution learnings appended after completion (classification accuracy, wave conflicts, recovery outcomes) |
 | `.sdlc/execution/execute-<branch>-<timestamp>.json` | Execution state file written after each wave; enables cross-session resume via --resume. Deleted on success, preserved on failure. |
+| Per-task fact sheets (`task-<id>.md`) | Written by `state/execute.js wave-start` before wave dispatch. When a plan task carries a `**Contract:**` block, the fact sheet includes a `## Contract` section with the verbatim contract content. Per-task agents consume this section as a closed set of decided design constraints (signatures, types, flags, error-cases, import paths) — they MUST NOT re-derive or reopen anything pinned there. |
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.
 

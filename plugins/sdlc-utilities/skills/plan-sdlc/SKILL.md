@@ -322,7 +322,16 @@ Complete enough that an agent with no codebase context can execute it.]
 **Acceptance criteria:**
 - [ ] [Specific, verifiable criterion]
 - [ ] [Another criterion]
+
+**Contract:**
+- shape (<code|docs|openspec>): [the type-aware decided shape execution renders verbatim]
+- names: [exact symbols / IDs / headings / fields]
+- mirror: [existing artifact + line anchors to copy structure from]
+- decisions: [per-task decided choices bound to this deliverable]
+- sync: [sibling artifacts that must stay byte-consistent]
 ```
+
+**Contract block (required — implements R45):** Every artifact-touching task MUST include a `**Contract:**` block per `./plan-format-reference.md`, carrying the type-appropriate decided shape (code: signatures/types/flags/error-cases/import-paths; docs: template+sections+audience+cross-links; openspec/spec: requirement IDs ADD/MODIFY/REMOVE + delta text + numbering). The plan type is derived from the task's `Files:` paths; a mixed-artifact task uses its dominant artifact's column. A task whose Contract is absent or merely restates "update X to do Y" is flagged by G18 in Step 3.
 
 **Verification strategy — match to task type:**
 - Feature/logic → TDD (write failing test, implement, pass)
@@ -342,7 +351,7 @@ Do not mandate TDD for config, documentation, or infrastructure tasks.
 
 **Fan-out dispatch: Dispatch ALL FIVE Step 3 lanes from `lanes[]` (P16) in a SINGLE message as parallel Agent tool calls. Do not dispatch them sequentially.**
 
-All 17 quality gates (G1–G17) are partitioned across five lanes — each gate belongs to exactly one lane. Lane dispatch parameters (`subagent_type`, `model`, and prompt body read from `promptTemplatePath`) MUST be sourced verbatim from the corresponding `lanes[i]` entry in the prepare output (`agent-dispatch-script-driven` guardrail — do NOT hardcode these values).
+All 18 quality gates (G1–G18) are partitioned across five lanes — each gate belongs to exactly one lane. Lane dispatch parameters (`subagent_type`, `model`, and prompt body read from `promptTemplatePath`) MUST be sourced verbatim from the corresponding `lanes[i]` entry in the prepare output (`agent-dispatch-script-driven` guardrail — do NOT hardcode these values).
 
 For each `lanes[i]` entry (i = 0..4):
 
@@ -376,7 +385,7 @@ Lane 4 (dimension-coverage/G17) returns the G17 findings JSON — parse the `fin
 **Merge algorithm:**
 1. `allIssues` = union of `issues[]` from all lanes
 2. `allPasses` = union of `passes[]` from all lanes
-3. `coverageCheck`: the union of all `gateIds[]` arrays returned by lanes MUST equal {G1..G17} exactly. Any missing gate ID → add a blocking issue: `{ gateId: "<missing>", severity: "error", message: "Gate <missing> not evaluated by any lane", blocking: true }`
+3. `coverageCheck`: the union of all `gateIds[]` arrays returned by lanes MUST equal {G1..G18} exactly. Any missing gate ID → add a blocking issue: `{ gateId: "<missing>", severity: "error", message: "Gate <missing> not evaluated by any lane", blocking: true }`
 4. Lane returning `laneStatus !== "ok"`: append to `allIssues` as blocking error `{ gateId: "lane-failure", severity: "error", message: "Lane <name> failed: <reason> — gate IDs <list> not evaluated", blocking: true }` — **exception: G17 lane (lanes[4]) failure is advisory, not blocking** (per R31 dispatch-failure fallback)
 5. Dedup `allIssues` by `(gateId, taskRef, message-normalized-prefix)` — keep first occurrence
 
@@ -461,7 +470,7 @@ When `lensReviewers[i].promptTemplatePath` is null, skip that lens and log to `.
 
 **Gate B — Verification Scorecard (implements R40, R42, R44 — Fixes #445):**
 
-After the merge step, assemble the `## Verification Scorecard` section in the plan file. This is purely additive — it MUST NOT remove or alter any existing gate evaluation, G1–G17 definitions, `buildLanes`, or the `{G1..G17}` union assertion. The scorecard is regenerated (replaced, not appended) on each Step 5 iteration (R44).
+After the merge step, assemble the `## Verification Scorecard` section in the plan file. This is purely additive — it MUST NOT remove or alter any existing gate evaluation, G1–G18 definitions, `buildLanes`, or the `{G1..G18}` union assertion. The scorecard is regenerated (replaced, not appended) on each Step 5 iteration (R44).
 
 **Pass `{REQUIREMENTS_JSON}` to lens reviewers as a new template variable** (in addition to the existing variables above):
 - `{REQUIREMENTS_JSON}` — `JSON.stringify(openspecContext.requirements)` when the inventory is present; `"null"` when `openspecContext.requirements` is null (CLI absent or non-OpenSpec plan). This is null-safe: lens prompts render it as `"none — inventory unavailable, use checklist"` when null.

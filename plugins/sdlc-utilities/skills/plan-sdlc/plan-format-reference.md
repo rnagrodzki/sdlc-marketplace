@@ -85,11 +85,80 @@ Complete enough that an agent with no codebase context can execute it.]
 - [ ] [Specific, verifiable criterion]
 - [ ] [Another criterion]
 
+**Contract:** (required for every artifact-touching task — the decided shape execution renders verbatim)
+- shape (<code|docs|openspec>): [the type-aware decided shape — see the per-type column guidance below]
+- names: [exact symbols / IDs / headings / fields this deliverable introduces or touches]
+- mirror: [the existing artifact this mirrors, with line anchors — the source of truth to copy structure from]
+- decisions: [per-task decided choices bound to this deliverable; cite `## Key Decisions` where relevant]
+- sync: [sibling artifacts that must stay byte-consistent with this deliverable]
+
 **openspec-task:** (optional — present only when plan was generated with `--from-openspec`)
 - change: <change-name>
 - ref: <kebab-slug-6char-hash>
 - line: <1-indexed-line-number-at-plan-time>
 - title: <verbatim-task-title-at-plan-time>
+```
+
+---
+
+## The `Contract:` block
+
+Every artifact-touching task carries a `**Contract:**` block: a bold-label header line followed by
+an indented `- key: value` list, mirroring the `**openspec-task:**` sub-block precedent above. It
+pins the **decided shape** of the deliverable so execution renders it verbatim rather than
+re-deriving (or stalling BLOCKED on) a design decision planning already closed. The G18 settlement
+gate flags any artifact-touching task whose Contract is absent or merely restates "update X to do Y".
+
+Keys: `shape`, `names`, `mirror`, `decisions`, `sync`.
+
+`shape` is **type-aware** — the plan type is derived from the task's `Files:` paths, and the decided
+shape follows that type's column:
+
+| Plan type | `Files:` signal | `shape` pins |
+|---|---|---|
+| **code** | source files (`.js`/`.ts`/etc.), `SKILL.md` | signatures / types / flags / error-cases / import-paths |
+| **docs** | `docs/**`, reference `*.md` | template + section list + audience + cross-links |
+| **openspec** (spec) | `docs/specs/**`, `openspec/**` | requirement IDs ADD/MODIFY/REMOVE + delta text + numbering + downstream obligations |
+
+A mixed-artifact task (e.g. a `.js` change plus a `.md` prompt) is judged against its **dominant**
+artifact's column — the one its primary deliverable touches.
+
+### Worked example — code
+
+```markdown
+**Contract:**
+- shape (code): `signToken(payload: object, expiresIn: string): string` and
+  `verifyToken(token: string): object`; throws `JwtExpiredError` | `JwtInvalidError` on failure;
+  import `jsonwebtoken`; secret from `process.env.JWT_SECRET`.
+- names: `signToken`, `verifyToken`, `JwtExpiredError`, `JwtInvalidError`.
+- mirror: existing util module style at `src/utils/hash.ts:1-40`.
+- decisions: typed errors over boolean returns (callers branch on error class).
+- sync: `src/middleware/auth.ts` imports `verifyToken` — signature must match.
+```
+
+### Worked example — docs
+
+```markdown
+**Contract:**
+- shape (docs): MODIFY `docs/skills/auth.md`. Add a `## Token Lifecycle` section (audience: end
+  users) after `## Usage`; bullet list of the 3 token states; cross-link to `/version-sdlc`.
+- names: section heading `## Token Lifecycle`.
+- mirror: the `## Usage` / `## Flags` section style at `docs/skills/auth.md:10-40`.
+- decisions: user-facing prose only — no internal API references.
+- sync: must match the field names introduced in the format reference (`Contract:` keys).
+```
+
+### Worked example — openspec / spec
+
+```markdown
+**Contract:**
+- shape (openspec): ADD requirement `R7` to `docs/specs/auth.md` under `## Core Requirements`;
+  MODIFY `R3`'s acceptance clause to cite the new token-state enum; delta text exactly as in the
+  Description; numbering continues from `R6`.
+- names: `R7` (new), `R3` (modified).
+- mirror: requirement-block style at `docs/specs/auth.md:21-22` (R5/R6).
+- decisions: numeric `R7` (not a named ID) — matches the file's existing numbering convention.
+- sync: SKILL.md Step 2 authors it; execute-plan-sdlc consumes it via the fact sheet.
 ```
 
 ---
@@ -113,6 +182,7 @@ Format:
 | Risk | `Low` \| `Medium` \| `High` | High-risk tasks trigger a user confirmation gate before execution |
 | Depends on | `Task N, Task M` or `none` | Must reference tasks by their exact number; no forward references |
 | Verify | `tests` \| `build` \| `lint` \| `manual` | Multiple allowed: `tests, build` |
+| Contract | Indented `- key: value` list with keys `shape`, `names`, `mirror`, `decisions`, `sync` | Required for every artifact-touching task; `shape` is type-aware (code/docs/openspec column derived from `Files:` paths); judged by G18 |
 | Files → Create | Relative path from project root | Must be exact — agents use this to know what to create |
 | Files → Modify | Relative path + one-line description of change | Required if an existing file is modified |
 | Files → Test | Relative path from project root | Omit row if task has no tests |
@@ -188,7 +258,10 @@ Import path: `import { verifyToken } from '../utils/jwt'`.
 
 ## What NOT to Include in Plans
 
-- Full implementation code (code snippets for patterns are fine; complete implementations are not)
+- Full implementation code (code snippets for patterns are fine; complete implementations are not).
+  Exception: a task's `Contract.shape` pins signatures / sections / requirement deltas — not full
+  bodies. A concrete Contract shape is the decided interface, not an implementation, and is NOT
+  flagged by this rule.
 - Absolute file paths (always use paths relative to project root)
 - Superpowers-specific directives or REQUIRED SUB-SKILL headers
 - References to tools or skills the executing agent should use

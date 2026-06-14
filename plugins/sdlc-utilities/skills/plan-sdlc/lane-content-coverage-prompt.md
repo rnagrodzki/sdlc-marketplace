@@ -1,7 +1,7 @@
 # Step 3 Lane: Content-Coverage Gate Evaluation
 
 **Lane:** content-coverage
-**Gates owned:** G5, G6, G8, G9, G11, G13, G15, G16
+**Gates owned:** G5, G6, G8, G9, G11, G13, G15, G16, G18
 **Default model:** sonnet
 
 You are a plan critique lane agent. Your role is to evaluate the plan against the content-coverage quality gates listed below. These are judgement-heavy text-reading checks that require understanding the plan's intent, task descriptions, and coverage completeness.
@@ -41,7 +41,14 @@ Evaluate each gate. For each gate, return a pass or one or more issues.
 
 **G16 — OpenSpec tasks.md coverage:** When the plan was created with `--from-openspec` (fromOpenspecDirect is true), every entry in the OpenSpec `tasks.md` is either (a) referenced by at least one plan task's `openspec-task.ref`, or (b) listed in `## Out-of-scope OpenSpec tasks`. This is a blocking error when violated.
 
----
+**G18 — Settlement / contract concreteness:** Every artifact-touching task MUST carry a `Contract:` block whose decided shape is concrete for the task's plan type. **Flag** (error-severity, blocking) any artifact-touching task whose Contract is **absent**, OR whose `shape` merely restates "update X to do Y" without a concrete type-appropriate shape.
+
+Derive the task's plan type from its `Files:` paths:
+- `docs/specs/**` and `openspec/**` → **openspec / spec column** (shape pins requirement IDs ADD/MODIFY/REMOVE + delta text + numbering + downstream obligations)
+- `docs/**` and reference `*.md` files → **docs column** (shape pins template + section list + audience + cross-links)
+- source files (`.js`/`.ts`/etc.) and `SKILL.md` → **code column** (shape pins signatures / types / flags / error-cases / import-paths)
+
+A **mixed-artifact** task (e.g. a `.js` file plus a `.md` prompt) is judged against its **dominant** artifact's column — the one its primary deliverable touches. A task that touches no artifacts (pure coordination) is exempt. Do NOT flag a task whose Contract pins a concrete, type-appropriate shape — only flag genuinely unsettled tasks.
 
 ## Output Schema
 
@@ -49,7 +56,7 @@ Return a single JSON object as your final output (no prose after the JSON block)
 
 ```json
 {
-  "gateIds": ["G5", "G6", "G8", "G9", "G11", "G13", "G15", "G16"],
+  "gateIds": ["G5", "G6", "G8", "G9", "G11", "G13", "G15", "G16", "G18"],
   "issues": [
     {
       "gateId": "G6",
@@ -59,7 +66,7 @@ Return a single JSON object as your final output (no prose after the JSON block)
       "blocking": false
     }
   ],
-  "passes": ["G5", "G8", "G9", "G11", "G13", "G15", "G16"],
+  "passes": ["G5", "G8", "G9", "G11", "G13", "G15", "G16", "G18"],
   "laneStatus": "ok"
 }
 ```
@@ -72,7 +79,7 @@ Return a single JSON object as your final output (no prose after the JSON block)
 
 **Severity:**
 - G6, G8, G9, G13, G15: `"warning"` (advisory) — misclassifications and citation gaps are correctable
-- G11, G16: `"error"` (blocking) — OpenSpec coverage gaps prevent safe execution
+- G11, G16, G18: `"error"` (blocking) — OpenSpec coverage gaps and unsettled contracts prevent safe execution
 - `blocking: true` maps to error severity; `blocking: false` maps to warning
 
 **Do not evaluate G1–G4, G7, G10, G12, G14, G17 — those belong to other lanes.**

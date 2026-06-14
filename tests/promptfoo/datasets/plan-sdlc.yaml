@@ -13,6 +13,8 @@
 #   plan-g17-behavior-mod-no-new-files -- CORRECT: B1 update-behavior proposal for public CLI flag addition (Fixes #417)
 #   plan-g17-doc-only-suppressed       -- CORRECT: doc-only diff suppresses all G17 proposals, empty findings (Fixes #417)
 #   plan-g17-pure-refactor-suppressed  -- CORRECT: pure-refactor markers suppress B-criteria, empty findings (Fixes #417)
+#   plan-contract-code                 -- CORRECT: non-OpenSpec code plan; settled + unsettled + mixed-artifact tasks; exercises G18 settlement gate (Fixes #459)
+#   plan-contract-docs                 -- CORRECT: docs/openspec plan; settled + unsettled tasks; exercises G18 settlement gate (Fixes #459)
 
 # --- Fan-out parallelization cases (P1/P2/P3 — Fixes #418) ---
 
@@ -855,3 +857,102 @@
         verdict ("All checks passed. Ready for archive.") and points to the Verification
         Scorecard section in the plan. The scorecard pointer appears before the workflow
         continuation menu options, not after them.
+
+# --- G18 settlement / contract concreteness gate (R45, G18 — Fixes #459) ---
+
+- description: "plan-sdlc: G18 PASSES a settled code task whose Contract pins a concrete shape (R45, G18, #459)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-contract-code.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G18 settlement gate for Task 1 ("Refresh-token
+      helper") in the plan. Task 1 carries a Contract block pinning concrete code shape
+      (signatures, named errors, import paths). Is Task 1 flagged by G18?
+  assert:
+    - type: icontains
+      value: "G18"
+    - type: llm-rubric
+      value: >
+        The response evaluates the G18 settlement gate and finds Task 1 SATISFIED / NOT
+        flagged: its Contract pins a concrete, type-appropriate code shape (the
+        refreshAccessToken signature, the typed errors, the import path). G18 does not block
+        on Task 1. The response does NOT treat a concrete Contract shape as a violation.
+
+- description: "plan-sdlc: G18 FLAGS an unsettled 'update X to do Y' code task missing its Contract (error-severity, blocks) (R45, G18, #459)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-contract-code.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G18 settlement gate for Task 2 ("Update the auth
+      middleware to support refresh") in the plan. Task 2 has no Contract block and its
+      description merely restates "update X to do Y". Is Task 2 flagged by G18?
+  assert:
+    - type: icontains
+      value: "G18"
+    - type: llm-rubric
+      value: >
+        The response evaluates the G18 settlement gate and FLAGS Task 2 as unsettled: it is
+        an artifact-touching task (modifies src/middleware/auth.ts) with no Contract block,
+        and its description merely restates "update X to do Y" without a concrete decided
+        shape. The response states G18 is error-severity, so the plan is BLOCKED until Task 2
+        carries a Contract pinning the decided code shape.
+
+- description: "plan-sdlc: G18 PASSES a settled docs/openspec task whose Contract pins sections + requirement deltas (R45, G18, #459)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-contract-docs.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G18 settlement gate for Task 1 ("Spec + reference
+      doc for token lifecycle") in the plan. Task 1 carries a Contract pinning the spec
+      requirement delta (R7) and the doc section (## Token Lifecycle). Is Task 1 flagged by
+      G18?
+  assert:
+    - type: icontains
+      value: "G18"
+    - type: llm-rubric
+      value: >
+        The response evaluates the G18 settlement gate and finds Task 1 SATISFIED / NOT
+        flagged. The task touches docs/specs/** and docs/** so G18 judges it against the
+        openspec/spec and docs columns; its Contract pins a concrete shape (the R7
+        requirement delta with state names, and the ## Token Lifecycle section with audience
+        and cross-link). G18 does not block on Task 1.
+
+- description: "plan-sdlc: G18 FLAGS an unsettled 'update X to do Y' docs task missing its Contract (error-severity, blocks) (R45, G18, #459)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-contract-docs.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G18 settlement gate for Task 2 ("Update the auth
+      doc to mention refresh") in the plan. Task 2 has no Contract block and its description
+      merely restates "update X to do Y". Is Task 2 flagged by G18?
+  assert:
+    - type: icontains
+      value: "G18"
+    - type: llm-rubric
+      value: >
+        The response evaluates the G18 settlement gate and FLAGS Task 2 as unsettled: it is
+        an artifact-touching task (modifies docs/skills/auth.md, a docs-column artifact) with
+        no Contract block and a description that merely restates "update X to do Y" without a
+        concrete decided shape (no section list, audience, or cross-links). The response
+        states G18 is error-severity, so the plan is BLOCKED until Task 2 carries a Contract.
+
+- description: "plan-sdlc: G18 judges a mixed-artifact task against its dominant column (R45, G18, #459)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-contract-code.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G18 settlement gate for Task 3 ("Refresh helper
+      plus error-copy prompt") in the plan. Task 3 touches both a .ts source file
+      (src/auth/errors.ts) and a .md prompt (prompts/auth-error-copy.md). Which column does
+      G18 judge it against, and is Task 3 flagged?
+  assert:
+    - type: icontains
+      value: "G18"
+    - type: llm-rubric
+      value: >
+        The response explains that G18 judges the mixed-artifact Task 3 against its DOMINANT
+        artifact's column — the .ts source file (errors.ts) is the primary deliverable, so it
+        is judged against the CODE column (not the docs column for the .md prompt). The
+        response finds Task 3 SATISFIED / NOT flagged because its Contract pins concrete code
+        shape (the two exported message constants with values). The derivation of plan type
+        from Files: paths and the dominant-column tie-break are applied, not assumed.

@@ -281,7 +281,7 @@
 
 # --- P16/P17 signals: lanes[] and lensReviewers[] (R35, R36 — Fixes #418) ---
 
-- description: "plan-prepare T4a: lanes[] has exactly 5 entries with disjoint gateIds covering G1-G17 (R35, Fixes #418)"
+- description: "plan-prepare T4a: lanes[] has exactly 5 entries with disjoint gateIds covering G1-G18 (R35, Fixes #418; G18 R45 Fixes #459)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
     script_cwd: "{{project_root}}"
@@ -306,8 +306,8 @@
         const allGateIds = data.lanes.flatMap(l => l.gateIds);
         const uniqueGateIds = new Set(allGateIds);
         if (allGateIds.length !== uniqueGateIds.size) return `duplicate gateIds across lanes: ${allGateIds}`;
-        // Check G1-G17 coverage
-        const expectedGates = new Set(['G1','G2','G3','G4','G5','G6','G7','G8','G9','G10','G11','G12','G13','G14','G15','G16','G17']);
+        // Check G1-G18 coverage
+        const expectedGates = new Set(['G1','G2','G3','G4','G5','G6','G7','G8','G9','G10','G11','G12','G13','G14','G15','G16','G17','G18']);
         for (const g of expectedGates) {
           if (!uniqueGateIds.has(g)) return `missing gate in lanes[].gateIds: ${g}`;
         }
