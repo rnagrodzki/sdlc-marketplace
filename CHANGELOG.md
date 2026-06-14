@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.21.4] - 2026-06-14
+
+### Added
+- plan-sdlc: per-task `Contract:` block with type-aware decided shape (code/docs/openspec columns); G18 gate (content-coverage lane settlement/contract concreteness check) (#459)
+- execute-plan-sdlc: verbatim consumption of Contract fields from task metadata (#459)
+
+### Fixed
+- execute-plan-sdlc: Contract extraction parsing guidance added; per-task fact sheet Contract field flow documented (#459)
+
 ## [0.21.3] - 2026-06-14
 
 ### Added
