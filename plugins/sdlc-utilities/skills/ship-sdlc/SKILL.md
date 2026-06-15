@@ -412,7 +412,7 @@ For ultra-short runs (`flags.steps.length < 2`), skip TodoWrite entirely.
 
 ### Pre-execute workspace auto-detection (R60, R37 — fixes #378, #379)
 
-Workspace is **auto-detected**, not selected — there is no flag and no prompt. The prepare script (`ship.js`) emits the derived value as `context.workspace`:
+Workspace is **auto-detected**, not selected — there is no flag and no prompt. The prepare script (`ship.js`) emits the derived value as `flags.workspace` (R60; the `context` object carries no `workspace` field — reading `context.workspace` was the #451 regression):
 
 - **`branch`** — cwd is the main worktree AND HEAD is the default branch. ship-sdlc auto-creates a feature branch before dispatching execute.
 - **`continue`** — a linked worktree, OR the main worktree already on a feature branch. ship-sdlc runs the pipeline in place; no branch is created.
@@ -428,7 +428,8 @@ SDLC_LIB=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/scripts/lib/c
 [ -z "$SDLC_LIB" ] && [ -d "plugins/sdlc-utilities/scripts/lib" ] && SDLC_LIB="plugins/sdlc-utilities/scripts/lib"
 [ -z "$SDLC_LIB" ] && { echo "ERROR: Could not locate scripts/lib (config.js). Is the sdlc plugin installed?" >&2; exit 2; }
 
-WORKSPACE=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write((d.context&&d.context.workspace)||'continue')")
+# Read the derived workspace from flags.workspace (R60, #451) — NOT context.workspace (no such field).
+WORKSPACE=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write((d.flags&&d.flags.workspace)||'continue')")
 
 if [ "$WORKSPACE" = "branch" ]; then
   # Step 1: Derive branch name from plan title via lib/branch-name.js (config-driven).

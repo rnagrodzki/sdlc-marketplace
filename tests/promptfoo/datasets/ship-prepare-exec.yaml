@@ -1074,6 +1074,57 @@
         const o = JSON.parse(output);
         return typeof o.context.expectedBranch === 'string' && o.context.expectedBranch.length > 0;
 
+# --- flags.workspace emission contract (R60/A8, #451) ---
+# Locks the EMISSION FIELD NAME `flags.workspace` (not context.workspace) and the
+# cwd × branch derive matrix. ship.js emission was never broken; these cases pin the
+# field path so a future rename breaks CI rather than silently re-breaking the SKILL.md
+# consumer (which the #451 regression read from the nonexistent context.workspace).
+# The SKILL.md bash consumption itself is NOT exercised here — it is verified
+# behaviorally (KD3). The undefined `context.workspace` assertion documents the exact
+# field that the regression mistakenly read.
+- description: "ship-prepare (#451): main worktree on default branch → flags.workspace === 'branch'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-auto-workspace"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        if (o.flags.workspace !== 'branch') return `FAIL: flags.workspace === ${JSON.stringify(o.flags.workspace)}, expected 'branch'`;
+        if (o.flags.sources.workspace !== 'derived') return `FAIL: flags.sources.workspace === ${JSON.stringify(o.flags.sources.workspace)}, expected 'derived'`;
+        if (o.context.workspace !== undefined) return 'FAIL: context.workspace must be undefined (the field the #451 regression mistakenly read)';
+        return true;
+
+- description: "ship-prepare (#451): main worktree on a feature branch → flags.workspace === 'continue' (re-run idempotency, no re-branch)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --auto"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-feature-branch"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        if (o.flags.workspace !== 'continue') return `FAIL: flags.workspace === ${JSON.stringify(o.flags.workspace)}, expected 'continue'`;
+        if (o.flags.sources.workspace !== 'derived') return `FAIL: flags.sources.workspace === ${JSON.stringify(o.flags.sources.workspace)}, expected 'derived'`;
+        if (o.context.workspace !== undefined) return 'FAIL: context.workspace must be undefined (the field the #451 regression mistakenly read)';
+        return true;
+
+- description: "ship-prepare (#451): linked worktree → flags.workspace === 'continue'"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}/worktrees/wt1"
+    project_root: "file://fixtures-fs/worktree-linked-openspec-plan"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        if (o.flags.workspace !== 'continue') return `FAIL: flags.workspace === ${JSON.stringify(o.flags.workspace)}, expected 'continue'`;
+        return true;
+
 - description: "ship-prepare: --plan-mode-blocked --bump patch writes ship state file with resolved flags (#400)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
