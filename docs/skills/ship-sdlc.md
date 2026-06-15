@@ -577,7 +577,6 @@ To migrate explicitly, run `/setup-sdlc --migrate`.
 | `draft` | `boolean` | `false` | Create PRs as drafts by default. |
 | `auto` | `boolean` | `false` | Run in non-interactive mode by default. |
 | `reviewThreshold` | `"critical"` \| `"high"` \| `"medium"` \| `"low"` | `"high"` | Minimum severity that triggers the fix loop. `low` triggers on any finding except `info`. |
-| `workspace` | `"branch"` \| `"worktree"` \| `"prompt"` | `"prompt"` | Workspace isolation strategy forwarded to execute-plan-sdlc. |
 | `rebase` | `true` \| `false` \| `"prompt"` | `true` | Rebase strategy before execution and versioning. |
 | `verifyPipelineTimeout` | `integer` (≥30) | `1200` | Maximum seconds verify-pipeline polls before giving up with a warning. (R57) |
 | `verifyPipelineInterval` | `integer` (≥10) | `60` | Seconds between verify-pipeline poll attempts. (R57) |
@@ -625,7 +624,7 @@ Remediation: delete the tag (git push origin :refs/tags/v1.2.3; git tag -d v1.2.
 and re-run version step on the correct branch.
 ```
 
-This check is a no-op when the version step was skipped (e.g., `workspace: worktree` mode).
+This check is a no-op when the version step was skipped (e.g., excluded from `--steps`).
 
 ### Migrating legacy configs
 
@@ -804,7 +803,7 @@ ship-sdlc also removes the intermediate prepare output file (`$PLAN_MODE_OUTPUT_
 - **git** — must be run inside a git repository on a feature branch (not the default branch).
 - **Review dimensions** — `.sdlc/review-dimensions/` must contain at least one dimension file for the review step. Run `/setup-sdlc --dimensions` to create them. If review is in the skip set, this is not required.
 - **Plan in context** — for the execute step, a plan must be present in the conversation. If no plan is found and execute is not skipped, the step is auto-skipped.
-- **Cwd in branch workspace mode** — when `ship.workspace = branch`, invoke ship-sdlc from the main worktree root. Invocations from inside a linked worktree path will abort with a diagnostic (R65, fixes #405).
+- **Workspace is auto-detected** — there is no workspace mode and no cwd assertion. ship-sdlc derives the workspace from cwd + current branch (R60): on the main worktree on the default branch it auto-creates a feature branch; inside a linked worktree or on a feature branch it runs in place. Invoking from inside a manual git worktree is fully supported (`.sdlc/` stays anchored to the main worktree).
 
 ### Harness Configuration
 
@@ -838,11 +837,10 @@ To keep the resident context footprint of the loaded skill small, `ship-sdlc/SKI
 |----------------|-----------|----------|
 | `entry-modes.md` | `--init-config`, `--gc`, or `--dry-run` passed | The three entry-mode handlers, each of which short-circuits the pipeline. |
 | `reference.md` | A pipeline-level failure, the Learning Capture step, or an edge-case lookup | Error Recovery, DO NOT, Gotchas, and Learning Capture reference material. |
-| `workspace-worktree.md` | `flags.workspace === 'worktree'` | Worktree-create (Step 3b) and worktree-cleanup bash. Branch-mode runs never read it. |
 | `config-format.md` | `--init-config` walkthrough | Config schema and walkthrough questions. |
 | `state-format.md` | Resume from a saved state file | Ship state-file schema. |
 
-Branch-mode-active gates — the cwd-assertion diagnostic and the post-version ancestry HARD GATE — stay inline in SKILL.md (they fire on the default branch-mode path and must not be gated behind a worktree-only Read).
+The post-version ancestry HARD GATE stays inline in SKILL.md (it must not be gated behind an on-demand Read). There is no cwd-assertion diagnostic — workspace is auto-detected (R60), so running from any cwd or branch is valid.
 
 ---
 
