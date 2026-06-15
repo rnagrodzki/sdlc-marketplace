@@ -150,7 +150,7 @@ Prompt in the main context:
 ```text
 Post this review comment to PR #{pr.number}? (yes / save / cancel)
   yes    — post the comment to the PR
-  save   — save review to .claude/reviews/<branch>-<YYYY-MM-DD>.md instead
+  save   — save review to .sdlc/reviews/<branch>-<YYYY-MM-DD>.md instead
   cancel — keep in terminal only (already shown above)
 ```
 
@@ -179,12 +179,12 @@ Wait for the user's reply.
 
   `SDLC_LINKS_OFFLINE=1` skips network reachability while keeping context-aware checks — use in sandboxed CI.
 
-- `save` →
+- `save` → (implements `R-reviews-path` — canonical save target is `.sdlc/reviews/`)
 
   ```bash
   BRANCH_SAFE="${branch//\//-}"
-  mkdir -p .claude/reviews
-  cp "{comment_file}" ".claude/reviews/${BRANCH_SAFE}-$(date +%Y-%m-%d).md"
+  mkdir -p .sdlc/reviews
+  cp "{comment_file}" ".sdlc/reviews/${BRANCH_SAFE}-$(date +%Y-%m-%d).md"
   ```
 
 - `cancel` → no action. The comment is already visible in the terminal from Step 3.
@@ -196,7 +196,7 @@ Prompt:
 ```text
 No PR found. Options:
   1. Create a draft PR and attach this review as a comment
-  2. Save review to .claude/reviews/<branch>-<YYYY-MM-DD>.md
+  2. Save review to .sdlc/reviews/<branch>-<YYYY-MM-DD>.md
   3. Keep in terminal only
 ```
 
@@ -212,7 +212,7 @@ Prompt:
 
 ```text
 Reviewing local changes — no PR to post to. Options:
-  1. Save review to .claude/reviews/<branch>-<YYYY-MM-DD>.md
+  1. Save review to .sdlc/reviews/<branch>-<YYYY-MM-DD>.md
   2. Keep in terminal only
 ```
 

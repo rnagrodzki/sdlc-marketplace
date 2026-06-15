@@ -249,7 +249,7 @@ Post this review comment to PR #{number}? (yes / save / cancel)
 | Reply | Effect |
 |-------|--------|
 | `yes` | Posts the comment to the PR via `gh api repos/{owner}/{repo}/issues/{number}/comments -F body=@{comment_file}`. The `-F body=@<path>` form reads the body from the file, so markdown with backticks, quotes, or long content posts reliably — no shell escaping. |
-| `save` | Copies the comment to `.claude/reviews/<branch>-<YYYY-MM-DD>.md` (slashes in branch names are replaced with `-`). Does not post. |
+| `save` | Copies the comment to `.sdlc/reviews/<branch>-<YYYY-MM-DD>.md` (slashes in branch names are replaced with `-`). Does not post. |
 | `cancel` | No action. The review remains visible in the terminal only. |
 
 No additional orchestrator or dimension subagent is dispatched after your reply — the comment body was computed during the single orchestrator run and persisted to disk.
@@ -259,7 +259,7 @@ No additional orchestrator or dimension subagent is dispatched after your reply 
 ```text
 No PR found. Options:
   1. Create a draft PR and attach this review as a comment
-  2. Save review to .claude/reviews/<branch>-<YYYY-MM-DD>.md
+  2. Save review to .sdlc/reviews/<branch>-<YYYY-MM-DD>.md
   3. Keep in terminal only
 ```
 
@@ -269,7 +269,7 @@ Option 1 invokes `/pr-sdlc` in draft mode, then posts the comment to the newly c
 
 ```text
 Reviewing local changes — no PR to post to. Options:
-  1. Save review to .claude/reviews/<branch>-<YYYY-MM-DD>.md
+  1. Save review to .sdlc/reviews/<branch>-<YYYY-MM-DD>.md
   2. Keep in terminal only
 ```
 

@@ -25,7 +25,7 @@ Review complete
 ## File state
 
 `/tmp/review-diff-ghi789/review-comment.md` exists with the formatted comment body.
-`.claude/reviews/` is currently empty.
+`.sdlc/reviews/` is currently empty.
 
 ## User interaction
 
@@ -38,6 +38,6 @@ Post this review comment to PR #42? (yes / save / cancel)
 The user replied: **save**
 
 Describe precisely what the skill does. It must NOT call `gh api`. It MUST save the
-comment to `.claude/reviews/<branch>-<YYYY-MM-DD>.md` by copying the `Comment file`
+comment to `.sdlc/reviews/<branch>-<YYYY-MM-DD>.md` by copying the `Comment file`
 path from the summary. After saving, both the manifest file and the diff dir at
 `/tmp/review-diff-ghi789` must be cleaned up.

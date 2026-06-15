@@ -262,9 +262,9 @@
     # Must NOT invoke gh api
     - type: not-regex
       value: "gh api"
-    # Must NOT write anything under .claude/reviews/
+    # Must NOT write anything under .sdlc/reviews/
     - type: not-regex
-      value: '\.claude/reviews/[^"\s]*\.md'
+      value: '\.sdlc/reviews/[^"\s]*\.md'
     # Must clean up the diff dir from the summary
     - type: regex
       value: "(rm -rf.*review-diff-def456|/tmp/review-diff-def456.*(cleaned|removed|deleted))"
@@ -272,25 +272,25 @@
     - type: llm-rubric
       value: >
         The response acknowledges the cancel reply. It does NOT post via `gh api`. It does NOT
-        write any file under `.claude/reviews/`. It still cleans up the manifest file and the
+        write any file under `.sdlc/reviews/`. It still cleans up the manifest file and the
         diff dir at `/tmp/review-diff-def456` — cleanup runs on every terminal branch, including
         cancel. It does not re-dispatch the orchestrator.
 
-- description: "review-sdlc: post-confirmation save — copies comment to .claude/reviews, no gh api (issue #167)"
+- description: "review-sdlc: post-confirmation save — copies comment to .sdlc/reviews, no gh api (issue #167)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/review-sdlc/SKILL.md"
     project_context: "file://fixtures/review-post-confirm-save.md"
     user_request: >
       Continue the /review-sdlc flow. The orchestrator has already returned the summary shown
       in the project context and the user replied "save". Describe exactly what happens next,
-      including the filename under .claude/reviews/.
+      including the filename under .sdlc/reviews/.
   assert:
     # Must NOT invoke gh api
     - type: not-regex
       value: "gh api"
-    # Must save under .claude/reviews/<branch>-<date>.md
+    # Must save under .sdlc/reviews/<branch>-<date>.md
     - type: regex
-      value: '\.claude/reviews/feat-search-api-\d{4}-\d{2}-\d{2}\.md|\.claude/reviews/[^"\s]*search-api[^"\s]*\.md'
+      value: '\.sdlc/reviews/feat-search-api-\d{4}-\d{2}-\d{2}\.md|\.sdlc/reviews/[^"\s]*search-api[^"\s]*\.md'
     # Must reference the orchestrator-provided comment_file as the source
     - type: icontains
       value: "/tmp/review-diff-ghi789/review-comment.md"
@@ -301,7 +301,7 @@
     - type: llm-rubric
       value: >
         The response describes saving the consolidated comment to a file under
-        `.claude/reviews/` named `<branch>-<YYYY-MM-DD>.md` where branch is `feat/search-api`
+        `.sdlc/reviews/` named `<branch>-<YYYY-MM-DD>.md` where branch is `feat/search-api`
         (slashes replaced or preserved per project convention) and the date is today. The save
         is performed by copying from the orchestrator-provided `Comment file` path
         (`/tmp/review-diff-ghi789/review-comment.md`). It does NOT call `gh api`. After saving,
