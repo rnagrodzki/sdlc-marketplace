@@ -487,6 +487,35 @@
         change=add-resource-indicators ref=create-resourceindicator-component-ab12cd reason=not-found).
         The warning is queued and surfaced in Step 9 REPORT under "OpenSpec sync warnings:".
 
+# ---------------------------------------------------------------------------
+# BEST-EFFORT / NON-DETERMINISTIC — Dispatch resilience regression (#463, R-nested-dispatch-resilient)
+# This case demonstrates intent: when execute-plan-sdlc runs as a ship-sdlc subagent it must
+# still dispatch wave-runner Agents (nested Agent dispatch). Behavioral non-determinism means
+# this is a demonstration of intent, NOT a gate. The deterministic guard is in
+# execute-plan-sdlc-dispatch-resilience-exec.yaml (Task 3), which is the real regression anchor.
+# ---------------------------------------------------------------------------
+- description: "execute-plan-sdlc (#463, R-nested-dispatch-resilient): dispatches wave-runner when running as ship-sdlc subagent [BEST-EFFORT]"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/feature-branch-with-commits.md"
+    user_request: >
+      You are execute-plan-sdlc running as a subagent dispatched by ship-sdlc for a multi-wave plan.
+      You are NOT the top-level context — ship-sdlc invoked you via the Agent tool.
+      A 2-wave plan is loaded: Wave 1 has T1 (Standard) and Wave 2 has T2 (Standard).
+      Walk through Step 5b for Wave 1: dispatch the wave-runner Agent for this wave.
+      Show the Agent tool call parameters you would use.
+  assert:
+    # Behavioral: must dispatch wave-runner Agent (nested dispatch must occur)
+    - type: llm-rubric
+      value: >
+        The response proceeds to dispatch the wave-runner Agent for Wave 1 using the Agent
+        tool. The dispatch includes `model:` and `mode: bypassPermissions` parameters and
+        does NOT include `isolation:`. The response does NOT emit any self-blocking text
+        such as "no agent-dispatch tool available" or refuse to call the Agent tool on the
+        grounds of running as a subagent. Nested Agent dispatch is supported — being
+        dispatched as a subagent does not remove the Agent tool. The wave-runner dispatch
+        must occur; "no agent-dispatch tool available" must NOT appear.
+
 - description: "execute-plan-sdlc: archive suggestion suppressed when undocumented - [ ] tasks remain (R38, #414)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"

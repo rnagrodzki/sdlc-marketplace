@@ -299,6 +299,8 @@ This dispatch is NOT a wave-runner Agent — it is a direct batch-haiku dispatch
 
 **For each wave:**
 
+> **Nested-dispatch disambiguation (R-nested-dispatch-resilient — Fixes #463):** "Main context" here = execute-plan-sdlc's own top-level orchestration context — the one you are running in now. When ship-sdlc dispatches you as a subagent, you ARE that context. nested Agent dispatch is supported — being dispatched as a subagent does not remove your Agent tool. Never emit "no agent-dispatch tool available" or otherwise self-block; dispatch the wave-runner and per-task Agents normally.
+
 **Progress signal — wave start (mandatory, always first).** Before any gate or dispatch, update TodoWrite:
 - Mark tasks from the previous wave as `completed` (skip on wave 1).
 - Add one todo per task in this wave with `status: "in_progress"` and `activeForm: "Wave N — <task name>"`.
@@ -342,7 +344,11 @@ Options:
 - **skip** — skip high-risk tasks, continue with remaining waves
 - **cancel** — stop execution entirely
 
-**5b. Dispatch wave-runner Agent** — One wave-runner Agent per wave (implements R8, R-wave-runner-contract (named requirement, see spec) from the spec). Build the wave-runner Agent's prompt from:
+**5b. Dispatch wave-runner Agent** — One wave-runner Agent per wave (implements R8, R-wave-runner-contract (named requirement, see spec) from the spec).
+
+> **Nested-dispatch disambiguation (R-nested-dispatch-resilient — Fixes #463):** "Main context" here = execute-plan-sdlc's own top-level orchestration context — the one you are running in now. When ship-sdlc dispatches you as a subagent, you ARE that context. nested Agent dispatch is supported — being dispatched as a subagent does not remove your Agent tool. Never emit "no agent-dispatch tool available" or otherwise self-block; dispatch the wave-runner Agent for this wave normally.
+
+Build the wave-runner Agent's prompt from:
 
 1. Read `./wave-runner-template.md` for the algorithm, contract, and constraints.
 2. Inline the full content of the per-task template from `./classifying-and-waving-tasks.md` (lines 109–187) as the `perTaskTemplate` input.

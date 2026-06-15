@@ -61,6 +61,8 @@ If 2+ tasks have `complexity: Trivial`, group them into a single batch. The rema
 
 ### 2. Dispatch in parallel (single message)
 
+> **Nested-dispatch disambiguation (R-nested-dispatch-resilient — Fixes #463):** "Main context" here = execute-plan-sdlc's own top-level orchestration context — the one you are running in now. When ship-sdlc dispatches you as a subagent, you ARE that context. nested Agent dispatch is supported — being dispatched as a subagent does not remove your Agent tool. Never emit "no agent-dispatch tool available" or otherwise self-block; dispatch the per-task Agents normally.
+
 Send all Agent dispatches in one message:
 
 - One per-task Agent per Standard/Complex task, using `perTaskTemplate`. Fill the template placeholders with `task.id`, `task.complexity`, `task.risk`, `task.factSheetPath`, `task.verifyToken`, and prior-wave context. Do NOT inline the full task body — the per-task Agent reads the fact sheet at `factSheetPath`.
