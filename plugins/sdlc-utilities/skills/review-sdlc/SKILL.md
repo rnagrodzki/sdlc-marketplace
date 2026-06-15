@@ -182,7 +182,7 @@ Wait for the user's reply.
 - `save` → (implements `R-reviews-path` — canonical save target is `.sdlc/reviews/`)
 
   ```bash
-  BRANCH_SAFE="${branch//\//-}"
+  BRANCH_SAFE="${branch//[^a-zA-Z0-9_-]/-}"
   mkdir -p .sdlc/reviews
   cp "{comment_file}" ".sdlc/reviews/${BRANCH_SAFE}-$(date +%Y-%m-%d).md"
   ```
