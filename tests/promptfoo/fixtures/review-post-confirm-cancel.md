@@ -25,7 +25,7 @@ Review complete
 ## File state
 
 `/tmp/review-diff-def456/review-comment.md` exists with the formatted comment body.
-`.claude/reviews/` does not yet contain any entry for this branch.
+`.sdlc/reviews/` does not yet contain any entry for this branch.
 
 ## User interaction
 
@@ -38,5 +38,5 @@ Post this review comment to PR #42? (yes / save / cancel)
 The user replied: **cancel**
 
 Describe precisely what the skill does. It must NOT call `gh api`, must NOT write any
-file under `.claude/reviews/`, and must still clean up both the manifest file and the
+file under `.sdlc/reviews/`, and must still clean up both the manifest file and the
 diff dir at `/tmp/review-diff-def456`.
