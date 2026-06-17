@@ -1075,20 +1075,22 @@ function splitDiffByFile(rawDiff) {
 function getTagList(projectRoot) {
   const out = exec('git tag --list --sort=-v:refname', { cwd: projectRoot });
   if (!out) return [];
-  return out.split('\n').filter(tag => /^v?\d+\.\d+\.\d+/.test(tag));
+  return out.split('\n').filter(tag => /^v?\d+\.\d+\.\d+$/.test(tag));
 }
 
 /**
  * List semver-like tags pointing at HEAD, sorted by descending version (latest first).
  * Includes tags with or without a 'v' prefix (e.g., 'v1.2.3' or '1.2.3').
  * Returns an empty array when exec fails (not a git repo) or no matching tags exist.
+ * Pre-release tags (e.g. 'v1.2.3-rc.1') are intentionally excluded by the strict end
+ * anchor so they cannot falsely trigger the idempotency guard in version-sdlc.
  * @param {string} projectRoot
  * @returns {string[]}
  */
 function getTagsAtHead(projectRoot) {
   const out = exec('git tag --points-at HEAD --sort=-v:refname', { cwd: projectRoot });
   if (!out) return [];
-  return out.split('\n').filter(tag => /^v?\d+\.\d+\.\d+/.test(tag));
+  return out.split('\n').filter(tag => /^v?\d+\.\d+\.\d+$/.test(tag));
 }
 
 /**
