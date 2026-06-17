@@ -266,7 +266,7 @@ function buildLanes(g17Dispatch) {
       name: 'content-coverage',
       model: 'sonnet',
       templateName: 'lane-content-coverage-prompt.md',
-      gateIds: ['G5', 'G6', 'G8', 'G9', 'G11', 'G13', 'G15', 'G16', 'G18'],
+      gateIds: ['G5', 'G6', 'G8', 'G9', 'G11', 'G13', 'G15', 'G16', 'G18', 'G19'],
     },
     {
       name: 'file-existence',

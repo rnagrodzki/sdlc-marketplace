@@ -1,7 +1,7 @@
 # Step 3 Lane: Content-Coverage Gate Evaluation
 
 **Lane:** content-coverage
-**Gates owned:** G5, G6, G8, G9, G11, G13, G15, G16, G18
+**Gates owned:** G5, G6, G8, G9, G11, G13, G15, G16, G18, G19
 **Default model:** sonnet
 
 You are a plan critique lane agent. Your role is to evaluate the plan against the content-coverage quality gates listed below. These are judgement-heavy text-reading checks that require understanding the plan's intent, task descriptions, and coverage completeness.
@@ -50,13 +50,20 @@ Derive the task's plan type from its `Files:` paths:
 
 A **mixed-artifact** task (e.g. a `.js` file plus a `.md` prompt) is judged against its **dominant** artifact's column — the one its primary deliverable touches. A task that touches no artifacts (pure coordination) is exempt. Do NOT flag a task whose Contract pins a concrete, type-appropriate shape — only flag genuinely unsettled tasks.
 
+**G19 — Render concreteness (advisory):** Flag (severity "warning", blocking:false) any
+task whose Files:/Description touch a render-trigger surface (R46 catalog #1–#8) but
+whose body renders NO concrete artifact (fenced block / table / before→after diff) for
+it. Docs-typo / rename tasks touch no surface → NOT flagged (anti-bloat).
+
+---
+
 ## Output Schema
 
 Return a single JSON object as your final output (no prose after the JSON block):
 
 ```json
 {
-  "gateIds": ["G5", "G6", "G8", "G9", "G11", "G13", "G15", "G16", "G18"],
+  "gateIds": ["G5", "G6", "G8", "G9", "G11", "G13", "G15", "G16", "G18", "G19"],
   "issues": [
     {
       "gateId": "G6",
@@ -66,7 +73,7 @@ Return a single JSON object as your final output (no prose after the JSON block)
       "blocking": false
     }
   ],
-  "passes": ["G5", "G8", "G9", "G11", "G13", "G15", "G16", "G18"],
+  "passes": ["G5", "G8", "G9", "G11", "G13", "G15", "G16", "G18", "G19"],
   "laneStatus": "ok"
 }
 ```
@@ -78,7 +85,7 @@ Return a single JSON object as your final output (no prose after the JSON block)
 - `laneStatus` — `"ok"` when evaluation completed; `"failed"` when plan file unreadable
 
 **Severity:**
-- G6, G8, G9, G13, G15: `"warning"` (advisory) — misclassifications and citation gaps are correctable
+- G6, G8, G9, G13, G15, G19: `"warning"` (advisory) — misclassifications, citation gaps, and render-concreteness gaps are correctable
 - G11, G16, G18: `"error"` (blocking) — OpenSpec coverage gaps and unsettled contracts prevent safe execution
 - `blocking: true` maps to error severity; `blocking: false` maps to warning
 

@@ -163,6 +163,123 @@ artifact's column — the one its primary deliverable touches.
 
 ---
 
+## Concrete Artifacts (render don't narrate)
+
+### Principle
+
+When a task has a concrete artifact — a payload shape, a field delta, a state transition, a config
+change — **show it** as a fenced block, table, or before→after diff. Prose is for rationale only.
+Reviewers should be able to verify correctness by reading the artifact directly, not by reconstructing
+it from a description.
+
+### Surface-Conditional Trigger Table
+
+Render an artifact only when the task surface matches the trigger. Size-conditional: trivial
+docs/rename tasks with no structural change render nothing.
+
+| # | Artifact | Trigger (task surface) | Render-as (sourced convention) |
+|---|---|---|---|
+| 1 | API request/response payload | Adds/changes HTTP endpoint or consumes external API | HTTP/JSON, success + error paired (AIP-193) |
+| 2 | Data structure w/ marked field changes | Adds/modifies struct / schema / DTO / table item | Field-diff: `+`add `−`remove, `null`=remove, `…` elide unchanged (RFC 7386/6902) |
+| 3 | Operation end-state / outcome | Data-writing operation | Before→after record in the data's own shape (RFC 7386) |
+| 4 | Workflow now→after | Changes an existing flow | 2-col now→after table (text) — house-style |
+| 5 | State-transition table | Adds/changes a status enum / state machine | Transition table: from → event → to (Nygard ADR) |
+| 6 | Call-order | Multi-component interaction | Numbered call-order list (caller → callee → effect; text only) — house-style |
+| 7 | Config / flag / env delta | Adds env var / feature flag / default | Typed-op table: add/replace/remove (RFC 6902) |
+| 8 | Error / failure-mode | Non-trivial unhappy path | Canonical error table: condition → status/code/behaviour (AIP-193) |
+
+### Rendering Conventions
+
+One elided example per touched surface. Scale verbosity to change size.
+
+**#1 — API payload (RFC 7386 / AIP-193): success + error paired**
+
+```http
+POST /v1/tokens
+{ "userId": "u_42", "expiresIn": "1h" }
+
+200 OK
+{ "token": "eyJ…", "expiresAt": "2026-06-17T12:00:00Z" }
+
+400 Bad Request
+{ "error": { "code": 400, "status": "INVALID_ARGUMENT",
+             "message": "expiresIn must be a duration string" } }
+```
+
+**#2 — Field-diff (RFC 7386 / RFC 6902): `+`add `−`remove, `null`=remove, `…` elide unchanged**
+
+```diff
+  { "id": 7,
++   "status": "active",     # added member
+-   "legacyFlag": true,     # removed (null per RFC 7386 also removes)
+    … }                     # unchanged members elided (Google Design Docs)
+```
+
+**#3 — Before→after end-state (RFC 7386): original then modified record in the data's own shape**
+
+```
+Before:  { "id": 12, "status": "pending", "retries": 0, … }
+After:   { "id": 12, "status": "active",  "retries": 0, … }
+```
+
+**#4 — Workflow now→after (house-style): 2-column table**
+
+| Now | After |
+|---|---|
+| Request → Auth middleware → Handler | Request → Rate-limit → Auth middleware → Handler |
+| … | … |
+
+**#5 — State-transition table (Nygard ADR): from → event → to**
+
+| From | Event | To |
+|---|---|---|
+| `pending` | payment confirmed | `active` |
+| `active` | manual cancel | `cancelled` |
+| … | … | … |
+
+**#6 — Call-order (house-style): numbered list, text only — no mermaid/diagrams**
+
+```
+1. Client → POST /v1/tokens → TokenService
+2. TokenService → validate(payload) → Validator (returns ok | ValidationError)
+3. TokenService → sign(payload) → JwtUtil (returns token string)
+…
+```
+
+**#7 — Config/flag/env delta (RFC 6902): typed ops add/replace/remove**
+
+| Op | Key | Type | Value | Notes |
+|---|---|---|---|---|
+| add | `RATE_LIMIT_MAX` | integer | `100` | Requests per minute per IP |
+| replace | `LOG_LEVEL` | string | `"info"` | Was `"debug"` |
+| … | … | … | … | … |
+
+**#8 — Error/failure-mode (AIP-193): condition → status/code/behaviour**
+
+| Condition | HTTP status | Code | Behaviour |
+|---|---|---|---|
+| Token expired | 401 | `UNAUTHENTICATED` | Refresh flow triggered |
+| Token malformed | 401 | `UNAUTHENTICATED` | Request rejected, no refresh |
+| … | … | … | … |
+
+### Size Cap and Anti-Bloat
+
+- One elided example per touched surface (use `…` to elide unchanged members, rows, or steps).
+- Scale verbosity to change size: a one-field addition needs one diff line, not a full schema dump.
+- Trivial docs or rename tasks with no structural change: render nothing.
+- Over-detailing belongs in code review, not in the plan (Cvet: the #1 RFC failure mode).
+
+### References
+
+- RFC 7386 — JSON Merge Patch: <https://datatracker.ietf.org/doc/html/rfc7386>
+- RFC 6902 — JSON Patch: <https://datatracker.ietf.org/doc/html/rfc6902>
+- AIP-193 — Errors: <https://google.aip.dev/193>
+- Google Design Docs: <https://www.industrialempathy.com/posts/design-docs-at-google/>
+- Rust RFC template: <https://github.com/rust-lang/rfcs/blob/master/0000-template.md>
+- Nygard ADR: <https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions>
+
+---
+
 ## Out-of-scope OpenSpec tasks (optional)
 
 Present only when `--from-openspec` was used AND at least one OpenSpec task has no plan
@@ -258,10 +375,15 @@ Import path: `import { verifyToken } from '../utils/jwt'`.
 
 ## What NOT to Include in Plans
 
-- Full implementation code (code snippets for patterns are fine; complete implementations are not).
+- Full implementation code / full schema-IDL dumps (code snippets for patterns are fine; complete
+  implementations and full schema dumps are not).
   Exception: a task's `Contract.shape` pins signatures / sections / requirement deltas — not full
   bodies. A concrete Contract shape is the decided interface, not an implementation, and is NOT
   flagged by this rule.
+  EXCEPTION (R46): one capped, elided (`…`) review artifact per touched surface is encouraged — a
+  payload/field-diff/state-table is distinct from a full implementation body or schema dump, which
+  stay excluded. See `## Concrete Artifacts (render don't narrate)` for the 8-artifact catalog and
+  rendering conventions.
 - Absolute file paths (always use paths relative to project root)
 - Superpowers-specific directives or REQUIRED SUB-SKILL headers
 - References to tools or skills the executing agent should use
