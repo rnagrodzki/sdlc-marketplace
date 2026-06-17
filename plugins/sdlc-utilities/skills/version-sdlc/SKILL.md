@@ -182,7 +182,30 @@ If `branchGuard.active === true` AND `branchGuard.ok === false`:
 - Halt the skill immediately. Do NOT proceed to Step 3 (commit/tag/push).
 - Do NOT re-derive the current branch via shell commands — use the resolved `branchGuard` field only.
 
-If `branchGuard.active === false` (flag was not passed) or `branchGuard.ok === true` (branches match): proceed to Step 3.
+If `branchGuard.active === false` (flag was not passed) or `branchGuard.ok === true` (branches match): proceed to Step 2.6.
+
+### Step 2.6 (IDEMPOTENCY): HARD GATE — Already-Bumped Check
+
+**Implements R19 (docs/specs/version-sdlc.md).**
+
+Check `idempotency.alreadyBumped` from `VERSION_CONTEXT_JSON`.
+
+If `idempotency.alreadyBumped === true`:
+- Do NOT edit the version file, write CHANGELOG, `git add`, `git commit`, `git tag`, or `git push`.
+- Do NOT re-derive the HEAD tag via shell commands — use the resolved `idempotency` fields only.
+- Derive the effective `NEW_TAG` from the resolved fields:
+  ```
+  NEW_TAG = idempotency.headReleaseTags.find(t => t.replace(/^v/, '') === currentVersion) ?? idempotency.headReleaseTags[0]
+  ```
+  (`currentVersion` is `versionSource.currentVersion` from Step 1; `headReleaseTags` is pre-sorted `-v:refname` so `[0]` is the highest.)
+- Report the skip:
+  ```
+  status: skipped
+  reason: branch already carries release tag <NEW_TAG> — no bump performed
+  ```
+- Halt the release workflow here. Do NOT proceed to Step 3.
+
+If `idempotency.alreadyBumped === false` (or the field is absent): proceed to Step 3.
 
 ### Step 3 (CRITIQUE): Self-review Against Quality Gates
 

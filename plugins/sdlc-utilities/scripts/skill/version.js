@@ -34,7 +34,7 @@ const fs   = require('node:fs');
 const path = require('node:path');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { checkGitState, getTagList, getCommitsSinceRef, getCommitsBetweenRefs, getRemoteState } = require(path.join(LIB, 'git'));
+const { checkGitState, getTagList, getCommitsSinceRef, getCommitsBetweenRefs, getRemoteState, getTagsAtHead } = require(path.join(LIB, 'git'));
 const {
   detectVersionFile, readVersion, validateSemver,
   computeNextVersions, computePreRelease, parseConventionalCommit,
@@ -759,6 +759,29 @@ async function main() {
     return;
   }
 
+  // 6.5 Idempotency guard — skip if HEAD already carries a release tag
+  // (KD3: scoped to release flow only; excluded under --retag)
+  const headReleaseTags = getTagsAtHead(projectRoot);
+  const alreadyBumped = headReleaseTags.length > 0 && !args.retag;
+  if (alreadyBumped) {
+    writeOutput({
+      flow:           'release',
+      errors:         [],
+      warnings,
+      config,
+      currentBranch,
+      currentVersion,
+      versionSource,
+      headReleaseTags,
+      idempotency: {
+        alreadyBumped: true,
+        headReleaseTags,
+        reason: `HEAD already carries release tag ${headReleaseTags[0]} — branch already bumped; skipping to stay idempotent`,
+      },
+    }, 'version-context', 0);
+    return;
+  }
+
   // 7. Compute next versions
   const bumpOptions = computeNextVersions(currentVersion);
 
@@ -974,6 +997,11 @@ async function main() {
     changelog:          changelogOutput,
     remoteState,
     branchGuard,
+    idempotency: {
+      alreadyBumped: false,
+      headReleaseTags,
+      reason:        null,
+    },
   }, 'version-context', 0);
 }
 

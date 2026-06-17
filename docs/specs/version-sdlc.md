@@ -53,6 +53,7 @@
 
 - R-config-version (issue #232): The prepare script `skill/version.js` MUST call `verifyAndMigrate(projectRoot, 'project')` and `verifyAndMigrate(projectRoot, 'local')` at start. The call is short-circuited when CLI `--skip-config-check` OR env `SDLC_SKIP_CONFIG_CHECK=1` is present; both gates resolve into a single `flags.skipConfigCheck` boolean in the prepare output (CLI > env > default false). On migration failure the prepare emits non-zero exit and an `errors[]` entry naming the failing step; SKILL.md halts with that text verbatim.
   - Acceptance: prepare output includes `flags.skipConfigCheck` and a `migration` block (or null when skipped); SKILL.md gates further work on `errors.length === 0`.
+- R19: When the release flow is active (not `--retag`) and the HEAD commit already carries a semver release tag (i.e., a prior version-sdlc run already committed and tagged a release at the current HEAD), the bump MUST be a non-destructive skip — not a second increment — on both the `major`/`minor`/`patch` axis and the `-<label>.N` pre-release axis. The prepare script detects this by comparing HEAD SHA against all existing release-tag SHAs; if any release tag resolves to HEAD, `idempotency.alreadyBumped` is set to `true` and the script exits 0 without computing a new version. The guard MUST NOT fire under `--retag` (R-RETAG remains the authority for that flow). The guard MUST NOT over-block legitimate progression: a new commit since the last release moves HEAD off the tagged commit, making the guard inactive and allowing the bump to proceed normally.
 
 ## Workflow Phases
 
@@ -92,6 +93,7 @@
 - P10: `commits` (array) — commits since last tag, each with optional `ticketIds`
 - P11: `flags` (object: `{ preLabel, noPush, changelog, hotfix, auto }`) — parsed CLI flags
 - P12: `conflictsWithNext` (object: `{ major, minor, patch }`) — whether each tag already exists
+- P-idempotency: `idempotency` (object: `{ alreadyBumped: boolean, headReleaseTags: string[], reason: string | null }`) — emitted on the release flow; `alreadyBumped` is `true` when the HEAD commit already carries one or more semver release tags (see R19); `headReleaseTags` lists those tag names; `reason` is a human-readable explanation string when `alreadyBumped` is `true`, otherwise `null`. When `alreadyBumped` is `true` the prepare script exits 0 without computing a new version, and SKILL.md MUST skip the bump and inform the user that the release was already performed at HEAD.
 - P13: `remoteState` (object: `{ hasUpstream, remoteBranch }`) — upstream tracking state for current branch; `hasUpstream` is false when no upstream is configured
 - P14: `currentBranch` (string) — name of the currently checked-out branch
 

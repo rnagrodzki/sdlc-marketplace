@@ -1079,6 +1079,19 @@ function getTagList(projectRoot) {
 }
 
 /**
+ * List semver-like tags pointing at HEAD, sorted by descending version (latest first).
+ * Includes tags with or without a 'v' prefix (e.g., 'v1.2.3' or '1.2.3').
+ * Returns an empty array when exec fails (not a git repo) or no matching tags exist.
+ * @param {string} projectRoot
+ * @returns {string[]}
+ */
+function getTagsAtHead(projectRoot) {
+  const out = exec('git tag --points-at HEAD --sort=-v:refname', { cwd: projectRoot });
+  if (!out) return [];
+  return out.split('\n').filter(tag => /^v?\d+\.\d+\.\d+/.test(tag));
+}
+
+/**
  * Return structured commit objects since a given ref (tag, commit, etc.) up to HEAD.
  * If sinceRef is empty or null, returns ALL commits in the repository.
  * Uses the same separator-based parsing as getCommitsStructured.
@@ -1340,6 +1353,7 @@ module.exports = {
   splitDiffByFile,
   // Version-specific
   getTagList,
+  getTagsAtHead,
   getCommitsSinceRef,
   getCommitsBetweenRefs,
   // Received-review-specific
