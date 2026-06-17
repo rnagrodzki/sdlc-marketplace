@@ -15,6 +15,7 @@
 #   plan-g17-pure-refactor-suppressed  -- CORRECT: pure-refactor markers suppress B-criteria, empty findings (Fixes #417)
 #   plan-contract-code                 -- CORRECT: non-OpenSpec code plan; settled + unsettled + mixed-artifact tasks; exercises G18 settlement gate (Fixes #459)
 #   plan-contract-docs                 -- CORRECT: docs/openspec plan; settled + unsettled tasks; exercises G18 settlement gate (Fixes #459)
+#   plan-render-artifacts              -- CORRECT: code plan with T1 (renders conventions: payload pair, field-diff, state table), T2 (narrates only), T3 (docs-typo); exercises G19 render-don't-narrate gate (R46, Fixes #470)
 
 # --- Fan-out parallelization cases (P1/P2/P3 — Fixes #418) ---
 
@@ -38,7 +39,7 @@
         (3) the main agent JOINs on all five lanes before writing the critiqueRan marker;
         (4) the guardrailsEvaluated marker fires only after the guardrail-compliance lane
         (lanes[3]) returns — not before;
-        (5) all 17 gate IDs (G1–G17) are covered across the 5 lanes with no gate
+        (5) all 19 gate IDs (G1–G19) are covered across the 5 lanes with no gate
         appearing in two lanes (disjoint partitioning).
 
 - description: "plan-sdlc: P2-fanout — Step 5 dispatches 2-3 lens reviewers in a single message per iteration for >=5-task plans (Fixes #418)"
@@ -956,3 +957,92 @@
         response finds Task 3 SATISFIED / NOT flagged because its Contract pins concrete code
         shape (the two exported message constants with values). The derivation of plan type
         from Files: paths and the dominant-column tie-break are applied, not assumed.
+
+# --- G19 render-don't-narrate gate (R46, G19 — Fixes #470) ---
+
+- description: "plan-sdlc: Step 2 renders HTTP payload for an API task (R46, G19, #470)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    user_request: >
+      Run /plan-sdlc Step 2. Author a task block for an endpoint that adds a
+      PUT /orgs/{id} route accepting {name, status} and returning 204 / 400.
+  assert:
+    - type: icontains
+      value: "```"
+    - type: llm-rubric
+      value: >
+        The task output RENDERS an HTTP payload (request + response shapes) as a fenced
+        block, not prose describing them. The rendered block shows at minimum a request
+        body and at least one response shape (success or error).
+
+- description: "plan-sdlc: Step 2 renders nothing for a docs-typo task (R46, G19, #470)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    user_request: >
+      Run /plan-sdlc Step 2. Author a task block for fixing a typo in README.md.
+  assert:
+    - type: llm-rubric
+      value: >
+        The task body does not contain a rendered payload, field-diff table, or
+        state-transition table. The task is trivial (docs-typo) and renders no concrete
+        artifact per R46. It is acceptable for the task to have a short description and
+        acceptance criteria only.
+
+- description: "plan-sdlc: G19 PASSES Task 1 that renders all three required artifact conventions (R46, G19, #470)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-render-artifacts.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G19 render-don't-narrate gate for Task 1
+      ("PUT /orgs/{id} — update name and status") in the plan. Task 1 renders a
+      success+error payload pair, a +/-/null field-diff table with elision, and a
+      state-transition table. Is Task 1 flagged by G19?
+  assert:
+    - type: icontains
+      value: "G19"
+    - type: llm-rubric
+      value: >
+        The response evaluates the G19 render-don't-narrate gate and finds Task 1
+        SATISFIED / NOT flagged: its Rendered artifacts section contains a fenced JSON
+        block with success and error responses (artifact #1, AIP-193), a markdown table
+        showing +/-/null field changes with … elision (artifact #2, RFC 7386/6902), and
+        a from→event→to state-transition table (artifact #5, Nygard). G19 does not block
+        on Task 1.
+
+- description: "plan-sdlc: G19 FLAGS Task 2 (renderable surface narrated only) as advisory warning, non-blocking (R46, G19, #470)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-render-artifacts.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G19 render-don't-narrate gate for Task 2
+      ("POST /orgs — create organisation") in the plan. Task 2 touches an HTTP endpoint
+      surface but only describes the payload in prose, renders no fenced block or table.
+      Is Task 2 flagged by G19? Does G19 block the plan?
+  assert:
+    - type: icontains
+      value: "G19"
+    - type: llm-rubric
+      value: >
+        The response evaluates the G19 gate and FLAGS Task 2 with a warning: it touches a
+        renderable HTTP-endpoint surface but narrates the payload/shape in prose instead of
+        rendering a concrete artifact. The response confirms G19 is advisory (warning
+        severity, non-blocking) — the plan is NOT blocked and can still be finalized.
+
+- description: "plan-sdlc: G19 does NOT flag Task 3 (docs-typo, no renderable surface) — anti-bloat (R46, G19, #470)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-render-artifacts.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G19 render-don't-narrate gate for Task 3
+      ("Fix typo in README.md") in the plan. Task 3 touches only README.md with a
+      trivial typo fix. Does G19 demand a rendered artifact for Task 3?
+  assert:
+    - type: icontains
+      value: "G19"
+    - type: llm-rubric
+      value: >
+        The response evaluates the G19 gate and finds NO finding for Task 3: it is a
+        trivial docs-typo task with no renderable surface (no HTTP endpoint, no data
+        structure, no state machine). G19 does not demand a rendered artifact for trivial
+        tasks. The response must NOT flag Task 3 — flagging a typo fix is a false positive
+        that G19 explicitly avoids per the anti-bloat rule.

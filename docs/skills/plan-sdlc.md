@@ -71,7 +71,7 @@ For 4+ file scopes, plan-sdlc dispatches a parallel dynamic-dimension orchestrat
 
 **Step 2 — Decompose.** Same as today, but each Standard/Complex task must cite ≥1 `F-<DIM>-<n>` ID or be marked "out-of-scope addition" with rationale. Trivial tasks exempt. When web/hybrid ran, Key Decisions explicitly **ADOPTS**, **REJECTS-with-rationale**, or marks **NOT-APPLICABLE** each web finding by ID.
 
-**Step 3 — Critique (5-lane parallelized).** All 18 quality gates (G1–G18) are partitioned across five lanes and dispatched in a single message as parallel Agent calls — one subagent per lane. The lanes run concurrently; Step 3 completes only after **all five lanes have returned** (JOIN barrier). One new gate row (G15): brief-citation coverage. Error severity when brief was produced; not-applicable when fallback ran. Lane 3 is the guardrail-compliance lane — `guardrailsEvaluated` fires when lane 3 returns. `critiqueRan` fires after all five lanes join.
+**Step 3 — Critique (5-lane parallelized).** All 19 quality gates (G1–G19) are partitioned across five lanes and dispatched in a single message as parallel Agent calls — one subagent per lane. The lanes run concurrently; Step 3 completes only after **all five lanes have returned** (JOIN barrier). Notable gates: G15 (brief-citation coverage — error severity when brief was produced, not-applicable when fallback ran), G18 (contract concreteness — error severity, blocks approval), G19 (render-don't-narrate — advisory). Lane 3 is the guardrail-compliance lane — `guardrailsEvaluated` fires when lane 3 returns. `critiqueRan` fires after all five lanes join.
 
 **Step 5 — Reviewer.** plan-reviewer-prompt gains a `{BRIEF_FILE}` input plus two gate rows: *exploration provenance* (uncited Standard/Complex tasks blocking) and *best-practice traceability* (silent omission of a web finding blocking). The reviewer also uses the multi-lens fan-out (R36): review dimensions are dispatched in parallel across the same five-lane structure, with each lane receiving `{REQUIREMENTS_SUMMARY}` (the numbered requirements list captured from the Step 1 CONSUME pass) so independent lenses can check requirement coverage without repeating work.
 
@@ -246,7 +246,7 @@ The plan format is identical regardless of mode, so `/execute-plan-sdlc` loads i
 
 | File / Artifact | Description |
 |-----------------|-------------|
-| `<plansDirectory>/YYYY-MM-DD-<feature-name>.md` | The written plan document (normal mode). Starts as a skeleton header at Step 0 and grows incrementally: header fields and Requirements section added at Step 1, task blocks at Step 2, critique fixes applied at Steps 4 and 6. Path resolved from: user-specified → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → `~/.claude/plans/` fallback. |
+| `<plansDirectory>/YYYY-MM-DD-<feature-name>.md` | The written plan document (normal mode). Starts as a skeleton header at Step 0 and grows incrementally: header fields and Requirements section added at Step 1, task blocks at Step 2, critique fixes applied at Steps 4 and 6. Artifact-touching tasks include rendered concrete artifacts — fenced payload blocks, before→after diffs, table schemas — embedded in the task body where the render-don't-narrate gate (G19) applies. Path resolved from: user-specified → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → `~/.claude/plans/` fallback. |
 | Plan mode designated file | When Claude Code plan mode is active, the plan is written to the system-designated file path instead of the above. Same incremental build process applies. The path appears in the plan mode system banner. |
 | `.sdlc/learnings/log.md` | Planning learnings appended after writing: scope decisions, clarification patterns, decomposition issues. |
 | `os.tmpdir()/sdlc-explore-<branchSlug>-XXXX/discovery-brief.md` | Dynamic-dimension discovery brief produced by `plan-explore-orchestrator` for 4+ file scopes. Contains per-dimension findings with stable `F-<DIM>-<n>` IDs, a contradictions section, and (when web/hybrid dimensions ran) a `## Best-Practice Synthesis` section. Wiped by EXIT/INT/TERM trap after Step 1 completes. Orphans swept by `ship-sdlc --gc`. |
@@ -393,6 +393,32 @@ A mixed-artifact task is judged against its dominant artifact's column.
 
 For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R45, G18.
 
+### Render-don't-narrate concrete artifacts (G19)
+
+G19 is **advisory** (non-blocking): it flags a task that touches a render-trigger
+surface but narrates instead of rendering. The author renders the artifact as
+plain-markdown text — fenced block / table / before→after diff; no diagrams.
+
+**Render-trigger surfaces** — G19 fires when the task touches any of:
+
+| Surface | Example signal in task body |
+|---|---|
+| REST / RPC endpoint | `PUT /orgs/{id}`, `POST /tokens`, `GET /items` |
+| CLI flag or config key | `--dry-run`, `SDLC_LINKS_OFFLINE=1` |
+| Structured schema / model | database table, JSON schema, event envelope |
+| State / flow / enum | status transitions, lifecycle states, permission levels |
+| Frontmatter / manifest contract | `plugin.json` fields, `Contract:` block keys |
+| Error taxonomy | error codes, HTTP status map |
+
+**Anti-bloat carve-out:** G19 is **not-applicable** for trivial tasks (Trivial complexity, or tasks whose only files match `docs/**`, `*.md` outside skills, or pure rename/move). These tasks have no render-trigger surface worth flagging.
+
+A task adding `PUT /orgs/{id}` renders the payload instead of describing it:
+
+    Request  PUT /orgs/{id}   { "name": "Acme", "status": "active" }
+    Response 204 (no body)  |  400 { "code": "INVALID_STATUS", "message": … }
+
+For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R46, G19.
+
 ### Gate A — Intake Audit (R39 — Fixes #445)
 
 When `--from-openspec` is active and the delta-spec requirement inventory is available (see "Requirement Inventory" below), plan-sdlc dispatches a **Gate A intake audit** before task decomposition. Gate A audits the SOURCE change artifacts — not the plan — across three dimensions:
@@ -414,7 +440,7 @@ Severity is assigned **per check** (not per dimension), matching the opsx:verify
 
 ### Gate B — Verification Scorecard (R40 — Fixes #445)
 
-At Step 5 (after the lens merge), plan-sdlc assembles a **`## Verification Scorecard`** section in the plan file. This is purely additive — the G1–G18 gate definitions, `buildLanes`, and the `{G1..G18}` union assertion are unchanged (R42). The scorecard contains:
+At Step 5 (after the lens merge), plan-sdlc assembles a **`## Verification Scorecard`** section in the plan file. This is purely additive — the G1–G19 gate definitions, `buildLanes`, and the `{G1..G19}` union assertion are unchanged (R42). The scorecard contains:
 
 1. **Dimension table** — CRITICAL/WARNING/SUGGESTION/PASS counts by dimension (Completeness / Correctness / Coherence), aggregated from lens findings that carry severity tags.
 2. **Traceability matrix** — one row per requirement from the inventory (`openspecContext.requirements[]`), showing covering task(s) and status (covered / partial / uncovered). When the inventory is null (CLI absent), falls back to the Step 1 requirements checklist with a noted downgrade.

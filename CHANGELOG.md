@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.21.9] - 2026-06-17
+
+### Added
+- plan-sdlc: G19 advisory gate enforcing concrete artifacts (not narrative prose) on tasks touching render-trigger surfaces (catalog #1–#8); non-blocking, warning severity (#470)
+- version-sdlc: idempotency guard — skip release bump when HEAD is already tagged with a release tag, preventing duplicate releases (#468)
+
+### Fixed
+- review-sdlc: migrate review save path to `.sdlc/reviews/` directory and sanitize branch-derived filenames (#466)
+
 ## [0.21.7] - 2026-06-16
 
 ### Fixed
