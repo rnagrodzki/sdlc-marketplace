@@ -182,7 +182,36 @@ If `branchGuard.active === true` AND `branchGuard.ok === false`:
 - Halt the skill immediately. Do NOT proceed to Step 3 (commit/tag/push).
 - Do NOT re-derive the current branch via shell commands — use the resolved `branchGuard` field only.
 
-If `branchGuard.active === false` (flag was not passed) or `branchGuard.ok === true` (branches match): proceed to Step 3.
+If `branchGuard.active === false` (flag was not passed) or `branchGuard.ok === true` (branches match): proceed to Step 2.6.
+
+### Step 2.6 (IDEMPOTENCY): HARD GATE — Already-Bumped Check
+
+**Implements R19 (docs/specs/version-sdlc.md).**
+
+Check `idempotency.alreadyBumped` from `VERSION_CONTEXT_JSON`.
+
+**Guard — absent/null `idempotency` object (version skew):** If `VERSION_CONTEXT_JSON` does not contain an `idempotency` key, or its value is `null`, treat `alreadyBumped` as `false` and proceed to Step 3. Do NOT attempt to access sub-fields on an absent/null object.
+
+If `idempotency.alreadyBumped === true`:
+- Do NOT edit the version file, write CHANGELOG, `git add`, `git commit`, `git tag`, or `git push`.
+- Do NOT re-derive the HEAD tag via shell commands — use the resolved `idempotency` fields only.
+- Derive the effective `NEW_TAG` from the resolved fields:
+  ```
+  const tags = idempotency.headReleaseTags;
+  NEW_TAG = (tags && tags.length > 0)
+    ? (tags.find(t => t.replace(/^v/, '') === currentVersion) ?? tags[0])
+    : undefined;
+  ```
+  (`currentVersion` is `versionSource.currentVersion` from Step 1; `headReleaseTags` is pre-sorted `-v:refname` so `[0]` is the highest. If `headReleaseTags` is empty or absent, `NEW_TAG` is `undefined` — report without a tag name.)
+- Report the skip:
+  ```
+  status: skipped
+  reason: branch already carries release tag <NEW_TAG> — no bump performed
+  ```
+  If `NEW_TAG` is `undefined`, report: `reason: HEAD already tagged (tag name unavailable) — no bump performed`.
+- Halt the release workflow here. Do NOT proceed to Step 3.
+
+If `idempotency.alreadyBumped === false` (or the `idempotency` field is absent/null): proceed to Step 3.
 
 ### Step 3 (CRITIQUE): Self-review Against Quality Gates
 

@@ -207,6 +207,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'revise-release', label: 'Revise release plan', type: 'llm', description: 'Fixes quality gate failures from critique' },
       { id: 'present-plan', label: 'Present release plan', type: 'user', description: 'Shows version, tag, changelog flag; awaits approval' },
       { id: 'verify-preconditions', label: 'Verify pre-conditions', type: 'verify', description: 'Checks tag conflicts, uncommitted changes, git identity' },
+      { id: 'check-idempotency', label: 'Idempotency gate (Step 2.6)', type: 'verify', description: 'Detects release tags already at HEAD; skips bump if branch already tagged to stay idempotent' },
       { id: 'check-ci', label: 'Check CI scripts', type: 'verify', description: 'Verifies installed retag/changelog scripts are current' },
       { id: 'execute-release', label: 'Execute release', type: 'script', description: 'Atomically: bump version, changelog, commit, tag, push' },
     ],
