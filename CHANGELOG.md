@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.9] - 2026-06-17
+
+### Added
+- plan-sdlc: G19 advisory gate (render-don't-narrate) — tasks touching render-trigger surfaces must render concrete artifacts (fenced block / table / before→after diff) rather than describe them in prose; not-applicable for trivial/docs/rename tasks (#470)
+- plan-sdlc: explicit G18 and G19 named gate definitions in SKILL.md alongside R45/R46 rules; G19 cross-reference added to R46 rule block; Gate B guard clause restored to correct MUST NOT structure (#470)
+
+### Changed
+- plan-sdlc: render-trigger surface catalog extended with "State / flow / enum" row (#470)
+- plan-sdlc: Step 3 description updated in docs to enumerate notable gates (G15, G18, G19) replacing stale single-gate parenthetical (#470)
+- plan-sdlc: site skill card tagline and critique-plan pipeline step updated to reflect G19 enforcement (#470)
+
 ### Changed
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
