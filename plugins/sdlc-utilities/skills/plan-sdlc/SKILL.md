@@ -77,7 +77,17 @@ Write an implementation plan from requirements, a spec, or a user description. P
 **Verification:** [TBD]
 
 ---
+
+## Deviations & assumptions
+
+| Item | asked | does | why |
+|---|---|---|---|
+| [TBD] | [what was asked] | [what the plan does] | [rationale] |
+
+---
 ```
+
+The `## Deviations & assumptions` section (implements R47) is a required top-of-plan section. Leave the placeholder row until Step 1/2 populates it (or note "none" when the plan matches the request exactly). Presence is enforced deterministically by the `validate-plan-format.js` PF6 check — not by an LLM gate.
 
 **Context detection and guardrail loading (skill/plan.js):**
 
@@ -315,9 +325,9 @@ Plan tasks NOT derived from any OpenSpec task MUST omit the field. N:1 mapping (
 - Modify: `exact/path/to/existing.ts` — [what changes]
 - Test: `tests/exact/path/to/test.ts`
 
-**Description:**
-[What to implement, how it connects to existing code, expected behavior, edge cases.
-Complete enough that an agent with no codebase context can execute it.]
+**Notes:** (optional — rationale only, ≤5 lines; the "what" lives in Files/Contract/Acceptance)
+[Why this approach, non-obvious constraints, or assumptions. The executable shape lives in
+Files + Contract + Acceptance criteria — do not restate it here.]
 
 **Acceptance criteria:**
 - [ ] [Specific, verifiable criterion]
@@ -335,9 +345,13 @@ Complete enough that an agent with no codebase context can execute it.]
 
 **G18 — Settlement / contract concreteness (error-severity):** Flags any artifact-touching task whose `Contract:` is absent or merely restates "update X to do Y" without a concrete type-appropriate shape. Owned by the content-coverage lane. Blocks plan approval until the Contract pins the decided shape.
 
-**Render don't narrate (surface-conditional — implements R46):** When a task touches a concrete-artifact surface (payload, struct/schema field change, status enum, flow, config/flag delta, error mode, data-writing end-state), RENDER the artifact (fenced block / table / before→after diff) — do not describe it in prose. Use the catalog + conventions in ./plan-format-reference.md. Cap: one elided (…) example per surface. Trivial docs/rename tasks render nothing. (Plain-text only — no diagrams/MDX.) A task whose concrete-artifact surface is described in prose rather than rendered is flagged by G19 in Step 3.
+**Render don't narrate (surface-conditional — implements R46):** When a task touches a concrete-artifact surface (payload, struct/schema field change, status enum, flow, config/flag delta, error mode, data-writing end-state), RENDER the artifact (fenced block / table / before→after diff) — do not describe it in prose. Use the catalog + conventions in ./plan-format-reference.md. Cap: one elided (…) example per distinct contract shape (a distinct contract shape is one unique combination of method + path for REST, or flag + type for CLI — two endpoints with the same method but different paths are distinct shapes). Trivial docs/rename tasks render nothing. (Mermaid fenced blocks allowed for flow/call-order/state surfaces; no MDX.) A task whose concrete-artifact surface is described in prose rather than rendered is flagged by G19 in Step 3.
 
-**G19 — Render-don't-narrate (advisory):** Flags a task that touches a render-trigger surface (REST/RPC endpoint, CLI flag, schema field, status enum, state/flow/enum, config delta, error taxonomy) but describes it in prose instead of rendering a fenced block, table, or before→after diff. Advisory severity — does not block plan approval. Owned by the content-coverage lane. Not-applicable for trivial tasks and pure docs/rename tasks.
+**G19 — Render-don't-narrate (error-severity):** Flags a task that touches a render-trigger surface (REST/RPC endpoint, CLI flag, schema field, status enum, state/flow/enum, config delta, error taxonomy) but describes it in prose instead of rendering a fenced block, table, or before→after diff. Owned by the content-coverage lane. Blocks plan approval until the surface is rendered. Not-applicable for trivial tasks and pure docs/rename tasks.
+
+**G20 — Notes rationale-only (error-severity):** Flags a `Notes:` block that restates the task's Contract/acceptance instead of carrying only rationale. Owned by the content-coverage lane (lanes[1]). Blocks plan approval until the `Notes:` block is rationale-only.
+
+**G21 — Self-contained code refs (error-severity):** Flags a bare `file:line` change reference not anchored with surrounding lines (or the full function body) plus an inline diff. A `file:line` used as a pointer / `Contract.mirror` precedent anchor is exempt. Owned by the content-coverage lane (lanes[1]). Blocks plan approval until the reference is self-contained.
 
 **Verification strategy — match to task type:**
 - Feature/logic → TDD (write failing test, implement, pass)
@@ -347,7 +361,7 @@ Complete enough that an agent with no codebase context can execute it.]
 
 Do not mandate TDD for config, documentation, or infrastructure tasks.
 
-**Write to plan file:** Append Key Decisions section (if applicable) and all task blocks.
+**Write to plan file:** Append Key Decisions section (if applicable) and all task blocks. Populate the top-of-plan `## Deviations & assumptions` table (implements R47): one row per place the plan diverges from or assumes beyond the literal request (columns Item | asked | does | why). When the plan matches the request exactly, replace the placeholder row with a single "none" row. **De-dup rationale convention (implements R52):** Each decision gets one rationale entry — do not duplicate rationale across multiple decisions for the same topic.
 
 **Post-write cleanup:** Remove the `## Requirements` working section from the plan file. Requirements are traceable through task acceptance criteria; the section was temporary scaffolding.
 
@@ -357,7 +371,7 @@ Do not mandate TDD for config, documentation, or infrastructure tasks.
 
 **Fan-out dispatch: Dispatch ALL FIVE Step 3 lanes from `lanes[]` (P16) in a SINGLE message as parallel Agent tool calls. Do not dispatch them sequentially.**
 
-All 19 quality gates (G1–G19) are partitioned across five lanes — each gate belongs to exactly one lane. Lane dispatch parameters (`subagent_type`, `model`, and prompt body read from `promptTemplatePath`) MUST be sourced verbatim from the corresponding `lanes[i]` entry in the prepare output (`agent-dispatch-script-driven` guardrail — do NOT hardcode these values).
+All 21 quality gates (G1–G21) are partitioned across five lanes — each gate belongs to exactly one lane. G20 and G21 are owned by the content-coverage lane (lanes[1]). Lane dispatch parameters (`subagent_type`, `model`, and prompt body read from `promptTemplatePath`) MUST be sourced verbatim from the corresponding `lanes[i]` entry in the prepare output (`agent-dispatch-script-driven` guardrail — do NOT hardcode these values).
 
 For each `lanes[i]` entry (i = 0..4):
 
@@ -391,7 +405,7 @@ Lane 4 (dimension-coverage/G17) returns the G17 findings JSON — parse the `fin
 **Merge algorithm:**
 1. `allIssues` = union of `issues[]` from all lanes
 2. `allPasses` = union of `passes[]` from all lanes
-3. `coverageCheck`: the union of all `gateIds[]` arrays returned by lanes MUST equal {G1..G19} exactly. Any missing gate ID → add a blocking issue: `{ gateId: "<missing>", severity: "error", message: "Gate <missing> not evaluated by any lane", blocking: true }`
+3. `coverageCheck`: the union of all `gateIds[]` arrays returned by lanes MUST equal {G1..G21} exactly. Any missing gate ID → add a blocking issue: `{ gateId: "<missing>", severity: "error", message: "Gate <missing> not evaluated by any lane", blocking: true }`
 4. Lane returning `laneStatus !== "ok"`: append to `allIssues` as blocking error `{ gateId: "lane-failure", severity: "error", message: "Lane <name> failed: <reason> — gate IDs <list> not evaluated", blocking: true }` — **exception: G17 lane (lanes[4]) failure is advisory, not blocking** (per R31 dispatch-failure fallback)
 5. Dedup `allIssues` by `(gateId, taskRef, message-normalized-prefix)` — keep first occurrence
 
@@ -417,7 +431,7 @@ SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/pla
 
 ## Step 4 (IMPROVE): Revise Plan and Present for Approval
 
-Fix all issues from Step 3. Rewrite the plan file with fixes applied (edit the existing file, don't append).
+Fix all issues from Step 3. Rewrite the plan file with fixes applied (edit the existing file, don't append). If any revision changes the scope or approach from what was originally recorded, update the `## Deviations & assumptions` table accordingly.
 
 **G16 (OpenSpec tasks.md coverage) failure resolution:** When G16 reports uncovered OpenSpec task entries, resolve each one by EITHER (a) adding a plan task with the missing `openspec-task` block carrying the corresponding `ref`, OR (b) appending the uncovered title under the `## Out-of-scope OpenSpec tasks` section with a one-line rationale. Both paths are valid; choose based on whether the implementation actually covers the work.
 
@@ -476,7 +490,7 @@ When `lensReviewers[i].promptTemplatePath` is null, skip that lens and log to `.
 
 **Gate B — Verification Scorecard (implements R40, R42, R44 — Fixes #445):**
 
-After the merge step, assemble the `## Verification Scorecard` section in the plan file. This is purely additive — it MUST NOT remove or alter any existing gate evaluation, `buildLanes`, or the `{G1..G19}` union assertion. G1–G18 definitions are unchanged; G19 is the additive extension introduced by R46. The scorecard is regenerated (replaced, not appended) on each Step 5 iteration (R44).
+After the merge step, assemble the `## Verification Scorecard` section in the plan file. This is purely additive — it MUST NOT remove or alter any existing gate evaluation, `buildLanes`, or the `{G1..G21}` union assertion. G1–G18 unchanged; G19 severity promoted (R46 mod); G20 additive (R48); G21 additive (R51). The scorecard is regenerated (replaced, not appended) on each Step 5 iteration (R44).
 
 **Pass `{REQUIREMENTS_JSON}` to lens reviewers as a new template variable** (in addition to the existing variables above):
 - `{REQUIREMENTS_JSON}` — `JSON.stringify(openspecContext.requirements)` when the inventory is present; `"null"` when `openspecContext.requirements` is null (CLI absent or non-OpenSpec plan). This is null-safe: lens prompts render it as `"none — inventory unavailable, use checklist"` when null.
@@ -503,7 +517,7 @@ After the merge step, assemble the `## Verification Scorecard` section in the pl
 
 ## Step 6 (IMPROVE): Apply Review Fixes
 
-Fix each blocking issue identified by the reviewer. Rewrite the plan file with fixes applied.
+Fix each blocking issue identified by the reviewer. Rewrite the plan file with fixes applied. If any revision changes the scope or approach from what was originally recorded, update the `## Deviations & assumptions` table accordingly.
 
 **Gate B verdict wiring (implements R41 — Fixes #445):** The Gate B Verification Scorecard verdict is treated as an additional blocking-issue source using the same `Issues Found` path. This avoids divergent gate phrasing (`no-opposite-logical-vectors` guardrail) — the CRITICAL verdict does not have a separate code path; it injects findings into the same blocking-issue set that the `Issues Found` path already processes.
 
@@ -586,6 +600,7 @@ Then call ExitPlanMode. Do NOT invoke execute-plan-sdlc or ship-sdlc in this tur
 - Ignore plan mode's designated file path when plan mode is active — always write to it
 - Use TodoWrite for lightweight plans — it adds overhead without value
 - Prompt the user at Step 0 session-recovery or Step 4 — those steps are autonomous (single-touchpoint at Step 7, implements R22/R23)
+- Treat G19 findings as advisory — G19 is error-severity and blocks plan approval
 
 ## Gotchas
 

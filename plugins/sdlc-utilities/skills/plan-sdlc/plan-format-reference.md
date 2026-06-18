@@ -21,6 +21,24 @@ Every plan document must begin with this header:
 
 All four fields are required. `execute-plan-sdlc` uses `Verification` as the default test command.
 
+## Deviations & assumptions (required)
+
+Every plan must carry a top-of-plan `## Deviations & assumptions` section, placed immediately after
+the document header (before `## Key Decisions`). It records each way the plan diverges from, or
+assumes beyond, the literal request — so reviewers can audit intent without reconstructing it.
+
+```markdown
+## Deviations & assumptions
+
+| Item | asked | does | why |
+|---|---|---|---|
+| Notification delivery | "send notifications" | dispatches via a background queue | decouples request latency from delivery; mirrors existing worker pattern |
+| Retry policy | (not specified) | adds 3-attempt exponential backoff | transient broker failures must not drop messages |
+```
+
+The columns are `Item | asked | does | why`. When a plan introduces no divergences or assumptions,
+render the header with a single row stating "none". The section is required on every plan.
+
 ## Key Decisions (optional)
 
 Capture architecture and design decisions made during planning that executing agents need to understand. Place this section between the document header and the first task block.
@@ -76,10 +94,11 @@ Present when `plan.guardrails` are configured in `.sdlc/config.json`. Produced b
 - Modify: `exact/relative/path/to/existing.ts` — [one line: what changes]
 - Test: `tests/exact/relative/path/to/test.ts`
 
-**Description:**
-[Full description of what to implement: what to build, how it connects to existing code,
-expected behavior, edge cases to handle. Include code snippets for non-obvious patterns.
-Complete enough that an agent with no codebase context can execute it.]
+**Notes:** (optional — rationale only, ≤5 lines; the "what" lives in Files/Contract/Acceptance)
+[Why this is built the way it is — non-obvious constraints, trade-offs, or context an agent needs
+to make the right call. Omit when the Files/Contract/Acceptance triple already says everything.
+Do NOT restate signatures, sections, or acceptance bullets here — that is the Contract's job, and
+concrete artifacts are rendered per `## Concrete Artifacts (render don't narrate)`.]
 
 **Acceptance criteria:**
 - [ ] [Specific, verifiable criterion]
@@ -153,8 +172,8 @@ artifact's column — the one its primary deliverable touches.
 ```markdown
 **Contract:**
 - shape (openspec): ADD requirement `R7` to `docs/specs/auth.md` under `## Core Requirements`;
-  MODIFY `R3`'s acceptance clause to cite the new token-state enum; delta text exactly as in the
-  Description; numbering continues from `R6`.
+  MODIFY `R3`'s acceptance clause to cite the new token-state enum; delta text pinned in this
+  Contract `shape`; numbering continues from `R6`.
 - names: `R7` (new), `R3` (modified).
 - mirror: requirement-block style at `docs/specs/auth.md:21-22` (R5/R6).
 - decisions: numeric `R7` (not a named ID) — matches the file's existing numbering convention.
@@ -180,17 +199,17 @@ docs/rename tasks with no structural change render nothing.
 | # | Artifact | Trigger (task surface) | Render-as (sourced convention) |
 |---|---|---|---|
 | 1 | API request/response payload | Adds/changes HTTP endpoint or consumes external API | HTTP/JSON, success + error paired (AIP-193) |
-| 2 | Data structure w/ marked field changes | Adds/modifies struct / schema / DTO / table item | Field-diff: `+`add `−`remove, `null`=remove, `…` elide unchanged (RFC 7386/6902) |
-| 3 | Operation end-state / outcome | Data-writing operation | Before→after record in the data's own shape (RFC 7386) |
-| 4 | Workflow now→after | Changes an existing flow | 2-col now→after table (text) — house-style |
-| 5 | State-transition table | Adds/changes a status enum / state machine | Transition table: from → event → to (Nygard ADR) |
-| 6 | Call-order | Multi-component interaction | Numbered call-order list (caller → callee → effect; text only) — house-style |
+| 2 | Data structure w/ marked field changes | Adds/modifies struct / schema / DTO / table item | Field-diff: `+`add `−`remove, `null`=remove, `…` elide unchanged (RFC 7386/6902); every distinct event/endpoint/operation renders its own record |
+| 3 | Operation end-state / outcome | Data-writing operation | Before→after record in the data's own shape (RFC 7386); every distinct event/endpoint/operation renders its own record |
+| 4 | Workflow now→after | Changes an existing flow | 2-col now→after table (text) or Mermaid `flowchart`/`sequenceDiagram`/`stateDiagram` — house-style |
+| 5 | State-transition table | Adds/changes a status enum / state machine | Transition table: from → event → to (Nygard ADR) or Mermaid `flowchart`/`sequenceDiagram`/`stateDiagram` |
+| 6 | Call-order | Multi-component interaction | Numbered call-order list (caller → callee → effect) or Mermaid `flowchart`/`sequenceDiagram`/`stateDiagram` — house-style |
 | 7 | Config / flag / env delta | Adds env var / feature flag / default | Typed-op table: add/replace/remove (RFC 6902) |
 | 8 | Error / failure-mode | Non-trivial unhappy path | Canonical error table: condition → status/code/behaviour (AIP-193) |
 
 ### Rendering Conventions
 
-One elided example per touched surface. Scale verbosity to change size.
+One elided example per distinct contract shape (not per surface category). Scale verbosity to change size.
 
 **#1 — API payload (RFC 7386 / AIP-193): success + error paired**
 
@@ -237,7 +256,7 @@ After:   { "id": 12, "status": "active",  "retries": 0, … }
 | `active` | manual cancel | `cancelled` |
 | … | … | … |
 
-**#6 — Call-order (house-style): numbered list, text only — no mermaid/diagrams**
+**#6 — Call-order (house-style): numbered list, text or Mermaid**
 
 ```
 1. Client → POST /v1/tokens → TokenService
@@ -264,7 +283,7 @@ After:   { "id": 12, "status": "active",  "retries": 0, … }
 
 ### Size Cap and Anti-Bloat
 
-- One elided example per touched surface (use `…` to elide unchanged members, rows, or steps).
+- One elided example per distinct contract shape (not per surface category) (use `…` to elide unchanged members, rows, or steps).
 - Scale verbosity to change size: a one-field addition needs one diff line, not a full schema dump.
 - Trivial docs or rename tasks with no structural change: render nothing.
 - Over-detailing belongs in code review, not in the plan (Cvet: the #1 RFC failure mode).
@@ -277,6 +296,42 @@ After:   { "id": 12, "status": "active",  "retries": 0, … }
 - Google Design Docs: <https://www.industrialempathy.com/posts/design-docs-at-google/>
 - Rust RFC template: <https://github.com/rust-lang/rfcs/blob/master/0000-template.md>
 - Nygard ADR: <https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions>
+
+### Code reference anchoring
+
+A bare `file:line` pointer is forbidden as a **change reference** — it forces the reader to open the
+file and is silently invalidated the moment surrounding lines shift. When a task references code it
+will change, anchor it self-contained: embed the surrounding lines (or the full function body) and
+show the edit as an inline `-`/`+` diff so the change is reviewable from the plan alone.
+
+```diff
+  function applyDiscount(order, rate) {
+-   return order.total * rate;
++   if (rate < 0 || rate > 1) throw new RangeError("rate out of bounds");
++   return order.total * (1 - rate);
+  }
+```
+
+Carve-out: `Contract.mirror` line-anchors (e.g. `src/utils/hash.ts:1-40`) remain valid — there they
+are **precedent pointers** to existing structure being copied, not change references. The mirror
+anchor names the source of truth to imitate; the prohibition applies only to lines the task edits.
+
+### One rationale per decision (R52)
+
+State each de-dup or design rationale exactly once and reference it; do not repeat the same
+justification across multiple tasks or sections. When two tasks share a rationale, record it in
+`## Key Decisions` and cite it — duplicated prose drifts out of sync when one copy is edited.
+
+### Claim→source table
+
+When a plan asserts behavioural claims that rest on external evidence (a spec clause, an RFC, a
+codebase pattern, a web finding), back them with a claim→source table so each claim is traceable
+and falsifiable rather than asserted.
+
+| Claim | Source |
+|---|---|
+| Errors return `INVALID_ARGUMENT` on bad input | AIP-193 |
+| Status transitions are validated in the domain layer | `src/routes/users.ts:1-50` |
 
 ---
 
@@ -320,6 +375,12 @@ Format:
 **Source:** docs/specs/auth-spec.md
 **Verification:** npm test
 
+## Deviations & assumptions
+
+| Item | Issue asked | Plan does | Why |
+|------|-------------|-----------|-----|
+| Token storage | "sessions or stateless?" | Stateless JWT, no session store | Spec defers to implementer; stateless avoids new infra |
+
 ---
 
 ### Task 1: JWT utility module
@@ -333,10 +394,8 @@ Format:
 - Create: `src/utils/jwt.ts`
 - Test: `tests/utils/jwt.test.ts`
 
-**Description:**
-Create a JWT utility module that exports `signToken(payload, expiresIn)` and `verifyToken(token)`.
-Use the `jsonwebtoken` npm package (already installed). Sign with `process.env.JWT_SECRET`.
-`verifyToken` should throw a typed error (`JwtExpiredError` | `JwtInvalidError`) on failure.
+**Notes:** (optional — rationale only, ≤5 lines; the "what" lives in Files/Contract/Acceptance)
+Reuse the already-installed `jsonwebtoken` package rather than hand-rolling signing; typed errors let the middleware (Task 2) branch on failure cause.
 
 **Acceptance criteria:**
 - [ ] `signToken` returns a JWT string with the given payload
@@ -358,11 +417,8 @@ Use the `jsonwebtoken` npm package (already installed). Sign with `process.env.J
 - Create: `src/middleware/auth.ts`
 - Test: `tests/middleware/auth.test.ts`
 
-**Description:**
-Create Express middleware that reads the `Authorization: Bearer <token>` header,
-calls `verifyToken` from Task 1, and attaches the decoded payload to `req.user`.
-On missing or invalid token, respond with `401 { error: "Unauthorized" }`.
-Import path: `import { verifyToken } from '../utils/jwt'`.
+**Notes:** (optional — rationale only, ≤5 lines; the "what" lives in Files/Contract/Acceptance)
+Middleware (not per-route guards) keeps auth enforcement in one place and reuses Task 1's `verifyToken` so the failure taxonomy stays single-sourced.
 
 **Acceptance criteria:**
 - [ ] Valid token: attaches decoded payload to `req.user` and calls `next()`
@@ -380,7 +436,7 @@ Import path: `import { verifyToken } from '../utils/jwt'`.
   Exception: a task's `Contract.shape` pins signatures / sections / requirement deltas — not full
   bodies. A concrete Contract shape is the decided interface, not an implementation, and is NOT
   flagged by this rule.
-  EXCEPTION (R46): one capped, elided (`…`) review artifact per touched surface is encouraged — a
+  EXCEPTION (R46): one capped, elided (`…`) review artifact per distinct contract shape is encouraged — a
   payload/field-diff/state-table is distinct from a full implementation body or schema dump, which
   stay excluded. See `## Concrete Artifacts (render don't narrate)` for the 8-artifact catalog and
   rendering conventions.

@@ -12,6 +12,7 @@
  *   budget-uncapped       -- computeWaveBudget with 3-task wave (no static cap)
  *   summarize-files       -- summarizePriorWaveContext caps filesAdded
  *   summarize-decisions   -- summarizePriorWaveContext caps decisionsFromPriorWaves
+ *   render-notes          -- renderFactSheet: present description → `## Notes (rationale)`, absent → omitted
  *   parse-complete        -- parseWaveSummary for a complete wave
  *   parse-overflow        -- parseWaveSummary: 4 dispatched, 2 returned → CONTEXT_OVERFLOW
  *   parse-free-text-error -- parseWaveSummary: free-text errorCode rejected
@@ -101,6 +102,38 @@ switch (op) {
       contractBeforeAcceptance:
         withContract.indexOf('## Contract') < withContract.indexOf('## Acceptance Criteria'),
       noContractSection: !withoutContract.includes('## Contract'),
+    });
+    break;
+  }
+
+  case 'render-notes': {
+    const { renderFactSheet } = require(path.join(LIB, 'task-factsheet'));
+    // Notes (rationale): a task whose `description` field is set renders a
+    // `## Notes (rationale)` section; an absent/empty description omits it.
+    const withNotes = renderFactSheet({
+      id: '1',
+      name: 'Notes-bearing task',
+      description: 'Cross-skill compatibility rationale.',
+      acceptanceCriteria: ['It works'],
+      files: ['src/thing.ts'],
+    });
+    const withoutNotes = renderFactSheet({
+      id: '2',
+      name: 'No-notes task',
+      description: '',
+      acceptanceCriteria: ['It also works'],
+      files: ['src/other.ts'],
+    });
+    const withAbsentDescription = renderFactSheet({
+      id: '3',
+      name: 'Omitted-desc task',
+      acceptanceCriteria: ['x'],
+      files: ['src/y.ts'],
+    });
+    out({
+      hasNotesSection: withNotes.includes('## Notes (rationale)'),
+      noNotesSection: !withoutNotes.includes('## Notes (rationale)'),
+      absentDescNoNotesSection: !withAbsentDescription.includes('## Notes (rationale)'),
     });
     break;
   }

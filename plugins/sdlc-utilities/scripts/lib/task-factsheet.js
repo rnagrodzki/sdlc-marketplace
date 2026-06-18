@@ -28,7 +28,7 @@ function renderFactSheet(task) {
   lines.push('');
 
   if (task.description && task.description.trim()) {
-    lines.push('## Description');
+    lines.push('## Notes (rationale)');
     lines.push('');
     lines.push(task.description.trim());
     lines.push('');

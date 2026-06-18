@@ -19,7 +19,8 @@
  *   PF2 — Task numbering (contiguous from 0 or 1)
  *   PF3 — Required metadata (Complexity, Risk, Depends on, Verify)
  *   PF4 — Dependency validity (valid refs, no cycles)
- *   PF5 — Task body (Description, Acceptance criteria)
+ *   PF5 — Task body (Acceptance criteria; optional Notes capped at 5 lines)
+ *   PF6 — Deviations & assumptions section present
  *
  * Uses only Node.js built-in modules. No npm install required.
  */
@@ -276,14 +277,8 @@ function checkPF5(tasks) {
   for (const task of tasks) {
     const prefix = `Task ${task.number}`;
 
-    // Check Description
-    const descMatch = task.body.match(/\*\*Description:\*\*\s*\n([\s\S]*?)(?=\n\*\*|$)/);
-    if (!descMatch || !descMatch[1].trim()) {
-      issues.push(`${prefix}: missing or empty **Description:**`);
-    }
-
     // Check Acceptance criteria with at least one checkbox
-    const acMatch = task.body.match(/\*\*Acceptance criteria:\*\*\s*\n([\s\S]*?)(?=\n### |\n---|\n## |$)/);
+    const acMatch = task.body.match(/\*\*Acceptance criteria:\*\*\s*\n([\s\S]{0,5000}?)(?=\n### |\n---|\n## |$)/);
     if (!acMatch) {
       issues.push(`${prefix}: missing **Acceptance criteria:**`);
     } else {
@@ -292,12 +287,32 @@ function checkPF5(tasks) {
         issues.push(`${prefix}: **Acceptance criteria:** has no checkbox items (expected at least one "- [ ]")`);
       }
     }
+
+    // Optional Notes block, capped at 5 non-blank lines
+    const notesMatch = task.body.match(/\*\*Notes:\*\*\s*\n([\s\S]{0,2000}?)(?=\n\*\*|\n### |\n---|\n## |$)/);
+    if (notesMatch) {
+      const notesBody = notesMatch[1];
+      const lineCount = notesBody.split('\n').filter(l => l.trim().length > 0).length;
+      if (lineCount > 5) {
+        issues.push(`${prefix}: **Notes:** has ${lineCount} non-blank lines (max 5)`);
+      }
+    }
   }
 
   if (issues.length > 0) {
     return { id: 'PF5', status: 'fail', message: issues.join('; ') };
   }
-  return { id: 'PF5', status: 'pass', message: 'All tasks have Description and Acceptance criteria' };
+  return { id: 'PF5', status: 'pass', message: 'All tasks have valid Acceptance criteria' };
+}
+
+function checkPF6(content) {
+  // Strip fenced code blocks before checking so headers inside code examples don't produce false passes.
+  const stripped = content.replace(/^```[\s\S]*?^```/gm, '');
+  const re = /^##\s+Deviations\s*&\s*assumptions/im;
+  if (!re.test(stripped)) {
+    return { id: 'PF6', status: 'fail', message: 'Missing required "## Deviations & assumptions" section' };
+  }
+  return { id: 'PF6', status: 'pass', message: 'Deviations & assumptions section present' };
 }
 
 // ---------------------------------------------------------------------------
@@ -352,6 +367,7 @@ try {
     checkPF3(tasks),
     checkPF4(tasks),
     checkPF5(tasks),
+    checkPF6(content),
   ];
 
   const passed = checks.every(c => c.status === 'pass');

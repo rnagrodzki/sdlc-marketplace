@@ -7,6 +7,12 @@
 
 ---
 
+## Deviations & assumptions
+
+None.
+
+---
+
 ## Key Decisions
 
 - **Standalone module over extending existing:** Keeps the scope small and testable.

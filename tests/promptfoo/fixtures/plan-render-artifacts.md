@@ -2,7 +2,7 @@
 
 This fixture is a **code** plan. It carries three tasks for the G19 render-artifacts gate:
 - **Task 1** — an HTTP-endpoint + status-enum task that RENDERS the required conventions: a success+error payload pair (artifact #1, AIP-193), a +/-/null field-diff with … elision (artifact #2, RFC 7386/6902), and a from→event→to state-transition table (artifact #5, Nygard). G19 must PASS it.
-- **Task 2** — a renderable-surface task (adds an HTTP endpoint) that NARRATES the payload in prose, renders no fenced block or table. G19 must FLAG it (warning-severity, advisory, non-blocking).
+- **Task 2** — a renderable-surface task (adds an HTTP endpoint) that NARRATES the payload in prose, renders no fenced block or table. G19 must FLAG it (error-severity, blocking).
 - **Task 3** — a docs-typo task that touches no renderable surface and renders nothing. G19 must NOT flag it (no artifact demanded).
 
 ---
