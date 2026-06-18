@@ -89,7 +89,7 @@
   illustrative, elided (`…`) example per distinct contract shape — never an exhaustive dump. Enforced
   by G19 (error, blocking). Additive: preserves R42.
 - R47 (Fixes #472 — Deviations section): Every plan MUST carry a top-of-plan `## Deviations & assumptions` section (table columns: Item | asked | does | why). Presence is enforced deterministically (PF6), not by an LLM gate.
-- R48 (Fixes #472 — Notes field): The per-task `Description:` field is renamed `Notes:`, demoted to OPTIONAL and rationale-only; the executable shape lives in `Files:` + `Contract:` + `Acceptance criteria:`. Flagged by G20 (blocking) when a `Notes:` block restates the task's Contract/acceptance instead of carrying only rationale; a `Notes:` block of ≤5 non-blank lines is enforced deterministically.
+- R48 (Fixes #472 — Notes field): The per-task `Description:` field is renamed `Notes:`, demoted to OPTIONAL and rationale-only; the executable shape lives in `Files:` + `Contract:` + `Acceptance criteria:`. Flagged by G20 (blocking) when a `Notes:` block restates the task's Contract/acceptance instead of carrying only rationale; a `Notes:` block of ≤5 non-blank lines is enforced deterministically (PF5 in `validate-plan-format.js`).
 - R49 (Fixes #472 — per-distinct-shape cap): One illustrative, elided (`…`) example per distinct contract shape (not per surface category). Enforced by G19 (error, blocking).
 - R50 (Fixes #472 — Mermaid): Mermaid fenced blocks are allowed for flow / call-order / state surfaces; no MDX.
 - R51 (Fixes #472 — self-contained code refs): A bare `file:line` change reference is forbidden; embed the surrounding lines (or the full function body) plus an inline `-`/`+` diff. Flagged by G21 (blocking). A `file:line` used as a pointer / `Contract.mirror` precedent anchor is exempt.
@@ -131,7 +131,9 @@
 - G18: Settlement / contract concreteness — every artifact-touching task carries a `Contract:` block whose decided shape is concrete for the task's plan type (type derived from `Files:` paths); flag any task that leaves the shape unsettled (absent Contract or a restatement of 'update X to do Y'). Error-severity; owned by the content-coverage lane.
 - G19: Render-don't-narrate — flags any task touching a render-trigger surface (R46
   catalog #1–#8) that renders no concrete artifact for it. Trivial docs/rename tasks
-  are not flagged. Error-severity; owned by the content-coverage lane.
+  are not flagged. Also flags any Contract that includes more than one rendered example
+  per distinct contract shape (per R49 cap — one elided example per unique method+path
+  for REST, or flag+type for CLI). Error-severity; owned by the content-coverage lane.
 - G20: Notes rationale-only — flags a `Notes:` block that restates the task's
   Contract/acceptance instead of carrying only rationale. Error-severity; owned by the content-coverage lane.
 - G21: Self-contained code refs — flags a bare `file:line` change reference not
@@ -183,6 +185,17 @@ Gate A (intake audit, R39) runs before decomposition when `openspecContext.requi
 - E6: Prepare/orchestrator failure recovery — when `plan-explore.js` invocation fails or `sdlc:plan-explore-orchestrator` exits non-zero, plan-sdlc falls back to inline exploration. Append a one-line note to `.sdlc/learnings/log.md` with the error string (`## YYYY-MM-DD — plan-sdlc orchestrator skipped: <error>`). Brief absence is not a plan failure — the plan is still produced via the inline-exploration path.
 - E7: Gate A CRITICAL finding — decomposition is blocked. Surface the findings to the user with two options: (1) fix the source change artifacts (proposal.md / delta specs / tasks.md) and re-run; (2) override and proceed anyway (records the override in `## Intake Audit Caveats`). No `--auto` override — CRITICAL findings require explicit user action.
 - E8: Gate B CRITICAL verdict — re-enter the existing Step 6 IMPROVE loop with the scorecard findings injected as blocking issues. Bounded by the existing 3-iteration cap (R8). If CRITICAL findings persist after the cap, surface to user via the existing max-iterations escalation path (R19/R22 preserved).
+
+## CI Validation Contract
+
+Deterministic checks performed by `plugins/sdlc-utilities/scripts/ci/validate-plan-format.js`. These run outside the LLM gate pipeline — pass/fail is structural, not inferred.
+
+- PF1: Header fields present (`Goal`, `Architecture`, `Source`, `Verification`)
+- PF2: Task numbering contiguous from 0 or 1
+- PF3: Required metadata present per task (`Complexity`, `Risk`, `Depends on`, `Verify`)
+- PF4: Dependency references valid (no cycles, all targets exist)
+- PF5: Task body valid (`Acceptance criteria` present with ≥1 checkbox; optional `Notes` block capped at ≤5 non-blank lines)
+- PF6: `## Deviations & assumptions` section present at top of plan (implements R47 deterministic enforcement — not an LLM gate)
 
 ## Constraints
 

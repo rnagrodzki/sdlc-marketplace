@@ -361,7 +361,7 @@ Build the wave-runner Agent's prompt from:
    ```
    This writes `<stateDir>/execution/<runId>/task-<id>.md` for each task. The printed JSON includes `factSheets: [...]` — the absolute paths to use as `factSheetPath` in the manifest. Task name, notes, files, and acceptance criteria live in the fact sheet; do NOT inline them in the manifest.
 
-   **Notes source (optional):** The task object's `description` JSON key is sourced from the optional `**Notes:**` plan field — never from a mandatory `**Description:**` field (no such field exists; do not parse for one). When a plan task carries a `**Notes:**` label, capture its rationale-only text as the `description` value passed to `--tasks-json`; when absent, pass empty (or omit). `renderFactSheet` emits non-empty notes as a `## Notes (rationale)` section and omits the section entirely when notes are absent.
+   **Notes source (optional):** The task object's `description` JSON key is sourced from the optional `**Notes:**` plan field. When a plan task carries a `**Notes:**` label, capture its rationale-only text as the `description` value passed to `--tasks-json`; when absent, pass empty (or omit). `renderFactSheet` emits non-empty notes as a `## Notes (rationale)` section and omits the section entirely when notes are absent. **Backward compatibility (version-skew):** When a `**Description:**` block is encountered in a plan task (legacy format written before the Notes rename), treat its content as the `description` value — do not discard it. Plans written after the rename use `**Notes:**` exclusively; the `**Description:**` label is not produced by new plans but must be handled gracefully when present in existing plans.
 
    **Contract consumption (R-CONTRACT, #459):** When a plan task carries a `Contract:` block, include its verbatim content as the `contract` field in that task's object passed to `--tasks-json`. `renderFactSheet` emits it as a `## Contract` section in the fact sheet. The per-task agent MUST consume the decided Contract verbatim and MUST NOT re-derive any design decision it pins — a decision settled in the Contract is closed, not reopened.
 
@@ -383,7 +383,7 @@ Build the wave-runner Agent's prompt from:
      "qualityTier": "balanced",
      "escalationBudget": 2,
      "tasks": [
-       { "id": "3", "complexity": "Standard", "risk": "Low", "factSheetPath": "/abs/path/.sdlc/execution/run-id/task-3.md", "assignedModel": "sonnet", "verifyToken": "dispatchMode in ship.js" }
+       { "id": "3", "complexity": "Standard", "risk": "Low", "factSheetPath": "/abs/path/.sdlc/execution/run-id/task-3.md", "assignedModel": "sonnet", "verifyToken": "dispatchMode in ship.js", "description": "optional rationale text from **Notes:** field; omit or pass empty string when absent" }
      ],
      "guardrails": [
        { "id": "no-direct-db-access", "description": "Do not import db client outside repo layer", "severity": "error" }

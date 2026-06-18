@@ -124,9 +124,16 @@ switch (op) {
       acceptanceCriteria: ['It also works'],
       files: ['src/other.ts'],
     });
+    const withAbsentDescription = renderFactSheet({
+      id: '3',
+      name: 'Omitted-desc task',
+      acceptanceCriteria: ['x'],
+      files: ['src/y.ts'],
+    });
     out({
       hasNotesSection: withNotes.includes('## Notes (rationale)'),
       noNotesSection: !withoutNotes.includes('## Notes (rationale)'),
+      absentDescNoNotesSection: !withAbsentDescription.includes('## Notes (rationale)'),
     });
     break;
   }
