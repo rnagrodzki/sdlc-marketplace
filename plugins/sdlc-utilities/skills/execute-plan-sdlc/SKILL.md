@@ -359,7 +359,9 @@ Build the wave-runner Agent's prompt from:
    ```bash
    node "$STATE_SCRIPT" wave-start --wave <N> --tasks-json '<json-array-of-task-objects>' --run-id <run-id>
    ```
-   This writes `<stateDir>/execution/<runId>/task-<id>.md` for each task. The printed JSON includes `factSheets: [...]` — the absolute paths to use as `factSheetPath` in the manifest. Task name, description, files, and acceptance criteria live in the fact sheet; do NOT inline them in the manifest.
+   This writes `<stateDir>/execution/<runId>/task-<id>.md` for each task. The printed JSON includes `factSheets: [...]` — the absolute paths to use as `factSheetPath` in the manifest. Task name, notes, files, and acceptance criteria live in the fact sheet; do NOT inline them in the manifest.
+
+   **Notes source (optional):** The task object's `description` JSON key is sourced from the optional `**Notes:**` plan field — never from a mandatory `**Description:**` field (no such field exists; do not parse for one). When a plan task carries a `**Notes:**` label, capture its rationale-only text as the `description` value passed to `--tasks-json`; when absent, pass empty (or omit). `renderFactSheet` emits non-empty notes as a `## Notes (rationale)` section and omits the section entirely when notes are absent.
 
    **Contract consumption (R-CONTRACT, #459):** When a plan task carries a `Contract:` block, include its verbatim content as the `contract` field in that task's object passed to `--tasks-json`. `renderFactSheet` emits it as a `## Contract` section in the fact sheet. The per-task agent MUST consume the decided Contract verbatim and MUST NOT re-derive any design decision it pins — a decision settled in the Contract is closed, not reopened.
 

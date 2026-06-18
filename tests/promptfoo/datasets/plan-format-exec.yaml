@@ -1,10 +1,13 @@
 # Script execution tests for validate-plan-format.js.
 # These tests run validate-plan-format.js directly against fixture plan files (no LLM).
-# They validate that plan format validation produces correct output for PF1-PF5 checks.
+# They validate that plan format validation produces correct output for PF1-PF6 checks.
 #
 # Fixture appropriateness:
-#   project-valid-plan    -- CORRECT: valid 3-task plan should pass all checks
-#   project-invalid-plan  -- CORRECT: plan with multiple deliberate errors (PF1-PF5)
+#   project-valid-plan           -- CORRECT: valid 3-task plan should pass all checks (no Notes)
+#   project-invalid-plan         -- CORRECT: plan with multiple deliberate errors (PF1-PF6)
+#   project-plan-no-deviations   -- CORRECT: otherwise-valid plan missing Deviations -> PF6 fail
+#   project-plan-oversized-notes -- CORRECT: Notes block over 5 lines -> PF5 cap fail
+#   project-plan-with-notes      -- CORRECT: Deviations + short Notes -> all pass
 
 - description: "plan-format: valid plan passes all checks (JSON)"
   vars:
@@ -86,3 +89,64 @@
       value: "PF5"
     - type: icontains
       value: "no checkbox"
+
+- description: "plan-format: missing Deviations section triggers PF6 fail"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
+    script_args: "--project-root {{project_root}} --file {{project_root}}/plans/plan.md --json"
+    project_root: "file://fixtures-fs/project-plan-no-deviations"
+  assert:
+    - type: icontains
+      value: '"passed": false'
+    - type: icontains
+      value: "PF6"
+    - type: icontains
+      value: "Deviations & assumptions"
+
+- description: "plan-format: oversized Notes block (>5 lines) triggers PF5 cap fail"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
+    script_args: "--project-root {{project_root}} --file {{project_root}}/plans/plan.md --json"
+    project_root: "file://fixtures-fs/project-plan-oversized-notes"
+  assert:
+    - type: icontains
+      value: '"passed": false'
+    - type: icontains
+      value: "PF5"
+    - type: icontains
+      value: "max 5"
+
+- description: "plan-format: plan with Deviations and short Notes passes all checks"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
+    script_args: "--project-root {{project_root}} --file {{project_root}}/plans/plan.md --json"
+    project_root: "file://fixtures-fs/project-plan-with-notes"
+  assert:
+    - type: icontains
+      value: '"passed": true'
+    - type: regex
+      value: '"failed":\s*0'
+    - type: icontains
+      value: "PF6"
+
+- description: "plan-format: valid plan (no Notes) passes PF5 without Description"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
+    script_args: "--project-root {{project_root}} --file {{project_root}}/plans/plan.md --json"
+    project_root: "file://fixtures-fs/project-plan-no-deviations"
+  assert:
+    - type: icontains
+      value: '"id": "PF5"'
+    - type: regex
+      value: '"id":\s*"PF5",\s*"status":\s*"pass"'
+
+- description: "plan-format: compliant plan re-run is idempotent (stable PASS)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
+    script_args: "--project-root {{project_root}} --file {{project_root}}/plans/plan.md --json"
+    project_root: "file://fixtures-fs/project-plan-with-notes"
+  assert:
+    - type: icontains
+      value: '"passed": true'
+    - type: regex
+      value: '"failed":\s*0'

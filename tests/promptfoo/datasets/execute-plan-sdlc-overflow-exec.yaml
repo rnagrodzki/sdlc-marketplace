@@ -29,6 +29,15 @@
     - type: javascript
       value: "const r = JSON.parse(output); r.hasContractSection === true && r.contractBeforeAcceptance === true && r.noContractSection === true"
 
+- description: "execute-plan-sdlc/wave-runner-overflow/task-factsheet: renderFactSheet emits ## Notes (rationale) for a task with description and omits the heading when absent"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/wave-overflow-test.js"
+    script_args: "--op render-notes"
+    project_root: "file://fixtures-fs/execute-overflow"
+  assert:
+    - type: javascript
+      value: "const r = JSON.parse(output); r.hasNotesSection === true && r.noNotesSection === true"
+
 # ---------------------------------------------------------------------------
 # dispatch-budget.js — byte-budget computation
 # ---------------------------------------------------------------------------

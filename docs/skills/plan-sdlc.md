@@ -47,6 +47,10 @@ Not every request needs a full planning pipeline:
 
 For plans with 5+ tasks, the skill also writes a `## Key Decisions` section — placed between the plan header and the first task — capturing architecture choices with rationale so executing agents understand *why* an approach was chosen, not just what to do.
 
+Every plan also carries a required **`## Deviations & assumptions`** section near the top (a table with `Item | Issue asked | Plan does | Why` columns) recording where the plan diverges from what was asked and any assumptions made — so a reviewer can triage the plan in one pass. Its presence is enforced deterministically by the `validate-plan-format.js` PF6 check, not by an LLM gate.
+
+Each task block carries `Complexity`, `Risk`, `Depends on`, `Verify`, `Files`, and `Acceptance criteria` metadata plus a `Contract:` (decided-shape) block. The free-prose **`Notes:`** field is **optional** and rationale-only (≤5 non-blank lines) — the executable "what" lives in `Files:` + `Contract:` + `Acceptance criteria:`. (Plans written before this convention used a mandatory `Description:` field; it is renamed `Notes:` and demoted to optional.)
+
 ---
 
 ## Dynamic-Dimension Discovery (R24–R28)
@@ -71,7 +75,7 @@ For 4+ file scopes, plan-sdlc dispatches a parallel dynamic-dimension orchestrat
 
 **Step 2 — Decompose.** Same as today, but each Standard/Complex task must cite ≥1 `F-<DIM>-<n>` ID or be marked "out-of-scope addition" with rationale. Trivial tasks exempt. When web/hybrid ran, Key Decisions explicitly **ADOPTS**, **REJECTS-with-rationale**, or marks **NOT-APPLICABLE** each web finding by ID.
 
-**Step 3 — Critique (5-lane parallelized).** All 19 quality gates (G1–G19) are partitioned across five lanes and dispatched in a single message as parallel Agent calls — one subagent per lane. The lanes run concurrently; Step 3 completes only after **all five lanes have returned** (JOIN barrier). Notable gates: G15 (brief-citation coverage — error severity when brief was produced, not-applicable when fallback ran), G18 (contract concreteness — error severity, blocks approval), G19 (render-don't-narrate — advisory). Lane 3 is the guardrail-compliance lane — `guardrailsEvaluated` fires when lane 3 returns. `critiqueRan` fires after all five lanes join.
+**Step 3 — Critique (5-lane parallelized).** All 21 quality gates (G1–G21) are partitioned across five lanes and dispatched in a single message as parallel Agent calls — one subagent per lane. The lanes run concurrently; Step 3 completes only after **all five lanes have returned** (JOIN barrier). Notable gates: G15 (brief-citation coverage — error severity when brief was produced, not-applicable when fallback ran), G18 (contract concreteness — error severity, blocks approval), G19 (render-don't-narrate — error severity, blocks approval), G20 (Notes rationale-only — error severity), G21 (self-contained code refs — error severity). Lane 3 is the guardrail-compliance lane — `guardrailsEvaluated` fires when lane 3 returns. `critiqueRan` fires after all five lanes join.
 
 **Step 5 — Reviewer.** plan-reviewer-prompt gains a `{BRIEF_FILE}` input plus two gate rows: *exploration provenance* (uncited Standard/Complex tasks blocking) and *best-practice traceability* (silent omission of a web finding blocking). The reviewer also uses the multi-lens fan-out (R36): review dimensions are dispatched in parallel across the same five-lane structure, with each lane receiving `{REQUIREMENTS_SUMMARY}` (the numbered requirements list captured from the Step 1 CONSUME pass) so independent lenses can check requirement coverage without repeating work.
 
@@ -395,9 +399,11 @@ For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R45, 
 
 ### Render-don't-narrate concrete artifacts (G19)
 
-G19 is **advisory** (non-blocking): it flags a task that touches a render-trigger
-surface but narrates instead of rendering. The author renders the artifact as
-plain-markdown text — fenced block / table / before→after diff; no diagrams.
+G19 is **error-severity** (blocking — it prevents plan approval): it flags a task
+that touches a render-trigger surface but narrates instead of rendering. The author
+renders the artifact as plain-markdown text — fenced block / table / before→after
+diff — or, for flow / call-order / state surfaces, a Mermaid fenced block
+(`flowchart` / `sequenceDiagram` / `stateDiagram`). No MDX.
 
 **Render-trigger surfaces** — G19 fires when the task touches any of:
 
@@ -410,6 +416,11 @@ plain-markdown text — fenced block / table / before→after diff; no diagrams.
 | Frontmatter / manifest contract | `plugin.json` fields, `Contract:` block keys |
 | Error taxonomy | error codes, HTTP status map |
 
+**Per distinct contract shape, not per surface.** When a task touches multiple
+distinct event/endpoint/operation shapes, each distinct shape renders its own
+record — one illustrative, elided (`…`) example per distinct contract shape (not
+one example per surface category).
+
 **Anti-bloat carve-out:** G19 is **not-applicable** for trivial tasks (Trivial complexity, or tasks whose only files match `docs/**`, `*.md` outside skills, or pure rename/move). These tasks have no render-trigger surface worth flagging.
 
 A task adding `PUT /orgs/{id}` renders the payload instead of describing it:
@@ -417,7 +428,28 @@ A task adding `PUT /orgs/{id}` renders the payload instead of describing it:
     Request  PUT /orgs/{id}   { "name": "Acme", "status": "active" }
     Response 204 (no body)  |  400 { "code": "INVALID_STATUS", "message": … }
 
-For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R46, G19.
+For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R46, R49, R50, G19.
+
+### Notes rationale-only (G20)
+
+G20 is **error-severity** (blocking): it flags a per-task `Notes:` block that
+restates the task's `Contract:` or `Acceptance criteria:` instead of carrying only
+rationale. The `Notes:` field is **optional** and rationale-only (≤5 non-blank
+lines, deterministically enforced) — the executable "what" lives in `Files:` +
+`Contract:` + `Acceptance criteria:`. G20 is not-flagged when `Notes:` is absent or
+genuinely a "why" rationale.
+
+For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R48, G20.
+
+### Self-contained code references (G21)
+
+G21 is **error-severity** (blocking): it flags a bare `file:line` *change*
+reference that is not anchored with the surrounding lines (or the full function
+body) plus an inline `-`/`+` diff — a reviewer cannot act on `login.go:200` without
+the code memorized. A `file:line` used as a *pointer* (in prose, or as a
+`Contract.mirror` precedent anchor) is exempt and passes.
+
+For spec definitions: [docs/specs/plan-sdlc.md](../specs/plan-sdlc.md) — R51, G21.
 
 ### Gate A — Intake Audit (R39 — Fixes #445)
 
@@ -440,7 +472,7 @@ Severity is assigned **per check** (not per dimension), matching the opsx:verify
 
 ### Gate B — Verification Scorecard (R40 — Fixes #445)
 
-At Step 5 (after the lens merge), plan-sdlc assembles a **`## Verification Scorecard`** section in the plan file. This is purely additive — the G1–G19 gate definitions, `buildLanes`, and the `{G1..G19}` union assertion are unchanged (R42). The scorecard contains:
+At Step 5 (after the lens merge), plan-sdlc assembles a **`## Verification Scorecard`** section in the plan file. This is purely additive — the gate definitions, `buildLanes`, and the `{G1..G21}` union assertion are unchanged by the scorecard layer itself (R42). The scorecard contains:
 
 1. **Dimension table** — CRITICAL/WARNING/SUGGESTION/PASS counts by dimension (Completeness / Correctness / Coherence), aggregated from lens findings that carry severity tags.
 2. **Traceability matrix** — one row per requirement from the inventory (`openspecContext.requirements[]`), showing covering task(s) and status (covered / partial / uncovered). When the inventory is null (CLI absent), falls back to the Step 1 requirements checklist with a noted downgrade.

@@ -391,6 +391,30 @@
 # is only reachable when validateChange + the tasks.md path both resolve through contentRoot
 # (= worktrees/wt1); if routing fell back to main, the change dir would not exist and
 # tasksUpdated would stay 0.
+# --- G20/G21 in content-coverage lane gateIds (Task 5, #470) ---
+
+- description: "plan-prepare T4c: content-coverage lane gateIds includes G20 and G21; no other lane claims them"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/plan-prepare-github-remote"
+  assert:
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        if (!data.lanes || !Array.isArray(data.lanes)) return 'lanes field missing or not array';
+        const contentLane = data.lanes.find(l => l.name === 'content-coverage');
+        if (!contentLane) return 'content-coverage lane not found';
+        if (!contentLane.gateIds.includes('G20')) return 'G20 missing from content-coverage gateIds';
+        if (!contentLane.gateIds.includes('G21')) return 'G21 missing from content-coverage gateIds';
+        // Assert no other lane claims G20 or G21
+        for (const lane of data.lanes) {
+          if (lane.name === 'content-coverage') continue;
+          if (lane.gateIds.includes('G20')) return `G20 also claimed by lane: ${lane.name}`;
+          if (lane.gateIds.includes('G21')) return `G21 also claimed by lane: ${lane.name}`;
+        }
+        return true;
+
 - description: "plan-prepare (#457): linked-worktree — tasks.md ref-injection writes to active worktree path"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"

@@ -1,7 +1,7 @@
 # Step 3 Lane: Content-Coverage Gate Evaluation
 
 **Lane:** content-coverage
-**Gates owned:** G5, G6, G8, G9, G11, G13, G15, G16, G18, G19
+**Gates owned:** G5, G6, G8, G9, G11, G13, G15, G16, G18, G19, G20, G21
 **Default model:** sonnet
 
 You are a plan critique lane agent. Your role is to evaluate the plan against the content-coverage quality gates listed below. These are judgement-heavy text-reading checks that require understanding the plan's intent, task descriptions, and coverage completeness.
@@ -50,10 +50,29 @@ Derive the task's plan type from its `Files:` paths:
 
 A **mixed-artifact** task (e.g. a `.js` file plus a `.md` prompt) is judged against its **dominant** artifact's column — the one its primary deliverable touches. A task that touches no artifacts (pure coordination) is exempt. Do NOT flag a task whose Contract pins a concrete, type-appropriate shape — only flag genuinely unsettled tasks.
 
-**G19 — Render concreteness (advisory):** Flag (severity "warning", blocking:false) any
-task whose Files:/Description touch a render-trigger surface (R46 catalog #1–#8) but
-whose body renders NO concrete artifact (fenced block / table / before→after diff) for
-it. Docs-typo / rename tasks touch no surface → NOT flagged (anti-bloat).
+**G19 — Render-don't-narrate:** Flag (error-severity, blocking:true) any task whose
+Files:/Description touch a render-trigger surface (R46 catalog #1–#8) but whose body
+renders NO concrete artifact (fenced block / table / before→after diff) for it.
+Docs-typo / rename tasks touch no surface → NOT flagged (anti-bloat).
+
+A ` ```mermaid ` fenced block is a **valid render** for flow / call-order / state
+surfaces (catalog #4/#5/#6) — a Mermaid-rendered flow PASSES G19 and must NOT be
+flagged.
+
+**G20 — Notes rationale-only:** Flag (error-severity, blocking:true) any task whose
+`Notes:` block (or legacy `Description:` block) **restates** the task's Contract shape
+or acceptance criteria instead of carrying only rationale (the *why* behind a decision).
+A `Notes:` that explains *why* a design choice was made is NOT flagged. A `Notes:` that
+re-lists function signatures, flag names, or acceptance bullets from the Contract is a
+violation. NOT flagged when the block is absent or genuinely rationale-only.
+
+**G21 — Self-contained code references:** Flag (error-severity, blocking:true) any task
+that uses a bare `file:line` reference as a **change site** without embedding the
+surrounding lines (or full function body) plus an inline -/+ diff, so that the change is
+not reviewable from the plan alone. A `file:line` used as a **pointer** — in prose
+context, or as a `Contract.mirror` precedent anchor pointing to existing structure being
+copied — is **exempt** and PASSES. Only bare change-site references lacking
+self-contained context are flagged.
 
 ---
 
@@ -63,7 +82,7 @@ Return a single JSON object as your final output (no prose after the JSON block)
 
 ```json
 {
-  "gateIds": ["G5", "G6", "G8", "G9", "G11", "G13", "G15", "G16", "G18", "G19"],
+  "gateIds": ["G5", "G6", "G8", "G9", "G11", "G13", "G15", "G16", "G18", "G19", "G20", "G21"],
   "issues": [
     {
       "gateId": "G6",
@@ -73,7 +92,7 @@ Return a single JSON object as your final output (no prose after the JSON block)
       "blocking": false
     }
   ],
-  "passes": ["G5", "G8", "G9", "G11", "G13", "G15", "G16", "G18", "G19"],
+  "passes": ["G5", "G8", "G9", "G11", "G13", "G15", "G16", "G18", "G19", "G20", "G21"],
   "laneStatus": "ok"
 }
 ```
@@ -85,8 +104,8 @@ Return a single JSON object as your final output (no prose after the JSON block)
 - `laneStatus` — `"ok"` when evaluation completed; `"failed"` when plan file unreadable
 
 **Severity:**
-- G6, G8, G9, G13, G15, G19: `"warning"` (advisory) — misclassifications, citation gaps, and render-concreteness gaps are correctable
-- G11, G16, G18: `"error"` (blocking) — OpenSpec coverage gaps and unsettled contracts prevent safe execution
+- G6, G8, G9, G13, G15: `"warning"` (advisory) — misclassifications and citation gaps are correctable
+- G11, G16, G18, G19, G20, G21: `"error"` (blocking) — OpenSpec coverage gaps, unsettled contracts, render violations, Notes restatements, and unanchored change references prevent safe execution
 - `blocking: true` maps to error severity; `blocking: false` maps to warning
 
 **Do not evaluate G1–G4, G7, G10, G12, G14, G17 — those belong to other lanes.**

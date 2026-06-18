@@ -16,6 +16,10 @@
 #   plan-contract-code                 -- CORRECT: non-OpenSpec code plan; settled + unsettled + mixed-artifact tasks; exercises G18 settlement gate (Fixes #459)
 #   plan-contract-docs                 -- CORRECT: docs/openspec plan; settled + unsettled tasks; exercises G18 settlement gate (Fixes #459)
 #   plan-render-artifacts              -- CORRECT: code plan with T1 (renders conventions: payload pair, field-diff, state table), T2 (narrates only), T3 (docs-typo); exercises G19 render-don't-narrate gate (R46, Fixes #470)
+#   plan-mermaid-flow                  -- CORRECT: code plan with T1 (Mermaid sequence + state diagrams for call-order/state surfaces), T2 (one elided example for a shared shape); exercises R49 per-distinct-shape cap + R50 Mermaid-allowed (Fixes #472)
+#   plan-deviations-notes              -- CORRECT: code plan with top-of-plan Deviations table, T1 (Notes rationale-only), T2 (Notes restates Contract); exercises R47 Deviations + R48/G20 Notes rationale-only (Fixes #472)
+#   plan-per-event-contracts           -- CORRECT: code plan, T1 emits 3 distinct events each with its own payload record; exercises per-distinct-shape render cap (catalog #2/#3, R49, Fixes #472)
+#   plan-bare-ref                      -- CORRECT: code plan, T1 has a bare file:line CHANGE ref (forbidden) + a Contract.mirror line-anchor (allowed carve-out); exercises Code reference anchoring convention (R51, Fixes #472)
 
 # --- Fan-out parallelization cases (P1/P2/P3 — Fixes #418) ---
 
@@ -39,7 +43,7 @@
         (3) the main agent JOINs on all five lanes before writing the critiqueRan marker;
         (4) the guardrailsEvaluated marker fires only after the guardrail-compliance lane
         (lanes[3]) returns — not before;
-        (5) all 19 gate IDs (G1–G19) are covered across the 5 lanes with no gate
+        (5) all 21 gate IDs (G1–G21) are covered across the 5 lanes with no gate
         appearing in two lanes (disjoint partitioning).
 
 - description: "plan-sdlc: P2-fanout — Step 5 dispatches 2-3 lens reviewers in a single message per iteration for >=5-task plans (Fixes #418)"
@@ -1009,7 +1013,7 @@
         a from→event→to state-transition table (artifact #5, Nygard). G19 does not block
         on Task 1.
 
-- description: "plan-sdlc: G19 FLAGS Task 2 (renderable surface narrated only) as advisory warning, non-blocking (R46, G19, #470)"
+- description: "plan-sdlc: G19 FLAGS Task 2 (renderable surface narrated only) as error-severity, blocking (R46, G19, #472)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
     project_context: "file://fixtures/plan-render-artifacts.md"
@@ -1023,10 +1027,11 @@
       value: "G19"
     - type: llm-rubric
       value: >
-        The response evaluates the G19 gate and FLAGS Task 2 with a warning: it touches a
+        The response evaluates the G19 gate and FLAGS Task 2: it touches a
         renderable HTTP-endpoint surface but narrates the payload/shape in prose instead of
-        rendering a concrete artifact. The response confirms G19 is advisory (warning
-        severity, non-blocking) — the plan is NOT blocked and can still be finalized.
+        rendering a concrete artifact. The response confirms G19 is error-severity and
+        blocking — the plan is BLOCKED until Task 2 renders the surface and cannot be
+        finalized while the prose-only description stands.
 
 - description: "plan-sdlc: G19 does NOT flag Task 3 (docs-typo, no renderable surface) — anti-bloat (R46, G19, #470)"
   vars:
@@ -1046,3 +1051,249 @@
         structure, no state machine). G19 does not demand a rendered artifact for trivial
         tasks. The response must NOT flag Task 3 — flagging a typo fix is a false positive
         that G19 explicitly avoids per the anti-bloat rule.
+
+# --- Render-don't-narrate hardening: Mermaid, per-distinct-shape, blocking, Notes, Deviations (R47–R52, Fixes #472) ---
+
+- description: "plan-sdlc: render block allows Mermaid for flow/call-order/state surfaces, no MDX (R50, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-mermaid-flow.md"
+    user_request: >
+      Run /plan-sdlc Step 2. Author the task block for Task 1 ("Order pipeline call order +
+      state machine"). The task touches a call-order surface and an order state machine.
+      Render the call order and the lifecycle. State which render forms the skill permits
+      for flow / call-order / state surfaces.
+  assert:
+    - type: icontains
+      value: "mermaid"
+    - type: llm-rubric
+      value: >
+        The response renders the call-order and/or state surface using a Mermaid fenced
+        block (sequenceDiagram, stateDiagram, or flowchart) and states that Mermaid fenced
+        blocks are an ALLOWED render form for flow / call-order / state surfaces. The
+        response does NOT claim diagrams are forbidden / plain-text only, and does NOT use
+        or permit MDX. The surface is rendered, not narrated in prose.
+
+- description: "plan-sdlc: render cap is one elided example per distinct contract shape, not per surface (R49, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-mermaid-flow.md"
+    user_request: >
+      Run /plan-sdlc Step 2. Author the task block for Task 2 ("Shared status enum across
+      create + update routes"). Both routes use the SAME OrderStatus shape. How many
+      illustrative elided (…) examples should the task render for that shared shape, and
+      why? State the render cap rule explicitly.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response states the render cap as ONE illustrative, elided (…) example per
+        DISTINCT contract shape — not one per surface category and not an exhaustive dump.
+        Because both routes share a single OrderStatus shape, the task renders that shape
+        exactly once (one elided example), not separately for the create and update routes.
+        The response does NOT render a duplicate example per endpoint.
+
+- description: "plan-sdlc: G19 is error-severity and blocks plan approval for a narrated render surface (R46/R49, G19, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    user_request: >
+      Run /plan-sdlc. List the Step 3 quality gate for render-don't-narrate. State G19's
+      severity and whether it blocks plan approval when an artifact-touching task narrates
+      a render-trigger surface (e.g. an HTTP payload, status enum, or state machine) in
+      prose instead of rendering it.
+  assert:
+    - type: icontains
+      value: "G19"
+    - type: llm-rubric
+      value: >
+        The response describes G19 (Render-don't-narrate) as ERROR-severity and BLOCKING:
+        when an artifact-touching task narrates a render-trigger surface in prose instead of
+        rendering a fenced block, table, or before→after diff, the plan is blocked until the
+        surface is rendered. The response does NOT describe G19 as advisory, warning-severity,
+        or non-blocking. It must not say G19 "does not block".
+
+- description: "plan-sdlc: G20 flags a Notes block that restates the task's Contract/acceptance (R48, G20, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-deviations-notes.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G20 gate for Task 1 ("Notification queue producer")
+      and Task 2 ("Notification queue worker") in the plan. Task 1's Notes carries only
+      rationale; Task 2's Notes restates the function signature and the acceptance bullets.
+      Which task does G20 flag, and is G20 blocking?
+  assert:
+    - type: icontains
+      value: "G20"
+    - type: llm-rubric
+      value: >
+        The response evaluates G20 (Notes rationale-only). It does NOT flag Task 1 (its
+        Notes block carries only rationale — why a queue was chosen). It FLAGS Task 2,
+        whose Notes block restates the Contract/acceptance (re-lists the drainQueue
+        signature and the acceptance bullets) instead of carrying rationale. The response
+        states G20 is error-severity and blocking — the plan is blocked until Task 2's
+        Notes is reduced to rationale only.
+
+- description: "plan-sdlc: per-task template uses optional rationale-only Notes field, not Description (R48, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    user_request: >
+      Run /plan-sdlc Step 2. Show the per-task metadata template you write for each task.
+      What is the field that used to be called Description, and what content belongs in it now?
+  assert:
+    - type: icontains
+      value: "Notes"
+    - type: llm-rubric
+      value: >
+        The response shows the per-task template with a Notes field (not a Description
+        field). Notes is described as OPTIONAL and rationale-only (≤5 lines) — the
+        executable "what" lives in Files, Contract, and Acceptance criteria, not in Notes.
+        The response does NOT present a mandatory Description field that carries the full
+        implementation detail.
+
+- description: "plan-sdlc: plan carries a top-of-plan Deviations & assumptions section (R47, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-deviations-notes.md"
+    user_request: >
+      Run /plan-sdlc. The plan dispatches notifications via a background queue although the
+      user only asked to "send notifications", and adds a retry policy that was not
+      specified. Show the section the plan must carry to record these divergences, including
+      its heading and table columns.
+  assert:
+    - type: icontains
+      value: "## Deviations & assumptions"
+    - type: llm-rubric
+      value: >
+        The response includes a top-of-plan section headed exactly "## Deviations &
+        assumptions" with a table whose columns are Item | asked | does | why. It records
+        the background-queue choice and the retry policy as rows (each divergence from or
+        assumption beyond the literal request). The response treats this section as required
+        on every plan, not optional.
+
+# --- plan-format-reference.md convention tests (Task 3, Fixes #472) ---
+
+- description: "plan-format-reference: render cap is one example per distinct contract shape — distinct events each get their own record (R49, catalog #2/#3, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/plan-format-reference.md"
+    project_context: "file://fixtures/plan-per-event-contracts.md"
+    user_request: >
+      Read the plan-format-reference conventions, then review Task 1 in the plan context above.
+      Task 1 emits three DISTINCT events (order.created, order.refunded, order.cancelled), each with
+      a different payload shape. State the render cap rule and how many records Task 1 must render
+      for these three distinct events, citing the catalog #2/#3 convention.
+  assert:
+    - type: icontains
+      value: "distinct contract shape"
+    - type: llm-rubric
+      value: >
+        The response states the render cap as ONE elided (…) example per DISTINCT contract shape
+        (not per surface category, not an exhaustive dump). It explains that because the three
+        events (order.created, order.refunded, order.cancelled) are DISTINCT shapes, each renders
+        its own record — three records, one per distinct event — per the catalog #2/#3 rule that
+        every distinct event/endpoint/operation renders its own record. The response does NOT claim
+        a single shared example suffices for all three distinct shapes.
+
+- description: "plan-format-reference: bare file:line forbidden as a CHANGE ref; Contract.mirror line-anchor remains a valid precedent pointer (R51 anchoring, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/plan-format-reference.md"
+    project_context: "file://fixtures/plan-bare-ref.md"
+    user_request: >
+      Read the plan-format-reference "Code reference anchoring" convention, then review Task 1 in
+      the plan context above. Task 1 references the change site as a bare pointer
+      `src/pricing/discount.ts:42` and carries a `Contract.mirror` line-anchor
+      `src/pricing/tax.ts:1-30`. Which of these two references violates the convention and which is
+      allowed, and how should the violating one be re-rendered?
+  assert:
+    - type: icontains
+      value: "Contract.mirror"
+    - type: llm-rubric
+      value: >
+        The response identifies the bare `src/pricing/discount.ts:42` pointer as a FORBIDDEN change
+        reference and says it must be re-anchored self-contained — embedding the surrounding lines
+        (or full function body) plus an inline -/+ diff so the change is reviewable from the plan
+        alone. The response identifies the `Contract.mirror` line-anchor `src/pricing/tax.ts:1-30`
+        as ALLOWED (the carve-out): it is a precedent pointer to existing structure being copied,
+        not a change reference. The response does NOT claim all line-anchors are forbidden and does
+        NOT flag the mirror anchor as a violation.
+
+- description: "plan-format-reference: Deviations & assumptions is required with Item|asked|does|why columns (R47, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/plan-format-reference.md"
+    user_request: >
+      Per the plan-format-reference, is a `## Deviations & assumptions` section required on every
+      plan? Where is it placed and what are its table columns? Show the exact heading and column row.
+  assert:
+    - type: icontains
+      value: "## Deviations & assumptions"
+    - type: llm-rubric
+      value: >
+        The response states that `## Deviations & assumptions` is REQUIRED on every plan, placed at
+        the top of the plan (immediately after the document header, before Key Decisions). It gives
+        the table columns exactly as Item | asked | does | why. The response does NOT describe the
+        section as optional and does NOT use a different column set.
+
+# --- G19 Mermaid-flow pass, G20 Notes restatement, G21 pointer-vs-change-ref (Fixes #472) ---
+
+- description: "plan-sdlc: G19 PASSES Task 1 that renders a Mermaid fenced block for a call-order/state surface (R46/R50, G19, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/lane-content-coverage-prompt.md"
+    project_context: "file://fixtures/plan-g19-mermaid-pass.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G19 render-don't-narrate gate for Task 1
+      ("Order pipeline call order + state machine") in the plan. Task 1 renders both the
+      call-order surface and the state machine using Mermaid fenced blocks. Is Task 1
+      flagged by G19?
+  assert:
+    - type: icontains
+      value: "G19"
+    - type: llm-rubric
+      value: >
+        The response evaluates the G19 render-don't-narrate gate and finds Task 1
+        NOT flagged. Task 1 renders the call-order surface with a Mermaid sequenceDiagram
+        fenced block and the state surface with a Mermaid stateDiagram-v2 fenced block —
+        both are valid renders for catalog #4/#5/#6 surfaces. The response states that a
+        Mermaid fenced block is an accepted render form for flow / call-order / state
+        surfaces and does NOT flag Mermaid diagrams as narration or as a G19 violation.
+        G19 does not block on Task 1.
+
+- description: "plan-sdlc: G20 flags a Notes block that restates the task's Contract/acceptance (error-severity, blocking) (R48, G20, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/lane-content-coverage-prompt.md"
+    project_context: "file://fixtures/plan-deviations-notes.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G20 Notes rationale-only gate for all tasks in
+      the plan. Which task's Notes block is flagged by G20? Is G20 error-severity and
+      blocking?
+  assert:
+    - type: icontains
+      value: "G20"
+    - type: llm-rubric
+      value: >
+        The response evaluates G20 (Notes rationale-only) and flags exactly the task
+        whose Notes block restates Contract shape or acceptance criteria (function
+        signatures, acceptance bullets) instead of carrying only rationale. The task whose
+        Notes carries only rationale (the why behind a design choice) is NOT flagged. The
+        response states G20 is error-severity and blocking — the plan is blocked until the
+        offending Notes block is reduced to rationale only.
+
+- description: "plan-sdlc: G21 PASSES a file:line used as a Contract.mirror pointer but FLAGS a bare file:line change-site reference (R51, G21, #472)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/lane-content-coverage-prompt.md"
+    project_context: "file://fixtures/plan-g21-pointer-vs-change.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G21 self-contained code references gate for
+      Task 1 and Task 2 in the plan. Task 1 references the change site as a bare
+      file:line pointer with no surrounding context or diff. Task 2 carries a
+      Contract.mirror line-anchor pointing to existing structure being copied. Which task
+      does G21 flag, and why does the other pass?
+  assert:
+    - type: icontains
+      value: "G21"
+    - type: llm-rubric
+      value: >
+        The response evaluates G21 (self-contained code references). It FLAGS Task 1:
+        the bare `src/pricing/discount.ts:42` reference is used as a change site without
+        surrounding lines or an inline -/+ diff, so the change is not reviewable from the
+        plan alone. The response states G21 is error-severity and blocking for Task 1. It
+        does NOT flag Task 2: the `Contract.mirror` line-anchor `src/pricing/tax.ts:1-30`
+        is a precedent pointer to existing structure being copied, which is the documented
+        exempt case. The response does NOT claim all file:line references are forbidden.
