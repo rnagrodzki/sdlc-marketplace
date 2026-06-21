@@ -33,13 +33,13 @@ Write an implementation plan from requirements, a spec, or a user description. P
       > This looks like a functional change. This project uses OpenSpec for spec-driven development.
       >
       > Options:
-      > 1. **Start OpenSpec flow** — run `/opsx:propose` to spec this out first (recommended for non-trivial features)
+      > 1. **Start OpenSpec flow** — use the openspec CLI to author a change first (recommended for non-trivial features)
       > 2. **Continue planning directly** — skip spec workflow, plan from conversation context
       > 3. **Use existing spec** — pass `--spec` if you already have an OpenSpec change for this
       >
       > Select (1/2/3):
 
-      - On **1**: Stop plan-sdlc. Tell the user to run `/opsx:propose "<their description>"`. In plan mode, call ExitPlanMode first.
+      - On **1**: Stop plan-sdlc. Tell the user to use the openspec CLI directly to create a change (run `openspec --help` for available commands). In plan mode, call ExitPlanMode first.
       - On **2**: Skip the rest of the OpenSpec block. `openspecContext` remains empty. Continue with standard planning.
       - On **3**: Re-run the OpenSpec loading logic (steps 3–6) to resolve and load the active change.
 3. If the user provided a spec file path pointing into `openspec/changes/<name>/`, extract `<name>` as the active change.

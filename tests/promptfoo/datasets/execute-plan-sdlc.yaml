@@ -164,8 +164,8 @@
       value: "verify"
     - type: llm-rubric
       value: >
-        The response falls back to a static advisory mentioning /opsx:verify and /opsx:archive
-        (or similar non-CLI suggestions) without fabricating a validation result. It does NOT
+        The response falls back to a static advisory mentioning openspec validate --strict
+        (or similar CLI suggestion) without fabricating a validation result. It does NOT
         claim validation passed. It may note that the openspec CLI is not available.
 
 - description: "execute-plan-sdlc: Learning Capture writes to log.md before Step 9 REPORT (issue #208)"

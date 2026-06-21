@@ -298,19 +298,17 @@ try {
     // Stage-aware SDLC suggestions
     switch (change.stage) {
       case 'spec-in-progress':
-        resumeLines.push('  Continue spec: /opsx:continue or /opsx:ff');
         break;
       case 'ready-for-plan':
         resumeLines.push(`  Plan with: /plan-sdlc --from-openspec ${change.name}`);
         resumeLines.push('  Or full pipeline: /ship-sdlc (after planning)');
         break;
       case 'implementation-in-progress':
-        resumeLines.push('  Continue: /opsx:apply');
         resumeLines.push('  Or commit progress: /commit-sdlc');
         break;
       case 'tasks-complete':
         resumeLines.push('  Ship: /ship-sdlc (commit -> review -> PR)');
-        resumeLines.push('  Verify first: /opsx:verify');
+        resumeLines.push(`  Verify first: openspec validate --strict ${change.name}`);
         break;
     }
   } else {

@@ -287,7 +287,7 @@
         SKILL.md example which shows "--auto --draft". The response correctly reflects
         that draft is false — the PR will not be created as a draft.
 
-- description: "ship-sdlc: OpenSpec pipeline summary includes both /opsx:verify and /opsx:archive"
+- description: "ship-sdlc: OpenSpec pipeline summary includes openspec validate and openspec archive suggestions"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
     project_context: "file://fixtures/ship-pipeline-ready.md"
@@ -297,20 +297,20 @@
       Step 1f — the active change is "add-resource-indicators". Show the final Step 6
       pipeline summary report with the OpenSpec suggestions included.
   assert:
-    # Must suggest /opsx:verify
+    # Must suggest openspec validate --strict
     - type: icontains
-      value: "/opsx:verify"
-    # Must suggest /opsx:archive
+      value: "openspec validate --strict"
+    # Must suggest openspec archive
     - type: icontains
-      value: "/opsx:archive"
+      value: "openspec archive"
     # Behavioral: both verify and archive are suggested in the summary
     - type: llm-rubric
       value: >
-        The pipeline summary report includes both /opsx:verify and /opsx:archive as
-        next-step suggestions because OpenSpec was detected. The verify suggestion
-        mentions validating implementation completeness against the spec. The archive
-        suggestion mentions archiving the OpenSpec change and syncing delta specs.
-        Both appear in the final summary, not just one of them.
+        The pipeline summary report includes both openspec validate --strict and openspec archive
+        as next-step suggestions because OpenSpec was detected and verify-openspec was not in
+        flags.steps. The verify suggestion mentions validating implementation completeness against
+        the spec. The archive suggestion mentions archiving the OpenSpec change and syncing delta
+        specs. Both appear in the final summary, not just one of them.
 
 - description: "ship-sdlc: cleanup validation failure surfaces pipeline contract violation"
   vars:
@@ -948,16 +948,16 @@
     - type: icontains
       value: "satisfied"
     - type: not-icontains
-      value: "→ Run /opsx:verify"
+      value: "→ Run openspec validate --strict"
     - type: llm-rubric
       value: >
-        The response describes dispatching verify-openspec via the Agent protocol (Skill tool,
-        model sonnet) with the args from step.invocation (--change add-auth). It shows the
-        satisfied verdict path: logging "OpenSpec verify: satisfied" and proceeding to
-        archive-openspec. In the REPORT section, it prints the verify result (e.g.,
-        "OpenSpec verify: satisfied") and does NOT emit the "→ Run /opsx:verify" fallback
-        text, because the step ran. The response correctly cites step.status === 'will_run'
-        from the prepare output (not $ARGUMENTS) as the gate condition.
+        The response describes running verify-openspec inline via openspec validate --strict
+        with --change add-auth. It shows the satisfied verdict path: logging
+        "openspec validate --strict: passed" and proceeding to archive-openspec. In the REPORT
+        section, it prints the verify result (e.g., "openspec validate --strict: passed") and
+        does NOT emit the "→ Run openspec validate --strict" fallback text, because the step
+        ran. The response correctly cites step.status === 'will_run' from the prepare output
+        (not $ARGUMENTS) as the gate condition.
 
 - description: "ship-sdlc (#441): verify-openspec not configured — fallback text appears in REPORT"
   vars:
@@ -970,15 +970,15 @@
       lines appear in REPORT. Do not dispatch any sub-skills.
   assert:
     - type: icontains
-      value: "→ Run /opsx:verify"
+      value: "→ Run openspec validate --strict"
     - type: llm-rubric
       value: >
         The response shows that when verify-openspec is not in flags.steps (Scenario B),
-        REPORT emits the "→ Run /opsx:verify to validate implementation completeness against
-        the spec" fallback text. It does NOT show a verify result because the step did not run.
-        The archive-openspec result (archived successfully) is reported separately. This
-        demonstrates the KD6 conditional text behavior: ran-result when the step executed,
-        fallback suggestion when it was absent from steps.
+        REPORT emits the "→ Run openspec validate --strict <change> to validate implementation
+        completeness against the spec" fallback text. It does NOT show a verify result because
+        the step did not run. The archive-openspec result (archived successfully) is reported
+        separately. This demonstrates the KD6 conditional text behavior: ran-result when the
+        step executed, fallback suggestion when it was absent from steps.
 
 - description: "ship-sdlc (R-progressive-disclosure): common-path branch-mode run does not read cold/worktree companion files"
   vars:

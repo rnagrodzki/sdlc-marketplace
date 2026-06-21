@@ -33,7 +33,7 @@ const SHIP_FIELDS = [
     type: 'multi-select',
     options: CANONICAL_STEPS.slice(),
     default: CANONICAL_STEPS.slice(),
-    description: 'Pipeline steps to run by default. received-review and commit-fixes run conditionally based on review verdict and are not configurable here. verify-pipeline and await-remote-review are opt-in entries — add them explicitly to enable post-PR CI verification and remote-reviewer awaiting. verify-openspec is an OpenSpec-gated opt-in — add it explicitly to run /opsx:verify between version and archive-openspec.',
+    description: 'Pipeline steps to run by default. received-review and commit-fixes run conditionally based on review verdict and are not configurable here. verify-pipeline and await-remote-review are opt-in entries — add them explicitly to enable post-PR CI verification and remote-reviewer awaiting. verify-openspec is an OpenSpec-gated opt-in — add it explicitly to run `openspec validate --strict <change>` between version and archive-openspec.',
   },
   {
     name: 'quick',

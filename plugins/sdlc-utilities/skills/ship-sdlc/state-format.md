@@ -113,7 +113,7 @@ The pipeline runs these canonical steps in order (conditional and optional steps
 | `received-review`     | Conditional: process critical/high review findings and apply fixes.                              |
 | `commit-fixes`        | Conditional: commit changes made during `received-review`.                                       |
 | `version`             | Bump the version according to `--bump` or interactive selection.                                 |
-| `verify-openspec`     | Opt-in, OpenSpec-gated: Agent-dispatched `/opsx:verify` validates implementation completeness against the spec before archiving. Runs only when configured in `steps[]` and a matched OpenSpec change exists. |
+| `verify-openspec`     | Opt-in, OpenSpec-gated: **inline `openspec validate --strict <change>`** validates change spec files structurally before archiving. (Structural validation only — confirms spec files are well-formed.) Runs only when configured in `steps[]` and a matched OpenSpec change exists. |
 | `archive-openspec`    | Opt-in: archive the OpenSpec change and sync delta specs (inline Bash, OpenSpec-gated).          |
 | `pr`                  | Open or update a pull request.                                                                   |
 | `verify-pipeline`     | Opt-in: poll `gh pr checks` until CI converges after the PR is opened.                          |

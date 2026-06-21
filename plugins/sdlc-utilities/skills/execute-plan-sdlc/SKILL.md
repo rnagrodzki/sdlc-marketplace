@@ -755,7 +755,7 @@ Guardrails:       N/N passed (M warnings, K overridden)
 
 If `openspecSpecs` was loaded in Step 1, append to the report:
 ```
-OpenSpec:         openspec/changes/<name>/ — run /opsx:verify to validate
+OpenSpec:         openspec/changes/<name>/ — run openspec validate --strict <name> to validate
 ```
 
 **OpenSpec sync warnings (implements R39 — Fixes #414):** When `openspecSyncWarnings` (populated by Step 5d's `markTaskDone` failure handler) is non-empty, append:
@@ -895,8 +895,8 @@ If `openspecSpecs` was loaded in Step 1 (the plan was OpenSpec-sourced), also su
    "
    ```
 3. **If `cliAvailable === false`:** emit the existing static advisory (no fabricated validation claim):
-   - `/opsx:verify` — validate implementation completeness against the spec
-   - `/opsx:archive` — merge delta specs into main specs after verification passes
+   - `openspec validate --strict <change>` — validate change spec files structurally
+   - `openspec archive <change> --yes` — archive the OpenSpec change and merge delta specs after validation passes
 4. **If `ok === true`:** apply the tasks.md coverage gate (implements R38 — Fixes #414) before emitting the suggestion:
    - Re-parse `openspec/changes/<name>/tasks.md` via `lib/openspec.js::parseTasks` using the same `$LIB` resolution + failure-guard + env-var contract as the `markTaskDone` block in Step 5d-bis:
 
