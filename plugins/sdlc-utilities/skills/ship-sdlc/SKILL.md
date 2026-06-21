@@ -583,27 +583,32 @@ fi
 
 If `step.status === 'will_run'` for the `verify-openspec` step (sourced from prepare output — NOT from `$ARGUMENTS`; implements R-verify-openspec-1..5):
 
-1. Extract the change name from `step.args` (split on `--change `, take the first token):
+1. Extract the change name from `step.args` by stripping the `--change ` prefix (the value after `--change` is the first whitespace-delimited token following it):
    ```bash
-   CHANGE_NAME="<changeName extracted from step.args --change token>"
+   CHANGE_NAME="${step.args#--change }"
+   CHANGE_NAME="${CHANGE_NAME%% *}"
    ```
+   (`step.args` is sourced from the prepare output, e.g. `--change my-feature` or `--change my-feature --auto`.)
 
 2. Locate the openspec library:
    ```bash
    OPENSPEC_LIB=$(find ~/.claude/plugins -name "openspec.js" -path "*/sdlc*/scripts/lib/openspec.js" 2>/dev/null | sort -V | tail -1)
    [ -z "$OPENSPEC_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/openspec.js" ] && OPENSPEC_LIB="plugins/sdlc-utilities/scripts/lib/openspec.js"
+   [ -z "$OPENSPEC_LIB" ] && { echo "ERROR: Could not locate scripts/lib/openspec.js. Is the sdlc plugin installed?" >&2; exit 2; }
    ```
 
-3. Run structural validation (synchronous call — no `.then`):
+3. Run structural validation (synchronous call — no `.then`). Pass values via environment to avoid shell injection; keep stdout clean (no `2>&1`):
    ```bash
-   node -e "
-     const lib = require('$OPENSPEC_LIB');
-     const r = lib.validateChangeStrict(process.cwd(), '$CHANGE_NAME');
-     console.log(JSON.stringify({ok:r.ok,cliAvailable:r.cliAvailable,stderr:r.stderr||''}));
-   " 2>&1
+   RESULT=$(OPENSPEC_LIB="$OPENSPEC_LIB" CHANGE_NAME="$CHANGE_NAME" node -e '
+     const lib = require(process.env.OPENSPEC_LIB);
+     const r = lib.validateChangeStrict(process.cwd(), process.env.CHANGE_NAME);
+     process.stdout.write(JSON.stringify({ok:r.ok,cliAvailable:r.cliAvailable,stderr:r.stderr||""}));
+   ')
+   NODE_EXIT=$?
+   [ "$NODE_EXIT" -ne 0 ] && { echo "ERROR: openspec validation script exited $NODE_EXIT" >&2; }
    ```
 
-4. Parse the JSON result and branch on verdict:
+4. Parse the JSON result from `$RESULT` and branch on verdict:
    - `cliAvailable: false` → log `openspec CLI not available, skipping validate` → proceed to archive-openspec (non-blocking).
    - `ok: true` → log `openspec validate --strict: passed` → proceed to archive-openspec.
    - `ok: false` AND `cliAvailable: true` → log `stderr` → note structural issues → proceed to archive-openspec (non-blocking per KD2).
