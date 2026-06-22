@@ -636,8 +636,8 @@ After creating or updating the PR, common follow-ups include:
 - `/version-sdlc` — tag a release after merge
 
 If OpenSpec enrichment was applied in Step 2 (an active change was detected), also suggest:
-- `/opsx:verify` — validate implementation completeness against the spec (after merge)
-- `/opsx:archive` — merge delta specs into main specs (after verification passes)
+- `openspec validate --strict <change>` — validate change spec files structurally (after merge)
+- `openspec archive <change> --yes` — archive the OpenSpec change and merge delta specs (after validation passes)
 
 ## See Also
 

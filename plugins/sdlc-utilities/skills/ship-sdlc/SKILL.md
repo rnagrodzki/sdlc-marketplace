@@ -579,35 +579,39 @@ fi
 
 `NEW_TAG` is the tag string emitted by version-sdlc (e.g. `v1.2.3`). `EXECUTE_BRANCH` is the feature branch variable set during pre-execute workspace auto-detection when the derive was `branch` (already available in the pipeline shell context; unset when the derive was `continue`). This gate is a **no-op when `NEW_TAG` is unset** (version step not in `flags.steps`) **or when `EXECUTE_BRANCH` is unset** (`continue` — run in place). Version always runs when in `steps[]` regardless of checkout (tags are repo-global).
 
-### Between version and archive-openspec — verify-openspec (Agent-dispatched, opt-in)
+### Between version and archive-openspec — verify-openspec (inline, opt-in)
 
 If `step.status === 'will_run'` for the `verify-openspec` step (sourced from prepare output — NOT from `$ARGUMENTS`; implements R-verify-openspec-1..5):
 
-1. Dispatch `/opsx:verify` via the Agent protocol. Use `step.invocation` as the skill invocation verbatim (e.g., `opsx:verify --change <name>`). Pass `model: step.model` (sonnet). Never add `isolation`. The agent must return a verdict `{ status: "satisfied" | "unsatisfied" | "error", summary: string, gaps: string[] }`.
+1. Extract the change name from `step.args` by stripping the `--change ` prefix (the value after `--change` is the first whitespace-delimited token following it):
+   ```bash
+   CHANGE_NAME="${step.args#--change }"
+   CHANGE_NAME="${CHANGE_NAME%% *}"
+   ```
+   (`step.args` is sourced from the prepare output, e.g. `--change my-feature` or `--change my-feature --auto`.)
 
-   **Agent prompt (adapted for verdict contract):**
-   > Invoke the skill using the Skill tool with `step.invocation` verbatim as the invocation: `<step.invocation>`.
-   > After the skill completes, return a JSON verdict on the last line of your response in exactly this shape:
-   > `VERIFY_VERDICT: {"status":"satisfied"|"unsatisfied"|"error","summary":"<one sentence>","gaps":["<gap1>",...]}`
-   > — `satisfied`: all spec requirements are met.
-   > — `unsatisfied`: implementation gaps were found; populate `gaps[]` with one entry per gap.
-   > — `error`: the verify tool failed to run; `summary` should describe the tooling failure.
+2. Locate the openspec library:
+   ```bash
+   OPENSPEC_LIB=$(find ~/.claude/plugins -name "openspec.js" -path "*/sdlc*/scripts/lib/openspec.js" 2>/dev/null | sort -V | tail -1)
+   [ -z "$OPENSPEC_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/openspec.js" ] && OPENSPEC_LIB="plugins/sdlc-utilities/scripts/lib/openspec.js"
+   [ -z "$OPENSPEC_LIB" ] && { echo "ERROR: Could not locate scripts/lib/openspec.js. Is the sdlc plugin installed?" >&2; exit 2; }
+   ```
 
-2. Parse the `VERIFY_VERDICT` JSON from the agent's response.
+3. Run structural validation (synchronous call — no `.then`). Pass values via environment to avoid shell injection; keep stdout clean (no `2>&1`):
+   ```bash
+   RESULT=$(OPENSPEC_LIB="$OPENSPEC_LIB" CHANGE_NAME="$CHANGE_NAME" node -e '
+     const lib = require(process.env.OPENSPEC_LIB);
+     const r = lib.validateChangeStrict(process.cwd(), process.env.CHANGE_NAME);
+     process.stdout.write(JSON.stringify({ok:r.ok,cliAvailable:r.cliAvailable,stderr:r.stderr||""}));
+   ')
+   NODE_EXIT=$?
+   [ "$NODE_EXIT" -ne 0 ] && { echo "ERROR: openspec validation script exited $NODE_EXIT" >&2; }
+   ```
 
-3. **Branch on verdict:**
-   - `status: "satisfied"` → log `verify-openspec: satisfied — <summary>`. Proceed to archive-openspec.
-   - `status: "error"` → log warning `verify-openspec: error — <summary>. Proceeding.`. Do not block the pipeline on tooling failure. Proceed to archive-openspec.
-   - `status: "unsatisfied"` AND `flags.auto === false` → present to user via `AskUserQuestion`:
-     > OpenSpec verify found N gap(s):
-     > - <gap1>
-     > - ...
-     >
-     > Options: **proceed** (continue to archive) | **abort** (save resume state, exit 1) | **open-as-finding** (record gaps in pipeline findings, continue)
-     - **proceed**: continue to archive-openspec.
-     - **abort**: write resume state via `state/ship.js fail`, exit 1.
-     - **open-as-finding**: append each gap to the existing ship-state findings collection — the same collection REPORT displays at the deferred-findings section (no new mechanism). Then proceed to archive-openspec.
-   - `status: "unsatisfied"` AND `flags.auto === true` → log warning `verify-openspec: unsatisfied — <N> gap(s). Recording as findings.`. Append gaps to the existing findings collection. Continue to archive-openspec.
+4. Parse the JSON result from `$RESULT` and branch on verdict:
+   - `cliAvailable: false` → log `openspec CLI not available, skipping validate` → proceed to archive-openspec (non-blocking).
+   - `ok: true` → log `openspec validate --strict: passed` → proceed to archive-openspec.
+   - `ok: false` AND `cliAvailable: true` → log `stderr` → note structural issues → proceed to archive-openspec (non-blocking per KD2).
 
 When `step.status !== 'will_run'` (skipped — not in steps[] or no matched change), skip this entire section.
 
@@ -894,13 +898,13 @@ If OpenSpec was detected in Step 1f and the `verify-openspec` step ran, append t
   (When unsatisfied and gaps were opened-as-finding or recorded, note: `N gap(s) recorded as pipeline findings.`)
 
 If OpenSpec was detected but `verify-openspec` is NOT in `flags.steps` (step was not configured), append:
-  `→ Run /opsx:verify to validate implementation completeness against the spec`
+  `→ Run openspec validate --strict <change> to validate implementation completeness against the spec`
 
 If OpenSpec was detected in Step 1f and the archive-openspec step ran successfully, append:
   `→ OpenSpec change "<name>" archived and committed.`
 
 If OpenSpec was detected but `archive-openspec` is NOT in `flags.steps`, append:
-  `→ Run /opsx:archive to archive the OpenSpec change and sync delta specs`
+  `→ Run openspec archive <change> --yes to archive the OpenSpec change and sync delta specs`
 
 ### Worktree cleanup
 
@@ -933,8 +937,8 @@ Reference material lives in `./reference.md` (implements R-progressive-disclosur
 
 After the pipeline completes, common follow-ups include:
 - `/received-review-sdlc` — address deferred medium/low findings
-- `/opsx:verify` — validate implementation against OpenSpec (only suggest when `verify-openspec ∉ flags.steps`; when the step ran, the result is already in REPORT)
-- `/opsx:archive` — archive the OpenSpec change and sync delta specs (only suggest when `archive-openspec ∉ flags.steps`)
+- `openspec validate --strict <change>` — validate implementation against OpenSpec (only suggest when `verify-openspec ∉ flags.steps`; when the step ran, the result is already in REPORT)
+- `openspec archive <change> --yes` — archive the OpenSpec change and sync delta specs (only suggest when `archive-openspec ∉ flags.steps`)
 
 ---
 

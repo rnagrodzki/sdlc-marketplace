@@ -311,7 +311,7 @@
     - type: javascript
       value: |
         const step = JSON.parse(output).steps.find(s => s.name === 'verify-openspec');
-        return step.status === 'will_run' && step.dispatchMode === 'agent' && step.skill === 'opsx:verify' && step.model === 'sonnet' && step.args.includes('add-auth')
+        return step.status === 'will_run' && step.skill === null && step.args.includes('add-auth')
 
 - description: "ship-prepare: verify-openspec skipped when absent from --steps"
   vars:

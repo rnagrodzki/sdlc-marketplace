@@ -35,7 +35,7 @@ const SUBSTEP_MAP = {
   'received-review':  ['fetch comments', 'classify findings', 'apply auto-fixes', 'surface remaining'],
   'commit-fixes':     ['re-stage', 'commit fixes'],
   version:            ['bump version', 'update CHANGELOG', 'tag'],
-  'verify-openspec':  ['dispatch opsx:verify', 'parse verdict'],
+  'verify-openspec':  ['openspec validate --strict', 'check result'],
   'archive-openspec': ['validate', 'run archive', 'stage', 'commit'],
   pr:                 ['push branch', 'draft body', 'gh pr create', 'apply labels'],
   'verify-pipeline':  ['poll checks', 'fetch logs on failure', 'analyze', 'commit fix if any'],
