@@ -129,11 +129,13 @@ Use the `Agent` tool with:
 
   ```text
   MANIFEST_FILE: <ERROR_CONTEXT_FILE>
-  PROJECT_ROOT: <cwd>
+  PROJECT_ROOT: <repository.contentRoot read from MANIFEST_FILE>
   ```
 
-  Substitute `<ERROR_CONTEXT_FILE>` with the absolute path captured in Step 1
-  (`MANIFEST_FILE`) and `<cwd>` with the current working directory.
+  Substitute `<ERROR_CONTEXT_FILE>` with the Step 1 `MANIFEST_FILE` path and
+  `<repository.contentRoot …>` with the `repository.contentRoot` value read from
+  that manifest JSON (the active worktree root; same single-source pattern used
+  for `pluginRepoUrl`). Do NOT recompute it via `git`.
 
 The orchestrator returns ONLY a JSON object:
 
@@ -255,18 +257,20 @@ When it holds, derive `<name>` from the dimension filename (`.sdlc/review-dimens
    GEN=$(find ~/.claude/plugins -name "dimension-to-instructions.js" -path "*/sdlc*/scripts/lib/dimension-to-instructions.js" 2>/dev/null | sort -V | tail -1)
    [ -z "$GEN" ] && [ -f "plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js" ] && GEN="plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
    [ -z "$GEN" ] && { echo "ERROR: Could not locate dimension-to-instructions.js. Is the sdlc plugin installed?" >&2; exit 2; }
-   MIRROR=$(node "$GEN" --file ".sdlc/review-dimensions/<name>.md")
+   # #474: read the just-written dimension at its ABSOLUTE content-rooted path,
+   # not a cwd-relative one (the dimension lives in the active worktree).
+   MIRROR=$(node "$GEN" --file "<proposal.targetFile>")
    GEN_EXIT=$?
    ```
    A non-zero `GEN_EXIT` (unparseable dimension) is a hard failure — halt per R-iteration-write rule 4 (see step 4) and surface the partial state (dimension written, mirror not).
 
-2. **Ensure the mirror directory exists:** `mkdir -p .github/instructions` (R-copilot-mirror: create if missing).
+2. **Ensure the mirror directory exists:** `mkdir -p "<CONTENT_ROOT>/.github/instructions"` (#474 — active worktree).
 
-3. **Write or patch the mirror** at `.github/instructions/<name>.instructions.md`:
+3. **Write or patch the mirror** at `<CONTENT_ROOT>/.github/instructions/<name>.instructions.md`:
    - If the mirror does NOT exist → Write the generator's `$MIRROR` output verbatim (via the native Write tool — subprocess FS writes do not persist).
    - If the mirror ALREADY exists → this branch covers **only a manually pre-seeded mirror** (the orchestrator reads but never proposes a copilot-instructions write for a not-yet-created dimension's mirror, so a normal `action === "add"` flow arrives here only if someone seeded the file by hand). Patch it **strengthen-only** (R-copilot-mirror / R8/C9): apply only additive checklist/severity-guide rows and tightened `applyTo`/severity from `$MIRROR`; never remove existing checklist items or lower a severity. Use Edit to merge, not a blind overwrite. `strengthen` proposals on an already-mirrored dimension are excluded by the outer gate (condition (b)) and never reach this step.
 
-4. **Halt on partial-write failure (R-iteration-write rule 4):** if the dimension write in 5b succeeded but the generator (step 1) or the mirror Write/Edit (step 3) fails, do NOT silently advance to the next proposal. Halt this iteration and surface the partial state explicitly: `Dimension written to .sdlc/review-dimensions/<name>.md but the Copilot mirror .github/instructions/<name>.instructions.md could not be created — resolve manually before continuing.`
+4. **Halt on partial-write failure (R-iteration-write rule 4):** if the dimension write in 5b succeeded but the generator (step 1) or the mirror Write/Edit (step 3) fails, do NOT silently advance to the next proposal. Halt this iteration and surface the partial state explicitly: `Dimension written to <proposal.targetFile> but the Copilot mirror <CONTENT_ROOT>/.github/instructions/<name>.instructions.md could not be created — resolve manually before continuing.` Where `<CONTENT_ROOT>` is `repository.contentRoot` from the manifest.
 
 5. Display a one-line confirmation on success: `Mirrored review dimension → .github/instructions/<name>.instructions.md`.
 

@@ -510,3 +510,24 @@
         mutual-exclusion message. The skill does NOT proceed to the prepare script in this case —
         it stops at Step 0 (Parse Arguments). No manifest is written. The response cites R19
         and the Step 0 mutual-exclusion guard.
+
+# #474 — worktree-aware write behavior (behavioral; NOT auto-run per no-auto-eval)
+
+- description: "harden-sdlc #474: SKILL.md passes PROJECT_ROOT from repository.contentRoot (not cwd)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/harden-sdlc/SKILL.md"
+    project_context: "file://fixtures/harden-plugin-defect-context.md"
+    user_request: >
+      A developer runs /harden-sdlc from a linked git worktree (linked-wt/) on branch feat/x.
+      The harden-prepare.js manifest contains repository.root = /main and
+      repository.contentRoot = /main/linked-wt. When dispatching the orchestrator in Step 3,
+      what value does SKILL.md pass for PROJECT_ROOT, and how is it obtained?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response states that SKILL.md reads repository.contentRoot from the manifest JSON
+        (MANIFEST_FILE) and passes it as PROJECT_ROOT to the orchestrator — NOT the current
+        working directory and NOT a value computed via git. The response must cite that this
+        follows the single-source pattern used for pluginRepoUrl (read directly from the
+        manifest). The response must NOT describe passing cwd or running git rev-parse as
+        the source for PROJECT_ROOT.

@@ -20,6 +20,7 @@ const surfaces = require(path.join(LIB, 'harden-surfaces'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { detectResumeState } = require(path.join(LIB, 'state'));
 const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
+const { resolveActiveWorktreeSafe } = require(path.join(LIB, 'worktree')); // #474: branch-tracked surfaces
 
 // Plugin repo URL (issue #288). Hardcoded inline by design — do NOT extract to
 // lib/harden-surfaces.js, do NOT share with error-report-prepare.js::TARGET_REPO.
@@ -72,9 +73,9 @@ function readStdinJson() {
   }
 }
 
-function safeExec(cmd) {
+function safeExec(cmd, opts = {}) {
   try {
-    return execSync(cmd, { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
+    return execSync(cmd, { stdio: ['ignore', 'pipe', 'pipe'], ...opts }).toString().trim();
   } catch (err) {
     process.stderr.write(`harden-prepare: git command failed (${cmd.split(' ')[0]}): ${err.stderr ? err.stderr.toString().trim() : err.message}\n`);
     return '';
@@ -225,8 +226,10 @@ function main() {
     return;
   }
 
-  // R-projectroot: main-worktree-rooted resolution (#360).
+  // R-projectroot: main-worktree-rooted resolution (#360) — config/guardrails.
   const projectRoot = resolveSdlcRoot();
+  // #474: branch-tracked surfaces (dimensions, copilot) live in the active worktree.
+  const contentRoot = resolveActiveWorktreeSafe();
   const surfaceLoadErrors = [];
 
   // R16 — Pre-flight validation: validate existing .sdlc/config.json guardrails
@@ -243,7 +246,7 @@ function main() {
     }
   }
 
-  const dimDir = resolveDimensionsDir(projectRoot);
+  const dimDir = resolveDimensionsDir(contentRoot); // #474: validate the active worktree's dimensions
   if (fs.existsSync(dimDir)) {
     let dimFiles = [];
     try {
@@ -270,8 +273,8 @@ function main() {
   // Load all five surfaces deterministically (R4).
   const planGuardrails    = surfaces.loadGuardrails(projectRoot, 'plan',    surfaceLoadErrors);
   const executeGuardrails = surfaces.loadGuardrails(projectRoot, 'execute', surfaceLoadErrors);
-  const reviewDimensions  = surfaces.loadReviewDimensions(projectRoot, surfaceLoadErrors);
-  const copilotInstructions = surfaces.loadCopilotInstructions(projectRoot, surfaceLoadErrors);
+  const reviewDimensions  = surfaces.loadReviewDimensions(contentRoot, surfaceLoadErrors);   // #474
+  const copilotInstructions = surfaces.loadCopilotInstructions(contentRoot, surfaceLoadErrors); // #474
   const errorReportSkillPath = surfaces.resolveErrorReportSkill(projectRoot, surfaceLoadErrors);
 
   const { shipState, executeState } = readPipelineState();
@@ -300,9 +303,10 @@ function main() {
       executeState,
     },
     repository: {
-      root:   projectRoot,
-      branch: safeExec('git rev-parse --abbrev-ref HEAD'),
-      recentDiffSummary: safeExec('git diff --shortstat HEAD~1..HEAD 2>/dev/null'),
+      root:        projectRoot,   // main worktree — config/.sdlc root (#474 KD1)
+      contentRoot,                // active worktree — branch-tracked surface root (#474)
+      branch: safeExec('git rev-parse --abbrev-ref HEAD', { cwd: contentRoot }),
+      recentDiffSummary: safeExec('git diff --shortstat HEAD~1..HEAD 2>/dev/null', { cwd: contentRoot }),
     },
     pluginRepoUrl: PLUGIN_REPO_URL,
     timestamp: new Date().toISOString(),

@@ -16,7 +16,7 @@ inherit no conversation context — everything you need is in the manifest.
 ## Inputs (provided in your prompt)
 
 - **MANIFEST_FILE**: Absolute path to the JSON manifest written by `harden-prepare.js`
-- **PROJECT_ROOT**: The project's working directory
+- **PROJECT_ROOT**: the active worktree root (= `repository.contentRoot` in the manifest)
 
 ## Step 0 — Load Manifest
 
@@ -35,12 +35,17 @@ Read the manifest JSON from `MANIFEST_FILE`. The manifest contains:
 | `surfaces.copilotInstructions[]` | `{applyTo, name, path}` |
 | `surfaces.errorReportSkillPath` | Resolved REFERENCE.md path for `error-report-sdlc` |
 | `pipeline.shipState` / `pipeline.executeState` | Optional paused-pipeline state, or `null` |
-| `repository.root` / `repository.branch` / `repository.recentDiffSummary` | Repo metadata |
+| `repository.root` | MAIN worktree — config/`.sdlc/` root; use to build the `.sdlc/config.json` targetFile for guardrail proposals |
+| `repository.contentRoot` | ACTIVE worktree — root of `reviewDimensions[].path` / `copilotInstructions[].path`; equals `PROJECT_ROOT` |
+| `repository.branch` / `repository.recentDiffSummary` | Active-checkout metadata |
 | `pluginRepoUrl` | Constant URL of the plugin's GitHub repository (issue #288) — read directly from `MANIFEST_FILE` by SKILL.md (Steps 5c and 6) to construct the user-facing prompt; NOT included in orchestrator output JSON |
 
 If you need the full body of a specific dimension or copilot instruction file to
-draft a proposal, you MAY Read the file via the `path` field in the manifest. Do
-not Read files outside `PROJECT_ROOT`.
+draft a proposal, you MAY Read the file via the `path` field in the manifest
+(these live under `PROJECT_ROOT` = `repository.contentRoot`). Do not Read files
+outside `PROJECT_ROOT`. Building the `.sdlc/config.json` targetFile under
+`repository.root` (the main worktree) is emitting a path string, not a Read, and
+is permitted.
 
 ## Step 1 — Classify the Failure
 
@@ -101,7 +106,7 @@ Each proposal:
 {
   "surface": "plan-guardrails | execute-guardrails | review-dimensions | copilot-instructions",
   "action": "add | strengthen | consolidate",
-  "targetFile": "absolute path to the file that would be edited",
+  "targetFile": "absolute path to the file that would be edited — for plan-guardrails/execute-guardrails use `<repository.root>/.sdlc/config.json` (main worktree); for review-dimensions/copilot-instructions use that surface's `path` field verbatim (active worktree, = repository.contentRoot-rooted)",
   "patch": "preview block — for sdlc.json, the new/modified guardrail object as JSON; for review-dimensions, the new frontmatter or new rule line; for copilot-instructions, the new checklist line",
   "rationale": "one to two sentences linking back to the failure signal"
 }
