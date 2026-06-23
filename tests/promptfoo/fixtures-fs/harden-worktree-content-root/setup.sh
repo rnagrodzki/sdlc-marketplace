@@ -6,8 +6,8 @@
 set -e
 
 git init -q -b main
-git config user.email "test@test.com"
-git config user.name "Test"
+git config --local user.email "test@test.com"
+git config --local user.name "Test"
 
 # --- main worktree: config + main-only dimension ---
 mkdir -p .sdlc/review-dimensions

@@ -132,10 +132,17 @@ Use the `Agent` tool with:
   PROJECT_ROOT: <repository.contentRoot read from MANIFEST_FILE>
   ```
 
-  Substitute `<ERROR_CONTEXT_FILE>` with the Step 1 `MANIFEST_FILE` path and
-  `<repository.contentRoot …>` with the `repository.contentRoot` value read from
-  that manifest JSON (the active worktree root; same single-source pattern used
-  for `pluginRepoUrl`). Do NOT recompute it via `git`.
+  Substitute `<ERROR_CONTEXT_FILE>` with the Step 1 `MANIFEST_FILE` path.
+  For `PROJECT_ROOT`, read `repository.contentRoot` from the manifest JSON:
+
+  ```bash
+  CONTENT_ROOT=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8')).repository.contentRoot)")
+  MAIN_ROOT=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8')).repository.root)")
+  ```
+
+  `CONTENT_ROOT` = `repository.contentRoot` (active worktree — dimensions/copilot paths rooted here).
+  `MAIN_ROOT` = `repository.root` (main worktree — `.sdlc/config.json` rooted here).
+  Do NOT recompute either via `git`. Store both; they are needed in Steps 5a and 5b.
 
 The orchestrator returns ONLY a JSON object:
 
@@ -211,7 +218,11 @@ Options: **apply** | **skip** | **cancel**
 When the user selects **apply**, validate the proposed change BEFORE writing:
 
 - For `surface == "plan-guardrails"` or `"execute-guardrails"`: the target is
-  `.sdlc/config.json`. Construct the prospective merged JSON in memory, then
+  `<MAIN_ROOT>/.sdlc/config.json` (the main worktree root from the manifest —
+  `repository.root`). This is deliberate: guardrail config is shared/main-rooted
+  (spec C-contentroot / KD2), even when the skill is invoked from a linked
+  worktree. `targetFile` in the proposal is already an absolute path rooted at
+  `repository.root`. Construct the prospective merged JSON in memory, then
   validate via the canonical guardrails validator:
 
   ```bash
@@ -247,7 +258,9 @@ Use Edit (preferred) or Write to apply the approved, validated change to
 Applied {action} on {surface} → {targetFile}
 ```
 
-**Copilot mirror for NEW review dimensions (R-copilot-mirror, issue #456) — same atomic, approved write step.** Immediately after the dimension write above (still inside this 5b iteration, before advancing to the next proposal), gate on BOTH: (a) `proposal.surface === "review-dimensions"` AND `proposal.targetFile` is under `.sdlc/review-dimensions/`, AND (b) `proposal.action === "add"` (a NEW dimension — existing dimensions are NOT retroactively mirrored per R8/C9; `strengthen` actions on an already-mirrored dimension do not re-run this). When the gate does not hold, skip this block entirely.
+**Copilot mirror for NEW review dimensions (R-copilot-mirror, issue #456) — same atomic, approved write step.** Immediately after the dimension write above (still inside this 5b iteration, before advancing to the next proposal), gate on BOTH: (a) `proposal.surface === "review-dimensions"` AND `proposal.targetFile` (an absolute path emitted by the orchestrator, rooted at `repository.contentRoot`) contains `.sdlc/review-dimensions/`, AND (b) `proposal.action === "add"` (a NEW dimension — existing dimensions are NOT retroactively mirrored per R8/C9; `strengthen` actions on an already-mirrored dimension do not re-run this). When the gate does not hold, skip this block entirely.
+
+Before this block runs, ensure `CONTENT_ROOT` is set from `repository.contentRoot` in the manifest (derived in Step 3; re-derive here if in a fresh shell block using the same one-liner pattern from Step 3).
 
 When it holds, derive `<name>` from the dimension filename (`.sdlc/review-dimensions/<name>.md` → `<name>.instructions.md`) and:
 

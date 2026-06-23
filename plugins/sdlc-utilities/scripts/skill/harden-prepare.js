@@ -74,8 +74,12 @@ function readStdinJson() {
 }
 
 function safeExec(cmd, opts = {}) {
+  // Whitelist only `cwd` from caller opts — spread of arbitrary opts (e.g. shell, env)
+  // would silently undermine the fixed stdio posture and defense-in-depth intent.
+  const execOpts = { stdio: ['ignore', 'pipe', 'pipe'] };
+  if (opts.cwd !== undefined) execOpts.cwd = opts.cwd;
   try {
-    return execSync(cmd, { stdio: ['ignore', 'pipe', 'pipe'], ...opts }).toString().trim();
+    return execSync(cmd, execOpts).toString().trim();
   } catch (err) {
     process.stderr.write(`harden-prepare: git command failed (${cmd.split(' ')[0]}): ${err.stderr ? err.stderr.toString().trim() : err.message}\n`);
     return '';
