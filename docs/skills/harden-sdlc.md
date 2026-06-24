@@ -241,6 +241,10 @@ Failure → harden classifies → proposes surface edits → user approves → n
 
 No file is written without an explicit `apply` AskUserQuestion answer recorded for that specific proposal.
 
+> **Worktrees.** From a linked git worktree, review-dimension and Copilot-instruction
+> edits land in the **active** worktree (your branch); guardrail edits to `.sdlc/config.json`
+> land in the **main** worktree (shared config). In a single worktree the two coincide.
+
 ---
 
 ## Related Skills

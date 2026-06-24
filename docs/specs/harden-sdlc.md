@@ -101,8 +101,9 @@
 - P8: `surfaces.copilotInstructions[]` — `{applyTo, name, path}` objects
 - P9: `surfaces.errorReportSkillPath` (string) — absolute path to resolved `error-report-sdlc/REFERENCE.md`
 - P10: `pipeline.shipState` / `pipeline.executeState` — optional summaries of paused pipeline state (or `null`)
-- P11: `repository.root` / `repository.branch` / `repository.recentDiffSummary` — git short-stat only, no full body
+- P11: `repository.root` / `repository.branch` / `repository.recentDiffSummary` — `repository.root` is the MAIN worktree (config/`.sdlc/` root, = `resolveSdlcRoot()`); `branch`/`recentDiffSummary` describe the ACTIVE checkout (resolved against `repository.contentRoot`); git short-stat only, no full body
 - P12: `pluginRepoUrl` (string) — constant URL of the plugin's GitHub repository, surfaced verbatim to the user prompt and forwarded as context to error-report-sdlc.
+- P13: `repository.contentRoot` (string) — the ACTIVE worktree root (`resolveActiveWorktreeSafe()`); equals `repository.root` in the single-worktree case. Branch-tracked surface paths (`reviewDimensions[].path`, `copilotInstructions[].path`) are rooted here, NOT at `repository.root`.
 
 ## Error Handling
 
@@ -127,8 +128,10 @@
 - C8: Must not re-derive data the prepare script already computes via shell commands, tool calls, or LLM inference — script output is the sole source for all factual context, preserving deterministic behavior
 - C9: Must not propose relaxing or removing existing rules in v1 (strengthen-only invariant)
 - C10: Must not auto-dispatch from caller skills — every caller integration is opt-in via menu selection only
-- C-projectroot: Scripts that use `process.cwd()` as the project root silently break when invoked from a sub-directory or a git worktree. All projectRoot resolutions in this skill's scripts MUST route through `resolveSdlcRoot()` (lib/config.js); `process.cwd()` is forbidden except in documented bootstrap entry points.
+- C-projectroot: Scripts that use `process.cwd()` as the project root silently break when invoked from a sub-directory or a git worktree. All projectRoot resolutions in this skill's scripts MUST route through `resolveSdlcRoot()` (lib/config.js); `process.cwd()` is forbidden except in documented bootstrap entry points. Scope: config/guardrail/state paths only — branch-tracked content paths use `contentRoot` per C-contentroot.
   - Acceptance: `resolveSdlcRoot()` is called to establish `projectRoot` in `skill/harden-prepare.js`; no bare `process.cwd()` usage contributes to any path resolved against the project root; invoking the script from a repo sub-directory yields the correct root.
+- C-contentroot: Branch-tracked surfaces (review-dimensions, copilot-instructions) and their pre-flight validation MUST resolve against `contentRoot = resolveActiveWorktreeSafe()` (lib/worktree.js), so writes land in the active worktree. Config/guardrail surfaces (plan/execute guardrails) and their pre-flight validation MUST resolve against `projectRoot = resolveSdlcRoot()` (main worktree) for both read and write — config is shared, main-rooted state (#351, `workspace-mode-compatibility`). The orchestrator builds the `.sdlc/config.json` targetFile from `repository.root` (main) and dimension/copilot targetFiles from each surface's `path` field (content). `PROJECT_ROOT` passed to the orchestrator is `repository.contentRoot`; the "do not Read outside PROJECT_ROOT" rule is scoped to Reads (the config targetFile under `repository.root` is an emitted path, not a Read).
+  - Acceptance: invoking `harden-prepare.js` from a linked worktree yields `reviewDimensions[].path` and `copilotInstructions[].path` under the active worktree and `repository.contentRoot` = active root, while `planGuardrails`/`executeGuardrails` are read from the main config and `repository.root` = main; in a single worktree all roots are identical.
 - C-11: Caller list MUST appear inline in this spec at I1 only. All other harden-sdlc surfaces (SKILL.md, `docs/skills/harden-sdlc.md`, `agents/harden-orchestrator.md`) MUST reference I1 by name rather than restating the list.
 - C-12: Strengthen-only invariant MUST appear inline at R8 (rule) and C9 (constraint) only. All other surfaces MUST reference R8 and C9 by name rather than restating the invariant text.
 
