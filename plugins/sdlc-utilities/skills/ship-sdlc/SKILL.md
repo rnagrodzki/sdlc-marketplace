@@ -237,6 +237,8 @@ Review verdict: CHANGES REQUESTED (1 critical, 2 high)
 
 In `--auto` mode, dispatch is automatic and `received-review-sdlc --auto` is forwarded — no interactive pause.
 
+In `--auto` mode NEVER call `AskUserQuestion` at this boundary — auto-dispatch `received-review-sdlc --auto` on the documented default. This is enforced deterministically by the `block-askuserquestion-auto.js` PreToolUse hook (R71) — the mid-turn sibling of the R67/R68 turn-end continuation hooks.
+
 ---
 
 ## Step 3 (CRITIQUE): Validate Pipeline
@@ -249,7 +251,7 @@ Pipeline validation:
   [pass] 5 of 7 steps will run
   [pass] All skip values recognized
   [pass] Version step supports --auto (release approval prompt skipped in auto mode)
-  [warn] If review finds critical/high issues, pipeline will pause for fix approval
+  [warn] If review finds critical/high issues, pipeline will pause for fix approval (interactive only; in --auto mode flags.auto === true → auto-dispatch the fix, no pause — R71)
 ```
 
 Validation checks:
@@ -352,6 +354,8 @@ For each step that will run, apply the dispatch protocol based on `step.dispatch
    ```
 
 > **`--auto` continuation (R67/R68/R70 — descriptive, not a competing imperative):** In `--auto` mode the pipeline advances to the next step's `begin-step` within the same response turn. This is reinforced by two hooks consuming the shared `pipelineAdvancing` predicate (`lib/state.js`): the `pipeline-continue.js` PostToolUse hook (R67) emits forward `additionalContext` between steps, and the `stop-pipeline-continue.js` Stop hook (R68) returns `decision: "block"` so the turn does not end mid-pipeline. Both are `flags.auto`-gated for the between-steps case — interactive (non-`auto`) review between steps is preserved. The `begin-step` → `complete-step` sequence (R70) is unchanged.
+
+> **`--auto` mid-turn no-pause (R71 — descriptive, not a competing imperative; mid-turn sibling of R67/R68 — #477):** In `--auto` mode (`flags.auto === true`) the pipeline must auto-dispatch the fix at the review→fix boundary and MUST NOT call `AskUserQuestion`. This is enforced deterministically by the `block-askuserquestion-auto.js` PreToolUse hook, which returns `permissionDecision: "deny"` while an active ship pipeline is advancing with `flags.auto === true`. Where the `stop-pipeline-continue.js` Stop hook (R68) guards the turn-*ending* hole, this guards the mid-turn *pause-for-input* hole. Interactive (non-`auto`) review pauses are preserved.
 
 ---
 
