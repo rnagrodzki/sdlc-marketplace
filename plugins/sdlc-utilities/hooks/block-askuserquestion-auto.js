@@ -52,7 +52,8 @@ function main() {
   try {
     ({ slugifyBranch, findStateFile, readState, pipelineAdvancing } = require('../scripts/lib/state'));
     ({ exec } = require('../scripts/lib/git'));
-  } catch {
+  } catch (err) {
+    process.stderr.write(`block-askuserquestion-auto: lib load failed — ${err && err.message || err}\n`);
     process.exit(0);
   }
 

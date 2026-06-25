@@ -38,7 +38,7 @@ This skill is for **expert users working on projects with established quality gu
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--auto` | Non-interactive mode. Forwards `--auto` to sub-skills that support it (commit-sdlc, version-sdlc, pr-sdlc). Pipeline still pauses at received-review-sdlc (intentionally interactive). | Off |
+| `--auto` | Non-interactive mode. Forwards `--auto` to all sub-skills that support it (commit-sdlc, received-review-sdlc, version-sdlc, pr-sdlc). No pause points — received-review-sdlc auto-dispatches fixes (R71) and version-sdlc skips the release approval prompt (R20). | Off |
 | `--steps <csv>` | Comma-separated list of steps to run, fully replacing the resolved step list. Valid values: `execute`, `commit`, `review`, `version`, `verify-openspec` (opt-in, OpenSpec-gated), `archive-openspec`, `pr`, `verify-pipeline` (opt-in), `await-remote-review` (opt-in), `learnings-commit`. The single source of truth for pipeline composition is `ship.steps[]` in `.sdlc/local.json`; CLI `--steps` is a one-shot override. | From config or built-in defaults |
 | `--quick` | Run the project's quick step profile (`ship.quick` in `.sdlc/local.json`) instead of `ship.steps[]`. Useful for fast local iterations (e.g. execute+commit+pr without review or versioning). Mutually exclusive with `--steps` (R-quick-5). Requires `ship.quick` to be configured (R-quick-6). | Off |
 | `--quality <full\|balanced\|minimal>` | Forwarded to execute-plan-sdlc as `--quality` (model tier). Only forwarded when the user explicitly passes `--quality` to ship; otherwise execute-plan-sdlc applies its own selection. (Renamed from `--preset` in #190 to disambiguate from `--steps`.) | Not forwarded |
@@ -65,7 +65,7 @@ To omit the `archive-openspec` step from a single run: `--steps <csv>` listing t
 
 ## How the Pipeline Works
 
-The pipeline runs up to 10 canonical steps sequentially (depending on which opt-in steps are configured). Two steps are conditional on the review verdict, and two steps pause even in `--auto` mode because they require human sign-off. The final step (`learnings-commit`) is a no-op when no learnings were captured this run.
+The pipeline runs up to 10 canonical steps sequentially (depending on which opt-in steps are configured). Two steps are conditional on the review verdict. In interactive mode (no `--auto`), received-review-sdlc and version-sdlc pause for human sign-off; in `--auto` mode both proceed without pausing (R20, R71). The final step (`learnings-commit`) is a no-op when no learnings were captured this run.
 
 ```
                           /ship-sdlc
@@ -104,8 +104,8 @@ plan-sdlc      (--auto if     (--committed)
                          v                   |
                     Step 5d:                 |
                     received-review-sdlc     |
-                    >>> ALWAYS PAUSES <<<    |
-                    (human fix approval)     |
+                    (pauses in interactive;  |
+                     auto-proceeds w/ R71)   |
                          |                   |
                     [changes made?]          |
                     yes  |  no               |
@@ -119,8 +119,8 @@ plan-sdlc      (--auto if     (--committed)
                                      v
                    [skipped?]   Step 5f:
                         +-----> version-sdlc
-                        |       >>> ALWAYS PAUSES <<<
-                        |       (release approval)
+                        |       (pauses in interactive;
+                        |        skips approval w/ --auto)
                         |            |
                         +-----<------+
                                      |
@@ -189,7 +189,7 @@ plan-sdlc      (--auto if     (--committed)
 **Key points:**
 
 - **Double-commit pattern**: The feature commit (step 5b) and the review fix commit (step 5e) are separate. This keeps feature work and review fixes distinct in git history.
-- **One mandatory pause point in `--auto` mode**: received-review-sdlc (automated code changes need human sign-off). version-sdlc skips the release approval prompt when `--auto` is forwarded.
+- **No mandatory pause points in `--auto` mode**: `--auto` is forwarded to received-review-sdlc (which auto-dispatches fixes without sign-off, enforced by the `block-askuserquestion-auto.js` PreToolUse hook — R71) and to version-sdlc (which skips the release approval prompt). In interactive mode (no `--auto`), received-review-sdlc pauses for human sign-off and version-sdlc pauses for release approval.
 - **Workspace auto-detection (R60, fixes #378, #379)**: ship-sdlc derives the workspace from cwd + current branch via `lib/git.js::deriveWorkspace` — there is no flag and no prompt. Two outcomes:
   - **`branch`** (cwd is the main worktree AND HEAD is the default branch): ship auto-creates a feature branch before dispatching execute. Lifecycle: (1) derive branch name from the plan title via `lib/branch-name.js` driven by `workspace.branch` config; (2) run ship state migration (`state/ship.js migrate --from <oldSlug> --to <newName>`) **before** creating the branch — critical because `state/ship.js read` must still resolve the OLD slug filename at migration time (load-bearing ordering); (3) `git checkout -b <name>`. After step (3), cwd is the main worktree on the new feature branch, so execute-plan-sdlc's own derive yields `continue` — ship does **not** forward a `--branch` value.
   - **`continue`** (a linked git worktree, OR the main worktree already on a feature branch): ship runs the pipeline in place on the current branch — no branch creation, no state migration. This covers the manual "create worktree → write plan → ship" workflow with zero flags. The version step runs normally (tags are repo-global).
@@ -281,7 +281,7 @@ Pipeline validation:
   [pass] Not on default branch (feat/user-auth)
   [pass] 4 of 7 steps will run
   [pass] All skip values recognized
-  [warn] If review finds critical/high issues, pipeline will pause for fix approval
+  [warn] If review finds critical/high issues, received-review-sdlc will auto-dispatch fixes (--auto forwarded, R71)
 
 Ship Pipeline
 --------------------------------------------------------------------
@@ -290,13 +290,13 @@ Step  Skill                 Status       Args           Pause?
 1     execute-plan-sdlc     will run     --quality balanced no
 2     commit-sdlc           will run     --auto         no
 3     review-sdlc           will run     --committed    no
-4     received-review-sdlc  conditional  (if crit/high) YES
+4     received-review-sdlc  conditional  (if crit/high) no
 5     commit-sdlc (fixes)   conditional  --auto         no
 6     version-sdlc          skipped      ---            ---
 7     pr-sdlc               will run     --auto         no
 --------------------------------------------------------------------
 Review threshold: high (any critical OR high finding triggers fix loop)
-Interactive pauses: received-review (if triggered)
+Interactive pauses: none (--auto mode)
 
 Auto mode — proceeding without confirmation.
 
@@ -401,7 +401,7 @@ Loads config (if present), detects context, presents the pipeline plan, and asks
 /ship-sdlc --auto --quality minimal
 ```
 
-Runs the quality preset with no confirmation prompts except at received-review-sdlc (if triggered) and version-sdlc.
+Runs the quality preset with no confirmation prompts. `--auto` is forwarded to all sub-skills — received-review-sdlc auto-dispatches fixes without pausing (R71) and version-sdlc skips the release approval prompt (R20).
 
 ### Dry run to preview the pipeline
 
