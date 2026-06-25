@@ -137,6 +137,27 @@
         injection finding is mentioned. The response does NOT silently continue to
         version-sdlc or pr-sdlc — it stops for human approval.
 
+- description: "ship-sdlc: --auto review critical/high dispatches received-review-sdlc without AskUserQuestion (R71/#477)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-review-critical.md"
+    user_request: >
+      The user invoked `/ship-sdlc --auto`. The review step returned 1 critical + 10 high
+      findings. Walk through what ship-sdlc does next at the review→fix boundary, citing the
+      relevant R-numbers from docs/specs/ship-sdlc.md.
+  assert:
+    - type: not-regex
+      value: "(AskUserQuestion)"
+    - type: regex
+      value: "(received-review-sdlc)"
+    - type: regex
+      value: "(--auto|flags\\.auto|R71)"
+    - type: llm-rubric
+      value: >
+        With flags.auto === true, ship-sdlc auto-dispatches received-review-sdlc --auto at the
+        review→fix boundary on the documented default and does NOT call AskUserQuestion or pause
+        for input (R71). It does not ask the user whether to fix the findings.
+
 - description: "ship-sdlc: medium/low review findings continue pipeline without invoking received-review-sdlc"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"

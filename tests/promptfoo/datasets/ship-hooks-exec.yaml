@@ -257,3 +257,41 @@
         if (inner.decision !== 'block') return `FAIL: decision ${inner.decision}`;
         // The hook reads but never writes state — repeated runs are stable.
         return true;
+
+# ---------------------------------------------------------------------------
+# block-askuserquestion-auto (R71 / C18, #477) — PreToolUse deny in --auto.
+# ---------------------------------------------------------------------------
+
+# Positive: auto + advancing ship pipeline → permissionDecision:"deny", exit 0.
+- description: "block-askuserquestion-auto (#477): auto+advancing pipeline denies AskUserQuestion"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/block-askuserquestion-auto.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"AskUserQuestion","tool_input":{}}'
+    project_root: "file://fixtures-fs/ship-pipeline-inprogress"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        const h = inner.hookSpecificOutput || {};
+        if (h.permissionDecision !== 'deny') return `FAIL: decision ${h.permissionDecision}`;
+        if (h.hookEventName !== 'PreToolUse') return 'FAIL: wrong hookEventName';
+        if (typeof h.permissionDecisionReason !== 'string' || !h.permissionDecisionReason) return 'FAIL: missing reason';
+        return true;
+
+# Negative control: auto=false (same in_progress step) → silent stdout, exit 0 (C18).
+- description: "block-askuserquestion-auto (#477): non-auto pipeline stays silent (C18)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/block-askuserquestion-auto.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"AskUserQuestion","tool_input":{}}'
+    project_root: "file://fixtures-fs/ship-pipeline-noauto"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
+        return true;
