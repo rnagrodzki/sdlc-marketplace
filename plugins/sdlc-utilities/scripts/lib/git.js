@@ -1094,6 +1094,20 @@ function getTagsAtHead(projectRoot) {
 }
 
 /**
+ * List ALL semver-like tags (including pre-release, e.g. 'v1.3.3-rc.1'),
+ * sorted by descending version. Unlike getTagList/getTagsAtHead, pre-release
+ * tags are retained — used only for pre-release counter selection and the G3
+ * pre-release collision check (R20). Does NOT feed the idempotency guard.
+ * @param {string} projectRoot
+ * @returns {string[]}
+ */
+function getAllSemverTags(projectRoot) {
+  const out = exec('git tag --list --sort=-v:refname', { cwd: projectRoot });
+  if (!out) return [];
+  return out.split('\n').filter(tag => /^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(tag));
+}
+
+/**
  * Return structured commit objects since a given ref (tag, commit, etc.) up to HEAD.
  * If sinceRef is empty or null, returns ALL commits in the repository.
  * Uses the same separator-based parsing as getCommitsStructured.
@@ -1356,6 +1370,7 @@ module.exports = {
   // Version-specific
   getTagList,
   getTagsAtHead,
+  getAllSemverTags,
   getCommitsSinceRef,
   getCommitsBetweenRefs,
   // Received-review-specific

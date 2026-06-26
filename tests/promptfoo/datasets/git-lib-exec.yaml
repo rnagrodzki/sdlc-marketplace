@@ -99,3 +99,12 @@
   assert:
     - type: contains
       value: '"feature.js"'
+
+- description: "git-lib: getAllSemverTags includes pre-release tags; getTagList excludes them"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op tagListVariants"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: 'RESULT: PASS'

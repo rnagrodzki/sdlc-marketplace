@@ -24,6 +24,9 @@
 'use strict';
 
 const path = require('path');
+const os   = require('os');
+const fs   = require('fs');
+const cp   = require('child_process');
 
 // Resolve lib path relative to this script — works correctly when run as a real file.
 const REPO_ROOT = path.resolve(__dirname, '../../..');
@@ -106,6 +109,45 @@ switch (op) {
     }
     const files = lib.getChangedFiles(base, projectRoot, scope);
     console.log(JSON.stringify({ scope, base, files }, null, 2));
+    break;
+  }
+
+  case 'tagListVariants': {
+    // Create a temp git repo, add tags, and assert getAllSemverTags vs getTagList behaviour.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'git-lib-tag-test-'));
+    const run = cmd => cp.execSync(cmd, { cwd: tmp, stdio: 'pipe' });
+    try {
+      run('git init -b main');
+      run('git config user.email test@example.com');
+      run('git config user.name Test');
+      run('git commit --allow-empty -m init');
+      run('git tag v1.3.2');
+      run('git tag v1.3.3-rc.1');
+      run('git tag v1.3.3-rc.2');
+      run('git tag nightly');
+
+      const allTags  = lib.getAllSemverTags(tmp);
+      const stableTags = lib.getTagList(tmp);
+
+      // getAllSemverTags must include rc tags and exclude nightly
+      const expectedAll = new Set(['v1.3.3-rc.2', 'v1.3.3-rc.1', 'v1.3.2']);
+      const actualAllSet = new Set(allTags);
+      const allMatch = allTags.length === 3 &&
+        [...expectedAll].every(t => actualAllSet.has(t)) &&
+        !actualAllSet.has('nightly');
+
+      // getTagList must return only [v1.3.2]
+      const stableMatch = stableTags.length === 1 && stableTags[0] === 'v1.3.2';
+
+      if (allMatch && stableMatch) {
+        console.log('RESULT: PASS');
+      } else {
+        console.log(`RESULT: FAIL allTags=${JSON.stringify(allTags)} stableTags=${JSON.stringify(stableTags)}`);
+        process.exitCode = 1;
+      }
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
     break;
   }
 

@@ -47,6 +47,8 @@ tests:
   - file://datasets/compact-recovery-sweep-exec.yaml
   - file://datasets/links-lib-exec.yaml
   - file://datasets/git-lib-exec.yaml
+  - file://datasets/version-lib-exec.yaml
+  - file://datasets/version-prerelease-exec.yaml
   - file://datasets/version-prepare-exec.yaml
   - file://datasets/harvest-learnings-exec.yaml
   - file://datasets/migrate-config-exec.yaml

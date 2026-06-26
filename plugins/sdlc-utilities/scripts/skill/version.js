@@ -34,11 +34,12 @@ const fs   = require('node:fs');
 const path = require('node:path');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { checkGitState, getTagList, getCommitsSinceRef, getCommitsBetweenRefs, getRemoteState, getTagsAtHead } = require(path.join(LIB, 'git'));
+const { checkGitState, getTagList, getCommitsSinceRef, getCommitsBetweenRefs, getRemoteState, getTagsAtHead, getAllSemverTags } = require(path.join(LIB, 'git'));
 const {
   detectVersionFile, readVersion, validateSemver,
   computeNextVersions, computePreRelease, parseConventionalCommit,
   readConfig, PRE_RELEASE_LABEL_RE,
+  reconcilePreReleaseWithTags, preReleaseTagExists,
 } = require(path.join(LIB, 'version'));
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
@@ -809,6 +810,8 @@ async function main() {
   //       criterion `1.2.3 → 1.2.4-rc.1`, fall back to the patched base in
   //       that case. This preserves the "fresh pre-release train starts on
   //       the NEXT release" intuition.
+  // R20: pre-release counter continues past existing -<label>.N git tags
+  const allSemverTags = getAllSemverTags(projectRoot);
   if (args.preLabel) {
     const currentHasPreRelease = currentVersion.includes('-');
     // "Sugar mode" covers both the label-form positional bump and the
@@ -835,6 +838,9 @@ async function main() {
       // current version (no base bump).
       bumpOptions.preRelease = computePreRelease(currentVersion, args.preLabel);
     }
+    // R20: advance the counter past existing tags — LAST statement in the block,
+    // so it only runs when bumpOptions.preRelease is defined (guarded by args.preLabel).
+    bumpOptions.preRelease = reconcilePreReleaseWithTags(bumpOptions.preRelease, allSemverTags);
   }
 
   // 9. Tags
@@ -852,7 +858,7 @@ async function main() {
     minor:      allTags.includes(`${tagPrefix}${bumpOptions.minor}`),
     patch:      allTags.includes(`${tagPrefix}${bumpOptions.patch}`),
     preRelease: bumpOptions.preRelease
-      ? allTags.includes(`${tagPrefix}${bumpOptions.preRelease}`)
+      ? preReleaseTagExists(bumpOptions.preRelease, allSemverTags, tagPrefix)
       : false,
   };
 

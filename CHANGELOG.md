@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.21.14] - 2026-06-26
+
+### Fixed
+- version-sdlc: pre-release tag counter continuation — when a pre-release tag already exists (e.g. `v1.3.3-rc.1`), the counter now advances to the next available number (`rc.2`, `rc.3`, etc.) by scanning existing git tags; out-of-spec labels are rejected before RegExp construction (#479)
+
 ## [0.21.13] - 2026-06-25
 
 ### Added
