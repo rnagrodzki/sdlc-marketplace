@@ -501,7 +501,8 @@ New SHA: <head[:7]>
 |-------|----------|---------------------------|
 | `skill/version.js` exit 1 | Show `errors[]`, stop | No — user input error |
 | `skill/version.js` exit 2 (crash) | Show stderr, stop | Yes |
-| Tag already exists (`conflictsWithNext` true) | Suggest next patch/minor/major; let user choose | No — user decision |
+| Base tag conflict (`conflictsWithNext.{major,minor,patch}` true) | Suggest next patch/minor/major; let user choose | No — user decision |
+| Pre-release tag conflict (`conflictsWithNext.preRelease` true) | Advance the pre-release counter (`rc.N` → `rc.N+1`); suggest re-running with the same label | No — user decision |
 | `git commit` fails | Show error; check for uncommitted changes or hook failure | Yes if non-hook failure |
 | `git tag` fails | Show error; check for duplicate tag or missing git identity | Yes if non-duplicate failure |
 | `git push --tags` fails | Show error; check remote connectivity and branch protection rules | Yes if non-auth failure |
@@ -519,7 +520,7 @@ When invoking `error-report-sdlc`, provide:
 
 - **`/version-sdlc --retag` vs `retag-release.yml`:** `/version-sdlc --retag` is user-initiated — you deliberately move the existing tag to HEAD after a deliberate decision. The CI workflow `retag-release.yml` is CI-automated squash-drift fix — it fires automatically on push when the tag points to a commit that was squash-merged away. They are orthogonal features; the CI workflow is unaffected by `--retag`, and vice versa. (Implements #424.)
 - **Squash merge orphans tags**: When using GitHub's "squash and merge" strategy, the annotated tag created on the feature branch points to the pre-merge commit, which becomes unreachable from main after merge. The `retag-release.yml` workflow (scaffolded during init) automatically moves the tag to the squash commit on main whenever a push lands on main. Without this workflow, tags are orphaned and `git describe` / `git log --decorate` on main will not show them.
-- `bumpOptions.preRelease` is pre-computed in the JSON only when `--pre` was passed at script time. If the user requests a different pre-label during `edit`, re-run the script — the `preRelease` field reflects the label passed at script invocation, not a label added mid-session.
+- `bumpOptions.preRelease` is pre-computed in the JSON only when a pre-release source is active (`--pre`, label-form `<bump>`, or `config.preRelease`). If the user requests a different pre-label during `edit`, re-run the script — the `preRelease` field reflects the label resolved at script invocation, not a label added mid-session.
 - **Version-file edit hard gate:** for ALL version-file formats (JSON, TOML, YAML — package.json, plugin.json, Cargo.toml, pyproject.toml, etc.) use the Edit tool with a single targeted string replacement and verify with `git diff <versionFile>` that exactly one line changed. If more than one line differs, abort and `git checkout -- <versionFile>`. Never use the Write tool or rewrite the file from memory — LLMs reliably truncate or paraphrase fields like `description` (see #211).
 - `git push && git push --tags` are two separate pushes. `git push --tags` alone does NOT push the release commit — both commands are required.
 - **Auto-`--set-upstream` on first push (R15):** When `remoteState.hasUpstream === false`, Step 8 emits `git push --set-upstream origin <currentBranch>` instead of bare `git push`. This eliminates the `fatal: The current branch has no upstream` error on releases cut from a fresh feature branch. The branch comes from `currentBranch` in the `version-context` JSON — never hardcode it. The subsequent `git push --tags` is unchanged.

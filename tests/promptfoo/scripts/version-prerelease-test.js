@@ -52,8 +52,6 @@ function runVersionJs(tmpRoot, extraArgs = []) {
     if (outPath && fs.existsSync(outPath)) {
       json = JSON.parse(fs.readFileSync(outPath, 'utf8'));
       fs.unlinkSync(outPath);
-    } else if (r.stdout) {
-      json = JSON.parse(r.stdout.trim());
     }
   } catch (_) {}
   return { exitCode: r.status, stdout: r.stdout, stderr: r.stderr, json };
@@ -107,6 +105,9 @@ function testPreReleaseContinuation() {
 
     // 7. Prepare run with positional `rc` label — emits JSON, no release.
     const r = runVersionJs(tmp, ['rc']);
+    if (r.exitCode !== 0) {
+      return emit(false, `version.js exited with code ${r.exitCode}: ${r.stderr}`);
+    }
     if (!r.json) {
       return emit(false, `no json output: exit=${r.exitCode} stderr=${r.stderr}`);
     }

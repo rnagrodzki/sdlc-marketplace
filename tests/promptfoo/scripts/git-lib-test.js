@@ -115,11 +115,9 @@ switch (op) {
   case 'tagListVariants': {
     // Create a temp git repo, add tags, and assert getAllSemverTags vs getTagList behaviour.
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'git-lib-tag-test-'));
+    const run = cmd => cp.execSync(cmd, { cwd: tmp, stdio: 'pipe' });
     try {
-      function run(cmd) {
-        cp.execSync(cmd, { cwd: tmp, stdio: 'pipe' });
-      }
-      run('git init');
+      run('git init -b main');
       run('git config user.email test@example.com');
       run('git config user.name Test');
       run('git commit --allow-empty -m init');
@@ -145,7 +143,7 @@ switch (op) {
         console.log('RESULT: PASS');
       } else {
         console.log(`RESULT: FAIL allTags=${JSON.stringify(allTags)} stableTags=${JSON.stringify(stableTags)}`);
-        process.exit(1);
+        process.exitCode = 1;
       }
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });

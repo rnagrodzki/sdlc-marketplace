@@ -106,6 +106,16 @@ switch (op) {
         result: preReleaseTagExists('1.3.3-rc.16', rcTags15, 'v'),
         expected: false,
       },
+      {
+        desc: 'no tags at all → false',
+        result: preReleaseTagExists('1.3.3-rc.1', [], 'v'),
+        expected: false,
+      },
+      {
+        desc: 'wrong prefix — tag exists under v but queried with nope → false',
+        result: preReleaseTagExists('1.3.3-rc.1', ['v1.3.3-rc.1'], 'nope'),
+        expected: false,
+      },
     ];
 
     for (const c of cases) {

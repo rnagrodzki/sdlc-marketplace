@@ -280,7 +280,22 @@ function computePreRelease(current, label) {
   return `${base}-${label}.1`;
 }
 
+/**
+ * Return the highest existing pre-release counter for a given base+label across
+ * the provided git tag list. Returns `0` when no matching tag is found (sentinel:
+ * "none found") — callers treat 0 as "start fresh at 1".
+ *
+ * @param {string} base  - Base version string (e.g. `"1.3.3"`).
+ * @param {string} label - Pre-release label (e.g. `"rc"`, `"beta"`). Must match
+ *   `^[a-z][a-z0-9]*$`; out-of-spec labels return 0 immediately (no RegExp built).
+ * @param {string[]} tags - Full list of semver-inclusive git tags to scan.
+ * @returns {number} Highest counter found, or `0` if none.
+ */
 function highestPreReleaseCounter(base, label, tags) {
+  // Guard: reject out-of-spec labels before constructing any RegExp from them.
+  // Inline the same pattern as PRE_RELEASE_LABEL_RE (^[a-z][a-z0-9]*$) to avoid
+  // a TDZ reference — PRE_RELEASE_LABEL_RE is a const declared later in this file.
+  if (!/^[a-z][a-z0-9]*$/.test(label)) return 0;
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const re = new RegExp(`^v?${esc(base)}-${esc(label)}\\.(\\d+)$`);
   let max = 0;
@@ -291,6 +306,18 @@ function highestPreReleaseCounter(base, label, tags) {
   return max; // 0 == none found
 }
 
+/**
+ * Advance the pre-release counter in `candidate` past the highest existing tag
+ * for the same base+label. Implements R20: counter continuation from git tags.
+ *
+ * Non-pre-release candidates (no `-<label>.<N>` suffix) are returned unchanged.
+ * If `candidate` cannot be parsed (malformed counter), a stderr warning is emitted
+ * and `candidate` is returned unchanged.
+ *
+ * @param {string}   candidate - Pre-release version string (e.g. `"1.3.3-rc.1"`).
+ * @param {string[]} tags      - Full semver-inclusive tag list (from `getAllSemverTags`).
+ * @returns {string} The candidate with its counter advanced if needed.
+ */
 function reconcilePreReleaseWithTags(candidate, tags) {
   const dashIdx = candidate.indexOf('-');
   const dotIdx  = candidate.lastIndexOf('.');
@@ -298,12 +325,23 @@ function reconcilePreReleaseWithTags(candidate, tags) {
   const base    = candidate.slice(0, dashIdx);
   const label   = candidate.slice(dashIdx + 1, dotIdx);
   const counter = parseInt(candidate.slice(dotIdx + 1), 10);
-  if (Number.isNaN(counter)) return candidate;
+  if (Number.isNaN(counter)) {
+    process.stderr.write(`[version] reconcilePreReleaseWithTags: could not parse counter from '${candidate}' — returning candidate unchanged\n`);
+    return candidate;
+  }
   const next = Math.max(counter, highestPreReleaseCounter(base, label, tags) + 1);
   return `${base}-${label}.${next}`;
 }
 
-// G3 pre-release collision predicate — reads the pre-release-inclusive tag list.
+/**
+ * G3 pre-release collision predicate — check whether a pre-release tag already
+ * exists in the provided tag list.
+ *
+ * @param {string}   version   - Pre-release version WITHOUT the tag prefix (e.g. `"1.3.3-rc.1"`).
+ * @param {string[]} tags      - Full semver-inclusive tag list (from `getAllSemverTags`).
+ * @param {string}   tagPrefix - Tag prefix string (e.g. `"v"` or `""`).
+ * @returns {boolean} `true` when `<tagPrefix><version>` exists in `tags`.
+ */
 function preReleaseTagExists(version, tags, tagPrefix) {
   return tags.includes(`${tagPrefix || ''}${version}`);
 }
