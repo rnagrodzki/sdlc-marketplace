@@ -47,7 +47,7 @@ Not every request needs a full planning pipeline:
 
 For plans with 5+ tasks, the skill also writes a `## Key Decisions` section — placed between the plan header and the first task — capturing architecture choices with rationale so executing agents understand *why* an approach was chosen, not just what to do.
 
-Every plan also carries a required **`## Deviations & assumptions`** section near the top (a table with `Item | asked | does | why` columns) recording where the plan diverges from what was asked and any assumptions made — so a reviewer can triage the plan in one pass. Its presence is enforced deterministically by the `validate-plan-format.js` PF6 check, not by an LLM gate.
+Every plan also carries a required **`## Deviations & assumptions`** section near the top (a table with `Item | asked | does | why` columns) recording where the plan diverges from what was asked and any assumptions made — so a reviewer can triage the plan in one pass. Its presence is enforced deterministically by the `validate-plan-format.js` PF6 check, not by an LLM gate. PF7 — Contract presence: every artifact-touching task (≥1 Create/Modify/Test Files entry) has a `**Contract:**` block (default check set). PF9 — Scorecard presence: `## Verification Scorecard` section present (under `--final` only; full-pipeline plans).
 
 Each task block carries `Complexity`, `Risk`, `Depends on`, `Verify`, `Files`, and `Acceptance criteria` metadata plus a `Contract:` (decided-shape) block. The free-prose **`Notes:`** field is **optional** and rationale-only (≤5 non-blank lines) — the executable "what" lives in `Files:` + `Contract:` + `Acceptance criteria:`. (Plans written before this convention used a mandatory `Description:` field; it is renamed `Notes:` and demoted to optional.)
 
@@ -496,6 +496,18 @@ See [OpenSpec Integration Guide](../openspec-integration.md) for the full workfl
 ## Link Verification (issue #198)
 
 Before declaring the plan ready (Step 7 handoff), the skill pipes the finalized plan file through `scripts/lib/links.js` as a hard gate. The validator auto-derives `expectedRepo` from `git remote origin` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill never constructs the validator context. URL classes checked: GitHub issues/PRs (owner/repo identity + existence), Atlassian `*.atlassian.net/browse/<KEY>` (host match), and any other `http(s)://` URL (HEAD reachability, 5s timeout). Hosts in the built-in skip list (`linkedin.com`, `x.com`, `twitter.com`, `medium.com`) are reported as `skipped`, not violations. Set `SDLC_LINKS_OFFLINE=1` to skip generic reachability while keeping context-aware checks. On non-zero exit, Step 7 is **not** entered and the violation list is surfaced verbatim. No flag toggles this gate — it is hard.
+
+## Format Validation (issue #483)
+
+Immediately after Link Verification passes (Step 6.6), the skill runs the finalized plan file through `scripts/ci/validate-plan-format.js` as a second hard gate before Step 7 handoff. This enforces the *structural presence* of the review surfaces deterministically, so a plan can no longer be finalized missing them because an LLM critique lane silently did not run.
+
+Checks applied at this gate:
+
+- **PF6** — `## Deviations & assumptions` section present.
+- **PF7** — every artifact-touching task (≥1 `Create:`/`Modify:`/`Test:` Files entry) carries a `**Contract:**` block. This is the deterministic floor for the G18 settlement gate.
+- **PF9** — `## Verification Scorecard` section present. This is the deterministic floor for Gate B. PF9 is applied **only when `--final` is passed**, which the skill does only for full-pipeline plans (those that ran the Step 5 multi-lens review). Lightweight plans that skip Step 5 are not expected to carry a scorecard, so PF9 is omitted for them. The `--final` decision is driven by the Step 0 routing branch, never by scorecard presence (that would make the check circular).
+
+These are *presence* checks only — concreteness and content quality remain the job of the LLM gates G18/G19/G20/G21 (the calibrated ceiling above this floor). On non-zero exit, Step 7 is **not** entered and the violation report is surfaced verbatim. No flag toggles this gate — it is hard. G19 (render-don't-narrate) and G21 (self-contained code refs) have no deterministic floor by design: both require semantic judgment that a regex proxy would mis-fire on (see PF8-reserved in the spec).
 
 ---
 

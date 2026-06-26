@@ -38,6 +38,13 @@ Create a utility module that exports a `formatDate(date)` function. It should ac
 - [ ] `formatDate` returns null for null/undefined input
 - [ ] Tests cover both cases
 
+**Contract:**
+- shape (code): `function formatDate(date: Date | null | undefined): string | null` — returns ISO 8601 string or null
+- names: `formatDate`
+- mirror: src/utils/helper.js
+- decisions: none
+- sync: none
+
 ---
 
 ### Task 2: Create API endpoint
@@ -59,6 +66,13 @@ Create a GET `/api/dates/now` endpoint that returns the current date using the `
 - [ ] Response contains `date` field with ISO string
 - [ ] Uses formatDate from Task 1
 
+**Contract:**
+- shape (code): `router.get('/now', handler)` — handler returns `{ date: string }` via `res.json`
+- names: `datesRouter`, handler
+- mirror: src/routes/dates.js
+- decisions: none
+- sync: none
+
 ---
 
 ### Task 3: Add documentation
@@ -77,3 +91,10 @@ Add a section to the README documenting the new `/api/dates/now` endpoint, inclu
 **Acceptance criteria:**
 - [ ] README contains endpoint documentation
 - [ ] Example request and response included
+
+**Contract:**
+- shape (prose): markdown section `## API: /api/dates/now` with `GET` example request and JSON response block
+- names: none
+- mirror: README.md
+- decisions: none
+- sync: none

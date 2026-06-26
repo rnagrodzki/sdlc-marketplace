@@ -11,6 +11,7 @@
  *   --file <path>           Plan file to validate (required)
  *   --json                  JSON output to stdout (default)
  *   --markdown              Formatted markdown output to stdout
+ *   --final                 Also enforce PF9 (Verification Scorecard)
  *
  * Exit codes: 0 = all pass, 1 = issues found, 2 = script error
  *
@@ -21,6 +22,8 @@
  *   PF4 — Dependency validity (valid refs, no cycles)
  *   PF5 — Task body (Acceptance criteria; optional Notes capped at 5 lines)
  *   PF6 — Deviations & assumptions section present
+ *   PF7 — Contract presence (artifact-touching tasks have **Contract:** block)
+ *   PF9 — Scorecard presence (under --final only)
  *
  * Uses only Node.js built-in modules. No npm install required.
  */
@@ -42,6 +45,7 @@ function parseArgs(argv) {
   let projectRoot  = resolveSdlcRoot();
   let filePath     = null;
   let outputFormat = 'json';
+  let requireScorecard = false;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -53,10 +57,12 @@ function parseArgs(argv) {
       outputFormat = 'json';
     } else if (a === '--markdown') {
       outputFormat = 'markdown';
+    } else if (a === '--final') {
+      requireScorecard = true;
     }
   }
 
-  return { projectRoot, filePath, outputFormat };
+  return { projectRoot, filePath, outputFormat, requireScorecard };
 }
 
 // ---------------------------------------------------------------------------
@@ -315,6 +321,23 @@ function checkPF6(content) {
   return { id: 'PF6', status: 'pass', message: 'Deviations & assumptions section present' };
 }
 
+function checkPF7(tasks) {
+  const offenders = tasks
+    .filter(t => /^[-*]\s+(Create|Modify|Test):/m.test(t.body)
+              && !/^\*\*Contract:\*\*/m.test(t.body))
+    .map(t => `Task ${t.number}`);
+  return offenders.length
+    ? { id: 'PF7', status: 'fail', message: `Missing **Contract:** block: ${offenders.join(', ')}` }
+    : { id: 'PF7', status: 'pass', message: 'All artifact-touching tasks have a Contract block' };
+}
+
+function checkPF9(content) {
+  const stripped = content.replace(/^```[\s\S]*?^```/gm, '');
+  return /^##\s+Verification\s+Scorecard/im.test(stripped)
+    ? { id: 'PF9', status: 'pass', message: 'Verification Scorecard section present' }
+    : { id: 'PF9', status: 'fail', message: 'Missing required "## Verification Scorecard" section' };
+}
+
 // ---------------------------------------------------------------------------
 // Output formatters
 // ---------------------------------------------------------------------------
@@ -346,7 +369,7 @@ function formatMarkdown(report) {
 // ---------------------------------------------------------------------------
 
 try {
-  const { projectRoot, filePath, outputFormat } = parseArgs(process.argv);
+  const { projectRoot, filePath, outputFormat, requireScorecard } = parseArgs(process.argv);
 
   if (!filePath) {
     process.stderr.write('validate-plan-format.js error: --file <path> is required\n');
@@ -368,7 +391,9 @@ try {
     checkPF4(tasks),
     checkPF5(tasks),
     checkPF6(content),
+    checkPF7(tasks),
   ];
+  if (requireScorecard) checks.push(checkPF9(content));
 
   const passed = checks.every(c => c.status === 'pass');
   const report = {
