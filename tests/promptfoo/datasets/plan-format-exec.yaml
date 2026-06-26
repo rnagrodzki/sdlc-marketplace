@@ -150,3 +150,40 @@
       value: '"passed": true'
     - type: regex
       value: '"failed":\s*0'
+
+- description: "plan-format: artifact task without Contract triggers PF7 fail"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
+    script_args: "--project-root {{project_root}} --file {{project_root}}/plans/plan.md --json"
+    project_root: "file://fixtures-fs/project-plan-missing-contract"
+  assert:
+    - type: icontains
+      value: '"passed": false'
+    - type: icontains
+      value: "PF7"
+    - type: icontains
+      value: "Contract"
+
+- description: "plan-format: --final without scorecard triggers PF9 fail"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
+    script_args: "--project-root {{project_root}} --file {{project_root}}/plans/test-plan.md --final --json"
+    project_root: "file://fixtures-fs/project-valid-plan"
+  assert:
+    - type: icontains
+      value: '"passed": false'
+    - type: icontains
+      value: "PF9"
+    - type: icontains
+      value: "Verification Scorecard"
+
+- description: "plan-format: --final with scorecard present passes PF9"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
+    script_args: "--project-root {{project_root}} --file {{project_root}}/plans/plan.md --final --json"
+    project_root: "file://fixtures-fs/project-plan-with-scorecard"
+  assert:
+    - type: icontains
+      value: '"passed": true'
+    - type: icontains
+      value: "PF9"

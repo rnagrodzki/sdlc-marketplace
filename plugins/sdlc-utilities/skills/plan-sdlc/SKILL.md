@@ -310,7 +310,7 @@ Plan tasks NOT derived from any OpenSpec task MUST omit the field. N:1 mapping (
 
 **Key decisions:** Note every decision where you chose between valid approaches. Focus on choices where a reasonable implementer might differ without the rationale. Skip obvious decisions.
 
-**Per-task metadata (required, consumed by execute-plan-sdlc):** Use the exact format from `./plan-format-reference.md`:
+**Per-task metadata (required, consumed by execute-plan-sdlc):** Read `./plan-format-reference.md` first and match its worked examples:
 
 ```markdown
 ### Task N: [Component Name]
@@ -343,15 +343,15 @@ Files + Contract + Acceptance criteria — do not restate it here.]
 
 **Contract block (required — implements R45):** Every artifact-touching task MUST include a `**Contract:**` block per `./plan-format-reference.md`, carrying the type-appropriate decided shape (code: signatures/types/flags/error-cases/import-paths; docs: template+sections+audience+cross-links; openspec/spec: requirement IDs ADD/MODIFY/REMOVE + delta text + numbering). The plan type is derived from the task's `Files:` paths; a mixed-artifact task uses its dominant artifact's column. A task whose Contract is absent or merely restates "update X to do Y" is flagged by G18 in Step 3.
 
-**G18 — Settlement / contract concreteness (error-severity):** Flags any artifact-touching task whose `Contract:` is absent or merely restates "update X to do Y" without a concrete type-appropriate shape. Owned by the content-coverage lane. Blocks plan approval until the Contract pins the decided shape.
+**G18 — Settlement / contract concreteness (error-severity):** Flags any artifact-touching task whose `Contract:` is absent or merely restates "update X to do Y" without a concrete type-appropriate shape. Owned by the content-coverage lane. Blocks plan approval until the Contract pins the decided shape. Backed by deterministic presence floor PF7 (validate-plan-format.js, default check set); LLM G18 judges concreteness above the floor.
 
 **Render don't narrate (surface-conditional — implements R46):** When a task touches a concrete-artifact surface (payload, struct/schema field change, status enum, flow, config/flag delta, error mode, data-writing end-state), RENDER the artifact (fenced block / table / before→after diff) — do not describe it in prose. Use the catalog + conventions in ./plan-format-reference.md. Cap: one elided (…) example per distinct contract shape (a distinct contract shape is one unique combination of method + path for REST, or flag + type for CLI — two endpoints with the same method but different paths are distinct shapes). Trivial docs/rename tasks render nothing. (Mermaid fenced blocks allowed for flow/call-order/state surfaces; no MDX.) A task whose concrete-artifact surface is described in prose rather than rendered is flagged by G19 in Step 3.
 
-**G19 — Render-don't-narrate (error-severity):** Flags a task that touches a render-trigger surface (REST/RPC endpoint, CLI flag, schema field, status enum, state/flow/enum, config delta, error taxonomy) but describes it in prose instead of rendering a fenced block, table, or before→after diff. Owned by the content-coverage lane. Blocks plan approval until the surface is rendered. Not-applicable for trivial tasks and pure docs/rename tasks.
+**G19 — Render-don't-narrate (error-severity):** Flags a task that touches a render-trigger surface (REST/RPC endpoint, CLI flag, schema field, status enum, state/flow/enum, config delta, error taxonomy) but describes it in prose instead of rendering a fenced block, table, or before→after diff. Owned by the content-coverage lane. Blocks plan approval until the surface is rendered. Not-applicable for trivial tasks and pure docs/rename tasks. LLM-only (semantic — render-trigger detection); hardened by prose. No deterministic floor (KD2).
 
 **G20 — Notes rationale-only (error-severity):** Flags a `Notes:` block that restates the task's Contract/acceptance instead of carrying only rationale. Owned by the content-coverage lane (lanes[1]). Blocks plan approval until the `Notes:` block is rationale-only.
 
-**G21 — Self-contained code refs (error-severity):** Flags a bare `file:line` change reference not anchored with surrounding lines (or the full function body) plus an inline diff. A `file:line` used as a pointer / `Contract.mirror` precedent anchor is exempt. Owned by the content-coverage lane (lanes[1]). Blocks plan approval until the reference is self-contained.
+**G21 — Self-contained code refs (error-severity):** Flags a bare `file:line` change reference not anchored with surrounding lines (or the full function body) plus an inline diff. A `file:line` used as a pointer / `Contract.mirror` precedent anchor is exempt. Owned by the content-coverage lane (lanes[1]). Blocks plan approval until the reference is self-contained. LLM-only (semantic — change-site vs precedent ref); no deterministic floor (KD6).
 
 **Verification strategy — match to task type:**
 - Feature/logic → TDD (write failing test, implement, pass)
@@ -380,6 +380,7 @@ For each `lanes[i]` entry (i = 0..4):
 - prompt body: Read `lanes[i].promptTemplatePath` and fill template variables:
   - All lanes: `{PLAN_FILE_PATH}` (absolute path to plan file), `{PROJECT_ROOT}` (cwd)
   - Lanes 0–3 non-G17: `{REQUIREMENTS_SUMMARY}` (the numbered requirements list from Step 1 CONSUME — same content as `{REQUIREMENTS_CHECKLIST}` in Step 5; retained in memory from Step 1), `{ACTIVE_GUARDRAILS}` (from `guardrails[]` P7), `{OPENSPEC_TASKS}` (from `openspecContext.tasks` P13, null when not OpenSpec-sourced), `{BRIEF_FINDING_IDS}` (from `explorePack.manifestPath` context, null when no brief)
+  - Lane 1 (content-coverage) additionally: `{FORMAT_REFERENCE_PATH}` — absolute path to plan-format-reference.md (sibling of lane-content-coverage-prompt.md in the same skill directory; resolve as `dirname(lanes[1].promptTemplatePath)/plan-format-reference.md`)
   - Lane 4 (G17/dimension-coverage): `{DIMENSIONS_DIR}` (`.sdlc/review-dimensions/`), `{COPILOT_DIR}` (`.github/instructions/`), `{GITHUB_HOSTING_DETECTED}` (`githubHosting.detected` from P14), `{LEARNINGS_LOG_PATH}` (`.sdlc/learnings/log.md`), `{PR_COMMIT_WINDOW}` (best-effort "last 14 days" if unknown)
 
 **Null `promptTemplatePath` handling:** When `lanes[i].promptTemplatePath` is null (prepare script reported it could not find the template), skip that lane's dispatch and immediately add a synthetic blocking issue:
@@ -548,6 +549,37 @@ On non-zero exit (`LINK_EXIT != 0`):
 - Stop. Do not retry. Do not edit URLs without user input. Do not bypass.
 
 On zero exit, proceed to Step 7. `SDLC_LINKS_OFFLINE=1` skips network reachability while keeping context-aware checks (GitHub identity match, Atlassian host match) — use in sandboxed CI.
+
+## Step 6.6 (FORMAT VALIDATION): Validate plan structure — HARD GATE
+
+After link verification passes, run the deterministic plan format validator. PF9 (Verification Scorecard presence) is applied only when this run executed Step 5 (the multi-lens review).
+
+**Set `FINAL_FLAG` from the Step 0 routing branch THIS run took** — NOT from scorecard presence (deriving it from the artifact it checks would make PF9 circular):
+
+- **Full-pipeline plan** (Step 0 routed through Step 5, the multi-lens review — i.e. ≥4 files): `FINAL_FLAG="--final"`. A scorecard is expected, so PF9 is enforced.
+- **Lightweight plan** (Step 5 skipped): `FINAL_FLAG=""`. No scorecard expected, so PF9 is not applied.
+
+Substitute the correct value into the block below before running it; `${FINAL_FLAG:+--final}` expands to `--final` only when `FINAL_FLAG` is non-empty, and to nothing otherwise (no word-splitting, no empty positional argument).
+
+```bash
+VALIDATOR=$(find ~/.claude/plugins -name "validate-plan-format.js" -path "*/sdlc*/scripts/ci/validate-plan-format.js" 2>/dev/null | sort -V | tail -1)
+[ -z "$VALIDATOR" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-plan-format.js" ] && VALIDATOR="plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
+[ -z "$VALIDATOR" ] && { echo "ERROR: Could not locate scripts/ci/validate-plan-format.js. Is the sdlc plugin installed?" >&2; exit 2; }
+# FINAL_FLAG is set above from the Step 0 routing branch THIS run took:
+#   "--final" for a full-pipeline plan (Step 5 ran → scorecard expected),
+#   ""        for a lightweight plan (Step 5 skipped → PF9 not applied).
+# It is NOT derived from scorecard presence (that would make PF9 circular).
+node "$VALIDATOR" ${FINAL_FLAG:+--final} --markdown --file "$plan_path"
+FORMAT_EXIT=$?
+```
+
+On non-zero exit (`FORMAT_EXIT != 0`):
+- The script has already printed the violation report to stdout (markdown format).
+- Do NOT proceed to Step 7 (Handoff). The plan is not ready.
+- Surface the violation report verbatim to the user.
+- Stop. Do not retry. Do not auto-edit. Do not bypass.
+
+On zero exit, proceed to Step 7.
 
 ## Step 7: Handoff
 

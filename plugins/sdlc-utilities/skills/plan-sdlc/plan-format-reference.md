@@ -127,6 +127,7 @@ an indented `- key: value` list, mirroring the `**openspec-task:**` sub-block pr
 pins the **decided shape** of the deliverable so execution renders it verbatim rather than
 re-deriving (or stalling BLOCKED on) a design decision planning already closed. The G18 settlement
 gate flags any artifact-touching task whose Contract is absent or merely restates "update X to do Y".
+Deterministically enforced by PF7 (validate-plan-format.js, default check set) — every artifact-touching task must carry this block.
 
 Keys: `shape`, `names`, `mirror`, `decisions`, `sync`.
 
@@ -316,6 +317,8 @@ Carve-out: `Contract.mirror` line-anchors (e.g. `src/utils/hash.ts:1-40`) remain
 are **precedent pointers** to existing structure being copied, not change references. The mirror
 anchor names the source of truth to imitate; the prohibition applies only to lines the task edits.
 
+G21 (self-contained code refs) remains an LLM judgment — no deterministic check (see KD6 in plan docs).
+
 ### One rationale per decision (R52)
 
 State each de-dup or design rationale exactly once and reference it; do not repeat the same
@@ -343,6 +346,14 @@ gate (R38) does not suppress the suggestion at execute time.
 
 Format:
 - <verbatim OpenSpec task title> — <one-line rationale>
+
+---
+
+## Verification Scorecard (full-pipeline plans)
+
+Present only in full-pipeline plans (i.e., `--from-openspec` or equivalent multi-task runs). Assembled by plan-sdlc at Step 5 (after the lens merge). Contains a dimension table, a traceability matrix, and a go/no-go verdict. See [`docs/skills/plan-sdlc.md`](../../../docs/skills/plan-sdlc.md) — Gate B section for the full format specification.
+
+Deterministically enforced by PF9 (validate-plan-format.js, --final) — the section must be present in full-pipeline plans.
 
 ---
 

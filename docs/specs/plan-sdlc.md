@@ -94,6 +94,8 @@
 - R50 (Fixes #472 — Mermaid): Mermaid fenced blocks are allowed for flow / call-order / state surfaces; no MDX.
 - R51 (Fixes #472 — self-contained code refs): A bare `file:line` change reference is forbidden; embed the surrounding lines (or the full function body) plus an inline `-`/`+` diff. Flagged by G21 (blocking). A `file:line` used as a pointer / `Contract.mirror` precedent anchor is exempt.
 - R52 (Fixes #472 — de-dup rationale convention): One rationale per decision — convention / guidance only, not gated.
+- R53 (Fixes #483 — deterministic gate backing): The structural PRESENCE of G18 (per-task `**Contract:**` block) and Gate B (`## Verification Scorecard` section) MUST be enforced deterministically by validate-plan-format.js — PF7 (Contract presence) and PF9 (Scorecard presence) — independent of the LLM gate lanes. PF7 runs in the default check set; PF9 runs only under `--final`. plan-sdlc Step 6.6 invokes the validator with `--final` as a hard gate blocking Step 7. PF9 is omitted (no `--final`) when Step 0 took the lightweight routing path (Step 5 skipped), so the scorecard floor applies only to full-pipeline plans. G19 and G21 remain LLM-only — both require semantic judgment (render-trigger detection; change-site vs precedent ref) that a deterministic proxy mis-fires, and a mis-fire would block valid plans at the Step 6.6 gate. The LLM gates G18/G19/G21 are retained as the concreteness/quality ceiling above the deterministic presence floor.
+- R54 (Fixes #483 — judge calibration): The content-coverage critique lane (owner of G18/G19/G20/G21) MUST receive the path to plan-format-reference.md and read it before judging those gates, evaluating concreteness / render / code-ref anchoring against its worked examples rather than the prose gate definitions alone. The Step 2 planner MUST read plan-format-reference.md and match its worked examples (read-then-match), not merely be pointed at it. The reference is read at runtime, never embedded in a dispatched prompt (prompt-cache stability).
 
 ## Workflow Phases
 
@@ -128,16 +130,16 @@
 - G15: Brief citation coverage — when `explorePack.manifestPath` was non-null AND the orchestrator produced a brief, every Standard/Complex task cites ≥1 `F-<DIM>-<n>` finding ID OR is marked "out-of-scope addition" with rationale. Trivial tasks are exempt. Severity: error when brief was produced; not applicable when fallback path ran.
 - G16: OpenSpec tasks.md coverage — when `fromOpenspecDirect` is true: every entry in `openspecContext.tasks[]` is either (a) referenced by ≥1 plan task's `openspec-task.ref`, or (b) listed in `## Out-of-scope OpenSpec tasks`. Error severity (blocking).
 - G17: Dimension Coverage — when G17 subagent dispatched: emit proposals per R31 criteria with R31 suppression and ranking rules. Severity: advisory (non-blocking).
-- G18: Settlement / contract concreteness — every artifact-touching task carries a `Contract:` block whose decided shape is concrete for the task's plan type (type derived from `Files:` paths); flag any task that leaves the shape unsettled (absent Contract or a restatement of 'update X to do Y'). Error-severity; owned by the content-coverage lane.
+- G18: Settlement / contract concreteness — every artifact-touching task carries a `Contract:` block whose decided shape is concrete for the task's plan type (type derived from `Files:` paths); flag any task that leaves the shape unsettled (absent Contract or a restatement of 'update X to do Y'). Error-severity; owned by the content-coverage lane. Backed by deterministic presence floor PF7 (validate-plan-format.js, default check set); LLM G18 judges concreteness above the floor.
 - G19: Render-don't-narrate — flags any task touching a render-trigger surface (R46
   catalog #1–#8) that renders no concrete artifact for it. Trivial docs/rename tasks
   are not flagged. Also flags any Contract that includes more than one rendered example
   per distinct contract shape (per R49 cap — one elided example per unique method+path
-  for REST, or flag+type for CLI). Error-severity; owned by the content-coverage lane.
+  for REST, or flag+type for CLI). Error-severity; owned by the content-coverage lane. LLM-only (semantic — render-trigger detection); hardened by prose. No deterministic floor (KD2).
 - G20: Notes rationale-only — flags a `Notes:` block that restates the task's
   Contract/acceptance instead of carrying only rationale. Error-severity; owned by the content-coverage lane.
 - G21: Self-contained code refs — flags a bare `file:line` change reference not
-  anchored with surrounding lines (or the full function body) plus an inline diff. Error-severity; owned by the content-coverage lane.
+  anchored with surrounding lines (or the full function body) plus an inline diff. Error-severity; owned by the content-coverage lane. LLM-only (semantic — change-site vs precedent ref); no deterministic floor (KD6).
 
 ### Verification Scorecard (Gates A/B)
 
@@ -151,6 +153,8 @@ Gates A and B apply the per-check severity model from opsx:verify verbatim (CRIT
 - When uncertain, prefer SUGGESTION > WARNING > CRITICAL (per opsx:verify heuristic)
 
 Gate A (intake audit, R39) runs before decomposition when `openspecContext.requirements` is present. Gate B (plan audit, R40) runs at Step 5 and produces the `## Verification Scorecard` section. Verdict labels are verbatim: any CRITICAL → *"…Fix before archiving."*; warnings only → *"…Ready for archive (with noted improvements)."*; clean → *"All checks passed. Ready for archive."* Both gates degrade gracefully when artifacts are missing (R43).
+
+Gate B (plan audit, R40): `## Verification Scorecard` section presence enforced deterministically by PF9 (validate-plan-format.js, `--final`); LLM Gate B judges content quality above the floor.
 
 ## Prepare Script Contract
 
@@ -196,6 +200,9 @@ Deterministic checks performed by `plugins/sdlc-utilities/scripts/ci/validate-pl
 - PF4: Dependency references valid (no cycles, all targets exist)
 - PF5: Task body valid (`Acceptance criteria` present with ≥1 checkbox; optional `Notes` block capped at ≤5 non-blank lines)
 - PF6: `## Deviations & assumptions` section present at top of plan (implements R47 deterministic enforcement — not an LLM gate)
+- PF7: Contract presence — every artifact-touching task (≥1 `Create:`/`Modify:`/`Test:` Files entry) carries a `**Contract:**` block (implements R53 deterministic floor for G18). Runs in the default check set.
+- PF8: reserved — intentionally unallocated. A deterministic floor for G21 (self-contained code refs) was considered and dropped: distinguishing a change-site `file:line` from a precedent/context ref is semantic, so a PF8 proxy would mis-fire and block valid plans at the Step 6.6 gate (the same objection that keeps G19 LLM-only). G21 stays the LLM ceiling. The number is preserved to keep PF references stable.
+- PF9: Scorecard presence — `## Verification Scorecard` section present (implements R53 deterministic floor for Gate B). Runs only under `--final`; omitted for lightweight plans that skip Step 5.
 
 ## Constraints
 

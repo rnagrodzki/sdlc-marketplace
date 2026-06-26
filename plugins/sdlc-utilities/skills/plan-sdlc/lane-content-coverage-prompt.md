@@ -16,8 +16,11 @@ You receive:
 - `{OPENSPEC_TASKS}` — OpenSpec tasks from tasks.md (null when not an OpenSpec-sourced plan)
 - `{ACTIVE_GUARDRAILS}` — guardrail IDs active for this project (for context)
 - `{BRIEF_FINDING_IDS}` — F-<DIM>-<n> finding IDs from the discovery brief (null when no brief produced)
+- `{FORMAT_REFERENCE_PATH}` — absolute path to plan-format-reference.md (the worked-example catalog: Contract shape, the render-trigger catalog, code-ref anchoring)
 
 Read the plan file at `{PLAN_FILE_PATH}` before evaluating.
+
+Read the catalog at `{FORMAT_REFERENCE_PATH}` before judging G18/G19/G20/G21. Its Contract examples, the 8-row render-trigger catalog, and the before→after code-ref diff are the calibration standard — judge concreteness / render / anchoring against those worked examples, not the prose gate definitions alone.
 
 ---
 
