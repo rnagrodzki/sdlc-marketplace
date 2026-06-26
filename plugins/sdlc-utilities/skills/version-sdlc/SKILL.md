@@ -112,7 +112,7 @@ Read `VERSION_CONTEXT_JSON`. Key fields to extract:
 | `flags.auto` | Whether `--auto` was passed — skip interactive approval prompts |
 | `config.ticketPrefix` | Optional Jira/project key prefix (e.g. `"PROJ"`). When set, ticket IDs matching this prefix are extracted from commits. |
 | `commits[].ticketIds` | Array of extracted ticket IDs (e.g. `["PROJ-123"]`) found in the commit subject and body. Empty array if none. |
-| `conflictsWithNext` | `{ major, minor, patch }` — whether each tag already exists |
+| `conflictsWithNext` | `{ major, minor, patch, preRelease }` — whether each candidate tag already exists; `preRelease` is checked against all semver tags incl. `-<label>.N` (R20) |
 
 ### Step 2 (PLAN): Determine Bump Type and Draft CHANGELOG
 
@@ -148,7 +148,7 @@ Pre-release intent comes from three mutually-exclusive sources, signalled by the
 2. Positional label-form (e.g. `version-sdlc rc`, `flags.bumpFromLabel === true`) — script auto-set `requestedBump = "patch"`
 3. `config.preRelease` default (`flags.preLabelFromConfig === true`) — script auto-set `requestedBump = "patch"`
 
-When `flags.preLabel` is set, use `bumpOptions.preRelease`. Otherwise use `bumpOptions[requestedBump]`. The script has already computed both pre-release semantics (counter increment, label reset, label switch) and the next-version values.
+When `flags.preLabel` is set, use `bumpOptions.preRelease`. Otherwise use `bumpOptions[requestedBump]`. The script has already computed both pre-release semantics (counter increment, label reset, label switch) and the next-version values. **Implements R20:** the pre-release counter continues from the highest existing `v<base>-<label>.N` git tag, not only from the version source file.
 
 **Implements R3 (breaking-change gate):** if `conventionalSummary.hasBreakingChanges` is `true` AND the resolved bump is not `major`, suggest `major` UNLESS the resolved bump is a pre-release from any source. Detect "is a pre-release" by checking that `flags.preLabel` is non-null. Pre-release trains skip this warning to avoid nagging on every RC iteration.
 
@@ -256,7 +256,7 @@ If the user chooses `edit`, ask what to change, revise, and present again. Loop 
 Before executing, verify:
 
 - The version file path exists (for `config.mode === "file"`)
-- The new tag does not conflict with existing tags (`conflictsWithNext[bumpType]` is false)
+- The new tag does not conflict with existing tags (base bump: `conflictsWithNext[bumpType]` is false; pre-release: `conflictsWithNext.preRelease` is false)
 - There are no uncommitted changes that would corrupt the release commit (run `git status --porcelain` and warn if non-empty)
 - Remote state is known — note `remoteState.hasUpstream` for use in Step 8 (the push step self-heals a missing upstream by emitting `--set-upstream`; no user action required)
 - Git identity is configured: run `git config user.name` and `git config user.email`. If either is empty, stop and instruct the user to set them:
@@ -469,7 +469,7 @@ New SHA: <head[:7]>
 | ---- | ----- | ------------- |
 | Semver correctness | New version is valid semver | `major.minor.patch[-pre]`, no leading zeros |
 | Breaking change bump | If `hasBreakingChanges`, bump is major (or is a pre-release) | Warn if minor/patch chosen with breaking commits |
-| Tag conflict | New tag does not already exist | `conflictsWithNext[bumpType]` is false |
+| Tag conflict | New tag does not already exist | base bump: `conflictsWithNext[bumpType]` is false; pre-release: `conflictsWithNext.preRelease` is false |
 | Changelog completeness | All user-facing commits are represented | No feat/fix commits silently omitted (if changelog enabled) |
 | No fabricated entries | Every CHANGELOG entry traces to a real commit | (if changelog enabled) |
 | Commit count | There are commits to release | `commits.length > 0` OR pre-release (allow empty pre-releases) |

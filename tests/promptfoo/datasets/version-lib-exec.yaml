@@ -1,0 +1,21 @@
+# Script execution tests for plugins/sdlc-utilities/scripts/lib/version.js.
+# Validates reconcilePreReleaseWithTags (counter-bump math) and preReleaseTagExists
+# (G3 pre-release collision predicate).
+# These run real Node.js scripts with no LLM.
+# Uses tests/promptfoo/scripts/version-lib-test.js so script_path resolves to a real file.
+
+- description: "version-lib: reconcilePreReleaseWithTags handles counter-bump math correctly"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/version-lib-test.js"
+    script_args: "--op reconcile"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
+
+- description: "version-lib: preReleaseTagExists correctly detects G3 pre-release collisions"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/version-lib-test.js"
+    script_args: "--op predicate"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"

@@ -280,6 +280,34 @@ function computePreRelease(current, label) {
   return `${base}-${label}.1`;
 }
 
+function highestPreReleaseCounter(base, label, tags) {
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`^v?${esc(base)}-${esc(label)}\\.(\\d+)$`);
+  let max = 0;
+  for (const t of tags) {
+    const m = re.exec(t);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return max; // 0 == none found
+}
+
+function reconcilePreReleaseWithTags(candidate, tags) {
+  const dashIdx = candidate.indexOf('-');
+  const dotIdx  = candidate.lastIndexOf('.');
+  if (dashIdx === -1 || dotIdx <= dashIdx) return candidate; // no pre-release suffix
+  const base    = candidate.slice(0, dashIdx);
+  const label   = candidate.slice(dashIdx + 1, dotIdx);
+  const counter = parseInt(candidate.slice(dotIdx + 1), 10);
+  if (Number.isNaN(counter)) return candidate;
+  const next = Math.max(counter, highestPreReleaseCounter(base, label, tags) + 1);
+  return `${base}-${label}.${next}`;
+}
+
+// G3 pre-release collision predicate — reads the pre-release-inclusive tag list.
+function preReleaseTagExists(version, tags, tagPrefix) {
+  return tags.includes(`${tagPrefix || ''}${version}`);
+}
+
 // ---------------------------------------------------------------------------
 // Conventional commit parsing
 // ---------------------------------------------------------------------------
@@ -390,4 +418,7 @@ module.exports = {
   readConfig,
   writeConfig,
   PRE_RELEASE_LABEL_RE,
+  reconcilePreReleaseWithTags,
+  preReleaseTagExists,
+  highestPreReleaseCounter,
 };

@@ -1,0 +1,12 @@
+# Script execution test for version.js pre-release counter continuation (Task 4, R20 / KD8).
+# Self-contained harness builds a throwaway git repo with base + 15 rc tags and asserts the
+# prepare flow continues the counter (1.3.3-rc.16), the emitted target is free, and tags.all
+# stays base-axis-only. No LLM provider. No destructive git ops in the real repo.
+# Uses tests/promptfoo/scripts/version-prerelease-test.js so script_path resolves to a real file.
+
+- description: "version pre-release: counter continues past existing rc tags → 1.3.3-rc.16, no conflict, tags.all base-axis only"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/version-prerelease-test.js"
+  assert:
+    - type: contains
+      value: "RESULT: PASS"
