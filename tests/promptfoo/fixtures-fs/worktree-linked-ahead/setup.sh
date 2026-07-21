@@ -6,7 +6,7 @@
 # Re-runnable: every git/worktree state is recreated from scratch on each run.
 set -e
 
-git init -q
+git init -q -b main
 git config user.email "test@test.com"
 git config user.name "Test"
 git config commit.gpgsign false

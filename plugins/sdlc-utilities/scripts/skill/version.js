@@ -454,7 +454,7 @@ async function main() {
     }
 
     // 4. Get existing tags
-    const existingTags = getTagList(projectRoot);
+    const existingTags = getTagList(activeRoot);
 
     // 5. Detect tag convention
     const usesVPrefix = existingTags.length > 0
@@ -536,7 +536,7 @@ async function main() {
       }
     } else {
       // tag mode
-      const tags = getTagList(projectRoot);
+      const tags = getTagList(activeRoot);
       if (!tags[0]) {
         errors.push('No version tags found.');
         writeOutput({ flow: 'changelog-update', errors, warnings }, 'version-context', 1);
@@ -554,7 +554,7 @@ async function main() {
     // 4. Build current tag and find previous tag
     const tagPrefix  = config.tagPrefix || 'v';
     const currentTag = `${tagPrefix}${currentVersion}`;
-    const allTags    = getTagList(projectRoot);
+    const allTags    = getTagList(activeRoot);
 
     if (!allTags.includes(currentTag)) {
       errors.push(`Tag '${currentTag}' not found. Has the release been tagged yet?`);
