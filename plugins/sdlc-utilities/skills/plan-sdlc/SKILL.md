@@ -347,7 +347,7 @@ Files + Contract + Acceptance criteria — do not restate it here.]
 
 **Render don't narrate (surface-conditional — implements R46):** When a task touches a concrete-artifact surface (payload, struct/schema field change, status enum, flow, config/flag delta, error mode, data-writing end-state), RENDER the artifact (fenced block / table / before→after diff) — do not describe it in prose. Use the catalog + conventions in ./plan-format-reference.md. Cap: one elided (…) example per distinct contract shape (a distinct contract shape is one unique combination of method + path for REST, or flag + type for CLI — two endpoints with the same method but different paths are distinct shapes). Trivial docs/rename tasks render nothing. (Mermaid fenced blocks allowed for flow/call-order/state surfaces; no MDX.) A task whose concrete-artifact surface is described in prose rather than rendered is flagged by G19 in Step 3.
 
-**G19 — Render-don't-narrate (error-severity):** Flags a task that touches a render-trigger surface (REST/RPC endpoint, CLI flag, schema field, status enum, state/flow/enum, config delta, error taxonomy) but describes it in prose instead of rendering a fenced block, table, or before→after diff. Owned by the content-coverage lane. Blocks plan approval until the surface is rendered. Not-applicable for trivial tasks and pure docs/rename tasks. LLM-only (semantic — render-trigger detection); hardened by prose. No deterministic floor (KD2).
+**G19 — Render-don't-narrate (error-severity):** For each render-trigger surface (REST/RPC endpoint, CLI flag, schema field, status enum, state/flow/enum, config delta, error taxonomy) a task touches, flags that surface if its shape is narrated in prose instead of rendered as a fenced block, table, or before→after diff — a render for one surface does NOT excuse prose for another surface in the same task. Owned by the content-coverage lane. Blocks plan approval until every touched surface is rendered. Not-applicable for trivial tasks and pure docs/rename tasks. LLM-only (semantic — render-trigger detection); hardened by prose. No deterministic floor (KD2).
 
 **G20 — Notes rationale-only (error-severity):** Flags a `Notes:` block that restates the task's Contract/acceptance instead of carrying only rationale. Owned by the content-coverage lane (lanes[1]). Blocks plan approval until the `Notes:` block is rationale-only.
 
@@ -358,8 +358,6 @@ Files + Contract + Acceptance criteria — do not restate it here.]
 - Config/infrastructure → build verification
 - Documentation → manual review
 - Integration → integration test or E2E
-
-Do not mandate TDD for config, documentation, or infrastructure tasks.
 
 **Write to plan file:** Append Key Decisions section (if applicable) and all task blocks. Populate the top-of-plan `## Deviations & assumptions` table (implements R47): one row per place the plan diverges from or assumes beyond the literal request (columns Item | asked | does | why). When the plan matches the request exactly, replace the placeholder row with a single "none" row. **De-dup rationale convention (implements R52):** Each decision gets one rationale entry — do not duplicate rationale across multiple decisions for the same topic.
 
@@ -412,7 +410,7 @@ Lane 4 (dimension-coverage/G17) returns the G17 findings JSON — parse the `fin
 
 Note every issue from `allIssues`. Do NOT write to the plan file in this step.
 
-**JOIN barrier — `guardrailsEvaluated` (implements R20, R35, issue #285):** After the guardrail-compliance lane (lanes[3]) result is incorporated into the merged issue list, record the checkpoint. **Do NOT write this marker before lanes[3] returns.** Each `--mark` block re-resolves `$SCRIPT` because SKILL.md bash blocks do not share shell state.
+**JOIN barrier — `guardrailsEvaluated` (implements R20, R35, issue #285):** After the guardrail-compliance lane (lanes[3]) result is incorporated into the merged issue list, record the checkpoint. **Do NOT write this marker before lanes[3] returns.**
 
 ```bash
 SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
@@ -608,6 +606,8 @@ Where `<verdict line>` is the verbatim verdict label from the scorecard: *"All c
 Then call ExitPlanMode. Do NOT invoke execute-plan-sdlc or ship-sdlc in this turn — they run after the user accepts in the next turn.
 
 **Normal mode:** Announce the plan path, then present the Workflow Continuation menu (see below). Prepend any advisory output from the wrapper above the menu's `ship` / `execute` / `done` lines.
+
+Do NOT report the plan as "validated" on format-floor PASS alone. Format floor = deterministic structure. Render/narrate quality was judged by the content-coverage lane in Step 3. Surface both, separately.
 
 ## Error Recovery
 

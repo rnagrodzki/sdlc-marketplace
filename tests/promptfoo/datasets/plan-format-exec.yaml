@@ -32,6 +32,8 @@
       value: "Plan Format Validation Report"
     - type: icontains
       value: "PASS"
+    - type: icontains
+      value: "Format floor"
 
 - description: "plan-format: missing Verification header triggers PF1 fail"
   vars:

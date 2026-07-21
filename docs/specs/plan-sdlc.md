@@ -95,7 +95,8 @@
 - R51 (Fixes #472 — self-contained code refs): A bare `file:line` change reference is forbidden; embed the surrounding lines (or the full function body) plus an inline `-`/`+` diff. Flagged by G21 (blocking). A `file:line` used as a pointer / `Contract.mirror` precedent anchor is exempt.
 - R52 (Fixes #472 — de-dup rationale convention): One rationale per decision — convention / guidance only, not gated.
 - R53 (Fixes #483 — deterministic gate backing): The structural PRESENCE of G18 (per-task `**Contract:**` block) and Gate B (`## Verification Scorecard` section) MUST be enforced deterministically by validate-plan-format.js — PF7 (Contract presence) and PF9 (Scorecard presence) — independent of the LLM gate lanes. PF7 runs in the default check set; PF9 runs only under `--final`. plan-sdlc Step 6.6 invokes the validator with `--final` as a hard gate blocking Step 7. PF9 is omitted (no `--final`) when Step 0 took the lightweight routing path (Step 5 skipped), so the scorecard floor applies only to full-pipeline plans. G19 and G21 remain LLM-only — both require semantic judgment (render-trigger detection; change-site vs precedent ref) that a deterministic proxy mis-fires, and a mis-fire would block valid plans at the Step 6.6 gate. The LLM gates G18/G19/G21 are retained as the concreteness/quality ceiling above the deterministic presence floor.
-- R54 (Fixes #483 — judge calibration): The content-coverage critique lane (owner of G18/G19/G20/G21) MUST receive the path to plan-format-reference.md and read it before judging those gates, evaluating concreteness / render / code-ref anchoring against its worked examples rather than the prose gate definitions alone. The Step 2 planner MUST read plan-format-reference.md and match its worked examples (read-then-match), not merely be pointed at it. The reference is read at runtime, never embedded in a dispatched prompt (prompt-cache stability).
+- R54 (Fixes #483 — judge calibration): The content-coverage critique lane (owner of G18/G19/G20/G21) MUST receive the path to plan-format-reference.md and read it before judging those gates, evaluating concreteness / render / code-ref anchoring against its worked examples rather than the prose gate definitions alone. The Step 2 planner MUST read plan-format-reference.md and match its worked examples (read-then-match), not merely be pointed at it. The reference is read at runtime, never embedded in a dispatched prompt (prompt-cache stability). The calibration reference MUST also contain at least one negative exemplar — a labeled BAD → GOOD pair showing prose narrating a render-trigger surface (R46/G19) alongside its corrected render — so the lane has a negative anchor to pattern-match against, not positive exemplars alone (Fixes #488).
+- R55 (Fixes #488 — report integrity): The format-floor result MUST be presented as deterministic-structure-only, distinct from the Step 3 content gates (G18–G21). A format-floor PASS alone MUST NOT be reported as "validated."
 
 ## Workflow Phases
 
@@ -131,11 +132,14 @@
 - G16: OpenSpec tasks.md coverage — when `fromOpenspecDirect` is true: every entry in `openspecContext.tasks[]` is either (a) referenced by ≥1 plan task's `openspec-task.ref`, or (b) listed in `## Out-of-scope OpenSpec tasks`. Error severity (blocking).
 - G17: Dimension Coverage — when G17 subagent dispatched: emit proposals per R31 criteria with R31 suppression and ranking rules. Severity: advisory (non-blocking).
 - G18: Settlement / contract concreteness — every artifact-touching task carries a `Contract:` block whose decided shape is concrete for the task's plan type (type derived from `Files:` paths); flag any task that leaves the shape unsettled (absent Contract or a restatement of 'update X to do Y'). Error-severity; owned by the content-coverage lane. Backed by deterministic presence floor PF7 (validate-plan-format.js, default check set); LLM G18 judges concreteness above the floor.
-- G19: Render-don't-narrate — flags any task touching a render-trigger surface (R46
-  catalog #1–#8) that renders no concrete artifact for it. Trivial docs/rename tasks
-  are not flagged. Also flags any Contract that includes more than one rendered example
-  per distinct contract shape (per R49 cap — one elided example per unique method+path
-  for REST, or flag+type for CLI). Error-severity; owned by the content-coverage lane. LLM-only (semantic — render-trigger detection); hardened by prose. No deterministic floor (KD2).
+- G19: Render-don't-narrate — for EACH render-trigger surface (R46 catalog #1–#8) a
+  task touches, flags that surface if its shape is narrated in prose rather than
+  rendered as a concrete artifact; a render for one surface does NOT excuse prose for
+  another surface in the same task. Trivial docs/rename tasks are not flagged. Also
+  flags any Contract that includes more than one rendered example per distinct
+  contract shape (per R49 cap — one elided example per unique method+path for REST,
+  or flag+type for CLI). Error-severity; owned by the content-coverage lane. LLM-only
+  (semantic — render-trigger detection); hardened by prose. No deterministic floor (KD2).
 - G20: Notes rationale-only — flags a `Notes:` block that restates the task's
   Contract/acceptance instead of carrying only rationale. Error-severity; owned by the content-coverage lane.
 - G21: Self-contained code refs — flags a bare `file:line` change reference not

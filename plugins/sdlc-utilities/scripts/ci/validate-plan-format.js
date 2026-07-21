@@ -350,7 +350,9 @@ function formatMarkdown(report) {
   const lines = [];
   lines.push('# Plan Format Validation Report');
   lines.push('');
-  lines.push(`**Overall:** ${report.passed ? 'PASS' : 'FAIL'} | ${report.summary.passed}/${report.summary.total} checks passed`);
+  lines.push(`**Format floor:** ${report.passed ? 'PASS' : 'FAIL'} | ${report.summary.passed}/${report.summary.total} deterministic structure checks`);
+  lines.push('');
+  lines.push('_Format floor checks STRUCTURE only (headers, Contract presence, metadata). It does NOT judge render-vs-narrate or prose density — that is Step 3 gates G18–G21._');
   lines.push('');
 
   lines.push('| Check | Status | Message |');

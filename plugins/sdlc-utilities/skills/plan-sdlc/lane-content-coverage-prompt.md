@@ -53,10 +53,11 @@ Derive the task's plan type from its `Files:` paths:
 
 A **mixed-artifact** task (e.g. a `.js` file plus a `.md` prompt) is judged against its **dominant** artifact's column — the one its primary deliverable touches. A task that touches no artifacts (pure coordination) is exempt. Do NOT flag a task whose Contract pins a concrete, type-appropriate shape — only flag genuinely unsettled tasks.
 
-**G19 — Render-don't-narrate:** Flag (error-severity, blocking:true) any task whose
-Files:/Description touch a render-trigger surface (R46 catalog #1–#8) but whose body
-renders NO concrete artifact (fenced block / table / before→after diff) for it.
-Docs-typo / rename tasks touch no surface → NOT flagged (anti-bloat).
+**G19 — Render-don't-narrate:** For EACH render-trigger surface (R46 catalog #1–#8) a
+task's Files:/Description touch, flag (error-severity, blocking:true) if that surface's
+shape is narrated in prose rather than rendered (fenced block / table / before→after
+diff). A render for one surface does NOT excuse prose for another surface in the same
+task. Docs-typo / rename tasks touch no surface → NOT flagged (anti-bloat).
 
 A ` ```mermaid ` fenced block is a **valid render** for flow / call-order / state
 surfaces (catalog #4/#5/#6) — a Mermaid-rendered flow PASSES G19 and must NOT be

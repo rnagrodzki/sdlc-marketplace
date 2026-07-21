@@ -36,8 +36,7 @@ assumes beyond, the literal request — so reviewers can audit intent without re
 | Retry policy | (not specified) | adds 3-attempt exponential backoff | transient broker failures must not drop messages |
 ```
 
-The columns are `Item | asked | does | why`. When a plan introduces no divergences or assumptions,
-render the header with a single row stating "none". The section is required on every plan.
+When a plan introduces no divergences or assumptions, render the header with a single row stating "none".
 
 ## Key Decisions (optional)
 
@@ -210,8 +209,6 @@ docs/rename tasks with no structural change render nothing.
 
 ### Rendering Conventions
 
-One elided example per distinct contract shape (not per surface category). Scale verbosity to change size.
-
 **#1 — API payload (RFC 7386 / AIP-193): success + error paired**
 
 ```http
@@ -281,6 +278,22 @@ After:   { "id": 12, "status": "active",  "retries": 0, … }
 | Token expired | 401 | `UNAUTHENTICATED` | Refresh flow triggered |
 | Token malformed | 401 | `UNAUTHENTICATED` | Request rejected, no refresh |
 | … | … | … | … |
+
+### Negative exemplar — prose narrating a render-trigger surface (BAD → GOOD)
+
+> **BAD — prose narrates the change (G19 must flag):**
+> "The consent gate needs special handling because errnorm normally converts a `StatusFailure`+AppError into a 302 `access_denied` redirect. To avoid this, when it detects an already-finalized session it writes the 400 JSON directly and returns `StatusPending` — the same technique as `redirectToConsent` — so the second POST yields a 400 `{"code":"ID3823"}` instead of another 302 with a fresh code, and only one grant issues."
+>
+> **GOOD — render replaces the narration:**
+> errnorm turns `StatusFailure`+AppError into a 302 `access_denied` (`errnorm/decorators.go:29-47`). Consent gate writes 400 JSON directly + returns `StatusPending` (mirror `redirectToConsent`).
+>
+> | | 1st POST | 2nd now | 2nd after |
+> |---|---|---|---|
+> | status | 302 | 302 | **400** |
+> | body | `?code=A` | `?code=B` (bug) | `{"code":"ID3823"}` |
+> | grants | 1 | **2** | **1** |
+>
+> Why BAD fails: it touches a render-trigger surface (state transition) but makes the reader reconstruct the table. Naming files != rendering.
 
 ### Size Cap and Anti-Bloat
 

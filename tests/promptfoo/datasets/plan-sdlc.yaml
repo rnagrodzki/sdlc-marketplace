@@ -20,6 +20,7 @@
 #   plan-deviations-notes              -- CORRECT: code plan with top-of-plan Deviations table, T1 (Notes rationale-only), T2 (Notes restates Contract); exercises R47 Deviations + R48/G20 Notes rationale-only (Fixes #472)
 #   plan-per-event-contracts           -- CORRECT: code plan, T1 emits 3 distinct events each with its own payload record; exercises per-distinct-shape render cap (catalog #2/#3, R49, Fixes #472)
 #   plan-bare-ref                      -- CORRECT: code plan, T1 has a bare file:line CHANGE ref (forbidden) + a Contract.mirror line-anchor (allowed carve-out); exercises Code reference anchoring convention (R51, Fixes #472)
+#   plan-g19-prose-flood               -- CORRECT: code plan, T1 narrates its HTTP payload surface (#1) entirely in prose while rendering an unrelated config-delta surface (#7) as a table; exercises the NEW per-surface G19 rule — the incidental render must NOT excuse the prose-narrated surface (R46, Fixes #488)
 
 # --- Fan-out parallelization cases (P1/P2/P3 — Fixes #418) ---
 
@@ -1051,6 +1052,35 @@
         structure, no state machine). G19 does not demand a rendered artifact for trivial
         tasks. The response must NOT flag Task 3 — flagging a typo fix is a false positive
         that G19 explicitly avoids per the anti-bloat rule.
+
+- description: "plan-sdlc: G19 per-surface prose-flood — an incidental unrelated render does NOT excuse a prose-narrated surface in the same task (R46, G19, #488)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-g19-prose-flood.md"
+    user_request: >
+      Run /plan-sdlc. Evaluate the Step 3 G19 render-don't-narrate gate for Task 1
+      ("PATCH /jobs/{id}/priority — update priority + add MAX_PRIORITY_QUEUE_DEPTH env
+      var") in the plan. Task 1 touches two render-trigger surfaces: the endpoint's
+      request/response payload (described only in the Description prose — no fenced
+      block, no table for it) and the MAX_PRIORITY_QUEUE_DEPTH config delta (rendered as
+      a typed-op table under Rendered artifacts). Is Task 1 flagged by G19? Does the
+      rendered config-delta table excuse the un-rendered payload surface?
+  assert:
+    - type: icontains
+      value: "G19"
+    - type: llm-rubric
+      value: >
+        The response evaluates the G19 gate PER-SURFACE and FLAGS Task 1 specifically for
+        the HTTP request/response PAYLOAD surface (catalog #1): that surface's shape
+        (the priority field, the success response fields, the 422 error body) is narrated
+        entirely in prose in the Description field with no fenced block, table, or
+        before→after diff rendering it. The response explicitly rejects the idea that the
+        task's rendered MAX_PRIORITY_QUEUE_DEPTH config-delta table (catalog #7) excuses
+        or satisfies G19 for the payload surface — it states that a render for one surface
+        (the config delta) does NOT excuse prose for another surface (the payload) in the
+        same task. The response confirms G19 is error-severity and blocking, and does NOT
+        conclude that Task 1 passes G19 merely because the task contains some rendered
+        artifact.
 
 # --- Render-don't-narrate hardening: Mermaid, per-distinct-shape, blocking, Notes, Deviations (R47–R52, Fixes #472) ---
 
