@@ -55,7 +55,6 @@ Read `MANIFEST_FILE`. Extract:
 **Name constraints:**
 - Names MUST be task-shaped: `auth-middleware-integration`, `cli-flag-parser-refactor`, `redis-cache-invalidation-strategy`
 - Names MUST NOT be the literal generic axes alone: `architecture`, `tests`, `security`, `performance`, `documentation`
-- Names should reflect what is specific to THIS task, not generic code-quality concerns
 
 **Mode assignment:**
 - `code` — pure internal analysis: reading existing code, checking patterns, finding file:line evidence
@@ -91,14 +90,13 @@ END_DIMENSION_CONTRACT
 
 ## Step 2 — FAN-OUT
 
-Dispatch ALL dimensions in a SINGLE message as parallel `Agent` tool calls.
-
-**IMPORTANT:** All dimension agents MUST be dispatched simultaneously (multiple tool calls in one message). Do not dispatch them sequentially.
+Dispatch ALL dimensions in a SINGLE message as parallel `Agent` tool calls. All dimension agents MUST be dispatched simultaneously (multiple tool calls in one message). Do not dispatch them sequentially.
 
 For each dimension, dispatch one `Agent`:
 - `subagent_type: general-purpose`
 - `model: <dimension.model>`
 - `mode: bypassPermissions`
+- `run_in_background: false` — **mandatory** (R56, #487): Agent dispatch defaults to background; a backgrounded call returns control before the subagent finishes, ending your turn with no results. `false` blocks until it returns.
 - **DO NOT pass `isolation: "worktree"` or any `isolation` value**
 
 ### Per-mode prompt suffix and tool restrictions
@@ -167,11 +165,13 @@ Web finding format: F-<dimension.name>-n: <url> — <observation> (recency: YYYY
 If no findings, return: ZERO_FINDINGS
 ```
 
-Collect all subagent results before proceeding to Step 3.
+**Await barrier (R56, #487):** Your turn is NOT complete until you have collected exactly one result per dispatched dimension — N = count of dispatched discovery dimensions. Do NOT end your turn, and do NOT proceed to Step 3 or write `discovery-brief.md`, while any dispatched subagent is still outstanding. If the runtime backgrounds a dispatch and re-invokes you via a task-completion notification, keep awaiting across notifications until the collected count equals N. Never consolidate on partial or zero results.
 
 ---
 
 ## Step 3 — CRITIQUE
+
+**Await guard (R56, #487):** Before critiquing, confirm the collected-result count equals N (dispatched discovery dimensions). If it is lower (partial) or zero, the Step 2 await barrier is not satisfied — resume awaiting the outstanding subagents. Do NOT run CRITIQUE or write `discovery-brief.md` on partial or zero results.
 
 After all subagents return:
 
@@ -242,9 +242,7 @@ explicitly ADOPT, REJECT-with-rationale, or mark NOT-APPLICABLE in Key Decisions
 
 **Path:** `manifest.outDir/discovery-brief.md` (from manifest JSON `outDir` field).
 
-**DO NOT** write to any path outside `manifest.outDir`.
-**DO NOT** modify `manifest.json`.
-**DO NOT** delete `manifest.outDir` — plan-sdlc owns cleanup via the EXIT/INT/TERM trap.
+**DO NOT** write outside `manifest.outDir`, modify `manifest.json`, or delete `manifest.outDir` (plan-sdlc owns cleanup via the EXIT/INT/TERM trap).
 
 ---
 
@@ -277,6 +275,7 @@ Every field is required. Use `0` for counts and `"none"` for empty lists.
 - [ ] Contradictions section present (even if "None detected.")
 - [ ] Zero-finding dimensions listed honestly (even if "None.")
 - [ ] Summary contains all required fields including `Brief file:` absolute path
+- [ ] Await barrier satisfied — every dimension dispatched with `run_in_background: false`, and exactly N results collected before CRITIQUE / brief write (R56, #487)
 
 ---
 
@@ -287,9 +286,7 @@ Every field is required. Use `0` for counts and `"none"` for empty lists.
 - Modify or delete `manifest.json`
 - Delete `manifest.outDir` — plan-sdlc owns cleanup
 - Omit `model:` on any Agent dispatch — omitting it silently inherits the parent model (opus)
-- Dispatch dimension subagents without an explicit `model:` parameter
-- Dispatch dimensions sequentially — all must be in a SINGLE message
-- Add web/hybrid dimensions for pure rename/move/dead-code refactors when `webResearchSignal: false`
 - Fabricate findings for zero-finding dimensions — report honestly
 - Exceed per-mode budgets: `web` ≤5 searches + ≤8 fetches; `hybrid` ≤3 searches + ≤5 fetches
 - Pass `isolation: "worktree"` on any Agent dispatch (see issues #370 #372)
+- Run CRITIQUE, write `discovery-brief.md`, or end your turn before collecting one result per dispatched dimension (count == N) (R56, #487)

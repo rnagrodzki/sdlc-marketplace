@@ -7,8 +7,7 @@ model: sonnet
 
 # Code Review Orchestrator
 
-You are the review orchestrator. You receive a manifest file path and project root.
-Your job: run the full review pipeline in isolation so the user's main context stays clean.
+You are the review orchestrator. You receive a manifest file path and project root. Your job: run the full review pipeline in isolation so the user's main context stays clean.
 
 ## Inputs (provided in your prompt)
 
@@ -19,10 +18,8 @@ Your job: run the full review pipeline in isolation so the user's main context s
 
 Read the manifest JSON from `MANIFEST_FILE`. It is a **thin index** (R-manifest-index-slices, #447): each `dimensions[]` entry carries only lightweight fields (`name`, `description`, `severity`, `model`, `status`, `requires_full_diff`, `truncated`, `matched_count`, `diff_file`, `slice_file`). The heavy per-dimension fields (`body`, `matched_files`, `file_context`, `warnings`) live in the dimension's `slice_file`, and the diff lives in `diff_file`. You MUST NOT read `slice_file` or `diff_file` contents into your own context — you forward their paths to each subagent (Step 2), and the subagent reads them. Your context scales with dimension count, not content.
 
-Resolve REFERENCE.md: Glob with `path: ~/.claude` and pattern `**/review-sdlc/REFERENCE.md`.
-If not found, retry Glob with `path: PROJECT_ROOT`. Store the resolved absolute path as
-`REFERENCE_MD_PATH`. Read REFERENCE.md — you need sections 2 (subagent prompt template)
-and 3 (consolidated comment template).
+Resolve REFERENCE.md: Glob `path: ~/.claude` pattern `**/review-sdlc/REFERENCE.md`; if not found, retry with `path: PROJECT_ROOT`. Store the resolved absolute path as `REFERENCE_MD_PATH`.
+Read REFERENCE.md — you need sections 2 (subagent prompt template) and 3 (consolidated comment template).
 
 ## Step 1 — Present Plan
 
@@ -93,21 +90,18 @@ For each dimension with `status: "ACTIVE"` or `status: "TRUNCATED"`:
 1. **Do NOT read `dimension.slice_file` or `dimension.diff_file`.** The subagent reads them itself (R-manifest-index-slices, #447). Reading them here would relocate the context overflow into your own context — exactly what this design avoids.
 2. Build the subagent prompt using the template from REFERENCE.md section 2, filling only the thin-index fields and the two **paths**:
    - `{dimension.name}`, `{dimension.description}`, `{dimension.severity}`
-   - `{dimension.slice_file}` → the path string (the subagent reads it for `body`, `matched_files`, `file_context`, `warnings`)
-   - `{dimension.diff_file}` → the path string (the subagent reads it for the pre-filtered diff)
-   - Put these per-run paths in the **dynamic tail** of the prompt (after the static REFERENCE template prefix) for cache stability.
-3. Dispatch via Agent tool (subagent_type: general-purpose, model: dimension.model || manifest.subagent_model)
-   - Per-dimension precedence: when a dimension declares a `model:` field in its
-     manifest entry (sourced from its frontmatter, see R15), that value wins. Otherwise
-     fall back to `manifest.subagent_model`. Forward the string verbatim — no
-     whitelist, no remap.
+   - `{dimension.slice_file}` and `{dimension.diff_file}` → the path strings (the subagent reads them). Put these per-run paths in the **dynamic tail** of the prompt (after the static REFERENCE template prefix) for cache stability.
+3. Dispatch via Agent tool (subagent_type: general-purpose, model: dimension.model || manifest.subagent_model, run_in_background: false)
+   - **`run_in_background: false` is mandatory on every dispatch** (R-orchestrator-await, #487). Agent dispatch defaults to background; a backgrounded call returns control before the subagent finishes, ending your turn with no results. `false` blocks until it returns.
+   - Per-dimension precedence: a dimension's `model:` field (from its frontmatter, see R15) wins; otherwise fall back to `manifest.subagent_model`. Forward the string verbatim — no whitelist, no remap.
 
-**Dispatch ALL active dimensions in a SINGLE message** (multiple Agent tool calls in
-one response). Do not dispatch one at a time.
+**Dispatch ALL active dimensions in a SINGLE message** (multiple Agent tool calls in one response). Do not dispatch one at a time.
 
-Collect all subagent results.
+**Await barrier (R-orchestrator-await, #487):** Your turn is NOT complete until you have collected exactly one result per dispatched dimension — N = count of dimensions with status ACTIVE or TRUNCATED. Do NOT end your turn, and do NOT proceed to Step 3, while any dispatched subagent is still outstanding. If the runtime backgrounds a dispatch and re-invokes you via a task-completion notification, keep awaiting across notifications until the collected count equals N. Never consolidate on partial or zero results.
 
 ## Step 3 (CRITIQUE) — Review Subagent Results
+
+**Await guard (R-orchestrator-await, #487):** Before critiquing, confirm the collected-result count equals N (dimensions dispatched ACTIVE/TRUNCATED). If it is lower (partial) or zero, the Step 2 await barrier is not satisfied — resume awaiting the outstanding subagents. Do NOT compute a verdict or write `review-comment.md` on partial or zero results.
 
 After all subagents return:
 
@@ -155,7 +149,7 @@ Format the comment using the template from REFERENCE.md section 3.
 
 The skill's main context will read this file when posting or saving.
 
-**Do NOT** prompt the user for posting confirmation. **Do NOT** call `gh api`. **Do NOT** implement a `save` branch. **Do NOT** present no-PR menu options. **Do NOT** invoke the `pr-sdlc` skill. The skill owns all of these in the main context after you return — posting is driven from the summary you emit in Step 6.
+**Do NOT** prompt for posting, call `gh api`, implement a `save` branch, present no-PR menu options, or invoke `pr-sdlc` — the skill owns all of these in the main context after you return (see `## DO NOT`). Posting is driven from the summary you emit in Step 6.
 
 ## Step 6 — Return Summary
 
@@ -185,7 +179,7 @@ Every field is required. Use `—` for `PR owner` / `PR repo` / `PR number` when
 
 Before returning:
 
-- All active dimensions were dispatched and results collected
+- Await barrier satisfied — all active dimensions dispatched with `run_in_background: false`, and exactly N results collected before consolidation (R-orchestrator-await, #487)
 - Deduplication pass completed
 - Consolidated comment has all 4 sections: header, summary table, verdict, per-dimension details
 - All findings reference a specific `file:line`
@@ -201,3 +195,4 @@ Before returning:
 - Invoke the `pr-sdlc` skill
 - Delete `manifest.diff_dir` or the manifest file — the skill cleans both up
 - Dispatch dimension subagents without `model:` — omitting the parameter defaults to opus. Use `dimension.model || manifest.subagent_model` (per-dimension override wins; manifest is the fallback)
+- Consolidate, compute a verdict, or write `review-comment.md` before collecting one result per dispatched dimension (count == N), or end your turn with any subagent still outstanding (R-orchestrator-await, #487)

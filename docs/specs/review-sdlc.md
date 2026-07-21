@@ -55,6 +55,7 @@
   - The top-level manifest MUST NOT contain `git.commit_log` or `dirty_files` (dead fields with zero non-writer consumers), and `git.changed_files` (array) is replaced by a `git.changed_files_count` integer.
   - The `review-orchestrator` MUST read only the thin index; it MUST forward `slice_file` and `diff_file` **paths** into each dispatch prompt and MUST NOT read slice/diff content into its own context. Each dispatched subagent reads its own slice and diff. The orchestrator's context therefore scales with dimension **count**, not content.
   - Acceptance: the manifest's `dimensions[]` entries contain no `body`/`matched_files`/`file_context`/`warnings`; each dispatched dimension has a `slice_file` path whose JSON contains those four fields; the top-level manifest has no `git.commit_log`, no `dirty_files`, and a numeric `git.changed_files_count`.
+- R-orchestrator-await (issue #487): The `review-orchestrator` agent MUST block until every dispatched dimension subagent returns before consolidating. (a) Every Step 2 dispatch uses `run_in_background: false`; (b) the turn is not complete and the orchestrator MUST NOT enter Step 3 (critique) or Step 5 (persist `review-comment.md`) until it has collected exactly one result per dispatched dimension — N = count of dimensions with status ACTIVE or TRUNCATED; (c) if the runtime backgrounds a dispatch and re-invokes via task-completion notifications, it keeps awaiting across notifications until the collected count equals N. Consolidating on partial or zero results is forbidden.
 
 ## Workflow Phases
 
@@ -74,6 +75,7 @@
 - G3: Manifest file and `diff_dir` cleaned up by the skill after the terminal branch (including failures)
 - G4: Exactly one `review-orchestrator` Agent dispatch per `/review-sdlc` invocation (a retry on failure counts as the same attempt; user confirmation never triggers a new dispatch)
 - G5: Full comment body displayed — Step 3 emits the verbatim contents of `${diff_dir}/review-comment.md` in the main context before the posting prompt is shown
+- G6: Await barrier — the orchestrator collects one result per dispatched dimension (count == N, ACTIVE+TRUNCATED) before any consolidation, and never computes a verdict or writes `review-comment.md` on partial or zero results (R-orchestrator-await)
 
 ## Prepare Script Contract
 
