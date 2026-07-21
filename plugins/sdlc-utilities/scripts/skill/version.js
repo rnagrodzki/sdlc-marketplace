@@ -45,6 +45,7 @@ const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { truncateText } = require(path.join(LIB, 'diff-truncate'));
 const { resolveSdlcRoot } = require(path.join(LIB, 'config'));
+const { resolveActiveWorktreeSafe } = require(path.join(LIB, 'worktree'));
 const { validateExpectedBranch } = require(path.join(LIB, 'branch-guard'));
 
 // ---------------------------------------------------------------------------
@@ -266,6 +267,12 @@ async function main() {
   // Lets version-sdlc be invoked from subdirectories or linked worktrees
   // without writing to the wrong directory.
   const projectRoot = resolveSdlcRoot();
+  // Task 3 (#498): HEAD-relative git ops (tags-at-head, commit ranges, remote
+  // state, retag rev-parse) must read the ACTIVE worktree, not the main
+  // worktree — otherwise a linked worktree's release gets computed against
+  // main's HEAD/tags. Version-file/changelog/config PATH reads stay on
+  // projectRoot (always the main worktree's .sdlc/ root).
+  const activeRoot  = resolveActiveWorktreeSafe();
   const args        = parseArgs(process.argv);
 
   // Issue #232: verifyAndMigrate gate (CLI > env > default false).
@@ -346,7 +353,7 @@ async function main() {
           }
         } else {
           // tag mode: derive from latest tag
-          const tags = getTagList(projectRoot);
+          const tags = getTagList(activeRoot);
           if (!tags[0]) {
             retagErrors.push('No version tags found — cannot derive current version for retag');
           } else {
@@ -362,7 +369,7 @@ async function main() {
         // Read-only: check that the candidate tag exists.
         const { spawnSync } = require('child_process');
         const revParse = spawnSync('git', ['rev-parse', `refs/tags/${currentTag}`], {
-          cwd: projectRoot, encoding: 'utf8',
+          cwd: activeRoot, encoding: 'utf8',
         });
         if (revParse.status !== 0) {
           retagErrors.push(`--retag requires tag ${currentTag} to already exist; none found`);
@@ -372,7 +379,7 @@ async function main() {
 
         // Get HEAD sha.
         const headRevParse = spawnSync('git', ['rev-parse', 'HEAD'], {
-          cwd: projectRoot, encoding: 'utf8',
+          cwd: activeRoot, encoding: 'utf8',
         });
         if (headRevParse.status === 0) {
           headSha = (headRevParse.stdout || '').trim();
@@ -561,7 +568,7 @@ async function main() {
       : null;  // no previous tag — first release
 
     // 5. Get commits between tags (previousTag..currentTag)
-    const rawCommits = getCommitsBetweenRefs(previousTag, currentTag, projectRoot);
+    const rawCommits = getCommitsBetweenRefs(previousTag, currentTag, activeRoot);
 
     if (rawCommits.length === 0) {
       warnings.push('No commits found between the previous tag and current tag.');
@@ -727,7 +734,7 @@ async function main() {
     };
   } else {
     // tag mode
-    const tags      = getTagList(projectRoot);
+    const tags      = getTagList(activeRoot);
     const latestTag = tags[0] || null;
 
     if (!latestTag) {
@@ -762,7 +769,7 @@ async function main() {
 
   // 6.5 Idempotency guard — skip if HEAD already carries a release tag
   // (KD3: scoped to release flow only; excluded under --retag)
-  const headReleaseTags = getTagsAtHead(projectRoot);
+  const headReleaseTags = getTagsAtHead(activeRoot);
   const alreadyBumped = headReleaseTags.length > 0 && !args.retag;
   if (alreadyBumped) {
     writeOutput({
@@ -811,7 +818,7 @@ async function main() {
   //       that case. This preserves the "fresh pre-release train starts on
   //       the NEXT release" intuition.
   // R20: pre-release counter continues past existing -<label>.N git tags
-  const allSemverTags = getAllSemverTags(projectRoot);
+  const allSemverTags = getAllSemverTags(activeRoot);
   if (args.preLabel) {
     const currentHasPreRelease = currentVersion.includes('-');
     // "Sugar mode" covers both the label-form positional bump and the
@@ -844,7 +851,7 @@ async function main() {
   }
 
   // 9. Tags
-  const allTags     = getTagList(projectRoot);
+  const allTags     = getTagList(activeRoot);
   const latestTag   = allTags[0] || null;
   const latestVersion = latestTag
     ? (latestTag.startsWith('v') ? latestTag.slice(1) : latestTag)
@@ -872,7 +879,7 @@ async function main() {
   };
 
   // 10. Commits since last tag
-  const rawCommits = getCommitsSinceRef(latestTag || null, projectRoot);
+  const rawCommits = getCommitsSinceRef(latestTag || null, activeRoot);
 
   if (rawCommits.length === 0 && !args.preLabel) {
     warnings.push('No commits since last tag. Nothing to release.');
@@ -960,7 +967,7 @@ async function main() {
   // 13. Remote state
   let remoteState;
   try {
-    const raw = getRemoteState(projectRoot);
+    const raw = getRemoteState(activeRoot);
     remoteState = raw
       ? { hasUpstream: raw.hasUpstream, remoteBranch: raw.remoteBranch, isAhead: raw.isAhead }
       : { hasUpstream: false, remoteBranch: null, isAhead: false };

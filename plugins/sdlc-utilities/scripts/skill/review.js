@@ -47,6 +47,7 @@ const { readSection, writeLocalConfig, resolveSdlcRoot } = require(path.join(LIB
 const { writeOutput } = require(path.join(LIB, 'output'));
 const { resolveSkipConfigCheck, ensureConfigVersion } = require(path.join(LIB, 'config-version-prepare'));
 const { getPluginVersion } = require(path.join(LIB, 'config-version'));
+const { resolveActiveWorktreeSafe } = require(path.join(LIB, 'worktree'));
 
 // ---------------------------------------------------------------------------
 // Review config (.sdlc/review.json)
@@ -512,6 +513,7 @@ function loadAndMatchDimensions(projectRoot, changedFiles, dimensionFilter) {
 
 function main() {
   const { projectRoot, baseBranch, dimensionFilter, scope: cliScope, setDefault } = parseArgs(process.argv);
+  const activeRoot = resolveActiveWorktreeSafe(); // issue #490: HEAD-relative git ops target the active worktree
 
   // Issue #232: verifyAndMigrate gate (CLI > env > default false).
   const skipConfigCheck = resolveSkipConfigCheck(process.argv);
@@ -556,7 +558,7 @@ function main() {
   let base = baseBranch;
   if (!isLocalScope && !base) {
     try {
-      base = detectBaseBranch(projectRoot);
+      base = detectBaseBranch(activeRoot);
     } catch (err) {
       process.stderr.write(`Error: ${err.message}\n`);
       process.exit(2);
@@ -568,10 +570,10 @@ function main() {
   // (issue #239). Non-fatal — offline / no-origin / auth-denied all silently
   // pass and we proceed with whatever the local ref reports.
   if (base) {
-    fetchBaseRef(base, projectRoot);
+    fetchBaseRef(base, activeRoot);
   }
 
-  const changedFiles = getChangedFiles(base, projectRoot, scope);
+  const changedFiles = getChangedFiles(base, activeRoot, scope);
   if (changedFiles.length === 0) {
     const scopeLabel = {
       all:       `committed + staged changes vs "${base}"`,
@@ -592,7 +594,7 @@ function main() {
 
   // Commit context only available for branch-based scopes
   if (!isLocalScope) {
-    const commitFileMap = getCommitFileMap(base, projectRoot);
+    const commitFileMap = getCommitFileMap(base, activeRoot);
     for (const dim of dims) {
       dim.file_context = dim.matched_files.map(file => ({
         file,
@@ -602,7 +604,7 @@ function main() {
   }
 
   // Diffs
-  const fileDiffs  = fetchAndSplitDiff(base, projectRoot, scope);
+  const fileDiffs  = fetchAndSplitDiff(base, activeRoot, scope);
   const activeDims = dims.filter(d => d.status === 'ACTIVE' || d.status === 'TRUNCATED');
   const tmpDir     = writeDimensionDiffs(activeDims, fileDiffs, projectRoot);
   // Per-dimension slice files (R-manifest-index-slices, #447): written after diffs so
@@ -633,7 +635,7 @@ function main() {
     current_branch: gitState.currentBranch,
     uncommitted_changes: gitState.uncommittedChanges,
     git: {
-      commit_count:        !isLocalScope ? getCommitCount(base, projectRoot) : 0,
+      commit_count:        !isLocalScope ? getCommitCount(base, activeRoot) : 0,
       changed_files_count: changedFiles.length,
     },
     pr,

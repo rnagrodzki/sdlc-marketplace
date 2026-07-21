@@ -388,3 +388,29 @@
   assert:
     - type: icontains
       value: '"branchGuard":'
+
+# Issue #490 — cwd-aware git state: pr-prepare must read the linked worktree's
+# commits/changedFiles (not the main worktree's) when invoked from a linked
+# worktree. The fix routes detectBaseBranch/getCommitsStructured/getChangedFiles
+# (and related git.js calls) through resolveActiveWorktreeSafe() instead of
+# projectRoot. No --base override is passed: the worktree-linked-ahead fixture
+# has no origin remote, and pr.js's --base path hard-verifies the base against
+# `origin/<base>` (halts with "does not exist on the remote" otherwise) — so the
+# base is left to detectBaseBranch(activeRoot), which resolves local "main".
+# The fixture config sets no pr.expectedAccount and has no origin remote, so
+# pr.js's account preflight is skipped (access-mode, warning only) and execution
+# reaches the routed git code. Assertions match the fixed script's real output.
+- description: "pr-prepare (#490): linked-worktree (worktree-linked-ahead) — commits & changedFiles reflect wt1's ahead commit, not main"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/pr.js"
+    script_cwd: "{{project_root}}/worktrees/wt1"
+    project_root: "file://fixtures-fs/worktree-linked-ahead"
+  assert:
+    - type: icontains
+      value: '"subject": "feat: linked worktree change"'
+    - type: icontains
+      value: '"linked-file.txt"'
+    - type: not-icontains
+      value: '"commits": []'
+    - type: not-icontains
+      value: '"changedFiles": []'

@@ -1,6 +1,12 @@
 version: "3"
 
 tasks:
+  hooks:install:
+    desc: Install the local git pre-push hook (runs exec-only promptfoo suites)
+    silent: true
+    cmds:
+      - lefthook install
+
   test:behavioral:
     desc: Run all promptfoo behavioral skill tests (LLM)
     silent: true

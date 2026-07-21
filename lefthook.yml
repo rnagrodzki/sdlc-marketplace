@@ -1,0 +1,13 @@
+# Pre-push hook: runs only the deterministic exec (scripts-only) promptfoo
+# suites — the regression tests for #490/#498. The behavioral/LLM suite
+# (promptfooconfig.yaml) is DELIBERATELY excluded: only scripts part.
+# Install with `task hooks:install` (or `lefthook install`).
+pre-push:
+  parallel: false
+  commands:
+    exec-scripts:
+      root: "tests/promptfoo/"
+      run: promptfoo eval --config promptfooconfig-exec.yaml
+    exec-hooks:
+      root: "tests/promptfoo/"
+      run: promptfoo eval --config promptfooconfig-exec-hooks.yaml

@@ -69,3 +69,19 @@
       value: |
         const semverOrUnknown = /^"plugin_version":"([0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?|unknown)"$/;
         semverOrUnknown.test(output.replace(/\s/g, '').replace(/^\{/, '').replace(/\}$/, ''))
+
+- description: "review-prepare (#490): linked-worktree (worktree-linked-ahead) — changed_files_count & current_branch reflect wt1, not the main worktree"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/review.js"
+    script_args: "--committed --base main"
+    script_cwd: "{{project_root}}/worktrees/wt1"
+    project_root: "file://fixtures-fs/worktree-linked-ahead"
+  assert:
+    # current_branch must reflect the ACTIVE worktree's branch (wt1 = feature/cwd-test),
+    # not the main worktree's branch — proves getChangedFiles/getCommitCount route to activeRoot
+    - type: icontains
+      value: '"current_branch": "feature/cwd-test"'
+    # changed_files_count must reflect wt1's one committed file vs main (linked-file.txt),
+    # not zero (which is what a HEAD-relative bug computed from the main worktree would yield)
+    - type: icontains
+      value: '"changed_files_count": 1'

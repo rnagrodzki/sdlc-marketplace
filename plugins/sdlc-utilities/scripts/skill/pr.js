@@ -56,6 +56,7 @@ const { validateLinks, formatViolations } = require(path.join(LIB, 'links'));
 const { loadPrTemplate } = require(path.join(LIB, 'pr-template'));
 const { jiraKeyRegex } = require(path.join(LIB, 'jira-keys'));
 const { validateExpectedBranch } = require(path.join(LIB, 'branch-guard'));
+const { resolveActiveWorktreeSafe } = require(path.join(LIB, 'worktree'));
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -166,6 +167,7 @@ function detectPrMode(forceUpdate, prMeta) {
 
 function main() {
   const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
+  const activeRoot = resolveActiveWorktreeSafe(); // issue #490: HEAD-relative git ops target the active worktree
   const { isDraft, forceUpdate, baseBranchOverride, isAuto, forcedLabels, expectedBranch } = parseArgs(process.argv);
 
   const errors   = [];
@@ -384,7 +386,7 @@ function main() {
       baseBranch = configDefaultBranch;
     } else {
       try {
-        baseBranch = detectBaseBranch(projectRoot);
+        baseBranch = detectBaseBranch(activeRoot);
       } catch (err) {
         errors.push(err.message);
         writeOutput({ errors, warnings, currentBranch }, 'pr-context', 1);
@@ -400,17 +402,17 @@ function main() {
   }
 
   // Step 6: Check remote state and push if needed
-  const remoteInfo = getRemoteState(projectRoot);
+  const remoteInfo = getRemoteState(activeRoot);
   let remoteAction = 'none';
 
   if (!remoteInfo.hasUpstream) {
-    const result = pushToRemote(projectRoot, false);
+    const result = pushToRemote(activeRoot, false);
     remoteAction = result === 'pushed-new' ? 'pushed-new' : 'error';
     if (remoteAction === 'error') {
       warnings.push('Could not push branch to remote. You may need to push manually before creating a PR.');
     }
   } else if (remoteInfo.isAhead) {
-    const result = pushToRemote(projectRoot, true);
+    const result = pushToRemote(activeRoot, true);
     remoteAction = result === 'pushed' ? 'pushed' : 'error';
     if (remoteAction === 'error') {
       warnings.push('Could not push to remote. You may need to push manually.');
@@ -443,7 +445,7 @@ function main() {
   }
 
   // Step 8: Gather commits
-  const commits = getCommitsStructured(baseBranch, projectRoot);
+  const commits = getCommitsStructured(baseBranch, activeRoot);
   if (commits.length === 0) {
     warnings.push(`No commits found between "${baseBranch}" and HEAD. The PR description may be sparse.`);
   }
@@ -452,15 +454,15 @@ function main() {
   // Best-effort refresh of local base ref so getDiffStat/getDiffContent see
   // the current origin/<base> rather than a stale local copy (issue #239).
   // Non-fatal — offline / no-origin / auth-denied all silently pass.
-  fetchBaseRef(baseBranch, projectRoot);
-  const diffStat    = getDiffStat(baseBranch, projectRoot);
-  const diffContent = getDiffContent(baseBranch, projectRoot);
+  fetchBaseRef(baseBranch, activeRoot);
+  const diffStat    = getDiffStat(baseBranch, activeRoot);
+  const diffContent = getDiffContent(baseBranch, activeRoot);
 
   if (!diffContent) {
     warnings.push(`No diff found between "${baseBranch}" and HEAD.`);
   }
 
-  const changedFiles = getChangedFiles(baseBranch, projectRoot, 'committed');
+  const changedFiles = getChangedFiles(baseBranch, activeRoot, 'committed');
 
   // Step 10: Extract JIRA ticket
   const jiraTicket = detectJiraTicket(currentBranch, commits);

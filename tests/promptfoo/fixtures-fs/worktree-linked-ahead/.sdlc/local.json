@@ -1,0 +1,8 @@
+{
+  "ship": {
+    "workspace": "branch"
+  },
+  "workspace": {
+    "mode": "branch"
+  }
+}
