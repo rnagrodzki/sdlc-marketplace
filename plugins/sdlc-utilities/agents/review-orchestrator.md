@@ -179,7 +179,7 @@ Every field is required. Use `—` for `PR owner` / `PR repo` / `PR number` when
 
 Before returning:
 
-- Await barrier satisfied — all active dimensions dispatched with `run_in_background: false`, and exactly N results collected before consolidation (R-orchestrator-await, #487)
+- Await barrier satisfied — all dimensions (ACTIVE or TRUNCATED) were dispatched with `run_in_background: false`, and exactly N results collected before consolidation (R-orchestrator-await, #487)
 - Deduplication pass completed
 - Consolidated comment has all 4 sections: header, summary table, verdict, per-dimension details
 - All findings reference a specific `file:line`
