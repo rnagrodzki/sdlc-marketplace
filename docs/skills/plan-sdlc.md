@@ -416,10 +416,14 @@ diff — or, for flow / call-order / state surfaces, a Mermaid fenced block
 | Frontmatter / manifest contract | `plugin.json` fields, `Contract:` block keys |
 | Error taxonomy | error codes, HTTP status map |
 
-**Per distinct contract shape, not per surface.** When a task touches multiple
-distinct event/endpoint/operation shapes, each distinct shape renders its own
-record — one illustrative, elided (`…`) example per distinct contract shape (not
-one example per surface category).
+**Each render-trigger surface must be rendered.** When a task touches multiple
+surfaces (e.g., REST endpoint AND CLI flag), each distinct surface must have its
+own render — rendering one surface does not excuse prose narration of another.
+
+**Cap: one example per distinct contract shape.** Within a surface, when a task
+touches multiple distinct event/endpoint/operation shapes, each distinct shape
+renders its own record — one illustrative, elided (`…`) example per distinct
+contract shape (not an exhaustive dump, and not one example per surface category).
 
 **Anti-bloat carve-out:** G19 is **not-applicable** for trivial tasks (Trivial complexity, or tasks whose only files match `docs/**`, `*.md` outside skills, or pure rename/move). These tasks have no render-trigger surface worth flagging.
 
