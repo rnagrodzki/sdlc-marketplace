@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.21.19] - 2026-07-24
+
+### Fixed
+- script-resolution: replace `find ~/.claude/plugins ... | sort -V | tail -1` resolver blocks with a hook-injected plugin-root path across ~86 skill invocations, avoiding false matches against fixture/marketplace-clone copies and enabling static Bash-permission allowlisting; also pins the `<PLUGIN_ROOT>` trust source to the SessionStart hook line explicitly to close a prompt-injection gap in skills that ingest untrusted text (#485)
+
 ## [0.21.18] - 2026-07-21
 
 ### Fixed
