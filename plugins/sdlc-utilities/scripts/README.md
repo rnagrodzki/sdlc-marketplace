@@ -51,15 +51,36 @@ scripts/
 
 ## Script Resolution
 
-Skills locate scripts using a two-step pattern:
+Skills locate scripts using the injected-path form. The `SessionStart` hook (`hooks/session-start.js`)
+emits a stable `sdlc plugin root: <abs>` line into session context on `startup`, `clear`, and `compact`;
+skill bodies substitute `<PLUGIN_ROOT>` from that line and invoke scripts directly:
 
 ```bash
-# 1. Installed plugin (find in plugin cache)
-SCRIPT=$(find ~/.claude/plugins -name "<name>.js" -path "*/sdlc*/scripts/<subdir>/<name>.js" 2>/dev/null | sort -V | tail -1)
-
-# 2. Development fallback (relative to repo root)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/<subdir>/<name>.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/<subdir>/<name>.js"
+node "<PLUGIN_ROOT>/scripts/<subdir>/<name>.js"
 ```
+
+Because the hook that fired IS the active install, its root is the one correct target — no
+`find` traversal, cached-version ranking, or dev-CWD fallback guard is needed. (The old
+multi-cached-version ambiguity this used to guard against, #258, is dissolved for this reason.)
+
+To let commands like this run without a per-invocation approval prompt, add a rule to
+`permissions.allow` in `settings.json` (user-level `~/.claude/settings.json`, project-level
+`.claude/settings.json`, or `.claude/settings.local.json`) — a plugin cannot write the user's
+settings, so this is a documented recommendation you deploy yourself, never a `SKILL.md`
+frontmatter field:
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(node \"*/scripts/*.js\"*)"]
+  }
+}
+```
+
+Claude Code Bash permission rules support `*` wildcards anywhere in the pattern, so this single
+rule matches the literal `node "` prefix, any path down to a `scripts/` directory (covering both
+the installed cache path and the `plugins/sdlc-utilities/scripts/...` path used when running
+directly from this repository), any `.js` script name, and any trailing arguments.
 
 All scripts use `__dirname`-based resolution for `lib/` imports:
 

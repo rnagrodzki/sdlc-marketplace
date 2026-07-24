@@ -15,11 +15,8 @@ Sub-flow of `/setup-sdlc --execution-guardrails`. Runs skill/guardrails.js with 
 Run skill/guardrails.js:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "guardrails.js" -path "*/sdlc*/scripts/skill/guardrails.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/guardrails.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/guardrails.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/guardrails.js" >&2; exit 2; }
-
-PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --project-root . --target execute --mode {init|add} --json)
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+PREPARE_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/guardrails.js" --output-file --project-root . --target execute --mode {init|add} --json)
 EXIT_CODE=$?
 echo "EXIT_CODE=$EXIT_CODE"
 cat "$PREPARE_OUTPUT_FILE"
@@ -64,9 +61,8 @@ On **custom**: collect id (validate kebab-case pattern `^[a-z][a-z0-9]*(-[a-z0-9
 Write selected guardrails via inline Node.js using config library:
 
 ```bash
-SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
-[ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
-[ -z "$SCRIPT_DIR" ] && { echo "ERROR: Could not locate lib/config.js" >&2; exit 2; }
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+SCRIPT_DIR="<PLUGIN_ROOT>/scripts/lib"
 
 node -e "
 const { writeSection } = require('$SCRIPT_DIR/config.js');
@@ -81,11 +77,8 @@ Replace `<GUARDRAILS_JSON>` with the JSON array of selected guardrails. In `--ad
 ### Step 4 (VALIDATE) — Run Validation Script
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "validate-guardrails.js" -path "*/sdlc*/scripts/ci/validate-guardrails.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-guardrails.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ci/validate-guardrails.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate ci/validate-guardrails.js" >&2; exit 2; }
-
-node "$SCRIPT" --project-root . --section execute --json
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+node "<PLUGIN_ROOT>/scripts/ci/validate-guardrails.js" --project-root . --section execute --json
 ```
 
 Parse output. If `overall` is "pass", report success with count. If "fail", show errors and offer to fix.

@@ -17,14 +17,11 @@ Thin dispatcher — runs the prepare script, then delegates everything to the
 
 ## Step 0 — Resolve and Run skill/review.js
 
-> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+> **Substitute `<PLUGIN_ROOT>`** with the absolute path from the `sdlc plugin root:` line in session context. Do not run `find`.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "review.js" -path "*/sdlc*/scripts/skill/review.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/review.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/review.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/review.js. Is the sdlc plugin installed?" >&2; exit 2; }
-
-MANIFEST_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS --json)
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+MANIFEST_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/review.js" --output-file $ARGUMENTS --json)
 EXIT_CODE=$?
 echo "MANIFEST_FILE=$MANIFEST_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -159,10 +156,8 @@ Wait for the user's reply.
 - `yes` → **link verification (R14, issue #198) — HARD GATE.** Before `gh api … /comments`, validate every URL embedded in the consolidated review comment body via the shared link validator. The script reads the body from `--file` and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
 
   ```bash
-  LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | sort -V | tail -1)
-  [ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
-  [ -z "$LINKS_LIB" ] && { echo "ERROR: Could not locate scripts/lib/links.js. Is the sdlc plugin installed?" >&2; exit 2; }
-  node "$LINKS_LIB" --file "{comment_file}" --json
+  # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+  node "<PLUGIN_ROOT>/scripts/lib/links.js" --file "{comment_file}" --json
   LINK_EXIT=$?
   ```
 

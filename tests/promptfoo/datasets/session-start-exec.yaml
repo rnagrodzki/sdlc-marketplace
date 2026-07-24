@@ -134,3 +134,55 @@
       value: "Active pipeline: ship-sdlc on feat/execute-and-ship"
     - type: icontains
       value: "Active execution (post-compact): execute-plan-sdlc on feat/execute-and-ship"
+
+# ---------------------------------------------------------------------------
+# Fixes #485 — sdlc plugin root injected into session context so helper-script
+# resolvers can reference the plugin's own install instead of globbing
+# ~/.claude/plugins (which can pick a fixture/clone copy).
+# ---------------------------------------------------------------------------
+
+- description: "session-start: matcher=startup emits 'sdlc plugin root:' pointing at the real plugin install"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-config"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "startup"
+  assert:
+    - type: icontains
+      value: "sdlc plugin root: "
+    - type: icontains
+      value: "plugins/sdlc-utilities"
+    - type: not-icontains
+      value: "/tests/"
+    - type: not-icontains
+      value: "/marketplaces/"
+
+- description: "session-start: matcher=clear emits 'sdlc plugin root:' (same line as startup)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-config"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "clear"
+  assert:
+    - type: icontains
+      value: "sdlc plugin root: "
+    - type: icontains
+      value: "plugins/sdlc-utilities"
+
+- description: "session-start: matcher=compact emits 'sdlc plugin root:' (same line as startup/clear)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-commit-config"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "compact"
+  assert:
+    - type: icontains
+      value: "sdlc plugin root: "
+    - type: icontains
+      value: "plugins/sdlc-utilities"

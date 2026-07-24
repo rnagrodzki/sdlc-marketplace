@@ -37,14 +37,11 @@ If the system context contains "Plan mode is active":
 
 ### Step 0: Resolve and Run skill/version.js
 
-> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+> **Substitute `<PLUGIN_ROOT>`** with the absolute path from the `sdlc plugin root:` line in session context. Do not run `find`.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "version.js" -path "*/sdlc*/scripts/skill/version.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/version.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/version.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/version.js. Is the sdlc plugin installed?" >&2; exit 2; }
-
-VERSION_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+VERSION_CONTEXT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/version.js" --output-file $ARGUMENTS)
 EXIT_CODE=$?
 # Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM, so
 # the manifest is removed even if the release is cancelled or errors out.
@@ -275,29 +272,22 @@ Resolve any issues found in Step 6 before proceeding. If a blocking issue cannot
 Before executing, check whether the project's installed CI scripts need updating.
 This ensures projects that ran `--init` in a prior session get notified about improvements.
 
-Locate and run the scaffold script in check-only mode:
-
-```bash
-SCRIPT=$(find ~/.claude/plugins -name "scaffold-ci.js" -path "*/sdlc*/scripts/util/scaffold-ci.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/scaffold-ci.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/scaffold-ci.js"
-[ -z "$SCRIPT" ] && { echo "WARN: Could not locate util/scaffold-ci.js — skipping CI script check" >&2; exit 0; }
-```
-
 Run the check (include `--changelog` only when `config.changelog === true`).
 
 > **Why `config.changelog`, not `flags.changelog`, here?** Step 7.5 scaffolds *persistent* CI scripts that ship with the project; the relevant question is whether the project opts into changelog enforcement long-term, not whether `--changelog` was passed for this single release. This is the only legitimate post-CONSUME reference to `config.changelog` per spec R18 — every other site (Step 2 draft, Step 5 display, Step 8.2 write) gates on `flags.changelog`. Do not "fix" this divergence.
 
 ```bash
-SCAFFOLD_OUTPUT_FILE=$(node "$SCRIPT" --check-only --output-file)
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+SCAFFOLD_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/util/scaffold-ci.js" --check-only --output-file)
 # Add --changelog if config.changelog === true:
-# SCAFFOLD_OUTPUT_FILE=$(node "$SCRIPT" --check-only --changelog --output-file)
+# SCAFFOLD_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/util/scaffold-ci.js" --check-only --changelog --output-file)
 ```
 
 Read the JSON output. If any files have `action: "outdated"` or `action: "missing"`:
    - Show what changed and which files would be updated (use `installedVersion` / `currentVersion` from the output)
    - Use AskUserQuestion to ask: "Update CI scripts? (yes / no) — this does not block the release."
    - **Auto mode:** When `flags.auto` is true, skip the AskUserQuestion and treat the response as `yes` — update outdated CI scripts automatically.
-   - On `yes`: run `node "$SCRIPT" --force` (add `--changelog` if applicable) to overwrite the outdated files
+   - On `yes`: run `node "<PLUGIN_ROOT>/scripts/util/scaffold-ci.js" --force` (add `--changelog` if applicable) to overwrite the outdated files
    - On `no`: warn and continue with the release
 
 The release proceeds regardless of the user's answer. This is informational, not a gate.
@@ -315,11 +305,9 @@ The release proceeds regardless of the user's answer. This is informational, not
 3b. **Link verification (R17, issue #198) — HARD GATE.** Before `git commit`, validate every URL embedded in the staged CHANGELOG entry (and any release-notes body) via the shared link validator. The script reads the body via `--file` and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON. Skip this sub-step entirely when changelog is disabled and no release-notes body was generated.
 
    ```bash
-   LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | sort -V | tail -1)
-   [ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
-   [ -z "$LINKS_LIB" ] && { echo "ERROR: Could not locate scripts/lib/links.js. Is the sdlc plugin installed?" >&2; exit 2; }
+   # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
    # Validate the new CHANGELOG entry only (not the entire historical file).
-   printf '%s' "$new_changelog_entry" | node "$LINKS_LIB" --json
+   printf '%s' "$new_changelog_entry" | node "<PLUGIN_ROOT>/scripts/lib/links.js" --json
    LINK_EXIT=$?
    ```
 

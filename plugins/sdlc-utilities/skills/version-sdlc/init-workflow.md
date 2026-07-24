@@ -42,21 +42,16 @@ Options:
 On `yes` or `changelog`, write the version section to `.sdlc/config.json` using `writeSection` from lib/config.js with
 the content from `suggestedConfig` (adjusted if `changelog` was chosen).
 
-Then scaffold CI scripts and workflows using `scaffold-ci.js`:
-
-```bash
-SCRIPT=$(find ~/.claude/plugins -name "scaffold-ci.js" -path "*/sdlc*/scripts/util/scaffold-ci.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/scaffold-ci.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/scaffold-ci.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate util/scaffold-ci.js" >&2; exit 2; }
-```
+Then scaffold CI scripts and workflows using `scaffold-ci.js`.
 
 Run the scaffold (include `--changelog` when `config.changelog === true`):
 
 ```bash
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
 # Without changelog:
-SCAFFOLD_OUTPUT_FILE=$(node "$SCRIPT" --output-file)
+SCAFFOLD_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/util/scaffold-ci.js" --output-file)
 # With changelog:
-SCAFFOLD_OUTPUT_FILE=$(node "$SCRIPT" --changelog --output-file)
+SCAFFOLD_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/util/scaffold-ci.js" --changelog --output-file)
 ```
 
 Read the JSON output. For each file in the `files` array:
@@ -79,9 +74,10 @@ The check-changelog lines are only shown when `config.changelog === true`.
 **Version check** — after scaffolding, check if any installed files are outdated. Run the scaffold script again in check-only mode:
 
 ```bash
-CHECK_OUTPUT_FILE=$(node "$SCRIPT" --check-only --output-file)
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+CHECK_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/util/scaffold-ci.js" --check-only --output-file)
 # With changelog:
-CHECK_OUTPUT_FILE=$(node "$SCRIPT" --check-only --changelog --output-file)
+CHECK_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/util/scaffold-ci.js" --check-only --changelog --output-file)
 ```
 
 Read the JSON output. If any files have `action: "outdated"`:
@@ -93,7 +89,7 @@ Read the JSON output. If any files have `action: "outdated"`:
 Update these files? (yes / no)
 ```
 
-On `yes`, run `node "$SCRIPT" --force` (add `--changelog` if applicable) to overwrite the outdated files. On `no`, warn:
+On `yes`, run `node "<PLUGIN_ROOT>/scripts/util/scaffold-ci.js" --force` (add `--changelog` if applicable) to overwrite the outdated files. On `no`, warn:
 ```
 ⚠  Skipped update. Outdated CI scripts may miss bug fixes or new features.
 ```

@@ -35,14 +35,11 @@ If the system context contains "Plan mode is active":
 
 ### Step 0: Resolve and Run skill/commit.js
 
-> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+> **Substitute `<PLUGIN_ROOT>`** with the absolute path from the `sdlc plugin root:` line in session context. Do not run `find`.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "commit.js" -path "*/sdlc*/scripts/skill/commit.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/commit.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/commit.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/commit.js. Is the sdlc plugin installed?" >&2; exit 2; }
-
-COMMIT_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+COMMIT_CONTEXT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/commit.js" --output-file $ARGUMENTS)
 EXIT_CODE=$?
 # No EXIT trap: success-path manifest is persistent (.sdlc/execution/commit-<slug>-<ts>.json)
 # so it survives across separate Bash tool invocations. Error-path manifests still write to
@@ -218,10 +215,8 @@ Show `Amend:` instead of `Commit:` heading when `flags.amend` is true.
 1. **Link verification (issue #198, R12) — HARD GATE.** Before `git commit`, validate every URL embedded in the commit message body via the shared link validator. The script reads the body from stdin and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
 
    ```bash
-   LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | sort -V | tail -1)
-   [ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
-   [ -z "$LINKS_LIB" ] && { echo "ERROR: Could not locate scripts/lib/links.js. Is the sdlc plugin installed?" >&2; exit 2; }
-   printf '%s' "$message" | node "$LINKS_LIB" --json
+   # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+   printf '%s' "$message" | node "<PLUGIN_ROOT>/scripts/lib/links.js" --json
    LINK_EXIT=$?
    ```
 

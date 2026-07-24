@@ -1,6 +1,6 @@
 ---
 name: script-resolution
-description: "Reviews find-based script resolution and Glob-based reference lookup patterns in commands and skills for runtime correctness across installed and development contexts"
+description: "Reviews injected-path script resolution and Glob-based reference lookup patterns in commands and skills for runtime correctness across installed and development contexts"
 triggers:
   - "**/commands/*.md"
   - "**/skills/**/SKILL.md"
@@ -13,31 +13,28 @@ model: sonnet
 
 # Script Resolution Review
 
-Review the runtime script resolution and file reference lookup patterns embedded in command and skill markdown files. This project resolves Node.js helper scripts at runtime using `find ~/.claude/plugins ... | sort -V | tail -1` with a `find .` fallback. These patterns must work both when the plugin is installed via the Claude Code marketplace (`~/.claude/plugins/`) and when running directly from the repository. With multiple cached plugin versions present (e.g. `0.17.38` and `0.18.4` side-by-side under `~/.claude/plugins/cache/sdlc-marketplace/sdlc/`), filesystem-traversal order is non-deterministic — `sort -V | tail -1` does natural version ordering and always selects the newest semver. See #258.
+Review the runtime script resolution and file reference lookup patterns embedded in command and skill markdown files. This project resolves Node.js helper scripts at runtime from the plugin root injected into session context by the `SessionStart` hook — a stable `sdlc plugin root: <abs>` line emitted on `startup|clear|compact`. Skill bodies invoke scripts with the literal form `node "<PLUGIN_ROOT>/scripts/<subdir>/<script>.js"`, substituting `<PLUGIN_ROOT>` from that line. Because the hook that fired IS the active install, its root is the one correct target — no version ranking or `find` traversal is needed (the #258 multi-version-ambiguity concern is dissolved). Subagent prompt templates and orchestrator agent templates run in subagent context, where the injected line is ABSENT — no plugin-script resolver of any form belongs there; pass a pre-computed path in instead. Auto-approving this invocation form is a user-deployed recommendation, not something this checklist enforces: see `permissions.allow` in `settings.json` (documented in `plugins/sdlc-utilities/scripts/README.md` and `docs/plugin-installation.md`), never `SKILL.md` frontmatter.
 
 ## Checklist
 
-- [ ] Every script resolution uses the two-step pattern: `find ~/.claude/plugins` first, then static path fallback — the `find` step includes `-path "*/sdlc*/scripts/*"` to narrow scope to sdlc-utilities
-- [ ] The `-path` filter in the primary `find` uses `*/sdlc*/scripts/<script>.js` (or `*/sdlc*/lib/config.js` for config.js) — never bare `-name "script.js"` or a generic `*/scripts/*` filter that could match plugins outside sdlc-utilities
-- [ ] The script filename in `-name "script.js"` exactly matches the file as it exists in `plugins/*/scripts/` (case-sensitive, no typos, correct extension)
-- [ ] Every resolution block ends with a failure guard: `[ -z "$SCRIPT" ] && { echo "ERROR: ..."; exit 2; }` — no silent continuation with an empty `$SCRIPT`
-- [ ] The error message in the failure guard names the specific script and explains how to fix it (e.g., "Is the sdlc plugin installed?")
+- [ ] Every plugin-script invocation uses the injected-path form: `node "<PLUGIN_ROOT>/scripts/<subdir>/<script>.js"` — no `find ~/.claude/plugins` resolver, no `$SCRIPT` variable, no cached-version ranking, no `trap`
+- [ ] The block instructs the model to substitute `<PLUGIN_ROOT>` from the `sdlc plugin root:` line injected into session context by the `SessionStart` hook
+- [ ] The script path in `<PLUGIN_ROOT>/scripts/<subdir>/<script>.js` exactly matches the file as it exists in `plugins/*/scripts/` (case-sensitive, no typos, correct extension, correct subdirectory)
+- [ ] No resolver of any form (old `find`-based or the new injected-path form) appears in a subagent prompt template (`**/*-prompt.md`) or orchestrator agent template (`agents/*.md`) — the injected line is absent in subagent context, so any resolver there fails silently; pre-computed paths must be passed in instead
 - [ ] Glob-based reference file lookups (REFERENCE.md, EXAMPLES.md, agent definitions) use `path: ~/.claude` first and explicitly document a cwd fallback if not found
 - [ ] Glob patterns for reference file lookups are specific enough to match exactly one file — e.g., `**/review-sdlc/REFERENCE.md` not `**/REFERENCE.md`
-- [ ] No resolution pattern uses hardcoded absolute paths other than the conventional `~/.claude/plugins` prefix
-- [ ] When a skill re-resolves the same script in a later step (e.g., first in Step 2 for validation, then in Step 7 for execution), both resolution blocks use identical find patterns — no divergent logic for the same script
-- [ ] The `find` pipeline ends with `| sort -V | tail -1` — never bare `| head -1`. With multiple cached plugin versions, `head -1` picks a non-deterministic (possibly stale) version; `sort -V | tail -1` always selects the newest semver
+- [ ] No resolution pattern uses hardcoded absolute paths other than the `<PLUGIN_ROOT>` substitution described above
+- [ ] When a skill re-resolves the same script in a later step (e.g., first in Step 2 for validation, then in Step 7 for execution), both resolution blocks use the identical injected-path form — no divergent logic for the same script
 
 ## Severity Guide
 
 | Finding | Severity |
 |---------|----------|
-| Missing failure guard — script runs with empty `$SCRIPT` | high |
-| `find ~/.claude/plugins` without `-path "*/sdlc*/scripts/*"` — could match scripts from other plugins | high |
-| Script filename mismatch between resolution pattern and actual file | high |
+| `find ~/.claude/plugins` resolver used instead of the injected-path form — can silently select a fixture or marketplace-clone copy of the script | high |
+| Plugin-script resolver (old or new form) present in a subagent prompt template or orchestrator agent template — the injected line is absent there, so resolution fails silently | high |
+| Script path mismatch between resolution pattern and actual file | high |
+| Missing/incorrect instruction to substitute `<PLUGIN_ROOT>` from the `sdlc plugin root:` context line | medium |
 | Glob reference lookup pattern too broad — could match wrong file | medium |
 | Missing cwd fallback for Glob-based reference lookup | medium |
-| Error message in failure guard doesn't name the script or suggest a fix | medium |
 | Divergent resolution patterns for the same script across steps | medium |
-| Hardcoded absolute path other than `~/.claude/plugins` | medium |
-| Bare `| head -1` after `find ~/.claude/plugins` (no `sort -V | tail -1`) — picks an arbitrary cached version (#258) | high |
+| Hardcoded absolute path other than the `<PLUGIN_ROOT>` substitution | medium |

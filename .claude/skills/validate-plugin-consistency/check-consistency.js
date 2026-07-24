@@ -7,6 +7,14 @@
  * Rules checked:
  *   1. script-resolution-order  — all find patterns in skill files use plugins-first
  *                                 (~/.claude/plugins before CWD)
+ *   1b. script-resolution-version — plugin scripts must be resolved via the
+ *                                 injected-path form node "<PLUGIN_ROOT>/scripts/…"
+ *                                 (see #485). Any `find ~/.claude/plugins` resolver
+ *                                 is flagged as the buggy shape it replaces. Subagent
+ *                                 prompt templates (skills/**\/*-prompt.md) and
+ *                                 orchestrator agent templates (agents/*.md) must
+ *                                 contain NO plugin-script resolver at all — they run
+ *                                 without the injected plugin-root context.
  *   2. skill-runs-script        — skills paired with prepare scripts must contain
  *                                 the find+node resolution pattern themselves
  *                                 Pairings: review-prepare.js → review-sdlc,
@@ -104,6 +112,34 @@ function discoverScripts(root) {
   return listDir(dir).filter(f => f.endsWith('.js') && !listDir(path.join(dir, f)).length);
 }
 
+// Recursively collect files under dir whose name matches suffix (e.g. '-prompt.md').
+function walkForSuffix(dir, suffix, results) {
+  for (const entry of listDir(dir)) {
+    const full = path.join(dir, entry);
+    if (isDir(full)) {
+      walkForSuffix(full, suffix, results);
+    } else if (entry.endsWith(suffix)) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
+// Subagent prompt templates: plugins/sdlc-utilities/skills/**/*-prompt.md
+function discoverPromptTemplates(root) {
+  const dir = path.join(root, 'plugins/sdlc-utilities/skills');
+  return walkForSuffix(dir, '-prompt.md', []);
+}
+
+// Orchestrator agent templates: plugins/sdlc-utilities/agents/*.md
+function discoverOrchestratorTemplates(root) {
+  const dir = path.join(root, 'plugins/sdlc-utilities/agents');
+  return listDir(dir)
+    .filter(f => f.endsWith('.md'))
+    .map(f => path.join(dir, f))
+    .filter(f => isFile(f));
+}
+
 // ---------------------------------------------------------------------------
 // Skill–script pairings (skills-primary architecture)
 // ---------------------------------------------------------------------------
@@ -171,6 +207,24 @@ function containsNodeScriptCall(content) {
   return /node\s+["']?\$SCRIPT["']?/.test(content);
 }
 
+// Detect the old buggy resolver: a `find ~/.claude/plugins ...` line locating a
+// plugin script by name. Regardless of `sort -V`/`head -1`, this shape can select
+// a fixture/clone copy instead of the installed script (#485).
+function isFindPluginScriptLine(line) {
+  return line.includes('find ~/.claude/plugins') && line.includes('.js');
+}
+
+// Detect the new injected-path resolver form: node "<PLUGIN_ROOT>/scripts/…".
+function isInjectedPathResolverLine(line) {
+  return line.includes('<PLUGIN_ROOT>/scripts/');
+}
+
+// Any plugin-script resolver — old find form or new injected-path form. Forbidden
+// in subagent/orchestrator templates, which run without the injected root context.
+function isAnyPluginScriptResolverLine(line) {
+  return isFindPluginScriptLine(line) || isInjectedPathResolverLine(line);
+}
+
 // ---------------------------------------------------------------------------
 // Rules
 // ---------------------------------------------------------------------------
@@ -198,28 +252,57 @@ function checkScriptResolutionOrder(skills, findings) {
 
 /**
  * Rule 1b — script-resolution-version
- * Plugins-resolution `find ~/.claude/plugins ...` pipelines must end with
- * `| sort -V | tail -1` to deterministically pick the newest cached plugin
- * version. A bare `| head -1` returns the first path the directory walk
- * emits — filesystem-traversal order, not version order — and may resolve a
- * stale cached version. See #258.
+ * Plugin scripts must be resolved via the injected-path form —
+ * node "<PLUGIN_ROOT>/scripts/…" — where <PLUGIN_ROOT> is substituted from the
+ * `sdlc plugin root: <abs>` line the SessionStart hook injects into session
+ * context. The old `find ~/.claude/plugins ...` resolver (even with
+ * `| sort -V | tail -1`) can silently select a fixture or marketplace-clone
+ * copy of the script instead of the installed one. See #485.
+ *
+ * Subagent prompt templates (plugins/sdlc-utilities/skills/**\/*-prompt.md) and
+ * orchestrator agent templates (plugins/sdlc-utilities/agents/*.md) run in
+ * subagent context, where the `sdlc plugin root:` line is ABSENT — so ANY
+ * plugin-script resolver there (old find form or the injected-path form) fails
+ * silently. Both forms are forbidden in that surface.
  */
-function checkScriptResolutionVersionSelector(skills, findings) {
+function checkScriptResolutionVersionSelector(skills, projectRoot, findings) {
+  // Surface A: skill bodies — only the old find-based resolver is flagged; the
+  // injected-path form is the required replacement and is not an error here.
   for (const skill of skills) {
     const content = readFile(skill.file);
     if (!content) continue;
     const lines = content.split('\n');
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (!line.includes('find ~/.claude/plugins')) continue;
-      if (!line.includes('| head -1')) continue;
-      if (line.includes('| sort -V | tail -1')) continue;
+      if (!isFindPluginScriptLine(lines[i])) continue;
       findings.push({
         rule: 'script-resolution-version',
         severity: 'error',
         file: path.relative(process.cwd(), skill.file),
         line: i + 1,
-        message: "Script resolution uses 'head -1' which picks an arbitrary cached version. Use '| sort -V | tail -1' to select the newest semver. See #258.",
+        message: 'Script resolution uses \'find ~/.claude/plugins\' which can silently select a fixture or marketplace-clone copy of the script (#485). Use the injected-path form instead: node "<PLUGIN_ROOT>/scripts/…", substituting <PLUGIN_ROOT> from the \'sdlc plugin root:\' line in session context.',
+      });
+    }
+  }
+
+  // Surface B: subagent prompt templates + orchestrator agent templates — no
+  // plugin-script resolver of any form is allowed; the injected root line is
+  // absent in subagent context.
+  const subagentFiles = [
+    ...discoverPromptTemplates(projectRoot),
+    ...discoverOrchestratorTemplates(projectRoot),
+  ];
+  for (const file of subagentFiles) {
+    const content = readFile(file);
+    if (!content) continue;
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (!isAnyPluginScriptResolverLine(lines[i])) continue;
+      findings.push({
+        rule: 'script-resolution-version',
+        severity: 'error',
+        file: path.relative(process.cwd(), file),
+        line: i + 1,
+        message: 'Subagent/orchestrator template contains a plugin-script resolver. These run in subagent context where the \'sdlc plugin root:\' line is absent, so any resolver here (find-based or injected-path) fails silently. Pass a pre-computed path into the template instead.',
       });
     }
   }
@@ -526,7 +609,7 @@ function main() {
   const findings = [];
 
   checkScriptResolutionOrder(skills, findings);
-  checkScriptResolutionVersionSelector(skills, findings);
+  checkScriptResolutionVersionSelector(skills, projectRoot, findings);
   checkSkillRunsScript(skills, scriptNames, findings);
   checkSkillUsesMktemp(skills, scriptNames, findings);
   checkSkillChecksExitCode(skills, scriptNames, findings);

@@ -22,11 +22,8 @@ at the current plugin version is a no-op.
 Locate and run the enrichment script:
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "openspec-enrich.js" -path "*/sdlc*/scripts/util/openspec-enrich.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/openspec-enrich.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/util/openspec-enrich.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate util/openspec-enrich.js" >&2; exit 2; }
-
-PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file {REMOVE_FLAG} --project-root .)
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+PREPARE_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/util/openspec-enrich.js" --output-file {REMOVE_FLAG} --project-root .)
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"

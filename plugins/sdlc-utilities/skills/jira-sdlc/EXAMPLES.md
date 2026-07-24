@@ -126,9 +126,9 @@ mcp__atlassian__getTransitionsForJiraIssue({
 ### Phase 6 — Save cache
 
 ```bash
-# $SCRIPT is set by the Script Resolution Block in SKILL.md Step 0.
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
 # Write assembled cache JSON to disk via the prepare script (handles site-keyed path)
-cat << 'EOF' | node "$SCRIPT" --project PROJ --save
+cat << 'EOF' | node "<PLUGIN_ROOT>/scripts/skill/jira.js" --project PROJ --save
 {
   "cloudId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "siteUrl": "https://mycompany.atlassian.net",
@@ -424,10 +424,8 @@ mcp__atlassian__transitionJiraIssue({
 COMMENT_MD="Reviewed the implementation. Token refresh is working in staging. Ready for QA sign-off."
 
 # Step 2: Convert to ADF
-SCRIPT=$(find ~/.claude/plugins -name "markdown-to-adf.js" -path "*/sdlc*/scripts/lib/markdown-to-adf.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: markdown-to-adf.js not found"; exit 2; }
-ADF_JSON=$(echo "$COMMENT_MD" | node "$SCRIPT")
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+ADF_JSON=$(echo "$COMMENT_MD" | node "<PLUGIN_ROOT>/scripts/lib/markdown-to-adf.js")
 
 # Step 3: Post with ADF format
 mcp__atlassian__addCommentToJiraIssue({
@@ -446,10 +444,8 @@ mcp__atlassian__addCommentToJiraIssue({
 COMMENT_MD="## Root Cause Analysis\n\nThe blank page is caused by the SAML callback handler returning early when \`RelayState\` is empty.\n\n\`\`\`js\n// Before fix:\nif (!relayState) return; // silently drops the response\n\n// After fix:\nif (!relayState) relayState = '/dashboard';\n\`\`\`\n\n## Test Results\n\n| Browser | Status |\n|---------|--------|\n| Chrome  | Pass   |\n| Firefox | Pass   |\n| Safari  | Pass   |"
 
 # Step 2: Convert to ADF
-SCRIPT=$(find ~/.claude/plugins -name "markdown-to-adf.js" -path "*/sdlc*/scripts/lib/markdown-to-adf.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: markdown-to-adf.js not found"; exit 2; }
-ADF_JSON=$(echo -e "$COMMENT_MD" | node "$SCRIPT")
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+ADF_JSON=$(echo -e "$COMMENT_MD" | node "<PLUGIN_ROOT>/scripts/lib/markdown-to-adf.js")
 
 # Step 3: Post with ADF format
 mcp__atlassian__addCommentToJiraIssue({

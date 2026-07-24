@@ -60,14 +60,11 @@ required before any further work, including running the prepare script.
 
 ### Step 3 — Run the Prepare Script (main context)
 
-> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+> **Substitute `<PLUGIN_ROOT>`** with the absolute path from the `sdlc plugin root:` line in session context. Do not run `find`.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "error-report-prepare.js" -path "*/sdlc*/scripts/skill/error-report-prepare.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/error-report-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/error-report-prepare.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/error-report-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
-
-ERROR_CONTEXT_FILE=$(node "$SCRIPT" \
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+ERROR_CONTEXT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/error-report-prepare.js" \
   --skill "$SKILL_NAME" \
   --step "$STEP_NAME" \
   --operation "$OPERATION" \

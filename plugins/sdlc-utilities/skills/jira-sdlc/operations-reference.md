@@ -175,10 +175,8 @@ conditionally after Step 2 classifies the operation type.
    - After ADF conversion, walk commentBody.body[] and resolve every `low`-confidence marker
 
 4. Build payload — convert markdown to ADF and assemble:
-   SCRIPT=$(find ~/.claude/plugins -name "markdown-to-adf.js" -path "*/sdlc*/scripts/lib/markdown-to-adf.js" 2>/dev/null | sort -V | tail -1)
-   [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/lib/markdown-to-adf.js"
-   [ -z "$SCRIPT" ] && { echo "ERROR: markdown-to-adf.js not found"; exit 2; }
-   cat <<'COMMENT_MD' | node "$SCRIPT"
+   # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+   cat <<'COMMENT_MD' | node "<PLUGIN_ROOT>/scripts/lib/markdown-to-adf.js"
    <markdown text>
    COMMENT_MD
    Final shape: { cloudId, issueIdOrKey, commentBody: <ADF JSON>, contentFormat: "adf",
@@ -233,7 +231,7 @@ conditionally after Step 2 classifies the operation type.
    - Call mcp__atlassian__lookupJiraAccountId({ cloudId, query: "<name or email>" })
    - If multiple results: show all and ask user to confirm which one
    - Once confirmed: save to cache via:
-     echo '{"<displayName>":"<accountId>"}' | node "$SCRIPT" --project "$KEY" --save-field userMappings
+     echo '{"<displayName>":"<accountId>"}' | node "<PLUGIN_ROOT>/scripts/skill/jira.js" --project "$KEY" --save-field userMappings
 
 3. Call mcp__atlassian__editJiraIssue({
      cloudId, issueKey,

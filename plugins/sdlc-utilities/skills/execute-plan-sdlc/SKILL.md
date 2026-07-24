@@ -55,12 +55,11 @@ Blocking issues → stop and ask. Warnings only → show them and proceed.
 
 **Guardrail loading:** Load execution guardrails from project config:
 
-> **VERBATIM** — Run this bash block exactly as written.
+> Substitute `<PLUGIN_ROOT>` with the absolute path from the `sdlc plugin root:` line in session context. Do not run `find`.
 
 ```bash
-SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
-[ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
-[ -z "$SCRIPT_DIR" ] && { echo "[]"; exit 0; }
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+SCRIPT_DIR="<PLUGIN_ROOT>/scripts/lib"
 node -e "
 const { readSection } = require('$SCRIPT_DIR/config.js');
 try {
@@ -156,10 +155,9 @@ When ship-sdlc invokes execute-plan-sdlc inside the ship pipeline, `--branch` is
    - **`branch`** — cwd is the main worktree AND the current branch IS the default branch. Derive a feature-branch name and run `git checkout -b`:
 
      ```bash
-     SDLC_LIB=$(find ~/.claude/plugins -name "branch-name.js" -path "*/sdlc*/scripts/lib/branch-name.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
-     [ -z "$SDLC_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/branch-name.js" ] && SDLC_LIB="plugins/sdlc-utilities/scripts/lib"
-     SDLC_LIB_CONFIG=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/scripts/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
-     [ -z "$SDLC_LIB_CONFIG" ] && SDLC_LIB_CONFIG="$SDLC_LIB"
+     # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+     SDLC_LIB="<PLUGIN_ROOT>/scripts/lib"
+     SDLC_LIB_CONFIG="<PLUGIN_ROOT>/scripts/lib"
      EXECUTE_NEW_BRANCH=$(node -e "
        const {resolveBranchName}=require('$SDLC_LIB/branch-name');
        const {readSection,resolveSdlcRoot}=require('$SDLC_LIB_CONFIG/config');
@@ -412,10 +410,9 @@ The wave-runner Agent handles in-wave per-task fan-out internally — it dispatc
 0. **Parse `WAVE_SUMMARY` via `lib/wave-summary.js` (R-BOUNDED-RETURN, R-CONTEXT_OVERFLOW, #432):** Call `parseWaveSummary(text, dispatchedIds)` in a brief inline Node.js block, where `text` is the wave-runner's full response and `dispatchedIds` is the array of task IDs sent in the manifest:
 
    ```bash
-   LIB=$(find ~/.claude/plugins -name "wave-summary.js" -path "*/sdlc*/scripts/lib/wave-summary.js" 2>/dev/null | sort -V | tail -1)
-   [ -z "$LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/wave-summary.js" ] && LIB="plugins/sdlc-utilities/scripts/lib/wave-summary.js"
+   # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
    PARSE_RESULT=$(node -e "
-   const { parseWaveSummary } = require('$LIB');
+   const { parseWaveSummary } = require('<PLUGIN_ROOT>/scripts/lib/wave-summary.js');
    const text = require('fs').readFileSync('/dev/stdin','utf8');
    const dispatched = JSON.parse(process.env.DISPATCHED_IDS || '[]');
    const r = parseWaveSummary(text, dispatched);
@@ -563,8 +560,8 @@ The progress report is rendered from `WAVE_SUMMARY` payload — per-task names, 
 
 **State persistence:** After each wave completes, update the execution state via `state/execute.js`. Locate the script:
 ```bash
-STATE_SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/execute.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$STATE_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/execute.js" ] && STATE_SCRIPT="plugins/sdlc-utilities/scripts/state/execute.js"
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+STATE_SCRIPT="<PLUGIN_ROOT>/scripts/state/execute.js"
 ```
 
 On the very first wave dispatch, initialize the state file:
@@ -593,12 +590,10 @@ Algorithm:
    - Otherwise, look up the `openspec-task` block for any one sibling (all siblings share `change`/`ref`/`line`/`title`) and call `markTaskDone(change, ref, { line, title })` via inline Node.js:
 
      ```bash
-     LIB=$(find ~/.claude/plugins -name "openspec.js" -path "*/sdlc*/scripts/lib/openspec.js" 2>/dev/null | sort -V | tail -1)
-     [ -z "$LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/openspec.js" ] && LIB="plugins/sdlc-utilities/scripts/lib/openspec.js"
-     [ -z "$LIB" ] && { echo "ERROR: Could not locate openspec.js. Is the sdlc plugin installed?" >&2; exit 2; }
+     # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
      # Pass arguments as env vars to avoid shell injection from LLM-generated task titles
      # (titles may contain ", `, $(...), or newlines that would break inline interpolation).
-     OPENSPEC_LIB="$LIB" \
+     OPENSPEC_LIB="<PLUGIN_ROOT>/scripts/lib/openspec.js" \
      OPENSPEC_CHANGE='<change>' \
      OPENSPEC_REF='<ref>' \
      OPENSPEC_LINE='<line>' \
@@ -898,13 +893,11 @@ If `openspecSpecs` was loaded in Step 1 (the plan was OpenSpec-sourced), also su
    - `openspec validate --strict <change>` — validate change spec files structurally
    - `openspec archive <change> --yes` — archive the OpenSpec change and merge delta specs after validation passes
 4. **If `ok === true`:** apply the tasks.md coverage gate (implements R38 — Fixes #414) before emitting the suggestion:
-   - Re-parse `openspec/changes/<name>/tasks.md` via `lib/openspec.js::parseTasks` using the same `$LIB` resolution + failure-guard + env-var contract as the `markTaskDone` block in Step 5d-bis:
+   - Re-parse `openspec/changes/<name>/tasks.md` via `lib/openspec.js::parseTasks` using the same injected `<PLUGIN_ROOT>` path + env-var contract as the `markTaskDone` block in Step 5d-bis:
 
      ```bash
-     LIB=$(find ~/.claude/plugins -name "openspec.js" -path "*/sdlc*/scripts/lib/openspec.js" 2>/dev/null | sort -V | tail -1)
-     [ -z "$LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/openspec.js" ] && LIB="plugins/sdlc-utilities/scripts/lib/openspec.js"
-     [ -z "$LIB" ] && { echo "ERROR: Could not locate openspec.js. Is the sdlc plugin installed?" >&2; exit 2; }
-     OPENSPEC_LIB="$LIB" \
+     # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+     OPENSPEC_LIB="<PLUGIN_ROOT>/scripts/lib/openspec.js" \
      OPENSPEC_TASKS_PATH="openspec/changes/<name>/tasks.md" \
      node -e "
      const fs = require('fs');

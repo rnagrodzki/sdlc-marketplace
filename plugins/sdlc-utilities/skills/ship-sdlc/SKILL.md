@@ -16,13 +16,11 @@ End-to-end feature shipping: execute plan, commit, review, fix critical issues, 
 
 If the system context contains "Plan mode is active":
 
-1. Locate `skill/ship.js` (same `find` pattern used in Step 1c below).
+1. Locate `skill/ship.js` via the injected plugin root (same form as Step 1c below).
 2. Invoke:
    ```bash
-   SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | sort -V | tail -1)
-   [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
-   [ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
-   PLAN_MODE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --plan-mode-blocked $ARGUMENTS)
+   # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+   PLAN_MODE_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/ship.js" --output-file --plan-mode-blocked $ARGUMENTS)
    PLAN_MODE_EXIT=$?
    echo "PLAN_MODE_OUTPUT_FILE=$PLAN_MODE_OUTPUT_FILE"
    echo "PLAN_MODE_EXIT=$PLAN_MODE_EXIT"
@@ -70,11 +68,8 @@ If not found: `No ship config found — using built-in defaults. Run /setup-sdlc
 
 Locate and run `skill/ship.js` with all CLI flags to pre-compute flags, context, and step statuses:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/skill/ship.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/ship.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/ship.js. Is the sdlc plugin installed?" >&2; exit 2; }
-
-PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file --has-plan --auto)
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+PREPARE_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/ship.js" --output-file --has-plan --auto)
 # Hook signal: if the session-start system-reminder contains a line matching
 # `/^Active pipeline: ship-sdlc/`, ALSO append `--hook-active-pipeline` to the
 # invocation above. When no state file is found, prepare emits
@@ -368,13 +363,9 @@ ship-sdlc surfaces live pipeline progress in the Claude Code task tray via main-
 **Helper resolution (run once at Step 5 entry):**
 
 ```bash
-SHIP_TODOS=$(find ~/.claude/plugins -name "ship-todos.js" -path "*/sdlc*/scripts/lib/ship-todos.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SHIP_TODOS" ] && [ -f "plugins/sdlc-utilities/scripts/lib/ship-todos.js" ] && SHIP_TODOS="plugins/sdlc-utilities/scripts/lib/ship-todos.js"
-[ -z "$SHIP_TODOS" ] && { echo "ERROR: ship-todos.js not found"; exit 2; }
-
-STATE_SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/state/ship.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$STATE_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/ship.js" ] && STATE_SCRIPT="plugins/sdlc-utilities/scripts/state/ship.js"
-[ -z "$STATE_SCRIPT" ] && { echo "ERROR: state/ship.js not found"; exit 2; }
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+SHIP_TODOS="<PLUGIN_ROOT>/scripts/lib/ship-todos.js"
+STATE_SCRIPT="<PLUGIN_ROOT>/scripts/state/ship.js"
 ```
 
 **Setup (one-time, BEFORE the Step 5 dispatch loop, only when `flags.steps.length >= 2`):**
@@ -428,9 +419,8 @@ The default-branch warning emitted by the prepare script is **advisory** (a pref
 When not resuming, consume the derived workspace and act:
 
 ```bash
-SDLC_LIB=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/scripts/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs -I {} dirname {})
-[ -z "$SDLC_LIB" ] && [ -d "plugins/sdlc-utilities/scripts/lib" ] && SDLC_LIB="plugins/sdlc-utilities/scripts/lib"
-[ -z "$SDLC_LIB" ] && { echo "ERROR: Could not locate scripts/lib (config.js). Is the sdlc plugin installed?" >&2; exit 2; }
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+SDLC_LIB="<PLUGIN_ROOT>/scripts/lib"
 
 # Read the derived workspace from flags.workspace (R60, #451) — NOT context.workspace (no such field).
 WORKSPACE=$(F="$PREPARE_OUTPUT_FILE" node -e "const d=JSON.parse(require('fs').readFileSync(process.env.F,'utf8'));process.stdout.write((d.flags&&d.flags.workspace)||'continue')")
@@ -448,11 +438,11 @@ if [ "$WORKSPACE" = "branch" ]; then
 
   # Step 2: Pre-execute ship state migration (R37) — runs in the main worktree cwd,
   # BEFORE branch creation, so `state/ship.js read` still resolves the OLD slug filename.
-  # $SCRIPT is resolved above in the workspace block (find ~/.claude/plugins … state/ship.js).
-  STATE_BRANCH=$(node "$SCRIPT" read 2>/dev/null | node -e "process.stdin.on('data',d=>{try{process.stdout.write(JSON.parse(d).branch||'')}catch(_){}})")
+  # state/ship.js is referenced by its <PLUGIN_ROOT> injected-path form below.
+  STATE_BRANCH=$(node "<PLUGIN_ROOT>/scripts/state/ship.js" read 2>/dev/null | node -e "process.stdin.on('data',d=>{try{process.stdout.write(JSON.parse(d).branch||'')}catch(_){}})")
   if [ -n "$STATE_BRANCH" ] && [ "$EXECUTE_BRANCH" != "$STATE_BRANCH" ]; then
     FROM_SLUG=$(echo "$STATE_BRANCH" | sed 's|[^a-zA-Z0-9-]|-|g')
-    result=$(node "$SCRIPT" migrate --from "$FROM_SLUG" --to "$EXECUTE_BRANCH" 2>&1)
+    result=$(node "<PLUGIN_ROOT>/scripts/state/ship.js" migrate --from "$FROM_SLUG" --to "$EXECUTE_BRANCH" 2>&1)
     echo "State migrated: $FROM_SLUG → $EXECUTE_BRANCH"
   fi
 
@@ -504,10 +494,8 @@ node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan-file "$PLAN_FILE" --event e
 Then dispatch `execute-plan-sdlc` as below. On Agent return (success), run the post-execution completeness invariant **before** marking the step complete (R-INVARIANT-COMPLETENESS, #432):
 
 ```bash
-EXECUTE_STATE_SCRIPT=$(find ~/.claude/plugins -name "execute.js" -path "*/sdlc*/scripts/state/execute.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$EXECUTE_STATE_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/execute.js" ] && EXECUTE_STATE_SCRIPT="plugins/sdlc-utilities/scripts/state/execute.js"
-[ -z "$EXECUTE_STATE_SCRIPT" ] && { echo "ERROR: Cannot locate execute.js — completeness gate cannot run." >&2; exit 2; }
-node "$EXECUTE_STATE_SCRIPT" verify-completeness
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+node "<PLUGIN_ROOT>/scripts/state/execute.js" verify-completeness
 COMPLETENESS_EXIT=$?
 if [ "$COMPLETENESS_EXIT" -ne 0 ]; then
   echo "ERROR: execute-plan-sdlc returned but planned tasks are unaccounted. Pipeline halted." >&2
@@ -565,13 +553,9 @@ After the version step dispatches and returns, capture the new tag from the vers
 
 ```bash
 # Post-version ancestry HARD GATE
-VERIFY_SCRIPT=$(find ~/.claude/plugins -name "verify-tag-ancestry.js" -path "*/sdlc*/scripts/util/verify-tag-ancestry.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$VERIFY_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js" ] && VERIFY_SCRIPT="plugins/sdlc-utilities/scripts/util/verify-tag-ancestry.js"
-if [ -z "$VERIFY_SCRIPT" ]; then
-  echo "WARNING: verify-tag-ancestry.js not found — post-version ancestry check skipped." >&2
-fi
-if [ -n "$VERIFY_SCRIPT" ] && [ -n "$NEW_TAG" ] && [ -n "$EXECUTE_BRANCH" ]; then
-  node "$VERIFY_SCRIPT" --tag "$NEW_TAG" --branch "$EXECUTE_BRANCH" --remote origin
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+if [ -n "$NEW_TAG" ] && [ -n "$EXECUTE_BRANCH" ]; then
+  node "<PLUGIN_ROOT>/scripts/util/verify-tag-ancestry.js" --tag "$NEW_TAG" --branch "$EXECUTE_BRANCH" --remote origin
   ANCESTRY_EXIT=$?
   if [ "$ANCESTRY_EXIT" -ne 0 ]; then
     echo "Pipeline halted: tag $NEW_TAG is not an ancestor of $EXECUTE_BRANCH." >&2
@@ -596,9 +580,8 @@ If `step.status === 'will_run'` for the `verify-openspec` step (sourced from pre
 
 2. Locate the openspec library:
    ```bash
-   OPENSPEC_LIB=$(find ~/.claude/plugins -name "openspec.js" -path "*/sdlc*/scripts/lib/openspec.js" 2>/dev/null | sort -V | tail -1)
-   [ -z "$OPENSPEC_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/openspec.js" ] && OPENSPEC_LIB="plugins/sdlc-utilities/scripts/lib/openspec.js"
-   [ -z "$OPENSPEC_LIB" ] && { echo "ERROR: Could not locate scripts/lib/openspec.js. Is the sdlc plugin installed?" >&2; exit 2; }
+   # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+   OPENSPEC_LIB="<PLUGIN_ROOT>/scripts/lib/openspec.js"
    ```
 
 3. Run structural validation (synchronous call — no `.then`). Pass values via environment to avoid shell injection; keep stdout clean (no `2>&1`):
@@ -657,9 +640,8 @@ If the `verify-pipeline` step has `status: "will_run"` (gated by step membership
 
 1. Resolve the script path:
    ```bash
-   VP_SCRIPT=$(find ~/.claude/plugins -name "verify-pipeline.js" -path "*/sdlc*/scripts/skill/verify-pipeline.js" 2>/dev/null | sort -V | tail -1)
-   [ -z "$VP_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/verify-pipeline.js" ] && VP_SCRIPT="plugins/sdlc-utilities/scripts/skill/verify-pipeline.js"
-   [ -z "$VP_SCRIPT" ] && { echo "ERROR: Could not locate skill/verify-pipeline.js. Is the sdlc plugin installed?" >&2; exit 2; }
+   # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+   VP_SCRIPT="<PLUGIN_ROOT>/scripts/skill/verify-pipeline.js"
    ```
 2. Run the script with the args from `step.args` plus `--state-file <ship-state-path>`:
    ```bash
@@ -695,9 +677,8 @@ If the `await-remote-review` step has `status: "will_run"` (gated by step member
 
 1. Resolve the script path:
    ```bash
-   AR_SCRIPT=$(find ~/.claude/plugins -name "await-remote-review.js" -path "*/sdlc*/scripts/skill/await-remote-review.js" 2>/dev/null | sort -V | tail -1)
-   [ -z "$AR_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/await-remote-review.js" ] && AR_SCRIPT="plugins/sdlc-utilities/scripts/skill/await-remote-review.js"
-   [ -z "$AR_SCRIPT" ] && { echo "ERROR: Could not locate skill/await-remote-review.js. Is the sdlc plugin installed?" >&2; exit 2; }
+   # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+   AR_SCRIPT="<PLUGIN_ROOT>/scripts/skill/await-remote-review.js"
    ```
 2. Run the script with the args from `step.args` plus `--state-file <ship-state-path>`:
    ```bash
@@ -796,8 +777,8 @@ Note: in a worktree, all of this is safe — main working tree is untouched.
 
 After each step, update pipeline state via `state/ship.js`. Locate the script:
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "ship.js" -path "*/sdlc*/scripts/state/ship.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/state/ship.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/state/ship.js"
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+SCRIPT="<PLUGIN_ROOT>/scripts/state/ship.js"
 ```
 
 At pipeline start (after Step 1 completes), initialize the state file:

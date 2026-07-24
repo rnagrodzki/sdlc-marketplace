@@ -24,10 +24,11 @@ Claude Code scans ~/.claude/plugins/ for plugin.json files
 Registers user-invocable skills in the / menu (e.g. /pr-sdlc)
 Loads skill descriptions for auto-invocation matching
 Attaches hooks from hooks.json
+SessionStart hook injects "sdlc plugin root: <abs>" into session context
     │
     ▼  Runtime (e.g. /pr-sdlc)
-Skill uses find to locate helper scripts:
-  find ~/.claude/plugins -name "pr-prepare.js"
+Skill substitutes <PLUGIN_ROOT> from that context line and invokes the script directly:
+  node "<PLUGIN_ROOT>/scripts/pr-prepare.js"
 ```
 
 ---
@@ -106,11 +107,12 @@ After installation, Claude Code can discover and load the plugin on next session
 
 ## On-Disk Layout
 
-After installation, the plugin's files live under `~/.claude/plugins/cache/`. Scripts
-are found at runtime using:
+After installation, the plugin's files live under `~/.claude/plugins/cache/`. At runtime,
+skills invoke scripts directly using the plugin root injected into session context (see
+[Script Resolution at Runtime](#script-resolution-at-runtime)):
 
 ```bash
-find ~/.claude/plugins -name "<script>.js"
+node "<PLUGIN_ROOT>/scripts/<script>.js"
 ```
 
 The full path includes marketplace, plugin name, and version:
@@ -128,7 +130,7 @@ The full path includes marketplace, plugin name, and version:
             │   └── review-sdlc/
             │       └── SKILL.md       # Invoked as /review-sdlc
             ├── scripts/
-            │   ├── pr-prepare.js      # Helper scripts (found at runtime via find)
+            │   ├── pr-prepare.js      # Helper scripts (invoked via <PLUGIN_ROOT>, see below)
             │   └── lib/
             ├── hooks/
             │   └── hooks.json
@@ -138,9 +140,9 @@ The full path includes marketplace, plugin name, and version:
 
 Example actual path: `~/.claude/plugins/cache/sdlc-marketplace/sdlc/0.8.1/scripts/pr-prepare.js`
 
-Because scripts are nested 4 levels deep under `~/.claude/plugins/`, a recursive
-`find` (without `-path` filters) is required — path-based filtering is fragile and
-unnecessary since script names are unique within the plugin.
+Because the `SessionStart` hook computes and injects this path directly (see
+[Script Resolution at Runtime](#script-resolution-at-runtime)), skills never need to search
+this tree at runtime — the four-level nesting above is invisible to skill authors.
 
 ---
 
@@ -231,27 +233,58 @@ Then restart Claude Code and reinstall:
 
 ## Script Resolution at Runtime
 
-Skills own script resolution — they locate and run helper scripts themselves using this
-two-step pattern:
+Skills own script resolution — they invoke helper scripts directly using the injected-path
+form. The `SessionStart` hook (`hooks/session-start.js`) computes the plugin root as
+`path.resolve(__dirname, '..')` and emits it into session context as a stable line on
+`startup`, `clear`, and `compact` (the line survives context compaction):
 
-```bash
-# Step 1: Search installed plugin (recursive find — scripts are 4 levels deep under cache/)
-SCRIPT=$(find ~/.claude/plugins -name "pr-prepare.js" 2>/dev/null | sort -V | tail -1)
-
-# Step 2: Fall back to the repository tree (for development / testing)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/pr-prepare.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/pr-prepare.js"
-
-# Step 3: Hard error if not found
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate pr-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+```text
+sdlc plugin root: /Users/you/.claude/plugins/cache/sdlc-marketplace/sdlc/0.21.18
 ```
 
-**Why `find` without `-path`?** Scripts are nested 4 levels deep (`cache/<marketplace>/<plugin>/<version>/scripts/`). The `-path "*/scripts/*"` filter that was previously used is fragile — LLMs paraphrase it and silently drop the glob wildcards. Since script names are unique within the plugin, `-name` alone is sufficient.
+Skill bodies substitute `<PLUGIN_ROOT>` from that line and invoke the script directly:
 
-**Why the direct-path CWD fallback?** Allows contributors working in the `sdlc-marketplace`
-repository to run commands directly without installing the plugin globally. The fallback
-uses a literal `[ -f "..." ]` check with no globbing — impossible to corrupt.
+```bash
+node "<PLUGIN_ROOT>/scripts/pr-prepare.js"
+```
+
+**Why no search?** The hook that fired IS the active install, so its own root is by
+construction the one correct target. Earlier versions of this pattern recursively searched
+`~/.claude/plugins` and ranked whichever cached versions it found to pick the newest one
+(#258). That ranking is no longer needed — there is nothing left to rank, because the firing
+hook's root already identifies the active install directly.
+
+**If the context line is missing** (e.g. a session predating this hook, or context that was
+never refreshed), fall back to the repository-relative path when developing inside this repo —
+`plugins/sdlc-utilities/scripts/pr-prepare.js`. This fallback is for local development only; it
+is not part of the primary allowlistable command below.
 
 **Why skills?** Skills are the primary entry point in the skills-primary model. Skills add a `VERBATIM` directive before each bash block, reducing the risk of LLM paraphrasing breaking script resolution. Skills also own argument parsing and preparation directly.
+
+### Auto-approving script invocations
+
+Claude Code prompts for approval before running a `Bash` command unless a matching rule
+exists in `permissions.allow`. To auto-approve the injected-path invocation form, add a rule
+to `settings.json` — user-level `~/.claude/settings.json`, project-level `.claude/settings.json`,
+or `.claude/settings.local.json` for a personal override. This is **not** a `SKILL.md`
+frontmatter field (`allowed-tools` is not a valid frontmatter field in this project) — a
+plugin cannot write the user's settings files, so this rule is a documented recommendation
+you deploy yourself:
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(node \"*/scripts/*.js\"*)"]
+  }
+}
+```
+
+Claude Code Bash permission rules support `*` wildcards anywhere in the pattern, not only as
+a trailing suffix. This single rule matches the literal `node "` prefix, any path down to a
+`scripts/` directory — covering both the installed cache path
+(`~/.claude/plugins/cache/sdlc-marketplace/sdlc/<version>/scripts/...`) and the repository
+path used during local development (`plugins/sdlc-utilities/scripts/...`) — any `.js` script
+name, and any trailing arguments.
 
 ---
 

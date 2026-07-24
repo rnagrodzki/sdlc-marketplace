@@ -91,12 +91,11 @@ The `## Deviations & assumptions` section (implements R47) is a required top-of-
 
 **Context detection and guardrail loading (skill/plan.js):**
 
-> **VERBATIM** — Run this bash block exactly as written.
+> Substitute `<PLUGIN_ROOT>` with the absolute path from the `sdlc plugin root:` line in session context. Do not run `find`.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan.js"
-[ -z "$SCRIPT" ] && { echo "{}"; exit 0; }
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+SCRIPT="<PLUGIN_ROOT>/scripts/skill/plan.js"
 
 PLAN_OUTPUT_FILE=$(node "$SCRIPT" --output-file)
 EXIT_CODE=$?
@@ -153,13 +152,12 @@ Naming convention: `YYYY-MM-DD-<feature-name>.md`. Create the directory if neede
 - **Consume-then-delete** — the Stop hook reads `planIntegrity` markers, evaluates the gates, then unlinks the marker regardless of outcome (single-shot semantics). Subsequent Stop events on the same branch fall through to the transcript-fallback path — this is correct R21 behavior.
 - **GC orphan sweep** — `ship-sdlc --gc` and `execute-plan-sdlc --gc` sweep stale `plan-*` markers (TTL-expired or branch-deleted) alongside `ship-*` and `execute-*` files; the JSON output includes a `plan` bucket alongside `ship` and `execute`.
 
-Each `--mark` block re-resolves `$SCRIPT` independently: SKILL.md bash blocks each run as a separate Bash tool invocation, so shell variables do NOT persist across blocks.
+Each `--mark` block references `plan.js` by its injected `<PLUGIN_ROOT>` path independently: SKILL.md bash blocks each run as a separate Bash tool invocation, so shell variables do NOT persist across blocks.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan.js"
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
 # writes planIntegrity marker consumed by stop-plan-integrity Stop hook (issue #285)
-[ -n "$SCRIPT" ] && node "$SCRIPT" --mark plan-file --path "<resolved-plan-path>" 2>/dev/null || true
+node "<PLUGIN_ROOT>/scripts/skill/plan.js" --mark plan-file --path "<resolved-plan-path>" 2>/dev/null || true
 ```
 
 Replace `<resolved-plan-path>` with the actual absolute path: in plan mode it is the designated plan file path extracted at the top of Step 0; in normal mode it is the path resolved above (from `plansDirectory` or the default fallback).
@@ -413,19 +411,17 @@ Note every issue from `allIssues`. Do NOT write to the plan file in this step.
 **JOIN barrier — `guardrailsEvaluated` (implements R20, R35, issue #285):** After the guardrail-compliance lane (lanes[3]) result is incorporated into the merged issue list, record the checkpoint. **Do NOT write this marker before lanes[3] returns.**
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan.js"
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
 # writes planIntegrity marker consumed by stop-plan-integrity Stop hook (issue #285)
-[ -n "$SCRIPT" ] && node "$SCRIPT" --mark guardrailsEvaluated 2>/dev/null || true
+node "<PLUGIN_ROOT>/scripts/skill/plan.js" --mark guardrailsEvaluated 2>/dev/null || true
 ```
 
 **JOIN barrier — `critiqueRan` (implements R20, R35, issue #285):** After ALL five lanes have returned and the merged issue list is complete (including G17/lanes[4] findings parsed into `g17Findings`), record the checkpoint. **Do NOT write this marker until all five lanes have returned.** This extends the existing G17 join semantics to every lane.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "plan.js" -path "*/sdlc*/scripts/skill/plan.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan.js"
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
 # writes planIntegrity marker consumed by stop-plan-integrity Stop hook (issue #285)
-[ -n "$SCRIPT" ] && node "$SCRIPT" --mark critiqueRan 2>/dev/null || true
+node "<PLUGIN_ROOT>/scripts/skill/plan.js" --mark critiqueRan 2>/dev/null || true
 ```
 
 ## Step 4 (IMPROVE): Revise Plan and Present for Approval
@@ -533,10 +529,8 @@ If this is the 3rd iteration, use AskUserQuestion to surface remaining issues in
 After the reviewer loop converges (or the user resolves remaining issues), validate every URL embedded in the finalized plan file via the shared link validator. The script reads the plan content from stdin and auto-derives `expectedRepo` from `parseRemoteOwner(cwd)` and `jiraSite` from `~/.sdlc-cache/jira/` — the skill MUST NOT construct ctx JSON.
 
 ```bash
-LINKS_LIB=$(find ~/.claude/plugins -name "links.js" -path "*/sdlc*/scripts/lib/links.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$LINKS_LIB" ] && [ -f "plugins/sdlc-utilities/scripts/lib/links.js" ] && LINKS_LIB="plugins/sdlc-utilities/scripts/lib/links.js"
-[ -z "$LINKS_LIB" ] && { echo "ERROR: Could not locate scripts/lib/links.js. Is the sdlc plugin installed?" >&2; exit 2; }
-node "$LINKS_LIB" --file "$plan_path" --json
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+node "<PLUGIN_ROOT>/scripts/lib/links.js" --file "$plan_path" --json
 LINK_EXIT=$?
 ```
 
@@ -560,14 +554,12 @@ After link verification passes, run the deterministic plan format validator. PF9
 Substitute the correct value into the block below before running it; `${FINAL_FLAG:+--final}` expands to `--final` only when `FINAL_FLAG` is non-empty, and to nothing otherwise (no word-splitting, no empty positional argument).
 
 ```bash
-VALIDATOR=$(find ~/.claude/plugins -name "validate-plan-format.js" -path "*/sdlc*/scripts/ci/validate-plan-format.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$VALIDATOR" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-plan-format.js" ] && VALIDATOR="plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
-[ -z "$VALIDATOR" ] && { echo "ERROR: Could not locate scripts/ci/validate-plan-format.js. Is the sdlc plugin installed?" >&2; exit 2; }
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
 # FINAL_FLAG is set above from the Step 0 routing branch THIS run took:
 #   "--final" for a full-pipeline plan (Step 5 ran → scorecard expected),
 #   ""        for a lightweight plan (Step 5 skipped → PF9 not applied).
 # It is NOT derived from scorecard presence (that would make PF9 circular).
-node "$VALIDATOR" ${FINAL_FLAG:+--final} --markdown --file "$plan_path"
+node "<PLUGIN_ROOT>/scripts/ci/validate-plan-format.js" ${FINAL_FLAG:+--final} --markdown --file "$plan_path"
 FORMAT_EXIT=$?
 ```
 
@@ -584,9 +576,8 @@ On zero exit, proceed to Step 7.
 **Context-heaviness advisory (implements R17):** Before printing either branch below, locate and run the advisory wrapper. If it prints text, prepend that text verbatim to the handoff menu (above the `ship` / `execute` / `done` lines). If it prints nothing, skip the prepend.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "plan-handoff-advisory.js" -path "*/sdlc*/scripts/skill/plan-handoff-advisory.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/plan-handoff-advisory.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/plan-handoff-advisory.js"
-[ -n "$SCRIPT" ] && node "$SCRIPT"
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+node "<PLUGIN_ROOT>/scripts/skill/plan-handoff-advisory.js"
 ```
 
 The wrapper reads `$TMPDIR/sdlc-context-stats.json` (written by the `UserPromptSubmit` hook `hooks/context-stats.js`) and emits a `/compact` advisory only when transcript ≥60% of model budget. Pipeline state is preserved across `/compact` (PreCompact + SessionStart hooks), so re-invoking after compaction is safe.

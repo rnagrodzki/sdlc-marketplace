@@ -155,20 +155,13 @@ Build the final block:
 - `llm` → `{ mode: 'llm' }`
 - `rules` → `{ mode: 'rules', rules: [...] }`
 
-Locate the config helper:
-
-```bash
-SCRIPT=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/lib/config.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate lib/config.js. Is the sdlc plugin installed?" >&2; exit 2; }
-```
-
 Then merge the labels block into the existing `pr` section without clobbering
 `titlePattern`, `allowedTypes`, or any other sibling key:
 
 ```bash
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
 node -e "
-const { readSection, writeSection } = require('$SCRIPT');
+const { readSection, writeSection } = require('<PLUGIN_ROOT>/scripts/lib/config.js');
 const root = process.cwd();
 const current = readSection(root, 'pr') || {};
 const next = { ...current, labels: <BLOCK_AS_JSON> };

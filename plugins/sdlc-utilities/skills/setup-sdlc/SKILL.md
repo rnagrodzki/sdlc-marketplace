@@ -50,14 +50,11 @@ If the system context contains "Plan mode is active":
 
 Run `skill/setup.js` via Bash to get current state:
 
-> **VERBATIM** -- Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+> Substitute `<PLUGIN_ROOT>` with the absolute path from the `sdlc plugin root:` line in session context. Do not run `find`.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "setup.js" -path "*/sdlc*/scripts/skill/setup.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/setup.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/setup.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/setup.js" >&2; exit 2; }
-
-PREPARE_OUTPUT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+PREPARE_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/setup.js" --output-file $ARGUMENTS)
 EXIT_CODE=$?
 echo "PREPARE_OUTPUT_FILE=$PREPARE_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -198,9 +195,8 @@ Options:
 On **yes**: Run migration via inline Node.js that calls `migrateConfig()` from `lib/config.js`:
 
 ```bash
-SCRIPT_DIR=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | sort -V | tail -1 | xargs dirname 2>/dev/null)
-[ -z "$SCRIPT_DIR" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && SCRIPT_DIR="plugins/sdlc-utilities/scripts/lib"
-[ -z "$SCRIPT_DIR" ] && { echo "ERROR: Could not locate lib/config.js" >&2; exit 2; }
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+SCRIPT_DIR="<PLUGIN_ROOT>/scripts/lib"
 
 node -e "
 const { migrateConfig } = require('$SCRIPT_DIR/config.js');
@@ -212,9 +208,8 @@ console.log(JSON.stringify(result, null, 2));
 Then dispatch the jira-templates migration shim if `prepare.legacy.jiraTemplates.exists` is true (R-LEGACY-DETECT, #423):
 
 ```bash
-SHIM=$(find ~/.claude/plugins -name "migrate-jira-templates.js" -path "*/sdlc*/scripts/skill/migrate-jira-templates.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SHIM" ] && [ -f "plugins/sdlc-utilities/scripts/skill/migrate-jira-templates.js" ] && SHIM="plugins/sdlc-utilities/scripts/skill/migrate-jira-templates.js"
-[ -n "$SHIM" ] && node "$SHIM" && echo "Jira templates migration complete" || echo "Jira templates migration: skipped or not found"
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+node "<PLUGIN_ROOT>/scripts/skill/migrate-jira-templates.js" && echo "Jira templates migration complete" || echo "Jira templates migration: skipped or not found"
 ```
 
 Parse the output. Report what was migrated:
@@ -585,8 +580,8 @@ The historical step labels map onto the dispatcher above for anyone updating tes
 Before invoking `util/setup-init.js`, render an end-of-run diff preview comparing the in-memory snapshot of the project config as read at preflight (Step 0 prepare output) against the accumulated answers from Steps 3a–3f. Use `lib/config.js::computeConfigDiff(before, after)` — pure helper, no I/O:
 
 ```bash
-LIB_CONFIG=$(find ~/.claude/plugins -name "config.js" -path "*/sdlc*/lib/config.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$LIB_CONFIG" ] && [ -f "plugins/sdlc-utilities/scripts/lib/config.js" ] && LIB_CONFIG="plugins/sdlc-utilities/scripts/lib/config.js"
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+LIB_CONFIG="<PLUGIN_ROOT>/scripts/lib/config.js"
 
 # Write JSON snapshots to temp files to avoid shell quoting hazards with
 # embedded quotes and newlines inside $BEFORE_JSON / $AFTER_JSON.
@@ -622,13 +617,10 @@ Otherwise, ask the user to confirm the diff via AskUserQuestion (suppressed when
 After collecting all answers AND confirming the diff preview above, write project config and local config via `util/setup-init.js`:
 
 ```bash
-INIT_SCRIPT=$(find ~/.claude/plugins -name "setup-init.js" -path "*/sdlc*/scripts/util/setup-init.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$INIT_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/util/setup-init.js" ] && INIT_SCRIPT="plugins/sdlc-utilities/scripts/util/setup-init.js"
-[ -z "$INIT_SCRIPT" ] && { echo "ERROR: Could not locate util/setup-init.js" >&2; exit 2; }
-
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
 # Replace <PROJECT_CONFIG_JSON> and <LOCAL_CONFIG_JSON> with the actual config objects
 # assembled from Steps 3a–3f. Only include sections that were configured (not skipped).
-INIT_OUTPUT_FILE=$(node "$INIT_SCRIPT" --output-file --project-config '<PROJECT_CONFIG_JSON>' --local-config '<LOCAL_CONFIG_JSON>')
+INIT_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/util/setup-init.js" --output-file --project-config '<PROJECT_CONFIG_JSON>' --local-config '<LOCAL_CONFIG_JSON>')
 EXIT_CODE=$?
 echo "INIT_OUTPUT_FILE=$INIT_OUTPUT_FILE"
 echo "EXIT_CODE=$EXIT_CODE"
@@ -645,7 +637,7 @@ Display created files, check for errors. The `setup-init.js` script deterministi
 Re-run `skill/setup.js` to verify the config files were written correctly:
 
 ```bash
-node "$SCRIPT" > "$PREPARE_OUTPUT_FILE"
+node "<PLUGIN_ROOT>/scripts/skill/setup.js" > "$PREPARE_OUTPUT_FILE"
 ```
 
 Parse the output and confirm:

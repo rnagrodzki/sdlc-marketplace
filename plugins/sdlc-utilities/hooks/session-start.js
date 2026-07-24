@@ -464,6 +464,7 @@ try {
 const outputLines = [
   `sdlc: v${version} (${skillCount} skills loaded)`,
   'Plan mode routing: always invoke plan-sdlc via the Skill tool when plan mode is active.',
+  `sdlc plugin root: ${pluginRoot}`,
   ...resumeLines,
 ];
 

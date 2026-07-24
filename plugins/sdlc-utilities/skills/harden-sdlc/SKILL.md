@@ -49,14 +49,11 @@ Pass `--from-issue "$ISSUE_NUM"` to the prepare script invocation in Step 1.
 
 ## Step 1 — CONSUME: Run the Prepare Script (R4, R13, C5–C8)
 
-> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+> **Substitute `<PLUGIN_ROOT>`** with the absolute path from the `sdlc plugin root:` line in session context. Do not run `find`.
 
 ```bash
-RESOLVER=$(find ~/.claude/plugins -name "resolve-script.sh" -path "*/sdlc*/scripts/lib/resolve-script.sh" 2>/dev/null | sort -V | tail -1)
-[ -z "$RESOLVER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/resolve-script.sh" ] && RESOLVER="plugins/sdlc-utilities/scripts/lib/resolve-script.sh"
-[ -n "$RESOLVER" ] && . "$RESOLVER"
-SCRIPT=$(resolve_script "harden-prepare.js" "*/sdlc*/scripts/skill/harden-prepare.js" "plugins/sdlc-utilities/scripts/skill/harden-prepare.js")
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/harden-prepare.js. Is the sdlc plugin installed?" >&2; exit 2; }
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+SCRIPT="<PLUGIN_ROOT>/scripts/skill/harden-prepare.js"
 
 MANIFEST_FILE=$(node "$SCRIPT" \
   ${FAILURE_TEXT:+--failure-text "$FAILURE_TEXT"} \
@@ -226,12 +223,8 @@ When the user selects **apply**, validate the proposed change BEFORE writing:
   validate via the canonical guardrails validator:
 
   ```bash
-  # resolve_script is sourced once at Step 1; re-source here if running in a fresh shell block
-  RESOLVER=$(find ~/.claude/plugins -name "resolve-script.sh" -path "*/sdlc*/scripts/lib/resolve-script.sh" 2>/dev/null | sort -V | tail -1)
-  [ -z "$RESOLVER" ] && [ -f "plugins/sdlc-utilities/scripts/lib/resolve-script.sh" ] && RESOLVER="plugins/sdlc-utilities/scripts/lib/resolve-script.sh"
-  [ -n "$RESOLVER" ] && . "$RESOLVER"
-  VALIDATOR=$(resolve_script "validate-guardrails.js" "*/sdlc*/scripts/ci/validate-guardrails.js" "plugins/sdlc-utilities/scripts/ci/validate-guardrails.js")
-  [ -z "$VALIDATOR" ] && { echo "ERROR: Could not locate ci/validate-guardrails.js. Is the sdlc plugin installed?" >&2; exit 2; }
+  # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+  VALIDATOR="<PLUGIN_ROOT>/scripts/ci/validate-guardrails.js"
   ```
 
   Run the validator against the prospective config. On non-zero exit, surface
@@ -267,12 +260,10 @@ When it holds, derive `<name>` from the dimension filename (`.sdlc/review-dimens
 1. **Generate the mirror deterministically** (NEVER hand-author the mirror — `scripts-over-llm-logic`). Resolve and run the generator on the just-written dimension file, capturing stdout:
 
    ```bash
-   GEN=$(find ~/.claude/plugins -name "dimension-to-instructions.js" -path "*/sdlc*/scripts/lib/dimension-to-instructions.js" 2>/dev/null | sort -V | tail -1)
-   [ -z "$GEN" ] && [ -f "plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js" ] && GEN="plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
-   [ -z "$GEN" ] && { echo "ERROR: Could not locate dimension-to-instructions.js. Is the sdlc plugin installed?" >&2; exit 2; }
+   # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
    # #474: read the just-written dimension at its ABSOLUTE content-rooted path,
    # not a cwd-relative one (the dimension lives in the active worktree).
-   MIRROR=$(node "$GEN" --file "<proposal.targetFile>")
+   MIRROR=$(node "<PLUGIN_ROOT>/scripts/lib/dimension-to-instructions.js" --file "<proposal.targetFile>")
    GEN_EXIT=$?
    ```
    A non-zero `GEN_EXIT` (unparseable dimension) is a hard failure — halt per R-iteration-write rule 4 (see step 4) and surface the partial state (dimension written, mirror not).

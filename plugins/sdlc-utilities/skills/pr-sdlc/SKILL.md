@@ -96,14 +96,11 @@ If no tests added, explain why.]
 
 ### Step 0: Resolve and Run skill/pr.js
 
-> **VERBATIM** — Run this bash block exactly as written. Do not modify, rephrase, or simplify the commands.
+> **Substitute `<PLUGIN_ROOT>`** with the absolute path from the `sdlc plugin root:` line in session context. Do not run `find`.
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "pr.js" -path "*/sdlc*/scripts/skill/pr.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/pr.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/skill/pr.js"
-[ -z "$SCRIPT" ] && { echo "ERROR: Could not locate skill/pr.js. Is the sdlc plugin installed?" >&2; exit 2; }
-
-PR_CONTEXT_FILE=$(node "$SCRIPT" --output-file $ARGUMENTS)
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+PR_CONTEXT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/pr.js" --output-file $ARGUMENTS)
 EXIT_CODE=$?
 # Single canonical cleanup: trap fires unconditionally on EXIT/INT/TERM, so
 # the manifest is removed even if a PR creation/update path errors out.
@@ -455,9 +452,8 @@ On success:
 **Link verification (issue #198, implements spec R15) — HARD GATE:** Before executing `gh pr create` or `gh pr edit`, validate every URL embedded in the final PR body via `scripts/skill/pr.js --validate-body`. The script reads the body from stdin and derives the expected GitHub repo identity (`parseRemoteOwner(projectRoot)`) deterministically — the skill MUST NOT construct ctx JSON.
 
 ```bash
-PR_PREPARE=$(find ~/.claude/plugins -name "pr.js" -path "*/sdlc*/scripts/skill/pr.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$PR_PREPARE" ] && [ -f "plugins/sdlc-utilities/scripts/skill/pr.js" ] && PR_PREPARE="plugins/sdlc-utilities/scripts/skill/pr.js"
-printf '%s' "$body" | node "$PR_PREPARE" --validate-body
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+printf '%s' "$body" | node "<PLUGIN_ROOT>/scripts/skill/pr.js" --validate-body
 LINK_EXIT=$?
 ```
 
@@ -494,13 +490,8 @@ ERR_FILE=$(mktemp)
 gh pr create --title "<title>" --body "<body>" [--draft] [--label ...] 2> "$ERR_FILE"
 GH_EXIT=$?
 if [ "$GH_EXIT" -ne 0 ]; then
-  RECOVER_SCRIPT=$(find ~/.claude/plugins -name "pr-recover-gh-account.js" -path "*/sdlc*/scripts/skill/pr-recover-gh-account.js" 2>/dev/null | sort -V | tail -1)
-  [ -z "$RECOVER_SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js" ] && RECOVER_SCRIPT="plugins/sdlc-utilities/scripts/skill/pr-recover-gh-account.js"
-  if [ -n "$RECOVER_SCRIPT" ]; then
-    RECOVER_JSON=$(node "$RECOVER_SCRIPT" --error-file "$ERR_FILE")
-  else
-    echo "Warning: pr-recover-gh-account.js not found — skipping account-switch recovery"
-  fi
+  # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+  RECOVER_JSON=$(node "<PLUGIN_ROOT>/scripts/skill/pr-recover-gh-account.js" --error-file "$ERR_FILE")
 fi
 rm -f "$ERR_FILE"
 ```

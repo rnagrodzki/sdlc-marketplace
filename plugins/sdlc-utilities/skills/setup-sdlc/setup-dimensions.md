@@ -55,8 +55,8 @@ In `--add` (expansion) mode:
 
 - Locate the validation script:
   ```bash
-  SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/sdlc*/scripts/ci/validate-dimensions.js" 2>/dev/null | sort -V | tail -1)
-  [ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ci/validate-dimensions.js"
+  # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+  SCRIPT="<PLUGIN_ROOT>/scripts/ci/validate-dimensions.js"
   ```
 - Run: `node "$SCRIPT" --project-root . --json`
 - Extract installed dimension names and their trigger patterns (new proposals must avoid identical globs).
@@ -64,9 +64,8 @@ In `--add` (expansion) mode:
 Also check for uncovered file suggestions from a recent review run:
 
 ```bash
-PREP=$(find ~/.claude/plugins -name "review.js" -path "*/sdlc*/scripts/skill/review.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$PREP" ] && [ -f "plugins/sdlc-utilities/scripts/skill/review.js" ] && PREP="plugins/sdlc-utilities/scripts/skill/review.js"
-[ -n "$PREP" ] && node "$PREP" --project-root . --json 2>/dev/null
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+node "<PLUGIN_ROOT>/scripts/skill/review.js" --project-root . --json 2>/dev/null
 ```
 
 If this succeeds, parse `plan_critique.uncovered_suggestions` and use as additional evidence in Step 3 (cite: "Recent review found N uncovered files matching this pattern"). If the command fails, silently skip.
@@ -146,9 +145,8 @@ For each selected dimension:
 Run the validation script (use `SCRIPT` resolved in Step 2, or re-resolve if Step 2 was skipped):
 
 ```bash
-SCRIPT=$(find ~/.claude/plugins -name "validate-dimensions.js" -path "*/sdlc*/scripts/ci/validate-dimensions.js" 2>/dev/null | sort -V | tail -1)
-[ -z "$SCRIPT" ] && [ -f "plugins/sdlc-utilities/scripts/ci/validate-dimensions.js" ] && SCRIPT="plugins/sdlc-utilities/scripts/ci/validate-dimensions.js"
-node "$SCRIPT" --project-root . --markdown
+# Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+node "<PLUGIN_ROOT>/scripts/ci/validate-dimensions.js" --project-root . --markdown
 EXIT_CODE=$?
 ```
 

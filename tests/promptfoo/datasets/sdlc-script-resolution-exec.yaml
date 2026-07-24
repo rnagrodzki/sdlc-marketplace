@@ -1,112 +1,12 @@
-# Script execution tests for the skill bash resolution pattern.
-# These tests validate the 3-step find + fallback + error pattern that all skills use
-# to locate helper scripts in both installed-plugin and development environments.
-#
-# Each fixture contains fake-home/ (HOME override) and fake-repo/ (CWD override).
-# The test-script-resolution.js script runs the verbatim bash pattern from skills
-# and outputs JSON: {"resolved":"<path>","source":"installed"|"local"|"error"}
-#
-# Fixture appropriateness:
-#   resolution-installed-only -- CORRECT: script only under ~/.claude/plugins
-#   resolution-dev-only       -- CORRECT: script only under plugins/sdlc-utilities/scripts/
-#   resolution-both           -- CORRECT: both paths present; installed must win
-#   resolution-neither        -- CORRECT: neither path exists; must produce error
+# Validator-regression tests for the script-resolution-version rule.
+# #485 replaced runtime `find`-based script resolution with hook-injected plugin
+# paths, so the cases that exercised runtime resolution were removed; only the
+# consistency-validator regression coverage remains here.
 
-- description: "script-resolution: installed plugin path is found"
-  vars:
-    script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
-    script_args: "--script-name pr.js --script-path skill/pr.js --project-root {{project_root}}"
-    project_root: "file://fixtures-fs/resolution-installed-only"
-  assert:
-    # Source must be "installed"
-    - type: icontains
-      value: '"source":"installed"'
-    # Resolved path must be under .claude/plugins
-    - type: icontains
-      value: ".claude/plugins"
-    # Must NOT fall back to local
-    - type: not-icontains
-      value: '"source":"local"'
-    # Must NOT be error
-    - type: not-icontains
-      value: '"source":"error"'
-
-- description: "script-resolution: dev fallback path is found when plugin not installed"
-  vars:
-    script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
-    script_args: "--script-name pr.js --script-path skill/pr.js --project-root {{project_root}}"
-    project_root: "file://fixtures-fs/resolution-dev-only"
-  assert:
-    # Source must be "local"
-    - type: icontains
-      value: '"source":"local"'
-    # Resolved path must reference the local scripts directory
-    - type: icontains
-      value: "plugins/sdlc-utilities/scripts"
-    # Must NOT be installed
-    - type: not-icontains
-      value: '"source":"installed"'
-    # Must NOT be error
-    - type: not-icontains
-      value: '"source":"error"'
-
-- description: "script-resolution: installed path wins when both paths exist"
-  vars:
-    script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
-    script_args: "--script-name pr.js --script-path skill/pr.js --project-root {{project_root}}"
-    project_root: "file://fixtures-fs/resolution-both"
-  assert:
-    # Source must be "installed" (find runs before local fallback)
-    - type: icontains
-      value: '"source":"installed"'
-    # Resolved path must be under .claude/plugins, not local
-    - type: icontains
-      value: ".claude/plugins"
-    # Must NOT fall back to local
-    - type: not-icontains
-      value: '"source":"local"'
-
-- description: "script-resolution: error when script not found in either location"
-  vars:
-    script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
-    script_args: "--script-name pr.js --script-path skill/pr.js --project-root {{project_root}}"
-    project_root: "file://fixtures-fs/resolution-neither"
-  assert:
-    # Source must be "error"
-    - type: icontains
-      value: '"source":"error"'
-    # Resolved must be null
-    - type: icontains
-      value: '"resolved":null'
-    # Must NOT produce a resolved path
-    - type: not-icontains
-      value: ".claude/plugins"
-    - type: not-icontains
-      value: "plugins/sdlc-utilities/scripts"
-
-# Multi-version regression (#258): when ~/.claude/plugins/cache/ contains two cached
-# plugin versions, the resolution pattern must select the newest semver, not an
-# arbitrary filesystem-traversal-order match.
-- description: "script-resolution: highest semver wins when multiple cached versions exist"
-  vars:
-    script_path: "repo://tests/promptfoo/scripts/test-script-resolution.js"
-    script_args: "--script-name pr.js --script-path skill/pr.js --project-root {{project_root}}"
-    project_root: "file://fixtures-fs/resolution-multi-version"
-  assert:
-    # Source must be "installed"
-    - type: icontains
-      value: '"source":"installed"'
-    # Newest version (0.18.4) must be in the resolved path
-    - type: icontains
-      value: "0.18.4"
-    # Older version (0.17.38) must NOT be in the resolved path
-    - type: not-icontains
-      value: "0.17.38"
-
-# Validator regression (#258): the script-resolution-version rule in
+# Validator regression (#485): the script-resolution-version rule in
 # .claude/skills/validate-plugin-consistency/check-consistency.js must flag
-# any plugins-resolution `find ... | head -1` lacking `sort -V | tail -1`.
-- description: "script-resolution: validator flags bare 'head -1' in plugins-resolution"
+# any plugin-script resolver that uses `find ~/.claude/plugins`.
+- description: "script-resolution: validator flags 'find ~/.claude/plugins' resolver form"
   vars:
     script_path: "repo://.claude/skills/validate-plugin-consistency/check-consistency.js"
     script_args: "--project-root {{project_root}} --json"
@@ -116,7 +16,7 @@
     - type: icontains
       value: '"rule": "script-resolution-version"'
     - type: icontains
-      value: 'head -1'
+      value: 'find ~/.claude/plugins'
 
 - description: "script-resolution: validator passes 'sort -V | tail -1' (good case)"
   vars:
