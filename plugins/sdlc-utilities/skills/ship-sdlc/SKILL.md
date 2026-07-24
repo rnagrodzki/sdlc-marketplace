@@ -495,7 +495,9 @@ Then dispatch `execute-plan-sdlc` as below. On Agent return (success), run the p
 
 ```bash
 # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
-node "<PLUGIN_ROOT>/scripts/state/execute.js" verify-completeness
+EXECUTE_STATE_SCRIPT="<PLUGIN_ROOT>/scripts/state/execute.js"
+[ -f "$EXECUTE_STATE_SCRIPT" ] || { echo "ERROR: Cannot locate execute.js — completeness gate cannot run." >&2; exit 2; }
+node "$EXECUTE_STATE_SCRIPT" verify-completeness
 COMPLETENESS_EXIT=$?
 if [ "$COMPLETENESS_EXIT" -ne 0 ]; then
   echo "ERROR: execute-plan-sdlc returned but planned tasks are unaccounted. Pipeline halted." >&2

@@ -12,11 +12,14 @@
     script_args: "--project-root {{project_root}} --json"
     project_root: "file://fixtures-fs/resolution-validator-cases/bad-project"
   assert:
-    # The new rule must fire on the bad fixture
+    # The new rule must fire on the bad fixture (Surface A: SKILL.md find-cascade)
     - type: icontains
       value: '"rule": "script-resolution-version"'
     - type: icontains
       value: 'find ~/.claude/plugins'
+    # Surface B: orchestrator/subagent-prompt templates carrying a resolver
+    - type: icontains
+      value: 'Subagent/orchestrator template contains a plugin-script resolver'
 
 - description: "script-resolution: validator passes 'sort -V | tail -1' (good case)"
   vars:
