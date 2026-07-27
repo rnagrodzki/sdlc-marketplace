@@ -93,6 +93,29 @@ const resumeLines = [];
 try {
   const { slugifyBranch, findStateFile, readState } = require('../scripts/lib/state');
   const { exec } = require('../scripts/lib/git');
+  const { resolveActiveWorktreeSafe } = require('../scripts/lib/worktree');
+
+  // F-session-start-worktree-banner-scoping-1/-2: state files are looked up
+  // by branch-slug from the shared main-worktree state pool with no
+  // worktree-identity check, so a state file left behind by a sibling
+  // worktree on the same branch slug could surface a banner for pipeline
+  // state that does not belong to the active checkout. Task 9 writes a
+  // `worktree` field into ship/execute state at init; compare it against the
+  // active worktree here. Diagnostic only — never changes where state files
+  // are located/keyed (resolveMainWorktree is untouched). Fails OPEN
+  // (returns true — banner still shown) when the field is absent (pre-field
+  // back-compat) or on any resolution error — never silently hide active work.
+  function sameWorktree(stateData) {
+    if (!stateData || stateData.worktree == null) return true;
+    try {
+      const a = fs.realpathSync(stateData.worktree);
+      const b = fs.realpathSync(resolveActiveWorktreeSafe(process.cwd()));
+      return a === b;
+    } catch {
+      return true;
+    }
+  }
+
   const branch = exec('git branch --show-current');
   if (branch) {
     const branchSlug = slugifyBranch(branch);
@@ -110,8 +133,10 @@ try {
           const stepIndex = steps.indexOf(currentStep) + 1;
           const stepName = currentStep.name || currentStep.id || 'unknown';
           const label = inProgress ? `paused at step ${stepIndex}: ${stepName}` : `last completed step ${stepIndex}: ${stepName}`;
-          resumeLines.push(`Active pipeline: ship-sdlc on ${branch} (${label})`);
-          resumeLines.push('  Resume with: /ship-sdlc --resume');
+          if (sameWorktree(shipState.data)) {
+            resumeLines.push(`Active pipeline: ship-sdlc on ${branch} (${label})`);
+            resumeLines.push('  Resume with: /ship-sdlc --resume');
+          }
         }
       }
     }
@@ -124,20 +149,22 @@ try {
         const waves = executeState.data.waves;
         const completedWaves = waves.filter(w => w.status === 'completed').length;
         const totalWaves = waves.length;
-        // Fixes #392 / R36: emit a distinct `Active execution (post-compact):`
-        // line on compact matcher so execute-plan-sdlc Step 0 can treat it as
-        // implicit --resume. The legacy `Active execution:` line is preserved
-        // byte-stable for startup/clear/resume matchers — protects prompt-cache and
-        // avoids breaking existing fast-path consumers (prompt-cache-hit-ratio
-        // guardrail). The hook is layer-agnostic: when both ship and execute
-        // states exist on compact, both lines are emitted; the consumer
-        // (SKILL.md Step 0) discriminates (ship-sdlc owns recovery).
-        if (matcherSource === 'compact') {
-          resumeLines.push(`Active execution (post-compact): execute-plan-sdlc on ${branch} (wave ${completedWaves} of ${totalWaves} complete)`);
-        } else {
-          resumeLines.push(`Active execution: execute-plan-sdlc on ${branch} (wave ${completedWaves} of ${totalWaves} complete)`);
+        if (sameWorktree(executeState.data)) {
+          // Fixes #392 / R36: emit a distinct `Active execution (post-compact):`
+          // line on compact matcher so execute-plan-sdlc Step 0 can treat it as
+          // implicit --resume. The legacy `Active execution:` line is preserved
+          // byte-stable for startup/clear/resume matchers — protects prompt-cache and
+          // avoids breaking existing fast-path consumers (prompt-cache-hit-ratio
+          // guardrail). The hook is layer-agnostic: when both ship and execute
+          // states exist on compact, both lines are emitted; the consumer
+          // (SKILL.md Step 0) discriminates (ship-sdlc owns recovery).
+          if (matcherSource === 'compact') {
+            resumeLines.push(`Active execution (post-compact): execute-plan-sdlc on ${branch} (wave ${completedWaves} of ${totalWaves} complete)`);
+          } else {
+            resumeLines.push(`Active execution: execute-plan-sdlc on ${branch} (wave ${completedWaves} of ${totalWaves} complete)`);
+          }
+          resumeLines.push('  Resume with: /execute-plan-sdlc --resume');
         }
-        resumeLines.push('  Resume with: /execute-plan-sdlc --resume');
       }
     }
   }

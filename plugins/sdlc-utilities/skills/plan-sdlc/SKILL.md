@@ -455,7 +455,10 @@ Step 4 is autonomous (implements R22 single-touchpoint handoff). After fixes are
 
 Skip for lightweight plans (2–3 file scope from Step 0 routing).
 
-**For plans with ≥5 tasks — Multi-lens fan-out:** Dispatch ALL lens reviewers from `lensReviewers[]` (P17) in a SINGLE message as parallel Agent tool calls. Do not dispatch them sequentially. Reuse canonical fan-out wording: "Dispatch ALL … in a SINGLE message as parallel Agent tool calls."
+<!-- fan-out-dispatch: await-barrier-required -->
+**For plans with ≥5 tasks — Multi-lens fan-out:** Dispatch ALL lens reviewers from `lensReviewers[]` (P17) in a SINGLE message as parallel Agent tool calls, each with `run_in_background: false` (R-orchestrator-await, #487). Do not dispatch them sequentially. Reuse canonical fan-out wording: "Dispatch ALL … in a SINGLE message as parallel Agent tool calls."
+
+**Await barrier (R-orchestrator-await, R-c1, #487):** do not consolidate lens findings or advance until exactly N lens results are collected (N = lenses dispatched). Never consolidate on partial or zero returns.
 
 For each `lensReviewers[i]` entry (i = 0..2):
 - `subagent_type`: `lensReviewers[i].subagentType`
@@ -479,7 +482,7 @@ When `lensReviewers[i].promptTemplatePath` is null, skip that lens and log to `.
 1. **Status**: `Approved` iff ALL lens reviewers returned `Approved`; otherwise `Issues Found`
 2. **Issues**: union of blocking issues across all lenses — dedup by `(taskRef, message-normalized-prefix)` (keep first occurrence)
 3. **Recommendations**: collect all recommendations, dedup by string prefix (first 60 chars)
-4. **Iteration counter**: increment by 1 per complete fan-out dispatch, regardless of how many lenses returned
+4. **Iteration counter**: increment by 1 only after the await barrier above is satisfied (exactly N lens results collected, N = lenses dispatched); never increment on partial or zero returns (R-orchestrator-await, R-c1, #487)
 
 **For plans with <5 tasks — Single reviewer (status quo):** Dispatch one reviewer with `{LENS}=all` using `./plan-reviewer-prompt.md` directly (same model acceptable). Status quo behavior preserved.
 

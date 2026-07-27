@@ -255,6 +255,34 @@
     - type: contains
       value: '"prunedOrphans":[]'
 
+- description: "state/ship.js init records the active worktree via resolveActiveWorktreeSafe (#490/#498-class)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/ship.js"
+    script_args: "init --branch main --flags {}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-state-stale"
+  assert:
+    # Single-worktree fixture: worktree resolves to the fixture's own git toplevel
+    # (== script_cwd), proving resolveActiveWorktreeSafe ran without throwing.
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return typeof data.worktree === 'string' && data.worktree.length > 0;
+
+- description: "state/execute.js init records the active worktree via resolveActiveWorktreeSafe (#490/#498-class)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "init --branch main --quality balanced --total-tasks 3"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-state-stale"
+  assert:
+    # cmdInit prints the bare state file path; script-runner auto-reads it, so `output`
+    # is the persisted state JSON itself.
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        return typeof data.worktree === 'string' && data.worktree.length > 0;
+
 # ---------------------------------------------------------------------------
 # Fixes #392 / R35 — state/execute.js wave-committed subcommand
 # ---------------------------------------------------------------------------

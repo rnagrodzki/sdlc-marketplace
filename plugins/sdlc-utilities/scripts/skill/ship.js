@@ -41,7 +41,7 @@ const os   = require('os');
 const { spawnSync } = require('child_process');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { exec, checkGitState, detectBaseBranch, deriveWorkspace, parseRemoteOwner, probeGhAuth, formatAccountMismatch, probeRepoAccess, formatAccessDenied } = require(path.join(LIB, 'git'));
+const { exec, checkGitState, detectBaseBranch, deriveWorkspace, parseRemoteOwner, probeGhAuth, formatAccountMismatch, probeRepoAccess, formatAccessDenied, getTagList } = require(path.join(LIB, 'git'));
 const { resolveMainWorktree, detectResumeState: detectResumeStateLib, readState, slugifyBranch } = require(path.join(LIB, 'state'));
 const { readSection, resolveSdlcRoot } = require(path.join(LIB, 'config'));
 const { writeOutput } = require(path.join(LIB, 'output'));
@@ -972,10 +972,76 @@ function detectResumeState(_projectRoot, currentBranch) {
 }
 
 // ---------------------------------------------------------------------------
+// verify-side-effect subcommand (R-b3, issue #478 — F-ship-step-status-integrity-guard-8)
+// ---------------------------------------------------------------------------
+
+// Steps whose completion has an objective, externally-observable side-effect.
+// Only `version` is wired today: its side-effect is the release git tag. The
+// pr/commit steps are a documented extension point (see the ship-sdlc SKILL.md
+// per-step completion block) but are intentionally NOT implemented here.
+const STEP_SIDE_EFFECTS = { version: 'tag' };
+
+/**
+ * `verify-side-effect --step <name> [--expected <tag>]`
+ *
+ * Objectively verifies that a dispatched step actually produced its expected
+ * side-effect rather than trusting the agent's self-report (R-b3). For the
+ * `version` step the side-effect is the release tag: it MUST appear in
+ * `getTagList(activeRoot)` — the active worktree's tag list (tags are
+ * repo-global, so the lookup is correct from any worktree; the same helper
+ * #498 used). Emits a single JSON object on stdout and exits 0 when the
+ * side-effect landed, 1 when it did not. Steps without a defined side-effect
+ * emit `{ landed: true, reason: 'no-side-effect' }` (exit 0) so callers are
+ * uniform.
+ *
+ * @param {string[]} argv  process.argv (argv[2] === 'verify-side-effect')
+ */
+function verifySideEffect(argv) {
+  const args = argv.slice(3);
+  let step = null;
+  let expected = null;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--step' && args[i + 1]) {
+      step = args[++i];
+    } else if (args[i] === '--expected' && args[i + 1]) {
+      expected = args[++i];
+    }
+  }
+
+  const emit = (obj, code) => {
+    process.stdout.write(JSON.stringify(obj, null, 2) + '\n');
+    process.exit(code);
+  };
+
+  const sideEffect = step ? STEP_SIDE_EFFECTS[step] : undefined;
+  if (!sideEffect) {
+    // No defined side-effect for this step — uniform pass-through so the
+    // caller can invoke verify-side-effect for every step without branching.
+    emit({ step, landed: true, reason: 'no-side-effect' }, 0);
+  }
+
+  // version → tag: the expected release tag MUST exist in the active worktree's
+  // tag list. An empty/absent expected tag is itself the #478 failure mode
+  // (version-sdlc produced no tag) → landed:false.
+  const activeRoot = resolveActiveWorktreeSafe();
+  const tags = getTagList(activeRoot);
+  const landed = Boolean(expected) && tags.includes(expected);
+  emit({ step, sideEffect, landed, expected: expected || null }, landed ? 0 : 1);
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 function main() {
+  // verify-side-effect subcommand (R-b3, issue #478): objective post-dispatch
+  // side-effect check invoked by the ship-sdlc SKILL.md per-step completion
+  // block. Short-circuits the prepare pipeline entirely — it composes no steps,
+  // so none of the config/gh/worktree setup below runs.
+  if (process.argv[2] === 'verify-side-effect') {
+    return verifySideEffect(process.argv);
+  }
+
   const projectRoot = resolveSdlcRoot(); // issue #351: route to main worktree .sdlc/
   // issue #457: OpenSpec content scans live on the active branch in the active worktree —
   // route detectActiveChanges/isArchived through contentRoot, NOT projectRoot.

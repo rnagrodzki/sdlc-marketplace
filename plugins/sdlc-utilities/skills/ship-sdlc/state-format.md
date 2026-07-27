@@ -40,6 +40,7 @@ Example: `.sdlc/execution/ship-feat-my-feature-20260327T143000Z.json`
 | `steps`           | array  | Ordered list of pipeline step records (see below).           |
 | `decisions`       | array  | Key decisions recorded for transparency (see below).         |
 | `deferredFindings`| array  | Review findings deferred to a follow-up (see below).        |
+| `worktree`        | string \| absent | Absolute realpath of the active worktree at init. Optional, absent on pre-#501 state files. Display/diagnostic metadata only—does not affect state file location keying or resume behavior. Used to scope the session-start banner to the active worktree. |
 | `nextPendingStep` | string \| null | Derived at read time by `lib/state.js::detectResumeState`. Name of the first step in `steps[]` whose `status` is neither `completed` nor `skipped`, or `null` when every step is resolved. Not written into the on-disk file; recomputed on every read so a resumed run picks the correct re-entry point. Example: `"review"`. |
 
 ---

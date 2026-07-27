@@ -40,6 +40,7 @@ const {
 
 const { writeTaskFactSheet, taskFactSheetPath } = require(path.join(LIB, 'task-factsheet'));
 const { splitWave, MaxSplitDepthExceededError } = require(path.join(LIB, 'wave-split'));
+const { resolveActiveWorktreeSafe } = require(path.join(LIB, 'worktree'));
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -226,6 +227,7 @@ function cmdInit(opts) {
     skill: 'execute-plan-sdlc',
     startedAt: new Date().toISOString(),
     branch: opts.branch,
+    worktree: resolveActiveWorktreeSafe(process.cwd()),
     planPath: opts.planPath || null,
     planHash: opts.planHash || null,
     quality: opts.quality,

@@ -38,6 +38,7 @@ const {
   gcStateFiles, pruneStateFiles, migrateBranchSlug,
   listBranches, readTtlDaysFromConfig,
 } = require(path.join(LIB, 'state'));
+const { resolveActiveWorktreeSafe } = require(path.join(LIB, 'worktree'));
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -59,6 +60,8 @@ function parseArgs(argv) {
       result.stateFile = args[++i];
     } else if (a === '--result' && args[i + 1]) {
       result.result = args[++i];
+    } else if (a === '--outcome' && args[i + 1]) {
+      result.outcome = args[++i];
     } else if (a === '--reason' && args[i + 1]) {
       result.reason = args[++i];
     } else if (a === '--error' && args[i + 1]) {
@@ -126,6 +129,7 @@ function cmdInit(opts) {
     version: 1,
     startedAt: new Date().toISOString(),
     branch: opts.branch,
+    worktree: resolveActiveWorktreeSafe(process.cwd()),
     flags,
     steps: [
       { name: 'execute',         status: 'pending' },
@@ -149,7 +153,7 @@ function cmdInit(opts) {
     const prunedOrphans = pruneStateFiles('ship', branchSlug);
 
     const filePath = initState('ship', opts.branch, data);
-    process.stdout.write(JSON.stringify({ filePath, prunedOrphans }) + '\n');
+    process.stdout.write(JSON.stringify({ filePath, prunedOrphans, worktree: data.worktree }) + '\n');
     process.exit(0);
   } catch (e) {
     process.stderr.write(`Error: ${e.message}\n`);
@@ -182,9 +186,17 @@ function startStepCore(data, stepName) {
  * Mark `stepName` completed in the given state data (mutates in place).
  * @returns {{ ok: true, step } | { ok: false, error: string }}
  */
-function completeStepCore(data, stepName, result) {
+function completeStepCore(data, stepName, result, outcome) {
   const step = data.steps.find(s => s.name === stepName);
   if (!step) return { ok: false, error: `step "${stepName}" not found` };
+  // R-b2 (docs/specs/ship-sdlc.md): outcome-verified completion. A `failure`
+  // outcome routes to `failed` — never write `completed`. Absent outcome
+  // (undefined) behaves as `success`, preserving legacy back-compat.
+  if (outcome === 'failure') {
+    step.status = 'failed';
+    if (result !== undefined) step.error = result;
+    return { ok: true, step };
+  }
   step.status = 'completed';
   step.completedAt = new Date().toISOString();
   if (result !== undefined) step.result = result;
@@ -292,6 +304,20 @@ function cmdBeginStep(opts) {
   const { stepTransition } = require(path.join(LIB, 'ship-todos'));
   const { data, filePath } = loadShipStateOrExit(opts);
 
+  // R-b1 (docs/specs/ship-sdlc.md): proceed-gate. Refuse (exit 1) to begin a
+  // step while any earlier step in steps[] is not terminal-OK. `skipped` is
+  // terminal-OK, so conditional steps that were skipped do not block (there is
+  // no `stalled` status — a stalled step surfaces as a stranded `in_progress`).
+  // idx === -1 (unknown step) is left to startStepCore's not-found error below.
+  const idx = data.steps.findIndex(s => s.name === opts.step);
+  const blocking = idx === -1 ? [] : data.steps.slice(0, idx).filter(s =>
+    s.status === 'pending' || s.status === 'in_progress' || s.status === 'failed');
+  if (blocking.length) {
+    process.stderr.write(`Error: cannot begin "${opts.step}" — prior step(s) not terminal-OK: ` +
+      blocking.map(s => `${s.name}=${s.status}`).join(', ') + '\n');
+    process.exit(1);
+  }
+
   const res = startStepCore(data, opts.step);
   if (!res.ok) {
     process.stderr.write(`Error: ${res.error}\n`);
@@ -309,17 +335,29 @@ function cmdCompleteStep(opts) {
     process.stderr.write('Error: --step is required\n');
     process.exit(2);
   }
-  const { markCompleted } = require(path.join(LIB, 'ship-todos'));
+  // R-b2 (docs/specs/ship-sdlc.md): --outcome gates completion. Default is
+  // `success` (absent flag => unchanged legacy behavior); only success|failure
+  // are valid (reject others with exit 2, matching the bad-args convention).
+  const outcome = opts.outcome === undefined ? 'success' : opts.outcome;
+  if (outcome !== 'success' && outcome !== 'failure') {
+    process.stderr.write(`Error: --outcome must be "success" or "failure", got "${opts.outcome}"\n`);
+    process.exit(2);
+  }
+  const { markCompleted, renderTodos } = require(path.join(LIB, 'ship-todos'));
   const { data, filePath } = loadShipStateOrExit(opts);
 
-  const res = completeStepCore(data, opts.step, opts.result);
+  const res = completeStepCore(data, opts.step, opts.result, outcome);
   if (!res.ok) {
     process.stderr.write(`Error: ${res.error}\n`);
     process.exit(1);
   }
   writeState(filePath, data);
 
-  const rendered = markCompleted(data, opts.step);
+  // On failure the step is now `failed`; render via the existing fail path
+  // (renderTodos failStep) rather than markCompleted (R-b2).
+  const rendered = outcome === 'failure'
+    ? renderTodos(data, { event: 'step', currentStep: opts.step, failStep: opts.step })
+    : markCompleted(data, opts.step);
   process.stdout.write(JSON.stringify(rendered, null, 2) + '\n');
   process.exit(0);
 }

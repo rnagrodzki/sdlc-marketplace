@@ -342,7 +342,7 @@ For each step that will run, apply the dispatch protocol based on `step.dispatch
 
 5. **Record step completion/failure** via `state/ship.js complete-step` (R70) — see the per-step completion block in "Main-thread TodoWrite orchestration" below; `complete-step` records `completed` and renders the task-tray todos in one call. Failures still use `state/ship.js fail` + the ship-todos `--fail-step` render.
 
-6. **Use result to determine next step** (e.g., review verdict → received-review decision). Print decision reasoning:
+6. **Use result to determine next step** (e.g., review verdict → received-review decision) — flow decisions read the agent's *result*, but step *completion status* is outcome-verified and never taken from the agent's self-report: the dispatched agent's reported outcome is forwarded to `complete-step --outcome` (R-b2), and the `version` step additionally gates completion on the objective release-tag side-effect via `verify-side-effect` (R-b3, F-ship-step-status-integrity-guard-8) — see the per-step completion block below. Print decision reasoning:
    ```
      Review verdict: APPROVED WITH NOTES (2 medium)
      Decision: CONTINUING — no critical/high issues found
@@ -387,8 +387,22 @@ For ultra-short runs (`flags.steps.length < 2`), skip TodoWrite entirely.
 
 `complete-step` atomically marks the step `completed` (the former `state/ship.js complete`) AND renders the task-tray todos (the former `ship-todos --event step --mark-completed`) in a single call. Persisting completion and rendering happen in-process, so the ordering constraint that previously required two separate ordered calls is now internal to the subcommand.
 
-1. Run: `node "$STATE_SCRIPT" complete-step --step <stepName> --state-file "$STATE_FILE" --result "<summary>"`.
-2. Parse JSON from stdout → call `TodoWrite` with the `todos` array, echo `marker`.
+Completion is **outcome-verified** (R-b2/R-b3, docs/specs/ship-sdlc.md) — the recorded status reflects what actually happened, not the agent's unverified self-report:
+
+1. Derive `OUTCOME` for the dispatched agent step from the Agent return (Step 4): `success` when the agent reported success, `failure` otherwise (R-b2). Inline steps (`skill: null`, e.g. `verify-openspec`, `learnings-commit`) have no agent report — omit `--outcome` and let `complete-step` record `completed`.
+   - **Version-step side-effect gate (R-b3, issue #478):** For the `version` step ONLY, do NOT trust the self-report. FIRST capture `NEW_TAG` from the version-sdlc agent return (the release tag is a declared artifact of the Step 4 result; empty when version-sdlc produced no tag) — this is the single capture point for `NEW_TAG`, reused unchanged by the "After version" ancestry gate below. THEN run the objective check and force `OUTCOME=failure` when the release tag did not land:
+     ```bash
+     # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
+     # NEW_TAG MUST already be captured from the version-sdlc return before this line.
+     SIDE_EFFECT=$(node "<PLUGIN_ROOT>/scripts/skill/ship.js" verify-side-effect --step version --expected "$NEW_TAG")
+     # SIDE_EFFECT is JSON: { step, sideEffect: "tag", landed: true|false, expected }.
+     # landed:false (exit 1) ⇒ no release tag was produced (NEW_TAG empty, or the
+     # tag is absent from the active worktree's tag list) ⇒ OUTCOME=failure, so
+     # complete-step routes version to `failed` and never `completed`.
+     ```
+   - **Extension point (pr / commit):** the same `verify-side-effect` pattern applies to other steps with objective side-effects (`pr` → PR URL, `commit` → HEAD commit), but only `version` has a defined side-effect in `ship.js` (`STEP_SIDE_EFFECTS`) today — not wired.
+2. Run: `node "$STATE_SCRIPT" complete-step --step <stepName> --state-file "$STATE_FILE" --result "<summary>"` — append `--outcome "$OUTCOME"` for dispatched agent steps.
+3. Parse JSON from stdout → call `TodoWrite` with the `todos` array, echo `marker`.
 
 **Per-step failure (called when `state/ship.js fail` records a failure):**
 
@@ -551,7 +565,7 @@ Then invoke commit-sdlc (step 5) for the fix commit.
 
 ### After version — post-version ancestry HARD GATE (R-post-version-ancestry, fixes #349)
 
-After the version step dispatches and returns, capture the new tag from the version-sdlc return value as `NEW_TAG`. When `NEW_TAG` is set (non-empty) AND `EXECUTE_BRANCH` is set (non-empty), run the ancestry check:
+Reuse `NEW_TAG` — the tag already captured at version-step completion from the version-sdlc return (see the per-step completion block's version-step side-effect gate; it is the single capture point). When `NEW_TAG` is set (non-empty) AND `EXECUTE_BRANCH` is set (non-empty), run the ancestry check:
 
 ```bash
 # Post-version ancestry HARD GATE

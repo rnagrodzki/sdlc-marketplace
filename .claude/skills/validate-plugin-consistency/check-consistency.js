@@ -35,6 +35,21 @@
  *                                 skills table (warning)
  *  11. temp-file-cleanup        — skills that use mktemp must also contain a cleanup
  *                                 reference (rm -f / rm -rf / clean) (warning)
+ *  12. invocation-verbatim      — dispatch-bearing templates (orchestrator agents +
+ *                                 subagent prompt templates) that show an inline
+ *                                 dispatch example built from a precomputed field
+ *                                 (subagent_type:/model: on one line, or a fenced
+ *                                 .invocation example) must carry a verbatim guard
+ *                                 co-located in the same header-delimited section (#485)
+ *  13. orchestrator-await-barrier — dispatch-bearing orchestrator agent templates
+ *                                 (frontmatter `tools` includes Agent) and any file
+ *                                 carrying the `<!-- fan-out-dispatch:
+ *                                 await-barrier-required -->` marker must carry the
+ *                                 await-barrier guard: `run_in_background: false`
+ *                                 plus a barrier instruction (await barrier / never
+ *                                 consolidate on partial / R-orchestrator-await).
+ *                                 Leaf drafters (`tools: Read`) do not dispatch and
+ *                                 are excluded structurally (#487)
  *
  * Usage:
  *   node check-consistency.js [--project-root <path>] [--json]
@@ -223,6 +238,49 @@ function isInjectedPathResolverLine(line) {
 // in subagent/orchestrator templates, which run without the injected root context.
 function isAnyPluginScriptResolverLine(line) {
   return isFindPluginScriptLine(line) || isInjectedPathResolverLine(line);
+}
+
+// Detect a dispatch example that forwards a precomputed invocation/dispatch field.
+// Two shapes (per #485, Key Decision 5): a fenced example referencing a precomputed
+// `.invocation` field, or an inline-constructed dispatch naming BOTH `subagent_type:`
+// and `model:` on one line where the value is a dotted precomputed field reference
+// (e.g. `dimension.model`). Bare placeholders on separate lines are NOT construction.
+function isDispatchExampleLine(line, inFence) {
+  if (inFence && line.includes('.invocation')) return true;
+  return /subagent_type:/.test(line)
+      && /model:/.test(line)
+      && /[A-Za-z_]\w*\.[A-Za-z_]\w*/.test(line);
+}
+
+// Detect a verbatim guard in a section's text. Accept both phrasings (#485):
+//   exact:   /verbatim/i AND (/do not construct/i OR /from .*example/i)
+//   variant: /verbatim/i AND /without .*(mutation|modif)/i  (plan-explore-orchestrator.md:12)
+function hasVerbatimGuard(text) {
+  if (!/verbatim/i.test(text)) return false;
+  const exact   = /do not construct/i.test(text) || /from .*example/i.test(text);
+  const variant = /without .*(mutation|modif)/i.test(text);
+  return exact || variant;
+}
+
+// Detect whether an agent template's frontmatter `tools` field lists Agent — the
+// marker of a dispatch-bearing orchestrator. Leaf drafters (`tools: Read`) do not
+// dispatch subagents and are excluded from the await-barrier rule (#487).
+function frontmatterToolsIncludesAgent(content) {
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  const frontmatter = fmMatch ? fmMatch[1] : '';
+  const toolsLine = frontmatter.split('\n').find(l => /^\s*tools:/i.test(l));
+  return toolsLine ? /\bAgent\b/.test(toolsLine) : false;
+}
+
+// Detect the await-barrier guard tokens (#487): a mandatory synchronous dispatch
+// (`run_in_background: false`) co-present with a barrier instruction in any of its
+// accepted phrasings.
+function hasAwaitBarrierTokens(content) {
+  const hasSyncDispatch = /run_in_background:\s*false/.test(content);
+  const hasBarrier = /await barrier/i.test(content)
+      || /never consolidate on partial/i.test(content)
+      || /R-orchestrator-await/.test(content);
+  return hasSyncDispatch && hasBarrier;
 }
 
 // ---------------------------------------------------------------------------
@@ -589,6 +647,114 @@ function checkTempFileCleanup(skills, scriptNames, findings) {
   }
 }
 
+/**
+ * Rule 12 — invocation-verbatim
+ * Dispatch-bearing templates (orchestrator agent templates + subagent prompt
+ * templates) that show an inline dispatch example built from a precomputed
+ * invocation/dispatch field must carry a verbatim guard co-located in the SAME
+ * header-delimited section as the example (#485). A "section" is the span
+ * between markdown headers (a `#` line outside a code fence). The example and
+ * its guard must live together so the LLM sees both — a guard in a different
+ * section does not defend the example.
+ */
+function checkInvocationVerbatim(skills, projectRoot, findings) {
+  const files = [
+    ...discoverOrchestratorTemplates(projectRoot),
+    ...discoverPromptTemplates(projectRoot),
+  ];
+
+  for (const file of files) {
+    const content = readFile(file);
+    if (!content) continue;
+    const lines = content.split('\n');
+
+    // Partition into header-delimited sections. Each section records the first
+    // dispatch-example line it contains (1-based) and its full text for guard
+    // detection. Code fences are tracked so a `#` inside a fence is not a header
+    // and a `.invocation` inside a fence is recognised as a fenced example.
+    const sections = [];
+    let current = { dispatchLine: null, text: [] };
+    let inFence = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^\s*```/.test(line)) {
+        inFence = !inFence;
+      } else if (!inFence && /^#{1,6}\s/.test(line)) {
+        sections.push(current);
+        current = { dispatchLine: null, text: [] };
+      }
+      current.text.push(line);
+      if (current.dispatchLine === null && isDispatchExampleLine(line, inFence)) {
+        current.dispatchLine = i + 1;
+      }
+    }
+    sections.push(current);
+
+    for (const section of sections) {
+      if (section.dispatchLine === null) continue;
+      if (hasVerbatimGuard(section.text.join('\n'))) continue;
+      findings.push({
+        rule: 'invocation-verbatim',
+        severity: 'error',
+        file: path.relative(process.cwd(), file),
+        line: section.dispatchLine,
+        message: 'Dispatch example builds invocation/dispatch args from a precomputed field but its section has no verbatim guard. Add a co-located instruction to forward the precomputed field verbatim (e.g. "Use the precomputed dispatch fields verbatim; do not construct them from the examples above").',
+      });
+    }
+  }
+}
+
+/**
+ * Rule 13 — orchestrator-await-barrier
+ * Two dispatch surfaces must carry the await-barrier guard (#487):
+ *   1. Orchestrator agent templates whose frontmatter `tools` includes Agent
+ *      (dispatch-bearing). Leaf drafters (`tools: Read` — commit / harden /
+ *      error-report orchestrators) do not dispatch subagents and are excluded
+ *      structurally.
+ *   2. Any SKILL file carrying the `<!-- fan-out-dispatch: await-barrier-required -->`
+ *      marker (e.g. the plan-sdlc Step 5 fan-out). The marker declares that the
+ *      surrounding fan-out must block on results, so the guard tokens must be
+ *      present — without a brittle "detect a fan-out in prose" heuristic.
+ * Guard tokens: `run_in_background: false` AND a barrier instruction
+ * (await barrier / never consolidate on partial / R-orchestrator-await).
+ */
+function checkOrchestratorAwaitBarrier(skills, projectRoot, findings) {
+  // Surface 1 — dispatch-bearing orchestrator agent templates.
+  for (const file of discoverOrchestratorTemplates(projectRoot)) {
+    const content = readFile(file);
+    if (!content) continue;
+    if (!frontmatterToolsIncludesAgent(content)) continue; // leaf drafter — no dispatch
+    if (hasAwaitBarrierTokens(content)) continue;
+    const lines = content.split('\n');
+    const toolsIdx = lines.findIndex(l => /^\s*tools:/i.test(l));
+    findings.push({
+      rule: 'orchestrator-await-barrier',
+      severity: 'error',
+      file: path.relative(process.cwd(), file),
+      line: toolsIdx >= 0 ? toolsIdx + 1 : undefined,
+      message: 'Dispatch-bearing orchestrator template (frontmatter tools includes Agent) is missing the await-barrier guard. Add `run_in_background: false` on every Agent dispatch plus a barrier instruction so the turn cannot end on partial results (e.g. "Await barrier … never consolidate on partial or zero results", R-orchestrator-await, #487).',
+    });
+  }
+
+  // Surface 2 — SKILL files carrying the fan-out-dispatch await-barrier-required marker.
+  const MARKER = '<!-- fan-out-dispatch: await-barrier-required -->';
+  for (const skill of skills) {
+    const content = readFile(skill.file);
+    if (!content || !content.includes(MARKER)) continue;
+    if (hasAwaitBarrierTokens(content)) continue;
+    const lines = content.split('\n');
+    const markerIdx = lines.findIndex(l => l.includes(MARKER));
+    findings.push({
+      rule: 'orchestrator-await-barrier',
+      severity: 'error',
+      file: path.relative(process.cwd(), skill.file),
+      line: markerIdx >= 0 ? markerIdx + 1 : undefined,
+      message: 'Fan-out marked `await-barrier-required` but the file is missing the await-barrier guard. Add `run_in_background: false` on the parallel dispatch plus a barrier instruction (await barrier / never consolidate on partial / R-orchestrator-await, #487).',
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -620,6 +786,8 @@ function main() {
   checkSkillsMetaExistence(projectRoot, findings);
   checkReadmeSkillsTable(projectRoot, findings);
   checkTempFileCleanup(skills, scriptNames, findings);
+  checkInvocationVerbatim(skills, projectRoot, findings);
+  checkOrchestratorAwaitBarrier(skills, projectRoot, findings);
 
   const errors   = findings.filter(f => f.severity === 'error');
   const warnings = findings.filter(f => f.severity === 'warning');

@@ -30,3 +30,60 @@
     # The good fixture must NOT trigger the new rule
     - type: not-icontains
       value: '"rule": "script-resolution-version"'
+
+# Validator regression (#487): the orchestrator-await-barrier rule must flag
+# dispatch-bearing orchestrator templates (frontmatter tools includes Agent) and
+# fan-out-marked SKILL files that are missing the `run_in_background: false` +
+# barrier-instruction guard tokens, while excluding leaf drafters (tools: Read).
+- description: "orchestrator-await-barrier: flags Agent-dispatching template with no barrier guard, and fan-out-marked SKILL missing barrier guard, while excluding the leaf drafter"
+  vars:
+    script_path: "repo://.claude/skills/validate-plugin-consistency/check-consistency.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/orchestrator-await-barrier-cases/bad-project"
+  assert:
+    - type: icontains
+      value: '"rule": "orchestrator-await-barrier"'
+    # Surface 1: dispatch-orchestrator.md (tools includes Agent, no barrier tokens) → flagged
+    - type: icontains
+      value: 'dispatch-orchestrator.md'
+    # Surface 2: example-skill/SKILL.md (fan-out marker present, no barrier tokens) → flagged
+    - type: icontains
+      value: 'plugins/sdlc-utilities/skills/example-skill/SKILL.md'
+    # leaf-orchestrator.md (tools: Read only) must NOT be flagged by this rule
+    - type: not-icontains
+      value: 'leaf-orchestrator.md'
+
+- description: "orchestrator-await-barrier: clean when the Agent-dispatching template and the fan-out-marked SKILL both carry the barrier guard"
+  vars:
+    script_path: "repo://.claude/skills/validate-plugin-consistency/check-consistency.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/orchestrator-await-barrier-cases/good-project"
+  assert:
+    - type: not-icontains
+      value: '"rule": "orchestrator-await-barrier"'
+
+# Validator regression (#452 / Task 12 subtask a — F-closed-issue-retrospective-guards-1):
+# the invocation-verbatim rule must flag a dispatch example that constructs its call from
+# a precomputed field (subagent_type: + model: + dotted reference, or a fenced `.invocation`
+# example) when its section carries no verbatim guard, and must accept BOTH guard phrasings
+# (exact: "verbatim" + "do not construct"/"from ... example"; variant: "verbatim" + "without
+# ... mutation/modif").
+- description: "invocation-verbatim: flags a precomputed-field dispatch example with no verbatim guard in its section"
+  vars:
+    script_path: "repo://.claude/skills/validate-plugin-consistency/check-consistency.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/invocation-verbatim-cases/bad-project"
+  assert:
+    - type: icontains
+      value: '"rule": "invocation-verbatim"'
+    - type: icontains
+      value: 'dispatch-example-orchestrator.md'
+
+- description: "invocation-verbatim: clean when the dispatch example's section carries either accepted verbatim-guard phrasing (exact or variant)"
+  vars:
+    script_path: "repo://.claude/skills/validate-plugin-consistency/check-consistency.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/invocation-verbatim-cases/good-project"
+  assert:
+    - type: not-icontains
+      value: '"rule": "invocation-verbatim"'

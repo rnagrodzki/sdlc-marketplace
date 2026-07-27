@@ -78,6 +78,7 @@ If there is only one worktree entry (no linked worktrees), the main working tree
 | `preset`     | string \| null | Execution preset (`"full"`, `"balanced"`, or `"minimal"`), or `null` if none was applied. Legacy `"A"`/`"B"`/`"C"` values may appear in older state files. |
 | `totalTasks` | number        | Total number of tasks across all waves.                                              |
 | `waves`      | array         | Ordered list of wave records (see below).                                            |
+| `worktree`   | string \| absent | Absolute realpath of the active worktree at init. Optional, absent on pre-#501 state files. Display/diagnostic metadata only—does not affect state file location keying or resume behavior. Used to scope the session-start banner to the active worktree. |
 | `context`    | object        | Accumulated cross-wave context enabling fresh-session resume (see below).            |
 
 ---

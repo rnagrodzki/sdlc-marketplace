@@ -94,6 +94,7 @@ For each dimension with `status: "ACTIVE"` or `status: "TRUNCATED"`:
 3. Dispatch via Agent tool (subagent_type: general-purpose, model: dimension.model || manifest.subagent_model, run_in_background: false)
    - **`run_in_background: false` is mandatory on every dispatch** (R-orchestrator-await, #487). Agent dispatch defaults to background; a backgrounded call returns control before the subagent finishes, ending your turn with no results. `false` blocks until it returns.
    - Per-dimension precedence: a dimension's `model:` field (from its frontmatter, see R15) wins; otherwise fall back to `manifest.subagent_model`. Forward the string verbatim — no whitelist, no remap.
+   - Use each dimension's precomputed dispatch fields verbatim; do not construct them from the examples above.
 
 **Dispatch ALL active dimensions in a SINGLE message** (multiple Agent tool calls in one response). Do not dispatch one at a time.
 

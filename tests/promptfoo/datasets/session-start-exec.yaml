@@ -158,3 +158,72 @@
       value: "/tests/"
     - type: not-icontains
       value: "/marketplaces/"
+
+# ---------------------------------------------------------------------------
+# Task 10 / F-session-start-worktree-banner-scoping-1/-2/-3/-4 — resume
+# banners are gated on worktree identity via sameWorktree(). State is looked
+# up by branch-slug from the shared main-worktree state pool; without this
+# gate, a state file recorded from a sibling/stale worktree on the same
+# branch slug would surface a banner for pipeline state that does not
+# belong to the active checkout.
+# ---------------------------------------------------------------------------
+
+- description: "session-start: worktree field matches active worktree -> both banners emitted, byte-identical to legacy text"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-session-start-worktree-match"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "startup"
+  assert:
+    - type: icontains
+      value: "Active pipeline: ship-sdlc on feat/worktree-match (paused at step 1: execute)"
+    - type: icontains
+      value: "  Resume with: /ship-sdlc --resume"
+    - type: icontains
+      value: "Active execution: execute-plan-sdlc on feat/worktree-match (wave 1 of 2 complete)"
+    - type: icontains
+      value: "  Resume with: /execute-plan-sdlc --resume"
+
+- description: "session-start: worktree field points at a sibling worktree that exists on disk -> both banners suppressed"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-session-start-worktree-mismatch"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "startup"
+  assert:
+    - type: not-icontains
+      value: "Active pipeline: ship-sdlc"
+    - type: not-icontains
+      value: "Active execution: execute-plan-sdlc"
+
+- description: "session-start: worktree field absent (pre-field state) -> both banners still emitted (back-compat)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-execute-post-compact-with-ship"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "startup"
+  assert:
+    - type: icontains
+      value: "Active pipeline: ship-sdlc on feat/execute-and-ship"
+    - type: icontains
+      value: "Active execution: execute-plan-sdlc on feat/execute-and-ship"
+
+- description: "session-start: worktree field points at a nonexistent path (realpath resolution error) -> both banners still emitted (fail-open)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/session-start.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-session-start-worktree-resolve-error"
+    script_stdin:
+      hook_event_name: "SessionStart"
+      source: "startup"
+  assert:
+    - type: icontains
+      value: "Active pipeline: ship-sdlc on feat/worktree-resolve-error"
+    - type: icontains
+      value: "Active execution: execute-plan-sdlc on feat/worktree-resolve-error"
