@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.21.21] - 2026-07-28
+
+### Fixed
+- execute-plan-sdlc: plan-file resolution now requires an explicit `<plan-file-path>` argument — the conversation-context "Smart loading" fallback is removed; an in-progress resume is exempted only when its persisted state carries a matching plan path, and a resume hash mismatch now halts deterministically under `--auto` instead of prompting (#505)
+- ship-sdlc: forward the skill's own arguments verbatim into `skill/ship.js` instead of hardcoding `--has-plan --auto`, restoring `--plan`/`--resume`/other flags that were previously dropped; also fixes a prepare-output variable name mismatch when reading the resolved plan file (#505)
+- ship-sdlc + execute-plan-sdlc: gate pipeline resume and state recovery by session identity, so stale or cross-session state (including compact-recovery and linked-worktree scenarios) is no longer treated as the active session's (#505)
+
 ## [0.21.20] - 2026-07-28
 
 ### Fixed
