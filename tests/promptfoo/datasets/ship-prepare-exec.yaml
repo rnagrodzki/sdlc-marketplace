@@ -415,7 +415,7 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        const expected = ['execute','commit','review','archive-openspec','pr'];
+        const expected = ['execute','commit','review','pr','archive-openspec'];
         return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
 
 - description: "ship-prepare: CLI --steps fully overrides config (#190)"
@@ -446,7 +446,7 @@
       value: |
         const o = JSON.parse(output);
         const versionStep = o.steps.find(s => s.name === 'version');
-        const expected = ['execute','commit','review','archive-openspec','pr'];
+        const expected = ['execute','commit','review','pr','archive-openspec'];
         return JSON.stringify(o.flags.steps) === JSON.stringify(expected)
           && versionStep.status === 'skipped'
           && versionStep.skipSource === 'config'
