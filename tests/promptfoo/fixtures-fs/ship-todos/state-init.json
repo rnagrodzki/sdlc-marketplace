@@ -8,11 +8,11 @@
     "resume": false,
     "implicitResume": false
   },
-  "steps": {
-    "execute":  { "name": "execute",  "status": "pending" },
-    "commit":   { "name": "commit",   "status": "pending" },
-    "review":   { "name": "review",   "status": "pending" },
-    "pr":       { "name": "pr",       "status": "pending" },
-    "cleanup":  { "name": "cleanup",  "status": "pending" }
-  }
+  "steps": [
+    { "name": "execute",  "status": "pending" },
+    { "name": "commit",   "status": "pending" },
+    { "name": "review",   "status": "pending" },
+    { "name": "pr",       "status": "pending" },
+    { "name": "cleanup",  "status": "pending" }
+  ]
 }

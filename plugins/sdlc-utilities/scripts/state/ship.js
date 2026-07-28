@@ -309,9 +309,20 @@ function cmdBeginStep(opts) {
   // terminal-OK, so conditional steps that were skipped do not block (there is
   // no `stalled` status — a stalled step surfaces as a stranded `in_progress`).
   // idx === -1 (unknown step) is left to startStepCore's not-found error below.
+  //
+  // Conditional-by-design steps (`received-review`, `commit-fixes` — the ones
+  // cmdInit tags with a `condition` field) are only initialized, never driven
+  // to `skipped` when their trigger doesn't fire — nothing in the codebase
+  // performs that transition. A bare `pending` is therefore their expected
+  // resting state, not a stalled step, so it must not block progression. An
+  // `in_progress`/`failed` conditional step WAS actually dispatched and is
+  // genuinely stuck/broken, so those statuses still block regardless of
+  // `condition`.
   const idx = data.steps.findIndex(s => s.name === opts.step);
-  const blocking = idx === -1 ? [] : data.steps.slice(0, idx).filter(s =>
-    s.status === 'pending' || s.status === 'in_progress' || s.status === 'failed');
+  const blocking = idx === -1 ? [] : data.steps.slice(0, idx).filter(s => {
+    if (s.status === 'pending') return s.condition === undefined;
+    return s.status === 'in_progress' || s.status === 'failed';
+  });
   if (blocking.length) {
     process.stderr.write(`Error: cannot begin "${opts.step}" — prior step(s) not terminal-OK: ` +
       blocking.map(s => `${s.name}=${s.status}`).join(', ') + '\n');
@@ -490,7 +501,14 @@ function cmdRead(opts) {
 function validatePipelineContract(stateData) {
   const violations = [];
   for (const step of (stateData.steps || [])) {
-    if (step.status === 'pending' || step.status === 'in_progress') {
+    // Conditional-by-design steps (tagged with a `condition` field at init —
+    // see cmdInit) that never had their trigger fire stay `pending` forever;
+    // that is their expected resting state, not a contract violation (mirrors
+    // the cmdBeginStep proceed-gate exception above). `in_progress` is always
+    // a violation — it means the step was actually dispatched and got stuck.
+    if (step.status === 'in_progress') {
+      violations.push({ step: step.name, status: step.status });
+    } else if (step.status === 'pending' && step.condition === undefined) {
       violations.push({ step: step.name, status: step.status });
     }
   }

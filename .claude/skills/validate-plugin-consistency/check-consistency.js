@@ -657,7 +657,7 @@ function checkTempFileCleanup(skills, scriptNames, findings) {
  * its guard must live together so the LLM sees both — a guard in a different
  * section does not defend the example.
  */
-function checkInvocationVerbatim(skills, projectRoot, findings) {
+function checkInvocationVerbatim(projectRoot, findings) {
   const files = [
     ...discoverOrchestratorTemplates(projectRoot),
     ...discoverPromptTemplates(projectRoot),
@@ -786,7 +786,7 @@ function main() {
   checkSkillsMetaExistence(projectRoot, findings);
   checkReadmeSkillsTable(projectRoot, findings);
   checkTempFileCleanup(skills, scriptNames, findings);
-  checkInvocationVerbatim(skills, projectRoot, findings);
+  checkInvocationVerbatim(projectRoot, findings);
   checkOrchestratorAwaitBarrier(skills, projectRoot, findings);
 
   const errors   = findings.filter(f => f.severity === 'error');

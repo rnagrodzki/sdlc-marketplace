@@ -1018,6 +1018,7 @@ function verifySideEffect(argv) {
     // No defined side-effect for this step — uniform pass-through so the
     // caller can invoke verify-side-effect for every step without branching.
     emit({ step, landed: true, reason: 'no-side-effect' }, 0);
+    return;
   }
 
   // version → tag: the expected release tag MUST exist in the active worktree's

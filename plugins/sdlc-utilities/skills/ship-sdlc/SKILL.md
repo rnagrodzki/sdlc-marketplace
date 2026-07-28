@@ -342,7 +342,7 @@ For each step that will run, apply the dispatch protocol based on `step.dispatch
 
 5. **Record step completion/failure** via `state/ship.js complete-step` (R70) — see the per-step completion block in "Main-thread TodoWrite orchestration" below; `complete-step` records `completed` and renders the task-tray todos in one call. Failures still use `state/ship.js fail` + the ship-todos `--fail-step` render.
 
-6. **Use result to determine next step** (e.g., review verdict → received-review decision) — flow decisions read the agent's *result*, but step *completion status* is outcome-verified and never taken from the agent's self-report: the dispatched agent's reported outcome is forwarded to `complete-step --outcome` (R-b2), and the `version` step additionally gates completion on the objective release-tag side-effect via `verify-side-effect` (R-b3, F-ship-step-status-integrity-guard-8) — see the per-step completion block below. Print decision reasoning:
+6. **Use result to determine next step** (e.g., review verdict → received-review decision) — flow decisions read the agent's *result*, and step *completion status* is recorded via the same channel: the dispatched agent's reported outcome is forwarded to `complete-step --outcome` (R-b2). For most steps this IS the agent's self-report, taken as given. The `version` step is the exception — completion there is objectively verified against the actual release-tag side-effect via `verify-side-effect` before the reported outcome is trusted (R-b3, F-ship-step-status-integrity-guard-8) — see the per-step completion block below. Print decision reasoning:
    ```
      Review verdict: APPROVED WITH NOTES (2 medium)
      Decision: CONTINUING — no critical/high issues found
@@ -387,7 +387,7 @@ For ultra-short runs (`flags.steps.length < 2`), skip TodoWrite entirely.
 
 `complete-step` atomically marks the step `completed` (the former `state/ship.js complete`) AND renders the task-tray todos (the former `ship-todos --event step --mark-completed`) in a single call. Persisting completion and rendering happen in-process, so the ordering constraint that previously required two separate ordered calls is now internal to the subcommand.
 
-Completion is **outcome-verified** (R-b2/R-b3, docs/specs/ship-sdlc.md) — the recorded status reflects what actually happened, not the agent's unverified self-report:
+Completion status is recorded via `--outcome` (R-b2/R-b3, docs/specs/ship-sdlc.md). For the `version` step, the recorded status is objectively verified against what actually happened (R-b3) rather than trusted from the agent's self-report; for other dispatched steps, the recorded status IS the agent's reported outcome, forwarded as-is (R-b2):
 
 1. Derive `OUTCOME` for the dispatched agent step from the Agent return (Step 4): `success` when the agent reported success, `failure` otherwise (R-b2). Inline steps (`skill: null`, e.g. `verify-openspec`, `learnings-commit`) have no agent report — omit `--outcome` and let `complete-step` record `completed`.
    - **Version-step side-effect gate (R-b3, issue #478):** For the `version` step ONLY, do NOT trust the self-report. FIRST capture `NEW_TAG` from the version-sdlc agent return (the release tag is a declared artifact of the Step 4 result; empty when version-sdlc produced no tag) — this is the single capture point for `NEW_TAG`, reused unchanged by the "After version" ancestry gate below. THEN run the objective check and force `OUTCOME=failure` when the release tag did not land:

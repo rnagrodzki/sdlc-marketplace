@@ -220,7 +220,12 @@ todo per substep, transitioning `pending → in_progress → completed` as the
 pipeline advances. Step 5 uses the atomic `state/ship.js begin-step` and
 `state/ship.js complete-step` subcommands (R69, R70) — each call atomically
 records the state transition and renders the TodoWrite payload in a single
-operation:
+operation. `complete-step` takes an `--outcome` flag reporting what the
+dispatched agent returned; for the `version` step this is cross-checked
+against the actual repository state via `verify-side-effect` before the
+step is recorded as completed (R-b3), so a step cannot be marked done on
+a false self-report. Other steps record the agent's reported outcome
+without an independent side-effect check (R-b2):
 
 - **commit** — stash unstaged, generate message, commit, restore stash
 - **review** — dispatch review dimensions, collect verdicts

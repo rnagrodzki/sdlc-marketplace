@@ -133,7 +133,17 @@ function renderTodos(state, opts = {}) {
   // R-b4 (#496, docs/specs/ship-sdlc.md): state.steps is an array of
   // {name, status} objects, not a name-keyed object — build a lookup map
   // instead of indexing the array by string key (which was always undefined).
-  const stepByName = new Map((Array.isArray(state.steps) ? state.steps : []).map(s => [s.name, s]));
+  // R-SHIPTODOS-FAILLOUD: a non-array `steps` field is a state-file shape bug
+  // (e.g. a stale pre-#496 object-keyed shape), not "zero steps" — silently
+  // coercing to [] makes every step misreport as pending. Fail loudly instead.
+  if (state.steps !== undefined && !Array.isArray(state.steps)) {
+    throw new Error(
+      'renderTodos: state.steps must be an array of {name, status} objects ' +
+      `(R-b4, #496) — got ${Array.isArray(state.steps) ? 'array' : typeof state.steps}. ` +
+      'This state file uses a stale pre-#496 shape and needs migration.'
+    );
+  }
+  const stepByName = new Map((state.steps || []).map(s => [s.name, s]));
 
   const todos = [];
   let skippedCount = 0;
@@ -164,7 +174,15 @@ function renderTodos(state, opts = {}) {
       baseStatus  = 'completed';
       labelSuffix = ' (skipped)';
       isSkipped   = true;
-    } else if (stepStatus === 'failed') {
+    } else if (stepStatus === 'failed' && stepName !== failStep) {
+      // Excludes the step currently transitioning to failed (stepName ===
+      // failStep): completeStepCore persists status:'failed' BEFORE this
+      // render runs, so without this exclusion this branch would preempt the
+      // fail-step per-substep override below (T6/R-TODOWRITE-TRUTHFUL, #432),
+      // collapsing every substep to a uniform "(failed)" instead of
+      // distinguishing in_progress→"(failed)" from pending→"(not attempted)".
+      // A step that failed in a *prior* run (not the one failing right now)
+      // still takes this coarse branch, which is the intended R-b4 behavior.
       baseStatus  = 'completed';
       labelSuffix = ' (failed)';
       isFailed    = true;
@@ -176,7 +194,7 @@ function renderTodos(state, opts = {}) {
       baseStatus = 'pending';
     }
     if (isSkipped) skippedCount++;
-    if (isFailed)  failedCount++;
+    if (isFailed || (failStep && stepName === failStep)) failedCount++;
 
     for (let i = 0; i < substeps.length; i++) {
       const sub    = substeps[i];

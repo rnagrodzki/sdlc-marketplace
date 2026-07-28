@@ -8,12 +8,12 @@
     "resume": false,
     "implicitResume": false
   },
-  "steps": {
-    "execute":  { "name": "execute",  "status": "completed" },
-    "commit":   { "name": "commit",   "status": "completed" },
-    "review":   { "name": "review",   "status": "completed" },
-    "version":  { "name": "version",  "status": "completed" },
-    "pr":       { "name": "pr",       "status": "in_progress" },
-    "cleanup":  { "name": "cleanup",  "status": "pending" }
-  }
+  "steps": [
+    { "name": "execute",  "status": "completed" },
+    { "name": "commit",   "status": "completed" },
+    { "name": "review",   "status": "completed" },
+    { "name": "version",  "status": "completed" },
+    { "name": "pr",       "status": "in_progress" },
+    { "name": "cleanup",  "status": "pending" }
+  ]
 }
