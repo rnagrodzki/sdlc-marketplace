@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
 
+## [0.21.20] - 2026-07-28
+
+### Fixed
+- ship-sdlc: add a proceed-gate that blocks starting a pipeline step until earlier non-conditional steps are terminal-OK, and verify step completion against actual outcomes so a failed dispatch is recorded as `failed` rather than silently `completed`; the version step specifically is now confirmed complete only when its release tag actually lands in the active worktree, not from the agent's self-report (#501)
+- ship-sdlc: scope pipeline state and the active-pipeline resume banner to the worktree that initialized them, so a sibling worktree's stale state no longer surfaces as the current session's; also fix `ship-todos` rendering so skipped/failed steps show an explicit label instead of collapsing to "pending" (#501)
+- check-consistency: add invocation-verbatim and orchestrator-await-barrier lint rules (generalizing prior fixes) and apply them to `review-orchestrator.md` and `plan-sdlc`'s lens fan-out step (#501)
+
 ## [0.21.19] - 2026-07-24
 
 ### Fixed
