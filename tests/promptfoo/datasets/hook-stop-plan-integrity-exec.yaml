@@ -22,7 +22,7 @@
 - description: "stop-plan-integrity: warns 'plan-sdlc was not invoked' when no state file but transcript shows plan mode"
   vars:
     script_path: "repo://tests/promptfoo/scripts/run-stop-plan-integrity.js"
-    script_args: "--project-root {{project_root}} --transcript-file transcript.jsonl"
+    script_args: "--project-root {{project_root}} --transcript-file transcript.jsonl --branch test-branch"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/plan-integrity-no-state-planmode"
   assert:

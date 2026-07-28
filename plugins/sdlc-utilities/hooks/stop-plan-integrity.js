@@ -58,7 +58,16 @@ try {
   // 2. State-file-first branch (no I/O on the primary path)
   // -------------------------------------------------------------------------
 
-  const found = findStateFile('plan', branchSlug);
+  // findStateFile can throw (e.g. resolveMainWorktree() failing outside any
+  // git repo, as happens for promptfoo's copied fixture dirs). Degrade to
+  // "no state file" rather than letting the outer catch swallow the whole
+  // hook and skip the transcript-fallback branch below.
+  let found;
+  try {
+    found = findStateFile('plan', branchSlug);
+  } catch (_) {
+    found = null;
+  }
 
   if (found) {
     // State file exists — check all four markers and the planFilePath stat.
