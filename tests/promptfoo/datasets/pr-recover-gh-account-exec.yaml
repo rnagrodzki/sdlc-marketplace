@@ -94,7 +94,7 @@
     - type: icontains
       value: '"recovered":false'
     - type: regex
-      value: '"hint":"gh auth login --hostname github\\.com"'
+      value: '"hint":"gh auth login --hostname github\.com"'
 
 - description: "pr-recover: canonical github.com host stays single-pass (no viaFallback)"
   vars:

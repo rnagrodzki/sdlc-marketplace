@@ -37,11 +37,11 @@
     - type: icontains
       value: 'local: v2→v3'
 
-- description: "migrate-config: future version (v4) refused"
+- description: "migrate-config: future version (v5) refused"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/migrate-config.js"
     script_cwd: "{{project_root}}"
-    project_root: "file://fixtures-fs/project-config-future-v4"
+    project_root: "file://fixtures-fs/project-config-future-v5"
   assert:
     - type: icontains
       value: 'CONFIG_VERSION_TOO_NEW'

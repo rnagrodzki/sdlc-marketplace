@@ -1,3 +1,3 @@
 ## Notes
 
-See https://httpbin.org/status/404 — should return 404.
+See https://example.com/sdlc-nonexistent-404-path — should return 404.

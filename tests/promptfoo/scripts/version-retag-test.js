@@ -20,7 +20,7 @@
 const fs   = require('fs');
 const os   = require('os');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { spawnSync, execSync } = require('child_process');
 
 const REPO_ROOT     = path.resolve(__dirname, '../../..');
 const VERSION_JS    = path.join(REPO_ROOT, 'plugins/sdlc-utilities/scripts/skill/version.js');
@@ -48,6 +48,15 @@ function copyDirRecursive(src, dst) {
     } else {
       fs.copyFileSync(s, d);
     }
+  }
+}
+
+// Fixtures that need real git tag state (not just checked-in files, since a
+// nested `.git` dir cannot be tracked by git) carry a setup.sh to build it.
+function runSetupIfPresent(dir) {
+  const setupScript = path.join(dir, 'setup.sh');
+  if (fs.existsSync(setupScript)) {
+    execSync(`bash "${setupScript}"`, { cwd: dir, timeout: 10_000, stdio: 'pipe' });
   }
 }
 
@@ -81,6 +90,7 @@ function testRetagWithTag() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vretag-tag-'));
   try {
     copyDirRecursive(fixture, tmp);
+    runSetupIfPresent(tmp);
     const r = runVersionJs(tmp, ['--retag']);
     if (!r.json) return emit(false, `no json output: exit=${r.exitCode} stderr=${r.stderr}`);
     if (r.json.mode !== 'retag') return emit(false, `expected mode=retag, got ${r.json.mode}`);

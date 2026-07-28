@@ -195,7 +195,7 @@
     - type: not-icontains
       value: 'bumpOptions'
 
-- description: 'version-sdlc-already-bumped-rc: rc re-run skips (idempotency guard)'
+- description: 'version-sdlc-already-bumped-rc: rc requested against stable-tagged HEAD skips (idempotency guard, R19 pre-release axis)'
   vars:
     script_path: 'repo://plugins/sdlc-utilities/scripts/skill/version.js'
     script_args: 'rc'

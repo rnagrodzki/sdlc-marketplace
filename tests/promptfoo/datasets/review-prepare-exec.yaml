@@ -68,7 +68,7 @@
     - type: javascript
       value: |
         const semverOrUnknown = /^"plugin_version":"([0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?|unknown)"$/;
-        semverOrUnknown.test(output.replace(/\s/g, '').replace(/^\{/, '').replace(/\}$/, ''))
+        return semverOrUnknown.test(output.replace(/\s/g, '').replace(/^\{/, '').replace(/\}$/, ''));
 
 - description: "review-prepare (#490): linked-worktree (worktree-linked-ahead) — changed_files_count & current_branch reflect wt1, not the main worktree"
   vars:

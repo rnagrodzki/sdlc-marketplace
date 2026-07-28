@@ -27,8 +27,17 @@ function getArg(name) {
   return process.argv[i + 1];
 }
 
+// script-runner.js splits script_args on whitespace, so a multi-word --input
+// value (e.g. free-form log text) arrives as several argv tokens. --input is
+// always the last flag in this driver's usage, so rejoin everything after it.
+function getRestArg(name) {
+  const i = process.argv.indexOf(name);
+  if (i === -1 || i + 1 >= process.argv.length) return null;
+  return process.argv.slice(i + 1).join(' ');
+}
+
 const op = getArg('--op');
-const input = getArg('--input');
+const input = getRestArg('--input');
 
 if (!op) {
   console.error('--op is required (evaluateChecks | classifyLogs)');

@@ -1,6 +1,8 @@
 # Script execution tests for plugins/sdlc-utilities/scripts/lib/links.js — issue #198.
 # Validates the link-verification gate against fixture artifact bodies.
-# Network-dependent cases use httpbin.org (404) and a guaranteed-unreachable .invalid host.
+# Network-dependent cases use example.com (RFC 2606 reserved domain, stable 404 on unknown
+# paths — httpbin.org was flaky/rate-limited and produced intermittent 503s) and a
+# guaranteed-unreachable .invalid host.
 # Offline-mode cases set SDLC_LINKS_OFFLINE=1 to skip generic reachability while keeping
 # context-aware checks (GitHub identity, Atlassian host).
 

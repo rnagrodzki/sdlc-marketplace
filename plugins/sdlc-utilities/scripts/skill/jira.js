@@ -44,7 +44,11 @@ function runAutoMigration() {
   if (_migrationRan) return;
   _migrationRan = true;
   try {
-    require(path.join(__dirname, 'migrate-jira-templates'));
+    // Call migrate() directly rather than relying on require()'s side effects —
+    // the shim's CLI entrypoint calls process.exit(), which would kill this
+    // (long-running) process if invoked via bare require().
+    const { migrate } = require(path.join(__dirname, 'migrate-jira-templates'));
+    migrate();
   } catch (_) { /* non-fatal — missing shim should not break jira ops */ }
 }
 
@@ -1013,4 +1017,5 @@ module.exports = {
   initTemplates,
   clearCache,
   copyTemplate,
+  runAutoMigration,
 };

@@ -92,13 +92,18 @@ function testAllCurrent() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'setup-sv-current-'));
   try {
     copyDirRecursive(fixture, tmp);
-    // Install the actual retag-release.cjs from the plugin
+    // Install every MANIFEST entry (not just retag-release.cjs) — setup.js's
+    // scriptVersions check walks the full scaffold-ci.js MANIFEST, so leaving
+    // any entry uninstalled here yields action=missing for it.
     const pluginRoot = path.resolve(REPO_ROOT, 'plugins/sdlc-utilities');
-    const ciSrc = path.join(pluginRoot, 'scripts', 'ci', 'retag-release.cjs');
-    if (fs.existsSync(ciSrc)) {
-      const destDir = path.join(tmp, '.github', 'scripts');
-      fs.mkdirSync(destDir, { recursive: true });
-      fs.copyFileSync(ciSrc, path.join(destDir, 'retag-release.cjs'));
+    const { MANIFEST } = require(path.join(pluginRoot, 'scripts', 'util', 'scaffold-ci'));
+    for (const entry of MANIFEST) {
+      const ciSrc = path.join(pluginRoot, entry.src);
+      if (fs.existsSync(ciSrc)) {
+        const destPath = path.join(tmp, entry.dest);
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        fs.copyFileSync(ciSrc, destPath);
+      }
     }
     const r = runSetupJs(tmp);
     if (!r.json) return emit(false, `no json: exit=${r.exitCode} stderr=${r.stderr}`);

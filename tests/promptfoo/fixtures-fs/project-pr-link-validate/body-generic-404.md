@@ -1,3 +1,3 @@
 ## Summary
 
-See documentation at https://httpbin.org/status/404 for the broken link case.
+See documentation at https://example.com/sdlc-nonexistent-404-path for the broken link case.

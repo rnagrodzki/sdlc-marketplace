@@ -186,9 +186,8 @@ function testLegacyOnlyIdempotent() {
 /**
  * Auto-trigger guard: verify the module-level _migrationRan flag in jira.js
  * causes the migration to run at most once per Node process. We spawn a helper
- * script that requires jira.js via the auto-migration require() call twice and
- * checks that the legacy dir was moved exactly once (by counting moves via a
- * side-channel JSON file written by the shim).
+ * script that requires jira.js and calls its exported runAutoMigration() twice,
+ * then checks that the legacy dir was moved exactly once.
  */
 function testAutoTriggerGuard() {
   // Prepare a tmpRoot with legacy-only content
@@ -198,14 +197,17 @@ function testAutoTriggerGuard() {
 'use strict';
 const path = require('path');
 const fs = require('fs');
-const SHIM = path.join(${JSON.stringify(REPO_ROOT)}, 'plugins/sdlc-utilities/scripts/skill/migrate-jira-templates.js');
+const JIRA = path.join(${JSON.stringify(REPO_ROOT)}, 'plugins/sdlc-utilities/scripts/skill/jira.js');
 const tmpRoot = ${JSON.stringify(tmpRoot)};
-process.env.SDLC_ROOT = tmpRoot;
-// Call the shim directly, simulating what jira.js does (module-level flag)
-// by requiring it twice — Node caches the module so body only runs once.
-const shim1 = require(SHIM);
-// second require — should be a no-op due to module cache
-const shim2 = require(SHIM);
+// resolveSdlcRoot() resolves off process.cwd() (falls back to cwd when git
+// worktree detection fails, e.g. tmpRoot is not a git repo) — chdir so the
+// migration targets the fixture, not the promptfoo harness's own cwd.
+process.chdir(tmpRoot);
+// Call the exported runAutoMigration() twice — the module-level _migrationRan
+// flag in jira.js (not Node's require cache) must make the second call a no-op.
+const jira = require(JIRA);
+jira.runAutoMigration();
+jira.runAutoMigration();
 // Check that exactly one move happened
 const legacyGone = !fs.existsSync(path.join(tmpRoot, '.claude', 'jira-templates'));
 const targetExists = fs.existsSync(path.join(tmpRoot, '.sdlc', 'jira-templates', 'Bug.md'));

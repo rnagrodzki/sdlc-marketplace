@@ -108,7 +108,7 @@
     - type: javascript
       value: |
         const valid = new Set(['review-dimensions', 'plan-guardrails', 'execute-guardrails', 'copilot-instructions', 'null']);
-        valid.has(output.trim())
+        return valid.has(output.trim());
     - type: icontains
       value: "review-dimensions"
 
