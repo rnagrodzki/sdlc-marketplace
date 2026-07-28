@@ -17,6 +17,17 @@
 #   ship-pipeline-failed-nocleanup— commit failed, no cleanup, auto:true
 #   ship-pipeline-resolved        — all steps completed
 #   ship-pipeline-nostate         — no ship state file
+#
+# All state-bearing fixtures above carry `sessionId: "sess-fixture"` and every
+# stdin payload carries the matching `"session_id":"sess-fixture"` — required by
+# the R73 (#505) session-identity gate, which needs BOTH sides present and equal
+# before any hook enforces. The R73-specific fixtures below vary that pairing:
+#   ship-pipeline-session-match           — sessionId == payload session_id
+#   ship-pipeline-session-mismatch        — sessionId != payload session_id
+#   ship-pipeline-session-absent          — no sessionId key (pre-#505 state file)
+#   ship-pipeline-session-reclaimed       — created by A, claimSession()'d to B
+#   ship-pipeline-session-ancient         — match + mtime backdated to 2024
+#   ship-pipeline-session-linked-worktree — match + payload cwd in another worktree
 
 # ---------------------------------------------------------------------------
 # pipeline-continue.js (PostToolUse, R67 broadened) — 6 cases
@@ -28,7 +39,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"Bash","tool_response":{}}'
+    script_stdin: '{"tool_name":"Bash","tool_response":{},"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-noauto"
   assert:
     - type: javascript
@@ -46,7 +57,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"Bash","tool_response":{}}'
+    script_stdin: '{"tool_name":"Bash","tool_response":{},"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-between-auto"
   assert:
     - type: javascript
@@ -64,7 +75,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"Bash"}'
+    script_stdin: '{"tool_name":"Bash","session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-between-noauto"
   assert:
     - type: javascript
@@ -79,7 +90,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"Bash","tool_response":{}}'
+    script_stdin: '{"tool_name":"Bash","tool_response":{},"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-failed-cleanup"
   assert:
     - type: javascript
@@ -96,7 +107,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"Bash"}'
+    script_stdin: '{"tool_name":"Bash","session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-resolved"
   assert:
     - type: javascript
@@ -111,7 +122,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"Bash"}'
+    script_stdin: '{"tool_name":"Bash","session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-nostate"
   assert:
     - type: javascript
@@ -130,7 +141,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"stop_hook_active":false}'
+    script_stdin: '{"stop_hook_active":false,"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-inprogress"
   assert:
     - type: javascript
@@ -147,7 +158,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"stop_hook_active":false}'
+    script_stdin: '{"stop_hook_active":false,"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-between-auto"
   assert:
     - type: javascript
@@ -166,7 +177,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"stop_hook_active":false}'
+    script_stdin: '{"stop_hook_active":false,"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-noauto"
   assert:
     - type: javascript
@@ -185,7 +196,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"stop_hook_active":false}'
+    script_stdin: '{"stop_hook_active":false,"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-between-noauto"
   assert:
     - type: javascript
@@ -200,7 +211,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"stop_hook_active":false}'
+    script_stdin: '{"stop_hook_active":false,"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-failed-nocleanup"
   assert:
     - type: javascript
@@ -215,7 +226,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"stop_hook_active":true}'
+    script_stdin: '{"stop_hook_active":true,"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-inprogress"
   assert:
     - type: javascript
@@ -230,7 +241,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"stop_hook_active":false}'
+    script_stdin: '{"stop_hook_active":false,"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-resolved"
   assert:
     - type: javascript
@@ -240,22 +251,66 @@
         if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
         return true;
 
-# 7. Idempotency — the hook is pure-read (never mutates state). Running it on the
-#    same in_progress state returns the same block decision every time.
-- description: "stop-pipeline-continue (R68): idempotent block on repeated invocation (no state mutation)"
+# 7. Consecutive-block cap (Task 6, #505 follow-up) — bounds the hook's own
+#    documented idempotence: repeated invocations against the SAME unchanged
+#    advancing state block forever unless capped. RECONCILES the prior
+#    "idempotent block on repeated invocation" case: the hook is invoked
+#    STOP_BLOCK_CAP+1 (4) times in sequence against the same unchanged
+#    in_progress step, sharing the same sidecar-bearing state dir across
+#    spawns (unlike every other case in this file, which spawns the hook
+#    exactly once). The first 3 invocations still block; the 4th degrades to
+#    silent exit 0 with a stderr diagnostic — stdout stays the JSON decision
+#    channel and never carries the cap-breach note.
+- description: "stop-pipeline-continue (Task 6, #505): consecutive-block cap silences after 3 unchanged blocks"
   vars:
-    script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
+    script_path: "-e"
+    script_args: '((cp,hook)=>console.log(JSON.stringify(Array(4).fill(0).map(_=>cp.spawnSync("node",[hook],{input:JSON.stringify({stop_hook_active:false,session_id:"sess-fixture"}),cwd:process.cwd(),encoding:"utf8"})).map(r=>({status:r.status,stdout:r.stdout,stderr:r.stderr})))))(require("child_process"),"{{repo_root}}/plugins/sdlc-utilities/hooks/stop-pipeline-continue.js")'
     script_cwd: "{{project_root}}"
-    script_stdin: '{"stop_hook_active":false}'
     project_root: "file://fixtures-fs/ship-pipeline-inprogress"
   assert:
     - type: javascript
       value: |
         const r = JSON.parse(output);
-        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
-        const inner = JSON.parse(r.stdout);
-        if (inner.decision !== 'block') return `FAIL: decision ${inner.decision}`;
-        // The hook reads but never writes state — repeated runs are stable.
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const runs = JSON.parse(r.stdout);
+        if (!Array.isArray(runs) || runs.length !== 4) return `FAIL: expected 4 runs, got: ${r.stdout}`;
+        for (let i = 0; i < 3; i++) {
+          if (runs[i].status !== 0) return `FAIL: run ${i} exit ${runs[i].status}`;
+          const decision = JSON.parse(runs[i].stdout);
+          if (decision.decision !== 'block') return `FAIL: run ${i} decision ${decision.decision}`;
+        }
+        if (runs[3].status !== 0) return `FAIL: run 3 (cap breach) exit ${runs[3].status}`;
+        if (runs[3].stdout.trim() !== '') return `FAIL: run 3 expected silent stdout, got: ${runs[3].stdout}`;
+        if (!/cap/i.test(runs[3].stderr)) return `FAIL: run 3 missing cap diagnostic on stderr: ${runs[3].stderr}`;
+        return true;
+
+# 7b. The cap resets when the pipeline advances to a different step (Task 6,
+#     #505 follow-up): the same 4-run sequence as above reaches the cap on
+#     step "execute" (sidecar count 3), the ship state file is then rewritten
+#     so step "commit" is in_progress instead, and a 5th invocation blocks
+#     again — the stepName mismatch against the sidecar's recorded step
+#     resets count to 0 rather than staying silenced by the prior step's cap.
+- description: "stop-pipeline-continue (Task 6, #505): consecutive-block counter resets on step change"
+  vars:
+    script_path: "-e"
+    script_args: '((cp,fs,hook,statePath)=>((r1,r2,r3,r4)=>(fs.writeFileSync(statePath,JSON.stringify({version:1,startedAt:"2026-06-08T12:00:00Z",branch:"feat/ship",sessionId:"sess-fixture",flags:{auto:true,steps:["execute","commit","pr"]},steps:[{name:"execute",status:"completed"},{name:"commit",status:"in_progress"},{name:"pr",status:"pending"}]})),((r5)=>console.log(JSON.stringify([r1,r2,r3,r4,r5].map(r=>({status:r.status,stdout:r.stdout,stderr:r.stderr})))))(cp.spawnSync("node",[hook],{input:JSON.stringify({stop_hook_active:false,session_id:"sess-fixture"}),cwd:process.cwd(),encoding:"utf8"}))))(cp.spawnSync("node",[hook],{input:JSON.stringify({stop_hook_active:false,session_id:"sess-fixture"}),cwd:process.cwd(),encoding:"utf8"}),cp.spawnSync("node",[hook],{input:JSON.stringify({stop_hook_active:false,session_id:"sess-fixture"}),cwd:process.cwd(),encoding:"utf8"}),cp.spawnSync("node",[hook],{input:JSON.stringify({stop_hook_active:false,session_id:"sess-fixture"}),cwd:process.cwd(),encoding:"utf8"}),cp.spawnSync("node",[hook],{input:JSON.stringify({stop_hook_active:false,session_id:"sess-fixture"}),cwd:process.cwd(),encoding:"utf8"})))(require("child_process"),require("fs"),"{{repo_root}}/plugins/sdlc-utilities/hooks/stop-pipeline-continue.js",process.cwd()+"/.sdlc/execution/ship-feat-ship-20260608T120000Z.json")'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-pipeline-inprogress"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const runs = JSON.parse(r.stdout);
+        if (!Array.isArray(runs) || runs.length !== 5) return `FAIL: expected 5 runs, got: ${r.stdout}`;
+        for (let i = 0; i < 3; i++) {
+          const decision = JSON.parse(runs[i].stdout);
+          if (decision.decision !== 'block') return `FAIL: run ${i} (step execute) decision ${decision.decision}`;
+        }
+        if (runs[3].stdout.trim() !== '') return `FAIL: run 3 (cap breach on execute) expected silent stdout, got: ${runs[3].stdout}`;
+        const afterReset = JSON.parse(runs[4].stdout);
+        if (afterReset.decision !== 'block') return `FAIL: run 4 (step commit, post-reset) expected block, got: ${runs[4].stdout}, stderr=${runs[4].stderr}`;
+        if (!/commit/.test(afterReset.reason || '')) return 'FAIL: post-reset block reason missing new step name "commit"';
         return true;
 
 # ---------------------------------------------------------------------------
@@ -267,7 +322,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/block-askuserquestion-auto.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"AskUserQuestion","tool_input":{}}'
+    script_stdin: '{"tool_name":"AskUserQuestion","tool_input":{},"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-inprogress"
   assert:
     - type: javascript
@@ -286,7 +341,7 @@
   vars:
     script_path: "repo://plugins/sdlc-utilities/hooks/block-askuserquestion-auto.js"
     script_cwd: "{{project_root}}"
-    script_stdin: '{"tool_name":"AskUserQuestion","tool_input":{}}'
+    script_stdin: '{"tool_name":"AskUserQuestion","tool_input":{},"session_id":"sess-fixture"}'
     project_root: "file://fixtures-fs/ship-pipeline-noauto"
   assert:
     - type: javascript
@@ -294,4 +349,346 @@
         const r = JSON.parse(output);
         if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
         if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
+        return true;
+
+# ---------------------------------------------------------------------------
+# hookEnforcementAllowed / claimSession (R73, #505) — session-identity gate.
+#
+# hookEnforcementAllowed(data, payload) is pure (no I/O), so the four
+# predicate cases invoke it directly via `node -e` — no fixture needed.
+# `script_args` is passed through hook-runner's `.split(/\s+/)`, so each
+# `-e` body below is a single whitespace-free expression (no `const`/`let`,
+# multi-param arrow functions instead of block statements).
+#
+# The reclaim-on-resume cases drive the real skill/ship.js binary (not the
+# library directly) against the existing project-ship-state-resume fixture,
+# to prove claimSession() is actually wired into both resume branches there
+# — not just that the library function works in isolation. The `-e` script
+# stamps the fixture's state file with sessionId "sess-A", spawns ship.js
+# with CLAUDE_CODE_SESSION_ID set to a different session, then reads the
+# file back and reports {status, before, after} — all inside the spawned
+# node process itself (which has normal require/fs access; only inline
+# promptfoo assertions are sandboxed and cannot use require/fs).
+# ---------------------------------------------------------------------------
+
+# 1. Matching session ids → allowed:true, regardless of payload.cwd (a linked
+#    task worktree's cwd must not affect the decision — no worktree term).
+- description: "hookEnforcementAllowed (R73, #505): matching session ids allows enforcement (payload.cwd ignored)"
+  vars:
+    script_path: "-e"
+    script_args: 'console.log(JSON.stringify(require("{{repo_root}}/plugins/sdlc-utilities/scripts/lib/state.js").hookEnforcementAllowed({sessionId:"sess-A"},{session_id:"sess-A",cwd:"/some/other/worktree"})))'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.allowed !== true) return `FAIL: allowed=${inner.allowed} reason=${inner.reason}`;
+        return true;
+
+# 2. Session ids differ → allowed:false, SILENT (no enforcement, no throw).
+- description: "hookEnforcementAllowed (R73, #505): mismatched session ids denies enforcement"
+  vars:
+    script_path: "-e"
+    script_args: 'console.log(JSON.stringify(require("{{repo_root}}/plugins/sdlc-utilities/scripts/lib/state.js").hookEnforcementAllowed({sessionId:"sess-A"},{session_id:"sess-B"})))'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.allowed !== false) return `FAIL: allowed=${inner.allowed}`;
+        if (!/mismatch/.test(inner.reason || '')) return `FAIL: reason=${inner.reason}`;
+        return true;
+
+# 3. State carries no sessionId (pre-#505 state file, or absent/null) → denies.
+- description: "hookEnforcementAllowed (R73, #505): state sessionId absent denies enforcement"
+  vars:
+    script_path: "-e"
+    script_args: 'console.log(JSON.stringify(require("{{repo_root}}/plugins/sdlc-utilities/scripts/lib/state.js").hookEnforcementAllowed({},{session_id:"sess-A"})))'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.allowed !== false) return `FAIL: allowed=${inner.allowed}`;
+        if (!/absent/.test(inner.reason || '')) return `FAIL: reason=${inner.reason}`;
+        return true;
+
+# 4. Hook payload carries no session_id (e.g. an older Claude Code build) → denies.
+- description: "hookEnforcementAllowed (R73, #505): payload session_id absent denies enforcement"
+  vars:
+    script_path: "-e"
+    script_args: 'console.log(JSON.stringify(require("{{repo_root}}/plugins/sdlc-utilities/scripts/lib/state.js").hookEnforcementAllowed({sessionId:"sess-A"},{})))'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.allowed !== false) return `FAIL: allowed=${inner.allowed}`;
+        if (!/absent/.test(inner.reason || '')) return `FAIL: reason=${inner.reason}`;
+        return true;
+
+# 5. Reclaim on IMPLICIT resume (R-implicit-resume, #359): a fresh state file
+#    stamped for session A, ship.js invoked with no --resume flag under
+#    session B (implicitResume auto-fires since fresh && !cli.resume) — the
+#    on-disk sessionId must flip to B.
+#    "fresh" here comes only from the fs.writeFileSync() call happening
+#    milliseconds before the ship.js spawn in the same expression below —
+#    resume.fresh is an mtime check, and nothing else in this case touches
+#    the file's mtime. Do not reorder or split the write out from the spawn
+#    (e.g. into a separate script_args or an earlier setup step): doing so
+#    lets the mtime age past the freshness window, implicitResume never
+#    fires, claimSession() is never called, and this case fails on the
+#    `after !== 'sess-B'` assertion below for a reason unrelated to
+#    claimSession itself (a maintenance trap, not a correctness one).
+- description: "claimSession (R73, #505): implicit resume reclaims sessionId for the resuming session"
+  vars:
+    script_path: "-e"
+    script_args: '((fs,cp,fp,shipJs)=>(fs.writeFileSync(fp,JSON.stringify({version:1,startedAt:"2026-01-01T00:00:00Z",branch:"main",flags:{auto:true,steps:["commit"]},steps:[{name:"commit",status:"pending"}],decisions:[],deferredFindings:[],sessionId:"sess-A"})),console.log(JSON.stringify({status:cp.spawnSync("node",[shipJs,"--steps","commit"],{cwd:process.cwd(),env:Object.assign({},process.env,{CLAUDE_CODE_SESSION_ID:"sess-B"}),encoding:"utf8"}).status,before:"sess-A",after:JSON.parse(fs.readFileSync(fp,"utf8")).sessionId}))))(require("fs"),require("child_process"),process.cwd()+"/.sdlc/execution/ship-main-20260101T000000Z.json","{{repo_root}}/plugins/sdlc-utilities/scripts/skill/ship.js")'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-state-resume"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.status !== 0) return `FAIL: ship.js exited ${inner.status}, no claim could happen`;
+        if (inner.before !== 'sess-A') return `FAIL: precondition not met, before=${inner.before}`;
+        if (inner.after !== 'sess-B') return `FAIL: sessionId not reclaimed, after=${inner.after}`;
+        return true;
+
+# 6. Reclaim on EXPLICIT --resume (R64/#400): same fixture, but ship.js is
+#    invoked with an explicit --resume flag under session C — proves the
+#    second (non-implicit) call site also fires.
+- description: "claimSession (R73, #505): explicit --resume reclaims sessionId for the resuming session"
+  vars:
+    script_path: "-e"
+    script_args: '((fs,cp,fp,shipJs)=>(fs.writeFileSync(fp,JSON.stringify({version:1,startedAt:"2026-01-01T00:00:00Z",branch:"main",flags:{auto:true,steps:["commit"]},steps:[{name:"commit",status:"pending"}],decisions:[],deferredFindings:[],sessionId:"sess-A"})),console.log(JSON.stringify({status:cp.spawnSync("node",[shipJs,"--resume","--steps","commit"],{cwd:process.cwd(),env:Object.assign({},process.env,{CLAUDE_CODE_SESSION_ID:"sess-C"}),encoding:"utf8"}).status,before:"sess-A",after:JSON.parse(fs.readFileSync(fp,"utf8")).sessionId}))))(require("fs"),require("child_process"),process.cwd()+"/.sdlc/execution/ship-main-20260101T000000Z.json","{{repo_root}}/plugins/sdlc-utilities/scripts/skill/ship.js")'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-state-resume"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.status !== 0) return `FAIL: ship.js exited ${inner.status}, no claim could happen`;
+        if (inner.before !== 'sess-A') return `FAIL: precondition not met, before=${inner.before}`;
+        if (inner.after !== 'sess-C') return `FAIL: sessionId not reclaimed, after=${inner.after}`;
+        return true;
+
+# ---------------------------------------------------------------------------
+# R73 (#505) end-to-end: the three enforcing hooks routed through
+# hookEnforcementAllowed(). Every fixture below is maximally enforcing
+# (execute in_progress + flags.auto = true) so the session gate is the ONLY
+# variable — a silent result can have no other cause.
+# ---------------------------------------------------------------------------
+
+# 7. MATCH / pipeline-continue → the nudge is preserved, not disabled.
+- description: "pipeline-continue (R73, #505): matching session_id still emits additionalContext"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"Bash","tool_response":{},"session_id":"sess-match"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-match"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        if (!/in_progress/.test((inner.hookSpecificOutput || {}).additionalContext || '')) return `FAIL: no nudge, stderr=${r.stderr}`;
+        return true;
+
+# 8. MATCH / stop-pipeline-continue → the block is preserved.
+- description: "stop-pipeline-continue (R73, #505): matching session_id still blocks"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"stop_hook_active":false,"session_id":"sess-match"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-match"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.decision !== 'block') return `FAIL: decision ${inner.decision}, stderr=${r.stderr}`;
+        return true;
+
+# 9. MATCH / block-askuserquestion-auto → the deny is preserved.
+- description: "block-askuserquestion-auto (R73, #505): matching session_id still denies"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/block-askuserquestion-auto.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"AskUserQuestion","tool_input":{},"session_id":"sess-match"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-match"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        if ((inner.hookSpecificOutput || {}).permissionDecision !== 'deny') return `FAIL: not denied, stderr=${r.stderr}`;
+        return true;
+
+# 10. MISMATCH / pipeline-continue → silent stdout, reason on STDERR, exit 0.
+- description: "pipeline-continue (R73, #505): mismatched session_id does not hijack the session"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"Bash","tool_response":{},"session_id":"sess-other"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-mismatch"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
+        if (!/mismatch/.test(r.stderr)) return `FAIL: reason not on stderr: ${r.stderr}`;
+        return true;
+
+# 11. MISMATCH / stop-pipeline-continue → no hard block on a foreign session.
+- description: "stop-pipeline-continue (R73, #505): mismatched session_id does not block a foreign session"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"stop_hook_active":false,"session_id":"sess-other"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-mismatch"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
+        if (!/mismatch/.test(r.stderr)) return `FAIL: reason not on stderr: ${r.stderr}`;
+        return true;
+
+# 12. MISMATCH / block-askuserquestion-auto → a foreign session may still ask.
+- description: "block-askuserquestion-auto (R73, #505): mismatched session_id does not deny a foreign session"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/block-askuserquestion-auto.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"AskUserQuestion","tool_input":{},"session_id":"sess-other"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-mismatch"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
+        if (!/mismatch/.test(r.stderr)) return `FAIL: reason not on stderr: ${r.stderr}`;
+        return true;
+
+# 13. ABSENT / pipeline-continue → pre-#505 state files fail to silence.
+- description: "pipeline-continue (R73, #505): state without sessionId fails to silence"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"Bash","tool_response":{},"session_id":"sess-any"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-absent"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
+        if (!/absent/.test(r.stderr)) return `FAIL: reason not on stderr: ${r.stderr}`;
+        return true;
+
+# 14. ABSENT / stop-pipeline-continue.
+- description: "stop-pipeline-continue (R73, #505): state without sessionId fails to silence"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"stop_hook_active":false,"session_id":"sess-any"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-absent"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
+        if (!/absent/.test(r.stderr)) return `FAIL: reason not on stderr: ${r.stderr}`;
+        return true;
+
+# 15. ABSENT / block-askuserquestion-auto.
+- description: "block-askuserquestion-auto (R73, #505): state without sessionId fails to silence"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/block-askuserquestion-auto.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"AskUserQuestion","tool_input":{},"session_id":"sess-any"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-absent"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        if (r.stdout.trim() !== '') return `FAIL: expected silent, got: ${r.stdout}`;
+        if (!/absent/.test(r.stderr)) return `FAIL: reason not on stderr: ${r.stderr}`;
+        return true;
+
+# 16. RECLAIMED — state created by session A, the real claimSession() applied for
+#     session B, then the hook invoked as B. Proves a legitimately resumed run
+#     keeps its nudges instead of being silenced by the creating session's id.
+#     `script_args` is the ONLY var that substitutes {{repo_root}}, so the claim
+#     and the hook spawn both happen inside a single whitespace-free `-e`
+#     expression (hook-runner splits script_args on /\s+/).
+- description: "pipeline-continue (R73, #505): reclaimed pipeline still nudges the resuming session"
+  vars:
+    script_path: "-e"
+    script_args: '((cp,st,hook)=>console.log(JSON.stringify({claimed:st.claimSession("ship","feat-ship"),hook:cp.spawnSync("node",[hook],{input:JSON.stringify({tool_name:"Bash",tool_response:{},session_id:"sess-B"}),cwd:process.cwd(),encoding:"utf8"})})))(require("child_process"),require("{{repo_root}}/plugins/sdlc-utilities/scripts/lib/state.js"),"{{repo_root}}/plugins/sdlc-utilities/hooks/pipeline-continue.js")'
+    script_cwd: "{{project_root}}"
+    script_env: '{"CLAUDE_CODE_SESSION_ID":"sess-B"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-reclaimed"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.claimed !== true) return 'FAIL: claimSession did not rewrite the state file';
+        if (inner.hook.status !== 0) return `FAIL: hook exited ${inner.hook.status}`;
+        const emitted = JSON.parse(inner.hook.stdout);
+        if (!/in_progress/.test((emitted.hookSpecificOutput || {}).additionalContext || '')) return `FAIL: no nudge after reclaim, stderr=${inner.hook.stderr}`;
+        return true;
+
+# 17. ANCIENT — matching session, state mtime backdated to 2024. The gate carries
+#     NO freshness/TTL term: a long-running step must not be silenced by age.
+- description: "stop-pipeline-continue (R73, #505): backdated state with matching session still blocks (no time term)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/stop-pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"stop_hook_active":false,"session_id":"sess-ancient"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-ancient"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.decision !== 'block') return `FAIL: staleness silenced the gate, stderr=${r.stderr}`;
+        return true;
+
+# 18. LINKED WORKTREE — matching session, but the payload `cwd` points at a
+#     linked task worktree while the state's `worktree` records the main
+#     checkout. The gate carries NO worktree term: a step dispatched with
+#     isolation: "worktree" must keep receiving its nudge (the reported stall).
+- description: "pipeline-continue (R73, #505): payload cwd in a linked worktree still nudges (no worktree term)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/hooks/pipeline-continue.js"
+    script_cwd: "{{project_root}}"
+    script_stdin: '{"tool_name":"Bash","tool_response":{},"session_id":"sess-wt","cwd":"/tmp/sdlc-worktrees/feat-ship-task-3"}'
+    project_root: "file://fixtures-fs/ship-pipeline-session-linked-worktree"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode}`;
+        const inner = JSON.parse(r.stdout);
+        if (!/in_progress/.test((inner.hookSpecificOutput || {}).additionalContext || '')) return `FAIL: worktree mismatch silenced the gate, stderr=${r.stderr}`;
         return true;

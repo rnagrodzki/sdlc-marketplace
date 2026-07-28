@@ -10,17 +10,20 @@
  * can emergently call AskUserQuestion at the review→fix boundary and stall an
  * unattended run. This hook DENIES that call deterministically.
  *
- * Returns permissionDecision: "deny" (exit 0, JSON stdout) when BOTH:
+ * Returns permissionDecision: "deny" (exit 0, JSON stdout) when ALL of:
  *   (a) a ship state file exists for the current branch AND
  *       pipelineAdvancing(data).advancing === true (R-advancing-predicate,
  *       lib/state.js — shared with R67/R68; no inline duplicate predicate), AND
- *   (b) flags.auto === true in the state file (strict R68 form
+ *   (b) the invoking session owns the pipeline (R73, #505 —
+ *       `hookEnforcementAllowed(data, payload)` matches `payload.session_id`
+ *       against `data.sessionId`), AND
+ *   (c) flags.auto === true in the state file (strict R68 form
  *       !!(data.flags && data.flags.auto === true)).
  *
  * In every other condition (no stdin, parse error, no git, no ship state file,
- * lib load failure, advancing false, flags.auto !== true) the hook exits 0
- * silently with no stdout (C18 — never block AskUserQuestion outside an active
- * --auto ship pipeline). The hook never mutates state.
+ * lib load failure, advancing false, foreign session, flags.auto !== true) the
+ * hook exits 0 silently with no stdout (C18 — never block AskUserQuestion
+ * outside an active --auto ship pipeline). The hook never mutates state.
  *
  * Lazy-loads ../scripts/lib/state.js and ../scripts/lib/git.js. Requires only
  * Node.js built-ins plus those two lib files — no new npm dependencies.
@@ -45,12 +48,12 @@ function main() {
   }
   // tool_name / tool_input are available on the payload (matcher already scoped
   // this hook to AskUserQuestion) but are not required for the deny decision.
-  void payload.tool_name;
-  void payload.tool_input;
+  // `payload.session_id` IS required — the R73 gate below reads it to confirm
+  // this session owns the pipeline.
 
-  let slugifyBranch, findStateFile, readState, pipelineAdvancing, exec;
+  let slugifyBranch, findStateFile, readState, pipelineAdvancing, hookEnforcementAllowed, exec;
   try {
-    ({ slugifyBranch, findStateFile, readState, pipelineAdvancing } = require('../scripts/lib/state'));
+    ({ slugifyBranch, findStateFile, readState, pipelineAdvancing, hookEnforcementAllowed } = require('../scripts/lib/state'));
     ({ exec } = require('../scripts/lib/git'));
   } catch (err) {
     process.stderr.write(`block-askuserquestion-auto: lib load failed — ${err && err.message || err}\n`);
@@ -81,6 +84,16 @@ function main() {
   // Pipeline must be advancing (shared predicate — no inline duplicate).
   const { advancing } = pipelineAdvancing(data);
   if (!advancing) process.exit(0);
+
+  // R73 (#505): only the session that currently claims this pipeline may have
+  // its AskUserQuestion denied. Session id only — no worktree comparison:
+  // linked worktrees share the main worktree's state dir, so a step dispatched
+  // with isolation: "worktree" must stay covered.
+  const gate = hookEnforcementAllowed(data, payload);
+  if (!gate.allowed) {
+    process.stderr.write(`block-askuserquestion-auto: not enforcing — ${gate.reason}\n`);
+    process.exit(0);
+  }
 
   // Strict auto gate (R68 form). Non-auto interactive review may legitimately
   // pause, so AskUserQuestion is allowed when flags.auto !== true (C18).

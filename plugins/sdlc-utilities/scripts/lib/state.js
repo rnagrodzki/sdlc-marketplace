@@ -294,7 +294,12 @@ function initState(prefix, branch, data) {
   const fileName = `${prefix}-${branchSlug}-${timestamp}.json`;
   const filePath = path.join(stateDir, fileName);
 
-  atomicWriteSync(filePath, JSON.stringify(data, null, 2));
+  // R73 (#505): stamp the creating session's id so hook enforcement can later
+  // tell "the session that owns this pipeline" apart from any other session
+  // that happens to share the branch. `claimSession()` re-stamps this on resume.
+  const dataToWrite = { ...data, sessionId: process.env.CLAUDE_CODE_SESSION_ID || null };
+
+  atomicWriteSync(filePath, JSON.stringify(dataToWrite, null, 2));
   return filePath;
 }
 
@@ -842,6 +847,80 @@ function pipelineAdvancing(data) {
 }
 
 // ---------------------------------------------------------------------------
+// Session identity (R73, #505)
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-stamp `sessionId` on an existing state file to the current session.
+ *
+ * `initState()` stamps the creating session's id, but R-implicit-resume and
+ * the explicit `--resume` path both continue an EXISTING state file without
+ * re-initializing it. Without this, `sessionId` would keep pointing at the
+ * (possibly long-dead) session that first created the pipeline, so
+ * `hookEnforcementAllowed` would silence continuation hooks for the rest of
+ * a legitimately resumed run. `claimSession()` closes that gap: whichever
+ * session most recently resumed the pipeline becomes the one hook
+ * enforcement recognizes as driving it.
+ *
+ * No-ops (returns `false`) when there is no matching state file (including
+ * an unreadable/corrupt one — `readState` already returns `null` for that),
+ * or when `CLAUDE_CODE_SESSION_ID` is unset in the environment.
+ *
+ * @param {string} prefix      "ship" | "execute" | "plan" | "commit"
+ * @param {string} branchSlug  Slugified branch name (via slugifyBranch)
+ * @returns {boolean} true when the state file was rewritten with the new sessionId
+ */
+function claimSession(prefix, branchSlug) {
+  const sessionId = process.env.CLAUDE_CODE_SESSION_ID;
+  if (!sessionId) return false;
+
+  const state = readState(prefix, branchSlug);
+  if (!state) return false;
+
+  state.data.sessionId = sessionId;
+  writeState(state.filePath, state.data);
+  return true;
+}
+
+/**
+ * Pure predicate: is the session behind `payload` allowed to enforce (i.e.
+ * inject "continue executing this step" reminders for) the pipeline
+ * described by `data`?
+ *
+ * R73 (#505): locating a state file by branch slug is not sufficient on its
+ * own — a stale or abandoned pipeline must not hijack an unrelated session
+ * that happens to share a branch. Enforcement additionally requires that
+ * `payload.session_id` matches `data.sessionId`.
+ *
+ * Deliberately excludes:
+ *   - Freshness/TTL — `mtime` only advances on step transitions, so a
+ *     long-running `execute` step must not be silenced by staleness.
+ *   - Worktree identity — `data.worktree` is diagnostic-only (see
+ *     state-format.md) and would legitimately mismatch for a step running
+ *     in a linked task worktree; `resolveStateDir()` already routes through
+ *     the main worktree, so merely locating the file proves same-repo.
+ *
+ * Mirrors the shape of `pipelineAdvancing(data)` above: pure, no I/O, no
+ * mtime/stat, no git invocation — cannot throw, cannot be slow, safe to call
+ * unconditionally inside a hook's 3-second timeout.
+ *
+ * @param {object} data                     Parsed state object (e.g. `readState(...).data`)
+ * @param {{session_id?: string}} payload    Hook payload; only `session_id` is read
+ * @returns {{allowed: boolean, reason: string}}
+ */
+function hookEnforcementAllowed(data, payload) {
+  const stateSessionId   = (data && data.sessionId) ? data.sessionId : null;
+  const payloadSessionId = (payload && payload.session_id) ? payload.session_id : null;
+
+  if (!stateSessionId)   return { allowed: false, reason: 'state sessionId absent' };
+  if (!payloadSessionId) return { allowed: false, reason: 'payload session_id absent' };
+  if (stateSessionId !== payloadSessionId) {
+    return { allowed: false, reason: 'session id mismatch' };
+  }
+  return { allowed: true, reason: 'session id match' };
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -867,4 +946,6 @@ module.exports = {
   COMPACT_RECOVERY_TTL_MS,
   summarizePriorWaveContext,
   pipelineAdvancing,
+  claimSession,
+  hookEnforcementAllowed,
 };

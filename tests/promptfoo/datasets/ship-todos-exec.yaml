@@ -1,13 +1,13 @@
-# Script execution tests for ship-todos.js — R-PLANFILE / R-SHIPTODOS-FAILLOUD (#task5).
+# Script execution tests for ship-todos.js — R-PLANFILE / R-SHIPTODOS-FAILLOUD (#505).
 # Covers: (a) --event execute with valid plan file produces per-task substeps,
-#         (b) --event execute without --plan-file exits 2 with clear error,
-#         (c) --event commit without --plan-file succeeds (regression guard).
+#         (b) --event execute without --plan exits 2 with clear error,
+#         (c) --event commit without --plan succeeds (regression guard).
 
 # (a) --event execute with valid plan file produces ≥2 task-mirrored substeps.
 - description: "ship-todos (R-PLANFILE): --event execute with plan file mirrors task headings as substeps"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
-    script_args: "--state-file {{project_root}}/state-pre-execute.json --event execute --current-step execute --plan-file {{project_root}}/plan-3-tasks.md"
+    script_args: "--state-file {{project_root}}/state-pre-execute.json --event execute --current-step execute --plan {{project_root}}/plan-3-tasks.md"
     project_root: "file://fixtures-fs/ship-todos"
   assert:
     - type: javascript
@@ -29,8 +29,8 @@
         if (todos.some(t => t.content === 'execute plan')) return 'FAIL: placeholder "execute plan" present alongside task-mirrored substeps';
         return true;
 
-# (b) --event execute without --plan-file exits 2 with descriptive error.
-- description: "ship-todos (R-SHIPTODOS-FAILLOUD): --event execute without --plan-file exits 2"
+# (b) --event execute without --plan exits 2 with descriptive error.
+- description: "ship-todos (R-SHIPTODOS-FAILLOUD): --event execute without --plan exits 2"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
     script_args: "--state-file {{project_root}}/state-pre-execute.json --event execute"
@@ -40,12 +40,12 @@
       value: |
         // Script exits 2 — the provider captures non-zero exit in output as an error marker.
         // The error message should appear in stderr (captured via the provider's combined output).
-        return output.includes('--event execute requires --plan-file') ||
+        return output.includes('--event execute requires --plan ') ||
                output.includes('exit code 2') ||
                output.includes('ERROR');
 
-# (c) --event commit without --plan-file succeeds — regression guard for execute-only change.
-- description: "ship-todos (R-SHIPTODOS-FAILLOUD): --event step --current-step commit without --plan-file exits 0 with valid JSON"
+# (c) --event commit without --plan succeeds — regression guard for execute-only change.
+- description: "ship-todos (R-SHIPTODOS-FAILLOUD): --event step --current-step commit without --plan exits 0 with valid JSON"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
     script_args: "--state-file {{project_root}}/state-pre-execute.json --event step --current-step commit"

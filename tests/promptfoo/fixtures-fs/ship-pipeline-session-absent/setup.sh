@@ -13,18 +13,19 @@ git checkout -q -b feat/ship
 
 mkdir -p .sdlc/execution
 
-# Ship state for branch feat/ship (slug feat-ship): between-steps gap — the
-# execute step is completed, commit is pending, NONE in_progress, flags.auto = true.
-# Exercises the broadened R67/R68 "advance to next step" path (auto-gated).
+# R73 (#505) fail-to-silence: a PRE-CHANGE state file, written before initState()
+# began stamping `sessionId`. There is no `sessionId` key at all, so ownership is
+# unknowable and no hook may enforce. Everything else is maximally enforcing
+# (execute in_progress + flags.auto = true) — the missing key is the only reason
+# for silence.
 cat > .sdlc/execution/ship-feat-ship-20260608T120000Z.json <<'EOF'
 {
   "version": 1,
   "startedAt": "2026-06-08T12:00:00Z",
   "branch": "feat/ship",
-  "sessionId": "sess-fixture",
   "flags": { "auto": true, "steps": ["execute", "commit", "pr"] },
   "steps": [
-    { "name": "execute", "status": "completed" },
+    { "name": "execute", "status": "in_progress" },
     { "name": "commit", "status": "pending" },
     { "name": "pr", "status": "pending" }
   ]

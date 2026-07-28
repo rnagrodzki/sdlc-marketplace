@@ -13,18 +13,20 @@ git checkout -q -b feat/ship
 
 mkdir -p .sdlc/execution
 
-# Ship state for branch feat/ship (slug feat-ship): between-steps gap — the
-# execute step is completed, commit is pending, NONE in_progress, flags.auto = true.
-# Exercises the broadened R67/R68 "advance to next step" path (auto-gated).
+# R73 (#505) POSITIVE control: state whose `sessionId` equals the `session_id` the
+# hooks receive on stdin ("sess-match"). execute in_progress + flags.auto = true,
+# so all three enforcing hooks must emit their existing decision unchanged
+# (nudge / block / deny) — the session gate preserves the feature, it does not
+# disable it.
 cat > .sdlc/execution/ship-feat-ship-20260608T120000Z.json <<'EOF'
 {
   "version": 1,
   "startedAt": "2026-06-08T12:00:00Z",
   "branch": "feat/ship",
-  "sessionId": "sess-fixture",
+  "sessionId": "sess-match",
   "flags": { "auto": true, "steps": ["execute", "commit", "pr"] },
   "steps": [
-    { "name": "execute", "status": "completed" },
+    { "name": "execute", "status": "in_progress" },
     { "name": "commit", "status": "pending" },
     { "name": "pr", "status": "pending" }
   ]

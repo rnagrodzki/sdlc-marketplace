@@ -1006,7 +1006,9 @@
 - description: "ship-prepare: invalid version.preRelease=RC (uppercase) — no override applied, exit 0 (#394)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --auto"
+    # R72 (#505): default steps include execute, so a real --plan is now required
+    # to keep this unrelated (version prerelease) case error-free.
+    script_args: "--has-plan --auto --plan {{repo_root}}/tests/promptfoo/fixtures-fs/ship-todos/plan-3-tasks.md"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/ship-prepare-prerelease-invalid"
   assert:
@@ -1229,7 +1231,9 @@
 - description: "ship-prepare: --quick resolves ship.quick into steps with sources.steps === 'quick'"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --quick"
+    # R72 (#505): ship.quick resolves to steps including execute, so a real
+    # --plan is now required to keep this quick-resolution case error-free.
+    script_args: "--has-plan --quick --plan {{repo_root}}/tests/promptfoo/fixtures-fs/ship-todos/plan-3-tasks.md"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-ship-quick-defined"
   assert:
@@ -1249,7 +1253,11 @@
 - description: "ship-prepare: --quick + --steps together produces R-quick-5 error"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --quick --steps execute,commit"
+    # R72 (#505): --steps execute,commit resolves execute to will_run, so a real
+    # --plan is required to isolate this assertion to the single R-quick-5 error
+    # (otherwise a second, structured missingPlanFile error object also lands in
+    # errors[], and the plain-string .includes() check below would throw on it).
+    script_args: "--has-plan --quick --steps execute,commit --plan {{repo_root}}/tests/promptfoo/fixtures-fs/ship-todos/plan-3-tasks.md"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-ship-quick-defined"
   assert:
@@ -1316,15 +1324,16 @@
         return o.freshKept >= 1;
 
 # ---------------------------------------------------------------------------
-# R-PLANFILE (#task5): --plan-file CLI flag forwarded through context.planFile
-# and into execute step args.
+# R72/C19/R-PLANFILE (#505): explicit-only plan resolution. --plan CLI flag
+# forwarded through context.planFile and into execute step args; no plan-path
+# autodiscovery (no directory scan, no mtime heuristic, no settings lookup).
 # Uses {{repo_root}} to reference the plan fixture file (absolute, no temp copy needed).
 # ---------------------------------------------------------------------------
 
-- description: "ship-prepare (R-PLANFILE): --plan-file sets context.planFile to absolute path"
+- description: "ship-prepare (R-PLANFILE): --plan sets context.planFile to absolute path"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --plan-file {{repo_root}}/tests/promptfoo/fixtures-fs/ship-todos/plan-3-tasks.md"
+    script_args: "--has-plan --plan {{repo_root}}/tests/promptfoo/fixtures-fs/ship-todos/plan-3-tasks.md"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
@@ -1336,10 +1345,10 @@
                o.context.planFile.endsWith('plan-3-tasks.md') &&
                o.context.planFile.startsWith('/');
 
-- description: "ship-prepare (R-PLANFILE): --plan-file injected into execute step args"
+- description: "ship-prepare (R-PLANFILE): --plan injected into execute step args"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
-    script_args: "--has-plan --plan-file {{repo_root}}/tests/promptfoo/fixtures-fs/ship-todos/plan-3-tasks.md"
+    script_args: "--has-plan --plan {{repo_root}}/tests/promptfoo/fixtures-fs/ship-todos/plan-3-tasks.md"
     script_cwd: "{{project_root}}"
     project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
   assert:
@@ -1349,10 +1358,10 @@
         const exec = (o.steps || []).find(s => s.name === 'execute');
         return exec !== undefined &&
                typeof exec.args === 'string' &&
-               exec.args.includes('--plan-file') &&
+               exec.args.includes('--plan "') &&
                exec.args.includes('plan-3-tasks.md');
 
-- description: "ship-prepare (R-PLANFILE): no --plan-file flag → context.planFile is string or null (fallback resolution)"
+- description: "ship-prepare (R72): no --plan with execute in resolved steps hard-errors with structured missingPlanFile {id,message} before any state write"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
     script_args: "--has-plan"
@@ -1362,9 +1371,83 @@
     - type: javascript
       value: |
         const o = JSON.parse(output);
-        // planFile is either an absolute string or null — never undefined
-        return Object.prototype.hasOwnProperty.call(o.context, 'planFile') &&
-               (o.context.planFile === null || typeof o.context.planFile === 'string');
+        // context.planFile === null is legitimate on its own — the error comes
+        // from execute being in the resolved (default) steps[] with no --plan.
+        if (o.context.planFile !== null) return 'FAIL: expected context.planFile === null';
+        const err = (o.errors || []).find(e => e && e.id === 'missingPlanFile');
+        if (!err) return 'FAIL: no missingPlanFile error found';
+        const m = err.message;
+        // what failed
+        if (!m.includes('cannot run the "execute" step without a plan document')) return `FAIL: missing "what": ${m}`;
+        // how to fix
+        if (!m.includes('--plan <path-to-plan.md>')) return `FAIL: missing "fix": ${m}`;
+        // why the rule exists
+        if (!m.includes('#505') || !m.includes('shared across repositories')) return `FAIL: missing "why": ${m}`;
+        return true;
+
+- description: "ship-prepare (R72): --plan path that does not exist on disk hard-errors with planFileNotFound"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --steps commit --plan {{project_root}}/does-not-exist.md"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const err = (o.errors || []).find(e => e && e.id === 'planFileNotFound');
+        if (!err) return 'FAIL: no planFileNotFound error found';
+        const m = err.message;
+        if (!m.includes('does not exist')) return `FAIL: missing "what": ${m}`;
+        if (!m.includes('Resolved to:')) return `FAIL: missing resolved path: ${m}`;
+        if (!m.includes('Fix: check the path')) return `FAIL: missing "fix": ${m}`;
+        return true;
+
+- description: "ship-prepare (R72): --plan path with non-.md extension hard-errors with planFileNotMarkdown"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan --steps commit --plan {{project_root}}/src/index.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const err = (o.errors || []).find(e => e && e.id === 'planFileNotMarkdown');
+        if (!err) return 'FAIL: no planFileNotMarkdown error found';
+        const m = err.message;
+        if (!m.includes('must point at a .md plan document')) return `FAIL: missing "what": ${m}`;
+        if (!m.includes('Got:') || !m.includes('index.js')) return `FAIL: missing offending path: ${m}`;
+        if (!m.includes('Fix: pass the plan markdown itself')) return `FAIL: missing "fix": ${m}`;
+        return true;
+
+- description: "ship-prepare (R72): fatal errors are mirrored to stderr, not only a temp-file path"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+    script_capture_stderr: true
+  assert:
+    - type: icontains
+      value: 'cannot run the "execute" step without a plan document'
+
+- description: "ship-prepare (R72/C19, #505): configured plansDirectory decoy is ignored — context.planFile stays null with no --plan (autodiscovery removed)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--steps commit"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-plans-dir"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        if (o.context.planFile !== null) return `FAIL: decoy plan leaked into context.planFile: ${o.context.planFile}`;
+        const exec = (o.steps || []).find(s => s.name === 'execute');
+        if (exec && typeof exec.args === 'string' && exec.args.includes('--plan')) {
+          return `FAIL: --plan should be omitted from execute args when planFile is null: ${exec.args}`;
+        }
+        return true;
 
 # ---------------------------------------------------------------------------
 # R69 (#452) — state/ship.js begin-step / complete-step subcommands.

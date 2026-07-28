@@ -538,3 +538,53 @@
         unflipped task: "line 3: Create IndicatorCache with TTL support — expected from plan
         task(s) <id>". The runArchive function is NOT called. The response instructs the user
         to fix the plan-task failures or add the title to ## Out-of-scope OpenSpec tasks.
+
+# ---------------------------------------------------------------------------
+# Standalone plan-argument gate (R41, #505)
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc (R41, #505): standalone invocation with neither a positional plan path nor --plan halts before Step 1 LOAD with what/how/why remediation text"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/feature-branch-with-commits.md"
+    user_request: >
+      Run /execute-plan-sdlc with no arguments at all — no positional plan-file-path,
+      no --plan flag, no --branch flag (this is a direct standalone invocation by the
+      user, not a dispatch from ship-sdlc), and no --resume flag. Nothing plan-related
+      is present in this conversation's context either. Walk through what the skill
+      does first, before Step 1 (LOAD).
+  assert:
+    - type: icontains
+      value: "cannot run without an explicit plan document"
+    - type: llm-rubric
+      value: >
+        The response halts before Step 1 (LOAD) — it does not load, validate, classify,
+        or build waves for any plan. It cites R41 (and/or #505). The halt message
+        follows a what/how/why structure: (1) what failed — no explicit plan document
+        was supplied; (2) how to fix it — re-run with a positional plan path
+        (e.g. `/execute-plan-sdlc <path-to-plan.md>`) or `--plan <path-to-plan.md>`;
+        (3) why the rule exists — plan-file resolution is explicit-only so the skill
+        never guesses or silently assumes which plan to execute. The response does not
+        proceed with execution.
+
+- description: "execute-plan-sdlc (R41, #505): standalone invocation does not prompt or fall back to conversation-context plan text"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/feature-branch-with-commits.md"
+    user_request: >
+      Earlier in this same conversation, the user pasted the full text of a plan
+      document (multiple tasks, dependencies, and all). Now the user runs
+      /execute-plan-sdlc standalone (no --branch, no --resume) with no positional
+      plan-file-path and no --plan flag. Does the skill use the plan text that was
+      pasted earlier in the conversation? Does it ask the user (e.g. via
+      AskUserQuestion) for a plan path? Describe exactly what happens.
+  assert:
+    - type: llm-rubric
+      value: >
+        The response states that the skill does NOT use the plan text pasted earlier
+        in conversation context, and does NOT prompt the user interactively (no
+        AskUserQuestion, no "which plan should I use" style question) to request a
+        plan path. Instead it halts immediately with the R41 remediation message
+        requiring an explicit `--plan <path>` or positional plan-file-path argument on
+        the command itself. The response is explicit that conversation context is not
+        a valid substitute for an explicit plan argument on a standalone invocation.

@@ -9,16 +9,21 @@ Orchestrates implementation plan execution with adaptive task classification, wa
 ## Usage
 
 ```text
-/execute-plan-sdlc
-/execute-plan-sdlc --quality balanced
+/execute-plan-sdlc <path-to-plan.md>
+/execute-plan-sdlc --plan <path-to-plan.md>
+/execute-plan-sdlc --plan <path-to-plan.md> --quality balanced
 /execute-plan-sdlc --resume
 ```
 
-Provide the plan in one of two ways:
-- Discuss, write, or paste the plan in the conversation before invoking — Claude reuses it from context without re-reading from file
-- Have a plan file accessible — Claude reads it on invocation
+Standalone invocation (not dispatched by ship-sdlc) requires the plan document explicitly — as a positional path argument or via `--plan <path>`. Plan autodiscovery from conversation context was removed (#505): the skill no longer infers which plan to run from what was discussed earlier in the session. The only exception is `--resume` when an execution state file already exists for the current branch — resume sources the plan path from the persisted state instead. Without one of these, the skill halts before Step 1 (LOAD):
 
-**Auto-trigger after plan mode:** When `/plan-sdlc` completes in plan mode, it proposes execution before calling ExitPlanMode. If you accept the plan, `/execute-plan-sdlc` is invoked automatically — no manual invocation needed. You can still invoke it standalone for plans created outside plan mode.
+> execute-plan-sdlc cannot run without an explicit plan document.
+> Fix: re-run with a positional plan path (`/execute-plan-sdlc <path-to-plan.md>`) or `--plan <path-to-plan.md>`.
+> Why: plan-file resolution is explicit-only (R41, #505). This skill MUST NOT guess which plan to execute by scanning conversation context or by prompting interactively for a path — a silently-assumed or misremembered plan could execute the wrong work against this repository.
+
+Use [`/plan-sdlc`](plan-sdlc.md) to write the plan document, then pass its path here.
+
+**Auto-trigger after plan mode:** When `/plan-sdlc` completes in plan mode, it proposes execution before calling ExitPlanMode. If you accept the plan, `/execute-plan-sdlc` is invoked automatically with the plan path — no manual invocation needed. You can still invoke it standalone (with an explicit path) for plans created outside plan mode.
 
 The plan must contain at least 2 tasks with clear deliverables (files to create or modify, behavior to implement).
 
@@ -34,7 +39,7 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 | `--rebase <auto\|skip\|prompt>` | Rebase onto the default branch before execution. `auto` rebases silently (aborts on conflict), `skip` skips, `prompt` asks. | Skip |
 | `--branch <name>` | **INTERNAL** — reserved for explicit caller override; not used by ship-sdlc since auto-detection was introduced. ship-sdlc establishes the feature branch via `git checkout -b` before dispatching execute, so execute's own workspace derivation yields `continue` (run in place). Do not pass this directly. (Implements R30, fixes #378, #379.) | unset |
 | `--commit-waves` | After each wave passes G9 (mechanical/filesystem verify) and G11 (post-wave guardrail check), commit the wave as `wip(execute): wave N — <task titles>` (subject truncated to 72 chars). Hooks always run — `--no-verify` is never passed. The small-plan direct-execution path (R5) NEVER triggers per-wave commits regardless of this flag. Pairs with commit-sdlc's WIP-squash path so the final feature commit subsumes WIP commits via soft-reset. (Fixes #392 / R35.) | Off |
-| `--plan-file <path>` | Explicit path to the active plan markdown. When set, Step 1 (LOAD) skips the conversation-context discovery heuristic and reads from this file directly — the compaction-stable plan source. Forwarded automatically by ship-sdlc from `context.planFile` so plan discovery survives compaction; users may also pass it directly for non-interactive invocations. (Implements R-PLANFILE.) | unset |
+| `--plan <path>` | Explicit path to the active plan markdown (the old autodiscovery flag was renamed in #505 — no back-compat alias for the previous name). Step 1 (LOAD) reads from this file directly — the compaction-stable plan source. Forwarded automatically by ship-sdlc from `context.planFile`. Required for standalone invocation (positionally or via this flag) unless `--resume` finds existing state for the branch — see Usage and Prerequisites. (Implements R-PLANFILE, R41.) | Required for standalone invocation; unset otherwise |
 
 ---
 
@@ -189,7 +194,7 @@ Plans with 4 or more tasks use standard wave execution with state persistence af
 
 After each wave completes, execution state is written to `.sdlc/execution/execute-<branch>-<timestamp>.json` in the main working tree. This JSON file records completed waves, task status, file changes, and contextual information (interfaces created, decisions made) needed to resume in a fresh session. When execution runs in a worktree, state is written to the main repo root so it survives worktree cleanup.
 
-**Resuming:** Pass `--resume` to pick up from the last completed wave. The state file contains enough context for a new session to continue without prior conversation history. If the plan file has changed since execution started (detected via content hash), you are prompted to resume with the old structure or restart.
+**Resuming:** Pass `--resume` to pick up from the last completed wave. The state file contains enough context for a new session to continue without prior conversation history. The plan's resolved path and a SHA-256 content hash are recorded when execution starts (`--plan-path`/`--plan-hash`, passed internally to `state/execute.js init`); if the plan file has changed since (hash mismatch on resume), you are prompted to resume with the old structure or restart.
 
 **Inter-wave abort:** Pressing Ctrl-C between waves (after a wave-runner Agent has returned and before the next wave starts) leaves the state file populated with completed waves. The next invocation with `--resume` picks up at the first non-completed wave. Mid-wave abort is not supported — waves run to completion or failure before control returns to main context.
 
@@ -213,12 +218,12 @@ There is no `Worktree:` line — execute-plan-sdlc never creates a worktree. The
 
 ## Examples
 
-### Execute a plan from conversation context
+### Execute a plan
 
-After writing or discussing a plan in the current session:
+After writing a plan (e.g. via `/plan-sdlc`), pass its path explicitly:
 
 ```text
-/execute-plan-sdlc
+/execute-plan-sdlc .claude/plans/my-feature-plan.md
 ```
 
 Claude presents the classified wave structure and waits for confirmation before executing:
@@ -249,12 +254,10 @@ Model Presets:
 Select preset (full/balanced/minimal), "custom" to edit individual tasks, or "cancel":
 ```
 
-### Execute a plan from a file
+### Execute a plan via `--plan`
 
 ```text
-/execute-plan-sdlc
-
-.claude/plans/my-feature-plan.md
+/execute-plan-sdlc --plan .claude/plans/my-feature-plan.md
 ```
 
 Claude loads the plan from the specified file, validates it, classifies tasks, and presents the wave structure for confirmation.
@@ -262,7 +265,7 @@ Claude loads the plan from the specified file, validates it, classifies tasks, a
 ### Skip quality-tier selection
 
 ```text
-/execute-plan-sdlc --quality balanced
+/execute-plan-sdlc --plan .claude/plans/my-feature-plan.md --quality balanced
 ```
 
 Claude applies the Balanced quality tier automatically and proceeds to execution after showing the wave structure — no interactive prompt.
@@ -318,7 +321,7 @@ Guardrails:       3/3 passed (1 warning, 0 overridden)
 ## Prerequisites
 
 - **Permission mode** — the skill always dispatches agents with `bypassPermissions`. The runtime caps child agent permissions to the parent session's level — if your session is not in bypassPermissions, agents will surface permission prompts to you automatically. The mode lock prevents any mode changes during execution based on plan content.
-- **An implementation plan** — either in the conversation context from the current session, or as a readable file. The plan must have at least 2 tasks; single-task plans don't need orchestration.
+- **An explicit plan document** — pass it positionally or via `--plan <path>` (see Usage). Plan autodiscovery from conversation context was removed (#505); a standalone invocation without one halts before Step 1 unless `--resume` finds existing state for the branch. The plan must have at least 2 tasks; single-task plans don't need orchestration. Use [`/plan-sdlc`](plan-sdlc.md) to write one.
 
 ### Harness Configuration
 
@@ -334,7 +337,7 @@ Guardrails:       3/3 passed (1 warning, 0 overridden)
 |-----------------|-------------|
 | Source code files | Files created or modified as specified by plan tasks |
 | `.sdlc/learnings/log.md` | Execution learnings appended after completion (classification accuracy, wave conflicts, recovery outcomes) |
-| `.sdlc/execution/execute-<branch>-<timestamp>.json` | Execution state file written after each wave; enables cross-session resume via --resume. Deleted on success, preserved on failure. |
+| `.sdlc/execution/execute-<branch>-<timestamp>.json` | Execution state file written after each wave; enables cross-session resume via `--resume`. Records the resolved plan path and a SHA-256 hash of the plan file's contents, so a resume against a since-edited plan is detected — see State Persistence and Resume. Deleted on success, preserved on failure. |
 | Per-task fact sheets (`task-<id>.md`) | Written by `state/execute.js wave-start` before wave dispatch. When a plan task carries a `**Contract:**` block, the fact sheet includes a `## Contract` section with the verbatim contract content. Per-task agents consume this section as a closed set of decided design constraints (signatures, types, flags, error-cases, import paths) — they MUST NOT re-derive or reopen anything pinned there. |
 
 Does not create commits, branches, or push to any remote. The user decides what to do with the changes after execution completes.

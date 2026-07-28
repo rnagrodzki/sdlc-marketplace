@@ -20,6 +20,7 @@ cat > .sdlc/execution/ship-feat-ship-20260608T120000Z.json <<'EOF'
   "version": 1,
   "startedAt": "2026-06-08T12:00:00Z",
   "branch": "feat/ship",
+  "sessionId": "sess-fixture",
   "flags": { "auto": true, "steps": ["execute", "commit", "pr"] },
   "steps": [
     { "name": "execute", "status": "completed" },

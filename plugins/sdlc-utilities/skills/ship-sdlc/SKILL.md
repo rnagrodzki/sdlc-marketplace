@@ -82,6 +82,8 @@ trap 'rm -f "$PREPARE_OUTPUT_FILE"' EXIT INT TERM
 
 Parse the output JSON from `$PREPARE_OUTPUT_FILE`. If `errors` is non-empty, display them and stop. The parsed output replaces manual computation in subsequent sub-steps (1d–1g).
 
+**Plan-file error rendering (implements R72):** If `errors` contains an entry whose `id` is one of `missingPlanFile`, `planFileNotFound`, or `planFileNotMarkdown`, print that entry's `message` VERBATIM before stopping — do NOT summarize, paraphrase, or collapse it into a generic "prepare failed" line. Each such message already states (1) what failed, (2) how to fix it, and (3) why the rule exists; it is composed by `skill/ship.js` (`runValidation`/`resolvePlanFile`) for direct display, not for further rewriting. `errors[]` entries may be plain strings or `{id, message}` objects — render with `typeof e === 'string' ? e : e.message` for every entry. Then STOP: do not dispatch any step.
+
 **Context-heaviness advisory (implements R35):** If the parsed output's top-level `contextAdvisory` field is a non-empty string, print it verbatim before continuing. The advisory recommends `/compact` and notes that pipeline state is preserved across compaction (PreCompact + SessionStart hooks). Sourced from `$TMPDIR/sdlc-context-stats.json`, written by the `UserPromptSubmit` hook (`hooks/context-stats.js`); helper at `scripts/lib/context-advisory.js`. When `contextAdvisory` is `null`, emit nothing.
 
 **Gitignore warning:** If `context.sdlcGitignored` is `false` in the output, print:
@@ -489,7 +491,7 @@ Match the branch from the ship state file against worktree entries. If found and
 
 **Execute-step todo mirroring (R-todowrite-visibility clause 4):**
 
-Assign `PLAN_FILE` from the prepare output's `context.planFile` field (R-PLANFILE). This is resolved once by `skill/ship.js` using the priority order: CLI `--plan-file` → project `.claude/settings.json` `plansDirectory` → global `~/.claude/settings.json` `plansDirectory` → default `~/.claude/plans/` (most recent `*.md`). Do not re-derive the path here — use `context.planFile` verbatim:
+Assign `PLAN_FILE` from the prepare output's `context.planFile` field (R-PLANFILE). Resolution is explicit-only (implements R72): `skill/ship.js` resolves the plan solely from the CLI `--plan <path>` flag — there is no config-driven or directory-scan fallback. A missing, nonexistent, or non-markdown `--plan` is rejected in Step 1c (`missingPlanFile` / `planFileNotFound` / `planFileNotMarkdown`) before this point is ever reached. Do not re-derive the path here — use `context.planFile` verbatim:
 
 ```bash
 PLAN_FILE=$(node -e "const d=require('fs').readFileSync(process.env.F,'utf8'); process.stdout.write(JSON.parse(d).context.planFile||'')" F="$SHIP_PREPARE_OUTPUT_FILE")
@@ -500,7 +502,7 @@ Where `$SHIP_PREPARE_OUTPUT_FILE` is the path to the temp file holding the `skil
 Before dispatching `execute-plan-sdlc`, run:
 
 ```bash
-node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan-file "$PLAN_FILE" --event execute --current-step execute
+node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan "$PLAN_FILE" --event execute --current-step execute
 ```
 
 `$PLAN_FILE` is sourced from `context.planFile` in the prepare output (R-PLANFILE). The helper expands the `execute` step's placeholder substep to one substep per plan task (one `### Task N:` heading per substep). Parse JSON, call `TodoWrite`, echo `marker`.
@@ -516,7 +518,7 @@ COMPLETENESS_EXIT=$?
 if [ "$COMPLETENESS_EXIT" -ne 0 ]; then
   echo "ERROR: execute-plan-sdlc returned but planned tasks are unaccounted. Pipeline halted." >&2
   # Mark execute step failed and halt — do NOT advance to commit/review/version/pr
-  node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan-file "$PLAN_FILE" --event execute --fail-step execute
+  node "$SHIP_TODOS" --state-file "$STATE_FILE" --plan "$PLAN_FILE" --event execute --fail-step execute
   exit "$COMPLETENESS_EXIT"
 fi
 ```

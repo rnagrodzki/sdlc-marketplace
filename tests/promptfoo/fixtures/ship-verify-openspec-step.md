@@ -16,7 +16,7 @@
     "openspec": { "branchMatch": "add-auth", "isAlreadyArchived": false }
   },
   "steps": [
-    { "name": "execute",         "status": "will_run",  "skill": "execute-plan-sdlc", "model": "opus",   "dispatchMode": "agent", "args": "--plan-file /tmp/plan.md", "pause": true,  "isolation": null },
+    { "name": "execute",         "status": "will_run",  "skill": "execute-plan-sdlc", "model": "opus",   "dispatchMode": "agent", "args": "--plan /tmp/plan.md", "pause": true,  "isolation": null },
     { "name": "commit",          "status": "will_run",  "skill": "commit-sdlc",       "model": "haiku",  "dispatchMode": "agent", "args": "",        "pause": false, "isolation": null },
     { "name": "review",          "status": "will_run",  "skill": "review-sdlc",       "model": "sonnet", "dispatchMode": "agent", "args": "",        "pause": false, "isolation": null },
     { "name": "version",         "status": "will_run",  "skill": "version-sdlc",      "model": "sonnet", "dispatchMode": "agent", "args": "--bump patch", "pause": true, "isolation": null },
@@ -45,7 +45,7 @@
     "openspec": { "branchMatch": "add-auth", "isAlreadyArchived": false }
   },
   "steps": [
-    { "name": "execute",         "status": "will_run",    "skill": "execute-plan-sdlc", "model": "opus",   "dispatchMode": "agent", "args": "--plan-file /tmp/plan.md", "pause": true,  "isolation": null },
+    { "name": "execute",         "status": "will_run",    "skill": "execute-plan-sdlc", "model": "opus",   "dispatchMode": "agent", "args": "--plan /tmp/plan.md", "pause": true,  "isolation": null },
     { "name": "commit",          "status": "will_run",    "skill": "commit-sdlc",       "model": "haiku",  "dispatchMode": "agent", "args": "",        "pause": false, "isolation": null },
     { "name": "review",          "status": "will_run",    "skill": "review-sdlc",       "model": "sonnet", "dispatchMode": "agent", "args": "",        "pause": false, "isolation": null },
     { "name": "version",         "status": "will_run",    "skill": "version-sdlc",      "model": "sonnet", "dispatchMode": "agent", "args": "--bump patch", "pause": true, "isolation": null },

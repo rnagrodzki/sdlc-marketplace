@@ -7,6 +7,14 @@
  * Writes to: <mainWorktree>/.sdlc/execution/.compact-recovery-<branchSlug>.json
  * (per-branch filename — issue #256; see hooks/README.md)
  *
+ * Parses stdin for `session_id`. R74 (#505): the write is gated on
+ * `hookEnforcementAllowed(data, payload)` (lib/state.js) — an unrelated
+ * session's compaction must not create or refresh the recovery sidecar for a
+ * pipeline it does not own. `savedAt` is sourced from the winning state
+ * file's own filesystem mtime, not `Date.now()`, so a genuinely quiet
+ * pipeline actually ages out of session-start.js's TTL gate instead of being
+ * kept artificially fresh by every subsequent (denied-enforcement) compaction.
+ *
  * Exit codes:
  *   0 = always (graceful degradation on errors)
  */
@@ -17,8 +25,19 @@ const fs   = require('node:fs');
 const path = require('node:path');
 
 try {
-  const { findStateFile, readState, slugifyBranch, resolveStateDir } = require('../scripts/lib/state');
+  const { findStateFile, readState, slugifyBranch, resolveStateDir, hookEnforcementAllowed } = require('../scripts/lib/state');
   const { exec } = require('../scripts/lib/git');
+
+  // Parse stdin JSON for session_id (R74, #505). Malformed/absent stdin
+  // degrades to an empty payload, which fails hookEnforcementAllowed closed
+  // to "skip the write" below — never throws, never blocks the hook.
+  let payload = {};
+  try {
+    const raw = fs.readFileSync(0, 'utf8');
+    payload = raw ? JSON.parse(raw) : {};
+  } catch {
+    payload = {};
+  }
 
   const branch = exec('git branch --show-current');
   if (!branch) process.exit(0);
@@ -26,6 +45,8 @@ try {
   const branchSlug = slugifyBranch(branch);
 
   let recovery = null;
+  let sourceData = null;
+  let sourceFilePath = null;
 
   // Ship state takes priority
   const shipFound = findStateFile('ship', branchSlug);
@@ -57,7 +78,7 @@ try {
       }
 
       recovery = {
-        savedAt: new Date().toISOString(),
+        savedAt: null, // filled below from sourceFilePath's mtime (R74, #505)
         pipeline: 'ship-sdlc',
         branch: data.branch || branch,
         currentStep,
@@ -69,6 +90,8 @@ try {
           skip: (data.flags && data.flags.skip) || [],
         },
       };
+      sourceData = data;
+      sourceFilePath = shipState.filePath;
     }
   }
 
@@ -88,19 +111,37 @@ try {
         }
 
         recovery = {
-          savedAt: new Date().toISOString(),
+          savedAt: null, // filled below from sourceFilePath's mtime (R74, #505)
           pipeline: 'execute-plan-sdlc',
           branch: data.branch || branch,
           completedWaves,
           totalWaves,
           preset: (data.preset) || null,
         };
+        sourceData = data;
+        sourceFilePath = executeState.filePath;
       }
     }
   }
 
   // No active pipeline — nothing to save
   if (!recovery) process.exit(0);
+
+  // R74 (#505): only write when this session owns the pipeline that produced
+  // `recovery`. An absent file is already the correct signal to
+  // session-start.js, so a denied session skips the write entirely rather
+  // than writing a "denied" marker, and any existing recovery file is left
+  // untouched.
+  const gate = hookEnforcementAllowed(sourceData, payload);
+  if (!gate.allowed) {
+    process.stderr.write(`pre-compact-save: not writing — ${gate.reason}\n`);
+    process.exit(0);
+  }
+
+  // savedAt sourced from the winning state file's own mtime, not Date.now(),
+  // so a genuinely quiet pipeline actually ages out of session-start.js's
+  // COMPACT_RECOVERY_TTL_MS gate instead of being kept artificially fresh.
+  recovery.savedAt = new Date(fs.statSync(sourceFilePath).mtimeMs).toISOString();
 
   // Write recovery file (per-branch — issue #256)
   const recoveryDir = resolveStateDir();

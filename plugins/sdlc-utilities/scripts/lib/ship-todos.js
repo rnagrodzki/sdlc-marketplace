@@ -10,7 +10,7 @@
  *
  * Options:
  *   --state-file <path>      required: ship state JSON path
- *   --plan-file <path>       optional: plan markdown for execute-step task mirroring
+ *   --plan <path>            optional: plan markdown for execute-step task mirroring
  *   --event <name>           required: init|step|resume|execute|cleanup
  *   --current-step <name>    required when --event=step: step transitioning
  *   --substep <name>         optional: substep to mark in_progress within current-step
@@ -310,7 +310,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
       case '--state-file':    args.stateFile    = argv[++i]; break;
-      case '--plan-file':     args.planFile      = argv[++i]; break;
+      case '--plan':          args.planFile      = argv[++i]; break;
       case '--event':         args.event         = argv[++i]; break;
       case '--current-step':  args.currentStep   = argv[++i]; break;
       case '--substep':       args.substep       = argv[++i]; break;
@@ -322,7 +322,7 @@ function parseArgs(argv) {
           '',
           'Options:',
           '  --state-file <path>      required: ship state JSON path',
-          '  --plan-file <path>       optional: plan markdown for execute task mirroring',
+          '  --plan <path>            optional: plan markdown for execute task mirroring',
           '  --event <name>           required: init|step|resume|execute|cleanup',
           '  --current-step <name>    required when --event=step',
           '  --substep <name>         optional: substep to mark in_progress',
@@ -365,19 +365,19 @@ function main() {
   }
 
   // Optionally load plan tasks.
-  // R-SHIPTODOS-FAILLOUD: for --event execute, --plan-file is required and must
+  // R-SHIPTODOS-FAILLOUD: for --event execute, --plan is required and must
   // parse to ≥1 task heading. Other events tolerate a missing/empty plan file.
   let planTasks = [];
   if (args.event === 'execute') {
     if (!args.planFile) {
       process.stderr.write(
-        'ERROR: --event execute requires --plan-file pointing to a plan with at least one \'### Task N:\' heading\n'
+        'ERROR: --event execute requires --plan pointing to a plan with at least one \'### Task N:\' heading\n'
       );
       process.exit(2);
     }
     if (!fs.existsSync(args.planFile)) {
       process.stderr.write(
-        `ERROR: --event execute requires --plan-file pointing to a plan with at least one '### Task N:' heading\n` +
+        `ERROR: --event execute requires --plan pointing to a plan with at least one '### Task N:' heading\n` +
         `plan-file not found: ${args.planFile}\n`
       );
       process.exit(2);
@@ -387,14 +387,14 @@ function main() {
       planTasks = parsePlanTasks(md);
       if (planTasks.length === 0) {
         process.stderr.write(
-          `ERROR: --event execute requires --plan-file pointing to a plan with at least one '### Task N:' heading\n` +
+          `ERROR: --event execute requires --plan pointing to a plan with at least one '### Task N:' heading\n` +
           `plan-file parsed but no '### Task N:' headings found: ${args.planFile}\n`
         );
         process.exit(2);
       }
     } catch (e) {
       process.stderr.write(
-        `ERROR: --event execute requires --plan-file pointing to a plan with at least one '### Task N:' heading\n` +
+        `ERROR: --event execute requires --plan pointing to a plan with at least one '### Task N:' heading\n` +
         `failed to read plan file: ${e.message}\n`
       );
       process.exit(2);

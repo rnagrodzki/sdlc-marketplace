@@ -13,6 +13,8 @@
  *   - advancing false (all terminal, or failed without a terminal cleanup pending)
  *     → exit 0 silently.
  *   - no ship state file / git or state resolution failure → exit 0 silently.
+ *   - the invoking session does not own the pipeline (R73, #505 —
+ *     `hookEnforcementAllowed(data, payload)`) → exit 0, reason to stderr only.
  *
  * Lazy-loads ../scripts/lib/state.js and ../scripts/lib/git.js. Requires only
  * Node.js built-ins plus those two lib files — no new npm dependencies.
@@ -36,13 +38,12 @@ function main() {
     process.exit(0);
   }
   // tool_name / tool_response are available on the payload but not required for
-  // the in_progress decision — reading them keeps parity with the hook contract.
-  void payload.tool_name;
-  void payload.tool_response;
+  // the in_progress decision. `payload.session_id` IS required — the R73 gate
+  // below reads it to confirm this session owns the pipeline.
 
-  let slugifyBranch, findStateFile, readState, pipelineAdvancing, exec;
+  let slugifyBranch, findStateFile, readState, pipelineAdvancing, hookEnforcementAllowed, exec;
   try {
-    ({ slugifyBranch, findStateFile, readState, pipelineAdvancing } = require('../scripts/lib/state'));
+    ({ slugifyBranch, findStateFile, readState, pipelineAdvancing, hookEnforcementAllowed } = require('../scripts/lib/state'));
     ({ exec } = require('../scripts/lib/git'));
   } catch {
     process.exit(0);
@@ -72,6 +73,17 @@ function main() {
   // 5. Evaluate the shared advancing predicate. If not advancing, exit 0 silently.
   const { advancing, step, index } = pipelineAdvancing(result.data);
   if (!advancing || !step) process.exit(0);
+
+  // 5b. R73 (#505): only the session that currently claims this pipeline. Session
+  //     id only — no worktree comparison: linked worktrees share the main
+  //     worktree's state dir, so a step dispatched with isolation: "worktree"
+  //     must keep receiving its nudge. Placed after the cheap advancing check so
+  //     the reason string is computed only when a decision was otherwise imminent.
+  const gate = hookEnforcementAllowed(result.data, payload);
+  if (!gate.allowed) {
+    process.stderr.write(`pipeline-continue: not enforcing — ${gate.reason}\n`);
+    process.exit(0);
+  }
 
   const auto = !!(result.data.flags && result.data.flags.auto);
   const stepIndex = index + 1;

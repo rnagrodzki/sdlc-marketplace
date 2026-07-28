@@ -254,3 +254,35 @@
   assert:
     - type: javascript
       value: "const r = JSON.parse(output); r.t1 === '1' && r.t2 === '2' && r.n3 === '3' && r.tUpper === '10' && r.tLower === '10' && r.noPrefix === 'abc'"
+
+# ---------------------------------------------------------------------------
+# state/execute.js init subcommand — plan-path/plan-hash persistence (R40, #505)
+# Prior to #505, execute.js:231 always wrote planPath/planHash as null because
+# no caller passed --plan-path/--plan-hash. These two cases prove the init
+# subcommand now persists both fields verbatim when the flags are supplied,
+# which is what makes the R15 resume-hash-mismatch guard reachable.
+# ---------------------------------------------------------------------------
+
+- description: "state/execute.js init (R40): records the real resolved planPath, not a null placeholder"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "init --branch fix/r40-planpath --quality balanced --total-tasks 2 --plan-path {{project_root}}/plan.md --plan-hash 44f59227a5f7d3ceabd397790669e2382494c19e623d409d40619dfa680ba12e"
+    project_root: "file://fixtures-fs/execute-overflow"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        return r.planPath === "{{project_root}}/plan.md" && r.planPath !== null;
+
+- description: "state/execute.js init (R40): planHash is a non-null content hash of the plan file bytes"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "init --branch fix/r40-planhash --quality balanced --total-tasks 2 --plan-path {{project_root}}/plan.md --plan-hash 44f59227a5f7d3ceabd397790669e2382494c19e623d409d40619dfa680ba12e"
+    project_root: "file://fixtures-fs/execute-overflow"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        return r.planHash === "44f59227a5f7d3ceabd397790669e2382494c19e623d409d40619dfa680ba12e" && r.planHash !== null;

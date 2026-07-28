@@ -50,10 +50,10 @@
       value: "const j = JSON.parse(output); j.marker.startsWith('[task-tray] resume:') && !!j.todos.find(t => t.content.startsWith('Review:') && t.status === 'in_progress') && !!j.todos.find(t => t.content.startsWith('Execute:') && t.status === 'completed') && !!j.todos.find(t => t.content.startsWith('Commit:') && t.status === 'completed')"
 
 # ship-todos.js: execute-step plan-task mirror
-- description: "ship-todos.js: --plan-file expands execute substeps to one todo per plan task"
+- description: "ship-todos.js: --plan expands execute substeps to one todo per plan task"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/lib/ship-todos.js"
-    script_args: "--state-file {{project_root}}/state-pre-execute.json --plan-file {{project_root}}/plan-3-tasks.md --event execute --current-step execute"
+    script_args: "--state-file {{project_root}}/state-pre-execute.json --plan {{project_root}}/plan-3-tasks.md --event execute --current-step execute"
     project_root: "file://fixtures-fs/ship-todos"
   assert:
     - type: javascript

@@ -29,7 +29,7 @@ This skill is for **expert users working on projects with established quality gu
 ## Usage
 
 ```text
-/ship-sdlc [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config] [--gc] [--ttl-days <N>]
+/ship-sdlc [--auto] [--steps <csv>] [--quality full|balanced|minimal] [--plan <path>] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config] [--gc] [--ttl-days <N>]
 ```
 
 ---
@@ -50,7 +50,7 @@ This skill is for **expert users working on projects with established quality gu
 | `--openspec-change <name>` | Explicitly select the OpenSpec change to archive, overriding branch-name matching. Used when the branch name does not match the change directory name. | — |
 | `--gc` | Prune stale ship- and execute- state files from `.sdlc/execution/`, then stop without running the pipeline. A file is pruned only when it is older than the TTL AND its branch is no longer in `git branch --list`. Fixes orphan accumulation from interrupted runs (issue #223). | Off |
 | `--ttl-days <N>` | TTL in days used by `--gc` and the terminal cleanup step. Files newer than this are kept regardless of branch existence (in-flight pipelines on detached HEAD or freshly-deleted branches must not be wiped). Configurable via `state.gc.ttlDays` in `.sdlc/config.json`; CLI overrides config. | `7` (or `state.gc.ttlDays`) |
-| `--plan-file <path>` | Explicit path to the active plan markdown; overrides the `plansDirectory` scan. Forwarded verbatim to execute-plan-sdlc as `--plan-file` so plan discovery is stable across compaction. Useful when multiple plan files exist or when the auto-scan would pick the wrong file. | auto (plansDirectory scan) |
+| `--plan <path>` | Explicit path to the active plan markdown (the old autodiscovery flag was renamed in #505 — no back-compat alias for the previous name). Forwarded to execute-plan-sdlc as `--plan <path>`. Required whenever the `execute` step will run; plan autodiscovery was removed (see note below). | Required when `execute` runs; unset otherwise |
 
 To enable post-PR CI verification, add `verify-pipeline` to `ship.steps` in `.sdlc/local.json` (or pass it via `--steps`). To await an automated reviewer's verdict, add `await-remote-review`. See R41 / R50 in `docs/specs/ship-sdlc.md`. To validate implementation completeness against the spec before archiving, add `verify-openspec` between `version` and `archive-openspec` — requires a matched OpenSpec change (`flags.openspecChange` or branch-name match); the step is skipped with a clear reason when neither is present.
 
@@ -58,6 +58,24 @@ To enable post-PR CI verification, add `verify-pipeline` to `ship.steps` in `.sd
 **Workspace is auto-detected (#378, #379):** There is no workspace flag. ship-sdlc derives the workspace from your cwd and current branch — on the **main worktree on the default branch** it auto-creates a feature branch (`git checkout -b`); on a **feature branch or inside a manual git worktree** it runs in place. The removed flags `--workspace`, `--branch`, and `--tree` are rejected with a clear error. The version step always runs when in `steps[]` (tags are repo-global, writable from any checkout) — there is no worktree-mode version skip or `skip-version-check` PR label.
 
 **Removed (#190 hard-remove):** `--preset` and `--skip` are no longer accepted. Passing either produces an error pointing at `--steps <csv>` (for step composition) and `--quality <full|balanced|minimal>` (for the execute-plan-sdlc model tier). Legacy on-disk v1 configs (`ship.preset`/`ship.skip`) are still auto-migrated to v2 by `lib/config.js`.
+
+**Removed: plan autodiscovery (#505):** ship-sdlc no longer scans `plansDirectory` (or any directory) for a recently-modified plan file. When a plan is present in the conversation and the `execute` step is not skipped, `--plan <path>` is now required — pass the plan document explicitly (see [Prerequisites](#prerequisites) and [`/plan-sdlc`](plan-sdlc.md), which writes the plan files this flag points at). Without it, ship-sdlc halts before invoking execute-plan-sdlc:
+
+```
+ship-sdlc cannot run the "execute" step without a plan document. Fix: re-run with --plan <path-to-plan.md>. Why: plan autodiscovery was removed (#505). It picked the most recently modified *.md in ~/.claude/plans/, which is shared across repositories — it could hand this repo a plan written for a different one and implement it here. If you did not mean to run execute, drop --has-plan (or omit execute from --steps) and the pipeline will skip it.
+```
+
+`--has-plan` in the message above is set internally by ship-sdlc's own context detection (whether a plan is present in the conversation) — it is not a flag you pass directly.
+
+An invalid `--plan` path produces one of:
+
+```
+--plan "<path>" does not exist. Resolved to: <resolved-path>. Fix: check the path, or run /plan-sdlc first to produce one.
+```
+
+```
+--plan must point at a .md plan document. Got: <resolved-path>. Fix: pass the plan markdown itself, not its directory or a state file.
+```
 
 To omit the `archive-openspec` step from a single run: `--steps <csv>` listing the desired steps without `archive-openspec`. Or omit it from `ship.steps[]` in `.sdlc/local.json` for a persistent change.
 
@@ -395,15 +413,15 @@ State file cleaned up: .sdlc/execution/ship-feat-user-auth-20260327T143000Z.json
 ### Basic usage (interactive)
 
 ```text
-/ship-sdlc
+/ship-sdlc --plan .claude/plans/my-feature-plan.md
 ```
 
-Loads config (if present), detects context, presents the pipeline plan, and asks for confirmation before each major step.
+Loads config (if present), detects context, presents the pipeline plan, and asks for confirmation before each major step. `--plan <path>` is required whenever the `execute` step will run (see [Removed: plan autodiscovery](#flags) above) — omit it only when `execute` is not in the resolved step list.
 
 ### Full auto mode with preset
 
 ```text
-/ship-sdlc --auto --quality minimal
+/ship-sdlc --auto --quality minimal --plan .claude/plans/my-feature-plan.md
 ```
 
 Runs the quality preset with no confirmation prompts. `--auto` is forwarded to all sub-skills — received-review-sdlc auto-dispatches fixes without pausing (R71) and version-sdlc skips the release approval prompt (R20).
@@ -411,7 +429,7 @@ Runs the quality preset with no confirmation prompts. `--auto` is forwarded to a
 ### Dry run to preview the pipeline
 
 ```text
-/ship-sdlc --dry-run --steps execute,commit,review,archive-openspec,pr
+/ship-sdlc --dry-run --steps execute,commit,review,archive-openspec,pr --plan .claude/plans/my-feature-plan.md
 ```
 
 Displays the full pipeline table showing which steps will run, which are skipped, and which flags are forwarded. No steps are executed.
@@ -427,7 +445,7 @@ Useful when you've already implemented the changes manually and want to commit, 
 ### Draft PR with auto mode
 
 ```text
-/ship-sdlc --auto --draft
+/ship-sdlc --auto --draft --plan .claude/plans/my-feature-plan.md
 ```
 
 Ships end-to-end and opens the PR as a draft for team review.
@@ -443,7 +461,7 @@ Finds the most recent state file for the current branch, skips completed steps, 
 ### Post-PR CI verification + Copilot review (interactive)
 
 ```text
-/ship-sdlc --steps execute,commit,review,archive-openspec,pr,verify-pipeline,await-remote-review,learnings-commit
+/ship-sdlc --steps execute,commit,review,archive-openspec,pr,verify-pipeline,await-remote-review,learnings-commit --plan .claude/plans/my-feature-plan.md
 ```
 
 After the PR is opened, ship-sdlc polls `gh pr checks` until CI converges. On failure, it prompts via `AskUserQuestion` (analyze | skip | abort). Once CI is green (or skipped), it polls for a Copilot review and dispatches `received-review-sdlc` on actionable verdicts. The two opt-in steps can also be set persistently in `ship.steps[]` in `.sdlc/local.json`. (R41–R56)
@@ -451,7 +469,7 @@ After the PR is opened, ship-sdlc polls `gh pr checks` until CI converges. On fa
 ### Post-PR full automation
 
 ```text
-/ship-sdlc --auto --steps execute,commit,review,archive-openspec,pr,verify-pipeline,await-remote-review,learnings-commit
+/ship-sdlc --auto --steps execute,commit,review,archive-openspec,pr,verify-pipeline,await-remote-review,learnings-commit --plan .claude/plans/my-feature-plan.md
 ```
 
 Same flow as above, but on CI failure ship-sdlc dispatches `verify-pipeline-sdlc` (subagent) directly with the failed-check log excerpts; on `fix-applied` verdict, ship-sdlc commits and pushes the fix and re-polls (capped at `verifyPipelineMaxIterations`, default 3). On a Copilot review, ship-sdlc dispatches `received-review-sdlc --auto`. (R46, R47, R52)
@@ -480,8 +498,8 @@ First, define a quick profile in `.sdlc/local.json` (or via `--init-config`):
 Then invoke:
 
 ```text
-/ship-sdlc --quick                # runs execute → commit → pr (the quick profile)
-/ship-sdlc --quick --dry-run      # preview which steps would run
+/ship-sdlc --quick --plan .claude/plans/my-feature-plan.md                # runs execute → commit → pr (the quick profile)
+/ship-sdlc --quick --dry-run --plan .claude/plans/my-feature-plan.md      # preview which steps would run
 ```
 
 Combining `--quick` with `--steps` is a hard error (R-quick-5):
@@ -808,6 +826,7 @@ ship-sdlc also removes the intermediate prepare output file (`$PLAN_MODE_OUTPUT_
 - **git** — must be run inside a git repository on a feature branch (not the default branch).
 - **Review dimensions** — `.sdlc/review-dimensions/` must contain at least one dimension file for the review step. Run `/setup-sdlc --dimensions` to create them. If review is in the skip set, this is not required.
 - **Plan in context** — for the execute step, a plan must be present in the conversation. If no plan is found and execute is not skipped, the step is auto-skipped.
+- **`--plan <path>` (#505)** — when a plan is present in context and the execute step is not skipped, the plan document must also be passed explicitly via `--plan <path>`; plan autodiscovery (the old `plansDirectory` scan) was removed and there is no fallback. Use [`/plan-sdlc`](plan-sdlc.md) to write the plan document, then pass its path.
 - **Workspace is auto-detected** — there is no workspace mode and no cwd assertion. ship-sdlc derives the workspace from cwd + current branch (R60): on the main worktree on the default branch it auto-creates a feature branch; inside a linked worktree or on a feature branch it runs in place. Invoking from inside a manual git worktree is fully supported (`.sdlc/` stays anchored to the main worktree).
 
 ### Harness Configuration
