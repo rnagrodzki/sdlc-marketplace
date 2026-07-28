@@ -29,8 +29,8 @@
  * Node.js built-ins plus those two lib files — no new npm dependencies.
  *
  * Exit codes:
- *   0 = always (graceful degradation — emits a deny decision only when both
- *       conditions hold; otherwise exits 0 silently).
+ *   0 = always (graceful degradation — emits a deny decision only when all
+ *       three conditions hold; otherwise exits 0 silently).
  */
 
 'use strict';
@@ -100,7 +100,7 @@ function main() {
   const auto = !!(data.flags && data.flags.auto === true);
   if (!auto) process.exit(0);
 
-  // Both conditions hold → deny.
+  // All three conditions hold → deny.
   const output = {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',

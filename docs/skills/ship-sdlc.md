@@ -65,7 +65,7 @@ To enable post-PR CI verification, add `verify-pipeline` to `ship.steps` in `.sd
 ship-sdlc cannot run the "execute" step without a plan document. Fix: re-run with --plan <path-to-plan.md>. Why: plan autodiscovery was removed (#505). It picked the most recently modified *.md in ~/.claude/plans/, which is shared across repositories — it could hand this repo a plan written for a different one and implement it here. If you did not mean to run execute, drop --has-plan (or omit execute from --steps) and the pipeline will skip it.
 ```
 
-`--has-plan` in the message above is set internally by ship-sdlc's own context detection (whether a plan is present in the conversation) — it is not a flag you pass directly.
+`--has-plan` in the message above is set internally by ship-sdlc's own step-eligibility signal (whether the `execute` step is eligible to run) — it is not a flag you pass directly.
 
 An invalid `--plan` path produces one of:
 
@@ -416,7 +416,7 @@ State file cleaned up: .sdlc/execution/ship-feat-user-auth-20260327T143000Z.json
 /ship-sdlc --plan .claude/plans/my-feature-plan.md
 ```
 
-Loads config (if present), detects context, presents the pipeline plan, and asks for confirmation before each major step. `--plan <path>` is required whenever the `execute` step will run (see [Removed: plan autodiscovery](#flags) above) — omit it only when `execute` is not in the resolved step list.
+Loads config (if present), detects context, presents the pipeline plan, and asks for confirmation before each major step. `--plan <path>` is required whenever the `execute` step will run (see the **Flags** table's `--plan <path>` row, and "Removed: plan autodiscovery" below it, above) — omit it only when `execute` is not in the resolved step list.
 
 ### Full auto mode with preset
 

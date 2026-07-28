@@ -237,16 +237,17 @@ try {
     }
   }
 
-  // Stale-sweep pass: remove `.compact-recovery-*.json` files older than 24h
-  // (issue #334). These are orphaned files left by sessions where the single-use
-  // unlink never fired (JSON parse error, permission failure, session kill, etc.).
-  // The sweep threshold (24h) is an order of magnitude beyond the freshness gate
-  // (1h), so the sweep cannot delete a file the consume path above would still want.
+  // Stale-sweep pass: remove `.compact-recovery-*.json` and `.stop-block-count-*.json`
+  // files older than 24h (issue #334). These are orphaned files left by sessions where
+  // the single-use unlink (or count-file cleanup) never fired (JSON parse error,
+  // permission failure, session kill, etc.). The sweep threshold (24h) is an order of
+  // magnitude beyond the freshness gate (1h), so the sweep cannot delete a file the
+  // consume path above would still want.
   const staleThresholdMs = 24 * 60 * 60 * 1000; // 24 hours
   try {
     const sweepEntries = fs.readdirSync(recoveryDir);
     for (const entry of sweepEntries) {
-      // Only target per-branch compact-recovery files
+      // Only target per-branch compact-recovery and stop-block-count files
       if (!/^\.(?:compact-recovery|stop-block-count)-.+\.json$/.test(entry)) continue;
       const entryPath = path.join(recoveryDir, entry);
       // Skip the file we just consumed above — avoid double-unlink

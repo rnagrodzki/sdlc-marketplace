@@ -445,15 +445,20 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
         // final feature commit subsumes per-wave WIP commits cleanly
         // (Fixes #392 / R35).
         flags.executeCommitWaves ? '--commit-waves' : '',
-        // R-PLANFILE: forward resolved plan file so execute-plan-sdlc skips
-        // conversation-context discovery (fragile under compaction).
+        // R-PLANFILE: forward the resolved plan file explicitly so
+        // execute-plan-sdlc never has to infer it from conversation context
+        // (fragile under compaction) — resolution is CLI-only (R72).
         planFile ? `--plan "${planFile}"` : '',
+        // Forward --auto so the plan-hash mismatch branch (R15) has a
+        // deterministic non-interactive default under ship dispatch,
+        // mirroring the resume-prompt's existing --auto handling.
+        flags.auto ? '--auto' : '',
       ].filter(Boolean).join(' '),
       reason: !flags.hasPlan
-        ? 'no plan in context'
+        ? 'no plan (--has-plan not set)'
         : !isIn('execute')
           ? 'not in steps[]'
-          : 'plan detected in context',
+          : 'plan available (--has-plan set)',
       pause: false,
       isolation: null,
       dispatchMode: 'agent',
@@ -1103,6 +1108,7 @@ function main() {
   let migrationManifest = { ...(cv.migration || {}), infrastructure: cv.infrastructure };
   if (cv.errors.length > 0) {
     for (const e of cv.errors) errors.push(`config-version: ${e.role}: ${e.message}`);
+    writeFatalErrors(errors);
     writeOutput({
       errors,
       warnings,
@@ -1121,6 +1127,7 @@ function main() {
   // entirely. Emit {action: "gc", report, errors, warnings} and exit.
   if (cli.gc) {
     if (errors.length > 0) {
+      writeFatalErrors(errors);
       writeOutput({ action: 'gc', errors, warnings }, 'ship-prepare', 1);
       return;
     }
@@ -1158,6 +1165,7 @@ function main() {
       report = { ttlDays, ship, execute, plan, commit, exploreTempdirs };
     } catch (err) {
       errors.push(`gc failed: ${err.message}`);
+      writeFatalErrors(errors);
       writeOutput({ action: 'gc', errors, warnings }, 'ship-prepare', 1);
       return;
     }
@@ -1197,6 +1205,7 @@ function main() {
     gitState = checkGitState(process.cwd());
   } catch (err) {
     errors.push(err.message);
+    writeFatalErrors(errors);
     writeOutput({ errors, warnings }, 'ship-prepare', 1);
     return;
   }
@@ -1237,6 +1246,7 @@ function main() {
     defaultBranch = detectBaseBranch(projectRoot);
   } catch (err) {
     errors.push(err.message);
+    writeFatalErrors(errors);
     writeOutput({ errors, warnings }, 'ship-prepare', 1);
     return;
   }

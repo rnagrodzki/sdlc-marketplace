@@ -378,7 +378,7 @@ function main() {
     if (!fs.existsSync(args.planFile)) {
       process.stderr.write(
         `ERROR: --event execute requires --plan pointing to a plan with at least one '### Task N:' heading\n` +
-        `plan-file not found: ${args.planFile}\n`
+        `--plan not found: ${args.planFile}\n`
       );
       process.exit(2);
     }
@@ -388,7 +388,7 @@ function main() {
       if (planTasks.length === 0) {
         process.stderr.write(
           `ERROR: --event execute requires --plan pointing to a plan with at least one '### Task N:' heading\n` +
-          `plan-file parsed but no '### Task N:' headings found: ${args.planFile}\n`
+          `--plan parsed but no '### Task N:' headings found: ${args.planFile}\n`
         );
         process.exit(2);
       }

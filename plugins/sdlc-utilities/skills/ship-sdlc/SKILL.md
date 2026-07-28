@@ -1,8 +1,8 @@
 ---
 name: ship-sdlc
-description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Dispatches every sub-skill (including execute-plan-sdlc) as an Agent for context isolation, with structured return values driving the pipeline state machine. Arguments: [--auto] [--steps <csv>] [--quick] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--init-config]. The `<label>` form for --bump (e.g. `--bump rc`) is forwarded to version-sdlc, where it is interpreted as `--bump patch --pre <label>`; labels must match `^[a-z][a-z0-9]*$`. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
+description: "Use this skill when shipping a feature end-to-end after plan acceptance: executing, committing, reviewing, fixing critical issues, versioning, and opening a PR in one flow. Dispatches every sub-skill (including execute-plan-sdlc) as an Agent for context isolation, with structured return values driving the pipeline state machine. Arguments: [--auto] [--steps <csv>] [--quick] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--plan <path>] [--init-config]. The `<label>` form for --bump (e.g. `--bump rc`) is forwarded to version-sdlc, where it is interpreted as `--bump patch --pre <label>`; labels must match `^[a-z][a-z0-9]*$`. Triggers on: ship it, ship this, full pipeline, execute to PR, ship feature, run the whole thing."
 user-invocable: true
-argument-hint: "[--auto] [--steps <csv>] [--quick] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
+argument-hint: "[--auto] [--steps <csv>] [--quick] [--quality full|balanced|minimal] [--bump patch|minor|major|<label>] [--draft] [--dry-run] [--resume] [--plan <path>] [--openspec-change <name>] [--init-config] [--gc] [--ttl-days <N>]"
 model: sonnet
 ---
 
@@ -69,7 +69,7 @@ If not found: `No ship config found — using built-in defaults. Run /setup-sdlc
 Locate and run `skill/ship.js` with all CLI flags to pre-compute flags, context, and step statuses:
 ```bash
 # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
-PREPARE_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/ship.js" --output-file --has-plan --auto)
+PREPARE_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/ship.js" --output-file --has-plan $ARGUMENTS)
 # Hook signal: if the session-start system-reminder contains a line matching
 # `/^Active pipeline: ship-sdlc/`, ALSO append `--hook-active-pipeline` to the
 # invocation above. When no state file is found, prepare emits
@@ -80,7 +80,9 @@ echo "EXIT_CODE=$EXIT_CODE"
 trap 'rm -f "$PREPARE_OUTPUT_FILE"' EXIT INT TERM
 ```
 
-Parse the output JSON from `$PREPARE_OUTPUT_FILE`. If `errors` is non-empty, display them and stop. The parsed output replaces manual computation in subsequent sub-steps (1d–1g).
+**`EXIT_CODE` gate:** `skill/ship.js` uses exit code 2 for an uncaught crash (top-level `try/catch` around `main()`) — on that path `writeOutput()` never runs, so `$PREPARE_OUTPUT_FILE` is empty/unset and there is no JSON to parse; print the `ship-prepare.js error: ...` text already on stderr and STOP without attempting to read the file. Exit code 1 means `writeOutput()` ran with a populated `errors[]` — proceed to parse the file; the render-and-stop rule below applies. Exit code 0 means success — proceed normally to 1d.
+
+Parse the output JSON from `$PREPARE_OUTPUT_FILE`. If `errors` is non-empty, render each entry per the rule below, then stop. The parsed output replaces manual computation in subsequent sub-steps (1d–1g).
 
 **Plan-file error rendering (implements R72):** If `errors` contains an entry whose `id` is one of `missingPlanFile`, `planFileNotFound`, or `planFileNotMarkdown`, print that entry's `message` VERBATIM before stopping — do NOT summarize, paraphrase, or collapse it into a generic "prepare failed" line. Each such message already states (1) what failed, (2) how to fix it, and (3) why the rule exists; it is composed by `skill/ship.js` (`runValidation`/`resolvePlanFile`) for direct display, not for further rewriting. `errors[]` entries may be plain strings or `{id, message}` objects — render with `typeof e === 'string' ? e : e.message` for every entry. Then STOP: do not dispatch any step.
 
@@ -189,7 +191,7 @@ The pipeline table is generated from the `steps` array in the `skill/ship.js` ou
 
 | Step | Skill | Status | Args | Pause |
 |------|-------|--------|------|-------|
-| 1 | execute-plan-sdlc | will_run | (none, or `--quality <X>` if user passed `--quality` to ship) | no |
+| 1 | execute-plan-sdlc | will_run | `--plan "<path>"` (from `context.planFile`, R-PLANFILE), plus `--quality <X>` if user passed `--quality` to ship | no |
 | 2 | commit-sdlc | will_run | `--auto` | no |
 | 3 | review-sdlc | will_run | `--committed` | no |
 | 4 | received-review-sdlc | conditional | (if crit/high) | YES |
@@ -476,7 +478,7 @@ The `migrate` subcommand renames `ship-<oldSlug>-<ts>.json` → `ship-<newSlug>-
 
 **Execute step resume:** When the pipeline is resuming (gate on `flags.resume === true` from the prepare output — this is `true` whether the user typed `--resume` or the hook triggered implicit resume; do NOT re-parse `$ARGUMENTS`) and the execute step's status in the ship state file is `in_progress`:
 1. Check for `<main-worktree>/.sdlc/execution/execute-<branch>-*.json` (an execute-plan-sdlc state file for the current branch). Resolve `<main-worktree>` via `git worktree list --porcelain` (first `worktree` line).
-2. If found, dispatch execute-plan-sdlc via the Agent tool with args from `step.invocation` plus `--resume` (e.g. `"--quality <X> --resume"` if the user passed `--quality` to ship; `"--resume"` otherwise). Wave progress and gates run inside the Agent's sub-context; the structured return value drives the next step. (Implements R-implicit-resume — `flags.resume` is the single resume signal regardless of source.)
+2. If found, dispatch execute-plan-sdlc via the Agent tool with args from `step.invocation` plus `--resume` (e.g. `"--plan \"<path>\" --quality <X> --resume"` if the user passed `--quality` to ship; `"--plan \"<path>\" --resume"` otherwise — `<path>` is `context.planFile`, R-PLANFILE; `step.invocation` already carries it, so it is never omitted from a resume dispatch). Wave progress and gates run inside the Agent's sub-context; the structured return value drives the next step. (Implements R-implicit-resume — `flags.resume` is the single resume signal regardless of source.)
 3. If not found, dispatch via Agent tool normally using `step.invocation` (execute restarts from scratch)
 
 ship-sdlc does not manage execute-plan-sdlc's state file — execute-plan-sdlc handles its own creation, updates, and cleanup.
@@ -494,10 +496,15 @@ Match the branch from the ship state file against worktree entries. If found and
 Assign `PLAN_FILE` from the prepare output's `context.planFile` field (R-PLANFILE). Resolution is explicit-only (implements R72): `skill/ship.js` resolves the plan solely from the CLI `--plan <path>` flag — there is no config-driven or directory-scan fallback. A missing, nonexistent, or non-markdown `--plan` is rejected in Step 1c (`missingPlanFile` / `planFileNotFound` / `planFileNotMarkdown`) before this point is ever reached. Do not re-derive the path here — use `context.planFile` verbatim:
 
 ```bash
-PLAN_FILE=$(node -e "const d=require('fs').readFileSync(process.env.F,'utf8'); process.stdout.write(JSON.parse(d).context.planFile||'')" F="$SHIP_PREPARE_OUTPUT_FILE")
+PLAN_FILE=$(node -e "const d=require('fs').readFileSync(process.env.F,'utf8'); process.stdout.write(JSON.parse(d).context.planFile||'')" F="$PREPARE_OUTPUT_FILE")
+PLAN_FILE_EXIT=$?
+if [ "$PLAN_FILE_EXIT" -ne 0 ]; then
+  echo "ERROR: failed to read context.planFile from prepare output ($PREPARE_OUTPUT_FILE)." >&2
+  exit "$PLAN_FILE_EXIT"
+fi
 ```
 
-Where `$SHIP_PREPARE_OUTPUT_FILE` is the path to the temp file holding the `skill/ship.js` JSON output (same file used to read `flags`, `steps`, etc.). When `context.planFile` is null or empty, `PLAN_FILE` will be empty and the `ship-todos.js` execute event will exit 2 with a clear error — surface that error before dispatching.
+Where `$PREPARE_OUTPUT_FILE` is the path to the temp file holding the `skill/ship.js` JSON output (same file used to read `flags`, `steps`, etc. — set in Step 1c). When `context.planFile` is null or empty, `PLAN_FILE` will be empty and the `ship-todos.js` execute event will exit 2 with a clear error — surface that error before dispatching.
 
 Before dispatching `execute-plan-sdlc`, run:
 
@@ -528,7 +535,7 @@ If `verify-completeness` exits 65, the pipeline MUST halt before commit. The mis
 Then run per-step-completion: `--mark-completed execute`. The parent does NOT receive per-task completion signals from the Agent; per-task todos all transition to `completed` atomically on return.
 
 Example dispatch sequence (use `step.invocation` for actual args):
-- Agent: execute-plan-sdlc, args: from `step.invocation` verbatim. **No `--branch` forward** (R60, fixes #378, #379): when the derive was `branch`, ship already ran `git checkout -b` before this dispatch, so cwd is on the feature branch and execute-plan-sdlc's own derive yields `continue` (run in place). When the derive was `continue`, ship never created a branch — execute also runs in place. Either way no workspace value crosses the boundary. Example: `"--quality balanced --rebase auto"`.
+- Agent: execute-plan-sdlc, args: from `step.invocation` verbatim, which already includes `--plan "<path>"` (`<path>` = `context.planFile`, R-PLANFILE — `step.invocation` is computed by `skill/ship.js`, not assembled by hand here). **No `--branch` forward** (R60, fixes #378, #379): when the derive was `branch`, ship already ran `git checkout -b` before this dispatch, so cwd is on the feature branch and execute-plan-sdlc's own derive yields `continue` (run in place). When the derive was `continue`, ship never created a branch — execute also runs in place. Either way no workspace value crosses the boundary. Example: `"--plan \"docs/plans/foo.md\" --quality balanced --rebase auto"`.
 - Agent: commit-sdlc, args: `"--auto"`
 - Agent: review-sdlc, args: `"--committed"`
 - Agent: received-review-sdlc, args: `"--auto"` (when `flags.auto`; otherwise no args)
