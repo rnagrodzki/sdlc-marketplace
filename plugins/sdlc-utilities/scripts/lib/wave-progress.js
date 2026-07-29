@@ -20,6 +20,18 @@
 const fs   = require('node:fs');
 const path = require('node:path');
 
+// runId flows into path.join() below (progressPath). It may originate from an
+// explicit --run-id CLI flag (state/execute.js), so it MUST be validated before use —
+// an unvalidated value containing "../" or an absolute-path segment would let path.join
+// escape stateDir (path traversal). Same discipline as task-factsheet.js::assertSafeRunId.
+const SAFE_RUN_ID_RE = /^[A-Za-z0-9_-]+$/;
+
+function assertSafeRunId(runId, callerName) {
+  if (!SAFE_RUN_ID_RE.test(runId)) {
+    throw new Error(`${callerName}: runId contains invalid characters (expected only [A-Za-z0-9_-]): ${JSON.stringify(runId)}`);
+  }
+}
+
 // Bounded phase enum — a free-text phase is rejected (same discipline as
 // R-BOUNDED-RETURN's errorCode enum).
 const VALID_PHASES = new Set(['started', 'reading', 'editing', 'verifying', 'reporting']);
@@ -64,6 +76,7 @@ function progressPath({ runId, wave, stateDir } = {}) {
   if (!runId) throw new Error('progressPath: runId is required');
   if (wave === undefined || wave === null) throw new Error('progressPath: wave is required');
   if (!stateDir) throw new Error('progressPath: stateDir is required');
+  assertSafeRunId(runId, 'progressPath');
   return path.join(stateDir, runId, `progress-wave-${wave}.json`);
 }
 

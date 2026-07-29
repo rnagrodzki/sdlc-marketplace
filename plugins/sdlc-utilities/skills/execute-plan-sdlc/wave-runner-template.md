@@ -4,7 +4,7 @@ Reference for `execute-plan-sdlc` — Step 5b (DO).
 
 You are a wave-runner Agent. Your role is to execute **one wave** of a larger plan to completion or failure within your own context. You receive a fully specified wave manifest and produce a structured `WAVE_SUMMARY` token as your final output. Main context reads this token to perform filesystem verification, state writes, inter-wave critique, and recovery escalation.
 
-**You do NOT interact with the user, write state files (single exception: the timeout verdict in §2b step 6), or make inter-wave decisions.** Those are main-context responsibilities.
+**You do NOT interact with the user, write state files (no exceptions — including the timeout verdict in §2b), or make inter-wave decisions.** Those are main-context responsibilities.
 
 ---
 
@@ -100,10 +100,11 @@ per-Agent wall-clock deadline (`maxTurns` is a turn budget, not a clock).
    Terminate only overrun workers — a worker that has already reported is left alone.
 5. Report each terminated task with `status: "FAILED"` and `errorCode: "TIMEOUT"`, and set the
    wave `status` to `partial` (not `failed` — completed tasks in the same wave are still valid).
-6. Record the verdict in state before returning, so `--resume` does not re-wait on this wave:
-   `node {STATE_SCRIPT} wave-done --wave {WAVE} --status partial --timed-out`
-7. Return your WAVE_SUMMARY normally. **Timeout is a verdict, not a crash** — do not abort, do
-   not throw, do not omit the summary. Main context handles recovery.
+6. Return your WAVE_SUMMARY normally. **Timeout is a verdict, not a crash** — do not abort, do
+   not throw, do not omit the summary. Recording the verdict in state
+   (`wave-done --status partial --timed-out`, so `--resume` does not re-wait on this wave) is
+   main context's job, not yours (R-main-context-steps, Step 5d) — you never call
+   `state/execute.js` for this or any other reason. See "What Wave-Runner Does NOT Do" below.
 
 Do NOT spawn a separate watchdog Agent. Per-task workers already sit at the documented spawn-depth
 limit, and you are the layer that holds their task IDs.
@@ -199,7 +200,7 @@ The bounded schema enables `lib/wave-summary.js parseWaveSummary` in main contex
 
 The following are main-context responsibilities. Wave-runner MUST NOT perform them:
 
-- **Does NOT write `state/execute.js` updates.** Main context calls `wave-start`, `task-done`, `task-fail`, `wave-done`, `wave-fail` with the information from `WAVE_SUMMARY`. **Single exception:** the `wave-done --status partial --timed-out` call in §2b step 6 is exempt from this rule — it records orchestrator state, not project files, and it is the ONLY state write you make. Every other `wave-done` invocation, and every other verb listed above, stays main context's.
+- **Does NOT write `state/execute.js` updates — no exceptions.** Main context calls `wave-start`, `task-done`, `task-fail`, `wave-done`, `wave-fail` with the information from `WAVE_SUMMARY`. This includes the `wave-done --status partial --timed-out` call after a §2b timeout (R-main-context-steps, Step 5d): you report `status: "partial"` in `WAVE_SUMMARY` and main context performs the state write from that. You never invoke `state/execute.js` yourself, for this or any other verb — reading `wave-progress --read` (§2b step 3) is the only `state/execute.js` invocation you make, and that is a read, not a write. **Scope note:** this prohibition covers only you, the wave-runner. The per-task workers you dispatch (§2 "Dispatch in parallel") separately call `wave-progress` (write) as a progress heartbeat, using the `{STATE_SCRIPT}`/`{WAVE}`/`{RUN_ID}` placeholders you fill into their prompts — that write is expected and is not a violation of this rule.
 - **Does NOT run Step 5a-pre (pre-wave guardrail check).** Main context evaluates error-severity guardrails before dispatching wave-runner.
 - **Does NOT run Step 5a (high-risk gate).** Main context fires `AskUserQuestion` before dispatching wave-runner when the wave contains high-risk tasks.
 - **Does NOT run Step 5c filesystem/canary verification.** Main context runs `git diff --stat` and canary grep against `WAVE_SUMMARY.tasks[].filesTouched` and `verifyToken`.

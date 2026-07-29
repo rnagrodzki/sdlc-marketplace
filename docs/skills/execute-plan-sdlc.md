@@ -435,7 +435,7 @@ node state/execute.js wave-progress --wave <N> --run-id <run-id> --task <id> --p
 
 ### TIMEOUT verdict
 
-When a task is still in flight at the deadline, the wave-runner terminates it and reports it in `WAVE_SUMMARY` with `status: "FAILED"` and `errorCode: "TIMEOUT"`. The wave itself is reported `status: "partial"` (not `failed` — other tasks in the same wave may have completed normally), and the wave-runner records `wave-done --status partial --timed-out`, which sets `wave.timedOut: true` on the wave row so a subsequent `--resume` does not re-wait on it.
+When a task is still in flight at the deadline, the wave-runner terminates it and reports it in `WAVE_SUMMARY` with `status: "FAILED"` and `errorCode: "TIMEOUT"`. The wave itself is reported `status: "partial"` (not `failed` — other tasks in the same wave may have completed normally). The wave-runner Agent never calls `state/execute.js` itself — all state writes are a main-context responsibility. On seeing `WAVE_SUMMARY.status === "partial"`, execute-plan-sdlc's main context runs `wave-done --status partial --timed-out`, which sets `wave.timedOut: true` on the wave row so a subsequent `--resume` does not re-wait on it.
 
 What this looks like from the outside:
 

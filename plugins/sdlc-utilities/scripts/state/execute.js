@@ -333,9 +333,10 @@ function cmdWaveStart(opts) {
         process.stderr.write(`Warning: failed to write fact sheet for task ${task.id}: ${e.message}\n`);
       }
     }
-    if (writtenPaths.length > 0) {
-      process.stdout.write(JSON.stringify({ factSheets: writtenPaths }) + '\n');
-    }
+    // Always surface the derived runId (even when writtenPaths is empty, e.g. every
+    // task entry was malformed) — callers rely on this as the single source of the
+    // run id; SKILL.md no longer generates or passes one via --run-id (#506).
+    process.stdout.write(JSON.stringify({ runId, factSheets: writtenPaths }) + '\n');
   }
 
   process.exit(0);
