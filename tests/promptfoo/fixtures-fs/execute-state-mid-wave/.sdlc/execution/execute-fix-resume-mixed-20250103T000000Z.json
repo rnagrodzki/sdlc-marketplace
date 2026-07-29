@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "skill": "execute-plan-sdlc",
+  "startedAt": "2025-01-03T00:00:00Z",
+  "branch": "fix/resume-mixed",
+  "planPath": "/tmp/resume-mixed-plan.md",
+  "planHash": "resumemixed00000000000000000000000000000000000000000000000000c",
+  "preset": "B",
+  "totalTasks": 6,
+  "waves": [
+    {
+      "number": 1,
+      "status": "completed",
+      "startedAt": "2025-01-03T00:00:10Z",
+      "completedAt": "2025-01-03T00:05:00Z",
+      "tasks": [
+        {
+          "id": "T1",
+          "name": "Completed wave task one",
+          "complexity": "Trivial",
+          "risk": "Low",
+          "status": "completed",
+          "filesChanged": ["a.js"],
+          "completedAt": "2025-01-03T00:02:00Z"
+        },
+        {
+          "id": "T2",
+          "name": "Completed wave task two",
+          "complexity": "Trivial",
+          "risk": "Low",
+          "status": "completed",
+          "filesChanged": ["b.js"],
+          "completedAt": "2025-01-03T00:04:00Z"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "status": "failed",
+      "startedAt": "2025-01-03T00:05:10Z",
+      "completedAt": "2025-01-03T00:08:00Z",
+      "tasks": [
+        {
+          "id": "T3",
+          "name": "Failed wave task",
+          "complexity": "Standard",
+          "risk": "Medium",
+          "status": "failed",
+          "filesChanged": ["c.js"],
+          "completedAt": "2025-01-03T00:07:00Z"
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "status": "partial",
+      "startedAt": "2025-01-03T00:08:10Z",
+      "completedAt": "2025-01-03T00:38:00Z",
+      "timedOut": true,
+      "tasks": [
+        {
+          "id": "T4",
+          "name": "Partial wave task",
+          "complexity": "Standard",
+          "risk": "Medium",
+          "status": "completed",
+          "filesChanged": ["d.js"],
+          "completedAt": "2025-01-03T00:20:00Z"
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "status": "in_progress",
+      "startedAt": "2025-01-03T00:38:10Z",
+      "completedAt": "2025-01-03T00:41:00Z",
+      "tasks": [
+        {
+          "id": "T5",
+          "name": "Interrupted wave task one",
+          "complexity": "Standard",
+          "risk": "Medium",
+          "status": "completed",
+          "filesChanged": ["e.js"],
+          "completedAt": "2025-01-03T00:40:00Z"
+        },
+        {
+          "id": "T6",
+          "name": "Interrupted wave task two",
+          "complexity": "Standard",
+          "risk": "Medium",
+          "status": "completed",
+          "filesChanged": ["f.js"],
+          "completedAt": "2025-01-03T00:41:00Z"
+        }
+      ]
+    }
+  ],
+  "context": {
+    "plannedTaskIds": ["T1", "T2", "T3", "T4", "T5", "T6"],
+    "planSummary": "Mixed-status waves for the resume-reset selectivity cases.",
+    "completedTaskIds": ["T1", "T2", "T4", "T5", "T6"],
+    "filesAdded": ["a.js"],
+    "filesModified": ["b.js", "d.js"],
+    "interfacesCreated": [],
+    "decisionsFromPriorWaves": []
+  }
+}

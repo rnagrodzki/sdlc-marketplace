@@ -17,7 +17,7 @@
 ## WAVE_SUMMARY returned by the wave-runner Agent
 
 ```
-WAVE_SUMMARY: {"wave":1,"status":"completed","tasks":[{"id":"T1","name":"Refactor token module","complexity":"Standard","risk":"Low","status":"DONE","filesChanged":["src/auth/token.ts","src/auth/index.ts"],"verifyToken":"parseToken in src/auth/token.ts","attempts":[{"model":"sonnet","status":"DONE"}],"finalModel":"sonnet"}],"verification":{"ran":false},"escalationsUsed":0}
+WAVE_SUMMARY: {"wave":1,"status":"completed","tasks":[{"id":"T1","status":"DONE","filesTouched":["src/auth/token.ts","src/auth/index.ts"],"verifyToken":"parseToken in src/auth/token.ts"}],"escalationsUsed":0}
 ```
 
 ## git diff --stat output for this wave

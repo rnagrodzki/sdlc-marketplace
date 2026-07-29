@@ -662,6 +662,45 @@
           && o.flags.awaitRemoteReviewers[0] === 'copilot'
 
 # ---------------------------------------------------------------------------
+# Issue #506 / R57 / R-WAVE-DEADLINE — ship.executeWaveTimeout and
+# ship.executeWaveInterval resolve config-or-default and are forwarded to
+# execute-plan-sdlc on the execute step's invocation.
+# ---------------------------------------------------------------------------
+
+- description: "ship-prepare: executeWaveTimeout falls back to BUILT_IN_DEFAULTS when cfg.ship is empty (R57, #506)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        return o.flags.executeWaveTimeout === 1800
+          && o.flags.executeWaveInterval === 60
+          && o.flags.sources.executeWaveTimeout === 'default'
+          && o.flags.sources.executeWaveInterval === 'default'
+
+- description: "ship-prepare: execute step forwards --wave-timeout from resolved config (R57, #506)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/ship.js"
+    script_args: "--has-plan"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-sdlc-gitignore-inner"
+  assert:
+    - type: javascript
+      value: |
+        const o = JSON.parse(output);
+        const execute = (o.steps || []).find(s => s.name === 'execute');
+        return execute !== undefined
+          && typeof execute.invocation === 'string'
+          && o.flags.executeWaveTimeout === 1800
+          && o.flags.executeWaveInterval === 60
+          && execute.invocation.includes('--wave-timeout 1800')
+          && execute.invocation.includes('--wave-interval 60');
+
+# ---------------------------------------------------------------------------
 # Issue #337 — Per-step isolation field (agent dispatch worktree isolation)
 # ---------------------------------------------------------------------------
 

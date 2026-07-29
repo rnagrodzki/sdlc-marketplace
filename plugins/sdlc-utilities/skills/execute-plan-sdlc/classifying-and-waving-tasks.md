@@ -135,7 +135,7 @@ On resource-constrained systems or when tasks share mutable state (databases, ca
 
 This template's content is inlined by execute-plan-sdlc Step 5b into the wave-runner Agent's prompt body as the `perTaskTemplate` input. It is no longer dispatched as a standalone Agent from main context — the wave-runner Agent uses it internally to fan out per-task sub-agents within its own context.
 
-Use this template for every per-task agent dispatch inside wave-runner. Fill all placeholders. The task body is loaded from the fact-sheet file — do NOT inline the full task text or reference the plan file directly.
+Use this template for every per-task agent dispatch inside wave-runner. Fill all placeholders, including `{STATE_SCRIPT}`, `{WAVE}`, and `{RUN_ID}` — the wave-runner fills these at dispatch (Task 22 supplies them). The task body is loaded from the fact-sheet file — do NOT inline the full task text or reference the plan file directly.
 
 ```
 You are implementing a single task from a larger plan. Focus only on your assigned task.
@@ -173,13 +173,18 @@ After implementation, list every file you actually modified — Step 5c-bis veri
 - (new file) path/to/new-file.ts
 
 ## Context From Prior Waves
-{Summary of relevant changes already completed. Omit if this is Wave 1. Be specific: "Task 3 created UserService at src/services/user.service.ts with methods getUser(id) and createUser(data)." Not: "Task 3 was completed."}
+The `## Upstream Surfaces` section of your fact sheet lists every file, interface, and decision
+produced by earlier waves. It is authoritative and machine-generated. Read it instead of
+searching the filesystem for what prior waves built. If a surface you need is absent from it,
+report `NEEDS_CONTEXT` — do not go looking for it.
 
 ## Completion Checklist (fill every line)
 
 ```
 COMPLETE: files_created=[list or none] files_modified=[list or none] tests_added=[yes|no|n/a] tests_pass=[yes|no|n/a] build_pass=[yes|no|n/a]
 VERIFY: <symbol_name> in <file_path>
+INTERFACES: <symbol_name> in <file_path>[, <symbol_name> in <file_path>...] | none
+DECISIONS: <one-line decision a later task must honour> | none
 STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
 ```
 
@@ -190,6 +195,10 @@ STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
 - **BLOCKED** — cannot complete the task; describe the blocker and what you tried below the checklist block
 
 For `VERIFY`, use the primary symbol you added or modified (function name, class name, config key, or constant). The orchestrator greps for this symbol to confirm your changes persisted in the filesystem.
+
+For `INTERFACES:`, list every symbol other tasks may depend on that you created or changed, in the same `<symbol_name> in <file_path>` form as `VERIFY` (comma-separate multiples). Use the literal `none` if you created no interface for later tasks to consume.
+
+For `DECISIONS:`, note any one-line decision a later task must honour — a naming convention, a chosen library, a schema shape, or similar. Use the literal `none` if you made no such decision.
 
 ## When You're in Over Your Head
 
@@ -202,6 +211,30 @@ It is always OK to stop and report BLOCKED. Bad work is worse than no work.
 - You've been reading files trying to understand the system without progress
 
 The orchestrator can provide more context, escalate to a more capable model, break the task into smaller pieces, or escalate to the user.
+
+## Progress Reporting
+
+Emit a heartbeat when you enter each phase. This is the only signal the orchestrator has that
+you are alive; a wave with no heartbeats is indistinguishable from a stalled one and will be
+terminated at the wave deadline.
+
+    node {STATE_SCRIPT} wave-progress --wave {WAVE} --run-id {RUN_ID} --task {TASK_ID} --phase <phase>
+
+Phases, in order: `started`, `reading`, `editing`, `verifying`, `reporting`. Emit each once.
+This command is exempt from the "use Edit exclusively" rule below — it writes orchestrator
+state, not project files.
+
+The heartbeat is advisory to you and load-bearing for the orchestrator: if the command fails or
+you cannot run it for any reason, proceed with your task anyway — do not report BLOCKED over a
+failed or missing heartbeat.
+
+`{STATE_SCRIPT}` is an absolute path supplied by the wave-runner at dispatch (Task 22 supplies
+it), matching `SKILL.md`'s `STATE_SCRIPT="<PLUGIN_ROOT>/scripts/state/execute.js"` — a relative
+path would resolve against whatever cwd you inherit. The `wave-progress` verb resolves its own
+state directory via `resolveStateDir()` and honours `SDLC_STATE_DIR_OVERRIDE` only if that
+variable is already present in your environment. Do not set or re-derive
+`SDLC_STATE_DIR_OVERRIDE` yourself — doing so could cause a workspace-mode run to write markers
+to a second location.
 
 ## Hard Constraints
 - Do NOT read the plan file — all task information is provided above
@@ -240,7 +273,7 @@ If you find issues during self-review, fix them before reporting.
 
 This template's content is inlined by execute-plan-sdlc Step 5b into the wave-runner Agent's prompt body as the `batchedTrivialTemplate` input. It is no longer dispatched as a standalone Agent from main context — the wave-runner Agent uses it internally when the wave has 2+ Trivial tasks.
 
-Use this template when dispatching 2+ trivial tasks as a single batch agent inside wave-runner. Fill all placeholders. Tasks are listed sequentially; the agent completes them in order. Each task body is loaded from its fact-sheet file — do NOT inline the full task text or reference the plan file directly.
+Use this template when dispatching 2+ trivial tasks as a single batch agent inside wave-runner. Fill all placeholders, including `{STATE_SCRIPT}`, `{WAVE}`, and `{RUN_ID}` — the wave-runner fills these at dispatch (Task 22 supplies them). Tasks are listed sequentially; the agent completes them in order. Each task body is loaded from its fact-sheet file — do NOT inline the full task text or reference the plan file directly.
 
 ~~~
 You are implementing a batch of trivial tasks from a larger plan. Complete all tasks in the order listed. Each task is small and self-contained.
@@ -292,7 +325,10 @@ Files you may touch for this task:
 {List any same-file ordering requirements. Example: "Task 2 must complete before Task 3 — both modify config.ts and Task 3 depends on the key Task 2 adds." If none, write "None."}
 
 ## Context From Prior Waves
-{Summary of relevant changes already completed. Omit if Wave 1. Be specific about interfaces, exports, and file locations.}
+The `## Upstream Surfaces` section of your fact sheet lists every file, interface, and decision
+produced by earlier waves. It is authoritative and machine-generated. Read it instead of
+searching the filesystem for what prior waves built. If a surface you need is absent from it,
+report `NEEDS_CONTEXT` — do not go looking for it.
 
 ## Before Reporting: Self-Review (Quick)
 For each task:
@@ -308,6 +344,32 @@ For each task, report:
 4. If DONE_WITH_CONCERNS: brief description of the concern
 5. If FAILED: what went wrong and what was completed before failure
 
+## Progress Reporting
+
+Emit a heartbeat when you enter each phase of the task currently in flight — not the batch as a
+whole. This is the only signal the orchestrator has that you are alive; a wave with no
+heartbeats is indistinguishable from a stalled one and will be terminated at the wave deadline.
+
+    node {STATE_SCRIPT} wave-progress --wave {WAVE} --run-id {RUN_ID} --task {TASK_ID} --phase <phase>
+
+Phases, in order: `started`, `reading`, `editing`, `verifying`, `reporting`. Emit each once per
+task. Use the ID of whichever task you are actively working — `{TASK_ID}` while working the
+current task, `{TASK_ID_NEXT}` once you move on to the next one — never a batch-level identifier.
+This command is exempt from the "use Edit exclusively" rule below — it writes orchestrator
+state, not project files.
+
+The heartbeat is advisory to you and load-bearing for the orchestrator: if the command fails or
+you cannot run it for any reason, proceed with the batch anyway — do not report a task FAILED
+over a failed or missing heartbeat.
+
+`{STATE_SCRIPT}` is an absolute path supplied by the wave-runner at dispatch (Task 22 supplies
+it), matching `SKILL.md`'s `STATE_SCRIPT="<PLUGIN_ROOT>/scripts/state/execute.js"` — a relative
+path would resolve against whatever cwd you inherit. The `wave-progress` verb resolves its own
+state directory via `resolveStateDir()` and honours `SDLC_STATE_DIR_OVERRIDE` only if that
+variable is already present in your environment. Do not set or re-derive
+`SDLC_STATE_DIR_OVERRIDE` yourself — doing so could cause a workspace-mode run to write markers
+to a second location.
+
 ## Hard Constraints
 - Complete tasks in the listed order
 - Do NOT modify files outside each task's "Files you may touch" list
@@ -317,11 +379,13 @@ For each task, report:
 - Do not add features, refactor, or clean up beyond what each task requires
 
 ## Verification Tokens
-After completing all tasks, report one verification token per task on its own line:
+After completing all tasks, report three verification tokens per task, each on its own line:
 ```
 VERIFY Task {N}: <symbol_name> in <file_path>
+INTERFACES Task {N}: <symbol_name> in <file_path>[, <symbol_name> in <file_path>...] | none
+DECISIONS Task {N}: <one-line decision a later task must honour> | none
 ```
-Use the primary symbol added or modified in each task. The orchestrator greps for these symbols to confirm changes persisted.
+Use the primary symbol added or modified in each task for `VERIFY:`. For `INTERFACES:` and `DECISIONS:`, follow the same fill rules as the per-task checklist — the literal `none` is acceptable for either. The orchestrator greps for these tokens to confirm changes persisted.
 
 ## Execution Context
 - Assigned model: {MODEL — haiku, sonnet, or opus}

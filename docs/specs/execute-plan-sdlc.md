@@ -26,7 +26,7 @@
 - R6: Single trivial task in a wave executed inline; 2+ trivials batched into one haiku agent
 - R7: Critique wave structure before execution: file conflicts, dependency integrity, risk clustering, context sufficiency
 - R8: Step 5b dispatches one wave-runner Agent per wave when the wave contains 1+ Standard or Complex task, OR a Trivial in-wave batch. The wave-runner Agent receives the wave manifest, prior-wave context, and reuses the per-task and batched-trivial prompt templates internally to fan out per-task sub-agents within its own context. Two-level isolation: execute-main → wave-runner Agent → per-task sub-agent. Every per-task agent prompt still includes full task text (never a reference to the plan file), exact file list, expected deliverable, and prior-wave context. (Fixes #353.)
-- R-nested-dispatch-resilient: execute-plan-sdlc and its wave-runner Agents MUST proceed with nested Agent dispatch when they run as subagents (e.g., dispatched by ship-sdlc); being dispatched as a subagent does not remove the Agent tool; they MUST NOT self-block or report agent-tool unavailability. Nested Agent dispatch is a supported harness capability (verified to depth 4; the ship→execute→wave-runner→per-task chain needs depth 3). The trigger for self-blocking is the 'main context' framing colliding with subagent execution — prose disambiguation at SKILL.md Step 5b and wave-runner-template.md is the enforcement mechanism. See R8 for the two-level isolation contract this requirement protects. (Fixes #463.)
+- R-nested-dispatch-resilient: execute-plan-sdlc and its wave-runner Agents MUST proceed with nested Agent dispatch when they run as subagents (e.g., dispatched by ship-sdlc); being dispatched as a subagent does not remove the Agent tool; they MUST NOT self-block or report agent-tool unavailability. Nested Agent dispatch is a supported harness capability (the documented limit is three subagent layers below the main conversation, overridable via CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH; the ship→execute→wave-runner→per-task chain occupies exactly that depth). The trigger for self-blocking is the 'main context' framing colliding with subagent execution — prose disambiguation at SKILL.md Step 5b and wave-runner-template.md is the enforcement mechanism. See R8 for the two-level isolation contract this requirement protects. (Fixes #463.)
 - R9: Filesystem verification mandatory after each wave: `git diff --stat` confirms claimed changes; canary check greps for verification token
 - R10: Completion checklist parsing: cross-check `files_created`/`files_modified` against `git diff --stat`, verify STATUS field, handle NEEDS_CONTEXT and BLOCKED statuses
 - R11: Spec compliance review after each wave for non-trivial tasks (skip for Speed quality tier — `--quality full`)
@@ -73,16 +73,16 @@
   - **Resume exemption:** This gate does NOT apply when a resume is in effect (`--resume`, A3, or `implicitResume`, R36) AND the persisted state file for the current branch has a non-null `planPath` (R40) — in that case the plan path is sourced from `planPath`, not from a fresh CLI argument, and R15 hash-verifies it before use. If a resume is in effect but no state file is found, or the state file's `planPath` is null/absent (a legacy state file predating R40), the gate applies exactly as if no resume were in effect — resume MUST NOT fall back to conversation context either.
   - Acceptance: behavioral coverage in `tests/promptfoo/datasets/execute-plan-sdlc.yaml` — `execute-plan-sdlc (R41, #505): standalone invocation with neither a positional plan path nor --plan halts before Step 1 LOAD with what/how/why remediation text`, `execute-plan-sdlc (R41, #505): standalone invocation does not prompt or fall back to conversation-context plan text`, `execute-plan-sdlc (R41, #505): --resume with a state file whose planPath is non-null does not halt and sources the plan from planPath`, `execute-plan-sdlc (R41, #505): --resume with a state file whose planPath is null halts with the same remediation text as the no-resume case`.
 - R-wave-runner-contract (issue #353): The wave-runner Agent is the sole executor within a wave. Its contract is:
-  - **Input** (provided verbatim in the Agent prompt body): `{ waveNumber, totalWaves, qualityTier, escalationBudget, tasks: [{id, name, complexity, risk, files, description?, acceptanceCriteria, assignedModel}], priorWaveContext: { planSummary, completedTaskIds, filesAdded, filesModified, interfacesCreated, decisionsFromPriorWaves }, perTaskTemplate, batchedTrivialTemplate }`. The `description` (Notes) field is OPTIONAL — a task whose executable shape lives in `files` + Contract + acceptanceCriteria passes without it. The `perTaskTemplate` and `batchedTrivialTemplate` fields carry the full inline content of the respective templates from `classifying-and-waving-tasks.md`, pasted by main context at dispatch time (not a path reference — wave-runner Agents must not need to Read files at the project root).
-  - **Output (final line):** `WAVE_SUMMARY: <single-line-json>` where json = `{ wave: N, status: 'completed' | 'failed' | 'partial', tasks: [{ id, name, complexity, risk, status: 'DONE'|'DONE_WITH_CONCERNS'|'NEEDS_CONTEXT'|'BLOCKED'|'FAILED', filesChanged: [...], verifyToken?: "<symbol> in <file>", attempts: [{model, status, error?}], finalModel, error? }], verification: { ran: bool, command?, passed?: bool, errorExcerpt?: string }, escalationsUsed: N }`.
-  - The output schema preserves enough fidelity that Step 6 recovery and Step 5c filesystem/canary checks in main context can reconstruct what each per-task sub-agent did.
+  - **Input** (provided verbatim in the Agent prompt body): `{ waveNumber, totalWaves, qualityTier, escalationBudget, tasks: [{id, name, complexity, risk, files, description?, acceptanceCriteria, assignedModel}], priorWaveSummary: { planSummary, completedTaskIds, filesAdded, filesModified, interfacesCreated, decisionsFromPriorWaves }, perTaskTemplate, batchedTrivialTemplate }`. The `description` (Notes) field is OPTIONAL — a task whose executable shape lives in `files` + Contract + acceptanceCriteria passes without it. The `perTaskTemplate` and `batchedTrivialTemplate` fields carry the full inline content of the respective templates from `classifying-and-waving-tasks.md`, pasted by main context at dispatch time (not a path reference — wave-runner Agents must not need to Read files at the project root).
+  - **Output (final line):** `WAVE_SUMMARY: <single-line-json>` where json = `{ wave: N, status: 'completed' | 'failed' | 'partial', tasks: [{ id, status: 'DONE'|'DONE_WITH_CONCERNS'|'NEEDS_CONTEXT'|'BLOCKED'|'FAILED', sha: string|null, filesTouched: [...], filesAdded?: [...], errorCode?: 'OVERFLOW'|'TIMEOUT'|'FAILED_TESTS'|'FAILED_BUILD'|'BLOCKED'|'NEEDS_CONTEXT', verifyToken?: "<symbol> in <file>", interfaces?: [...], decisions?: [...] }], escalationsUsed: N }`. `filesAdded` is a subset of `filesTouched` (the worker's `files_created=` list), not a disjoint set. `name`, `complexity`, `risk`, `finalModel`, `attempts[]`, `filesChanged`, `error`, and `verification` are deliberately absent - see `R-BOUNDED-RETURN`, which this bullet previously contradicted. Main context re-reads them from state by task ID.
+  - `verifyToken` is retained in the output because `R9` mandates a canary check in main context and the token has no other path back from the runner.
   - Per-task retries (haiku→sonnet→opus, budget 2) remain wave-runner's responsibility — semantics preserved, scope moved one layer down. Attempts are recorded in `attempts[]`.
 
 - R-main-context-steps (issue #353): The following steps are main-context responsibilities of execute-plan-sdlc and MUST NOT move into the wave-runner Agent: Step 2b (small-plan direct execution), Step 5 pre-wave trivial batch, Step 5a-pre (pre-wave guardrail check), Step 5a (high-risk gate), Step 5c (filesystem verification, canary check, conflict detection, completion-checklist parsing), Step 5c-bis (spec compliance reviewer), Step 5c-ter (post-wave guardrail check), Step 5d (state writes), Step 5e (inter-wave critique), and Step 6 (recovery escalation). When execute is invoked via Skill tool from ship-sdlc, all of these surfaces fire in ship's main context, restoring supervision.
 
 - R-tier-prompt-invariant (issue #353): Step 4 tier-selection AskUserQuestion fires in execute-plan-sdlc's invocation context. ship-sdlc MUST NOT synthesize a default `--quality` value when forwarding to execute — only forward `--quality` if the user explicitly passed it to ship. Otherwise the prompt fires for the user in ship's main context, enabling informed quality selection.
 
-- R-wave-abort-resume (issue #353): Inter-wave abort is the explicit break point. Mid-wave abort is not supported (wave-runner runs to wave completion or wave failure). `--resume` re-enters at the first wave with `status !== 'completed'` per existing `state/execute.js` resume detection.
+- R-wave-abort-resume (issue #353): Inter-wave abort is the explicit break point. Mid-wave abort is not supported (wave-runner runs to wave completion or wave failure). `--resume` re-enters at the first wave with `status !== 'completed'` per existing `state/execute.js` resume detection. Mid-wave abort is supported only under R-WAVE-DEADLINE, and only when R-WAVE-RESUME-RESET has cleared untrusted rows on the subsequent resume.
 
 - R-small-plan-inline (issue #353): Step 2b small-plan direct-execution (≤3 tasks, all Trivial/Standard, no high-risk) bypasses wave-runner Agents entirely. Tasks execute inline in main context. Wave-runner Agents do not apply to this path.
 
@@ -157,7 +157,7 @@
 
 ## Constraints
 
-- C1: Must not stop for checkpoints between waves (except high-risk gates)
+- C1: Must not stop for user checkpoints between waves (except high-risk gates and R-WAVE-DEADLINE timeout recovery, neither of which is a discretionary checkpoint)
 - C2: Must not dispatch agents that modify the same files in parallel
 - C3: Must not skip final verification
 - C4: Must not reference the plan file inside an agent prompt — paste full task text
@@ -197,3 +197,75 @@
 - R-PLANFILE: A plan file MUST be supplied — via the positional plan file path (A1) or `--plan <path>` (A7), or (when a resume is in effect) via the persisted state file's `planPath` field (R40) — before Step 1 (LOAD) runs; see R41 for the standalone-invocation halt this requires when none of the above is available. Step 1 (LOAD) has no conversation-context discovery path at all — there is no heuristic to skip. Conversation context is NEVER consulted for plan content, even if plan text is present in context. `--plan <path>` is forwarded by ship-sdlc from `context.planFile` for compaction stability — ensures the same plan file is read across compaction boundaries. Acceptance: "Given `--plan /path/to/plan.md` is passed AND plan text is present in conversation context, Step 1 reads from the file path and ignores the context payload."
 
 - R-CONTRACT: When a task carries a `Contract:` block, execution consumes the decided shape verbatim and MUST NOT re-derive any design decision it pins. The Contract is surfaced to the per-task agent via the fact sheet. The BLOCKED-on-architectural-decision path (classifying-and-waving-tasks.md) MUST NOT fire for a decision already settled in the Contract.
+
+- R-WAVE-CONTEXT-PRODUCER (Fixes #506): Every field of the bounded prior-wave context object
+  (`planSummary`, `completedTaskIds`, `filesAdded`, `filesModified`, `interfacesCreated`,
+  `decisionsFromPriorWaves`) MUST have a deterministic script-side producer. No field may be
+  read by `summarizePriorWaveContext` without a corresponding write path in `state/execute.js`.
+  The producer MUST NOT probe the filesystem or shell out to git: every value is carried on the
+  wire by the worker that produced it. `filesModified` = `task-done --files-changed` minus
+  `task-done --files-added`; `filesAdded` = `--files-added`, sourced from
+  `WAVE_SUMMARY.tasks[].filesAdded` (itself the worker's `COMPLETE: files_created=` list);
+  `interfacesCreated` = `task-done --verify-token`, sourced from
+  `WAVE_SUMMARY.tasks[].verifyToken` and `.interfaces[]`; `completedTaskIds` = the `--task` value
+  of each successful `task-done`; `decisionsFromPriorWaves` = `wave-done --decisions`, sourced
+  from `WAVE_SUMMARY.tasks[].decisions[]`; `planSummary` = `context --data`, which remains the
+  only verb main context calls directly and carries no other key. The `context --data` verb MUST
+  reject payloads whose top-level keys fall outside this six-key set, MUST reject a non-object
+  payload, and MUST exit non-zero rather than silently no-op on an empty object. Prior-wave
+  context MUST reach the per-task agent through the fact sheet (`R-FACT-SHEET-DISPATCH`), not
+  through LLM-narrated prose alone. Testable assertion: "After `task-done --files-changed
+  '[\"a.js\",\"b.js\"]' --files-added '[\"b.js\"]'`, `state.context.filesModified` is `[\"a.js\"]`
+  and `state.context.filesAdded` is `[\"b.js\"]`, no git process is spawned, and `context --data
+  'null'` exits non-zero without mutating state."
+
+- R-WAVE-LIVENESS (Fixes #506): Wave rows in `execute-state.json` MUST carry a `startedAt`
+  ISO-8601 timestamp set on first `wave-start` and never overwritten on resume; task rows MUST
+  carry `completedAt`. Task rows MUST NOT carry a `startedAt`: `task-done` runs after the task
+  finishes and has no truthful start time to record, so a synthesized one would be worse than
+  none. Elapsed-time enforcement is therefore a **wave**-level measurement taken from
+  `wave.startedAt`, and per-task liveness comes from the in-flight progress marker below — the
+  only signal written *during* execution. That marker MUST be written to
+  `<stateDir>/execution/<runId>/progress-wave-<N>.json` by each dispatched worker, atomically
+  (tmp + rename), recording `{taskId, phase, updatedAt}`. Every other detection path in the skill
+  is post-hoc. Markers live under the per-run directory and are reaped by `--gc` alongside fact
+  sheets. Testable assertion: "After `wave-start` followed by one `wave-progress` write, the
+  marker file exists, parses, and its `updatedAt` is not older than the wave's `startedAt`."
+
+- R-WAVE-RESUME-RESET (Fixes #506): On resume into a wave whose `status` is `in_progress`,
+  execute-plan-sdlc MUST reset that wave's `tasks[]` to empty before re-dispatching. Task rows
+  written for a wave that never reached `completed` are untrusted (see `state-format.md`) and
+  MUST NOT be counted by `verify-completeness`, which would otherwise report a false-complete at
+  the exit-65 gate for work that was never finished. The reset MUST be idempotent: running it
+  twice on the same state produces the same result and does not discard rows belonging to waves
+  whose status is `completed` or `failed`. This requirement is a precondition for any wave-abort
+  mechanism, including `R-WAVE-DEADLINE`. Testable assertion: "Given a state file with wave 2
+  `in_progress` carrying 3 task rows and wave 1 `completed` carrying 2, resume-reset leaves wave
+  1 untouched, empties wave 2, and `verify-completeness` then reports the wave-2 task IDs as
+  missing rather than accounted."
+
+- R-WAVE-DEADLINE (Fixes #506): A wave MUST be bounded by a wall-clock deadline sourced from
+  `ship.executeWaveTimeout` (seconds, `.sdlc/local.json`, R57 convention). execute-plan-sdlc has
+  no prepare script of its own to resolve this value: ship-sdlc resolves `ship.executeWaveTimeout`
+  and forwards it as `--wave-timeout` to the execute step invocation (same cross-skill wiring
+  pattern as R35). The harness provides no per-Agent wall-clock deadline — `maxTurns` is a turn
+  budget, not a clock — so the wave-runner MUST enforce the deadline itself by dispatching
+  per-task workers in the background and polling
+  with `Monitor`, terminating overrun workers with `TaskStop`. The deadline MUST NOT be enforced
+  by a separate watchdog subagent: the per-task layer already sits at the documented spawn-depth
+  limit. On expiry the runner MUST emit `errorCode: TIMEOUT` for each terminated task and a wave
+  `status` of `partial`, and MUST exit normally — timeout is a verdict, not a crash, matching
+  `await-remote-review.js` and `verify-pipeline.js`. A state marker MUST be written so a
+  subsequent `--resume` does not re-wait. Testable assertion: "Given a worker that exceeds
+  `executeWaveTimeout`, WAVE_SUMMARY reports that task with `errorCode: TIMEOUT` and wave
+  `status: partial`, and the skill proceeds to recovery rather than aborting the pipeline."
+
+- R-WAVE-BACKGROUND-DISPATCH (Fixes #506): Every Agent dispatch in execute-plan-sdlc MUST set
+  `run_in_background` explicitly. Subagents run in the background by default, so an unstated
+  assumption of foreground blocking is silently false. The wave-runner dispatch from main context
+  MUST set `run_in_background: false` (main context requires the result before continuing);
+  per-task dispatches from the wave-runner MUST set `run_in_background: true` so the runner can
+  poll and terminate them under `R-WAVE-DEADLINE`. Background subagents retain `Edit`, `Write`,
+  `Bash`, `Monitor`, `TaskStop`, and `SendMessage`, so backgrounding does not reduce worker
+  capability. Testable assertion: "Every Agent-dispatch instruction in SKILL.md and
+  wave-runner-template.md names `run_in_background` with an explicit boolean."

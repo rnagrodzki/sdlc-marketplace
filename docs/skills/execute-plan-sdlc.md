@@ -40,6 +40,8 @@ The plan must contain at least 2 tasks with clear deliverables (files to create 
 | `--branch <name>` | **INTERNAL** — reserved for explicit caller override; not used by ship-sdlc since auto-detection was introduced. ship-sdlc establishes the feature branch via `git checkout -b` before dispatching execute, so execute's own workspace derivation yields `continue` (run in place). Do not pass this directly. (Implements R30, fixes #378, #379.) | unset |
 | `--commit-waves` | After each wave passes G9 (mechanical/filesystem verify) and G11 (post-wave guardrail check), commit the wave as `wip(execute): wave N — <task titles>` (subject truncated to 72 chars). Hooks always run — `--no-verify` is never passed. The small-plan direct-execution path (R5) NEVER triggers per-wave commits regardless of this flag. Pairs with commit-sdlc's WIP-squash path so the final feature commit subsumes WIP commits via soft-reset. (Fixes #392 / R35.) | Off |
 | `--plan <path>` | Explicit path to the active plan markdown (the old autodiscovery flag was renamed in #505 — no back-compat alias for the previous name). Step 1 (LOAD) reads from this file directly — the compaction-stable plan source. Forwarded automatically by ship-sdlc from `context.planFile`. Required for standalone invocation (positionally or via this flag) unless `--resume` finds existing state for the branch — see Usage and Prerequisites. (Implements R-PLANFILE, R41.) | Required for standalone invocation; unset otherwise |
+| `--wave-timeout <seconds>` | Wall-clock deadline for a single wave (R-WAVE-DEADLINE). Once the deadline elapses, the wave-runner terminates any task still in flight and reports it with `errorCode: TIMEOUT` — see [Wave Timeout and Liveness](#wave-timeout-and-liveness-506) below. Sourced from `ship.executeWaveTimeout` in `.sdlc/local.json` when invoked via ship-sdlc (which resolves the config key and forwards this flag on the command line); a standalone invocation that omits the flag falls back to the same built-in default. Unit: seconds. | `BUILT_IN_DEFAULTS` in `scripts/lib/ship-fields.js` |
+| `--wave-interval <seconds>` | Poll interval the wave-runner uses (via `Monitor`) to check in-flight task liveness while enforcing `--wave-timeout` (R-WAVE-LIVENESS). Sourced from `ship.executeWaveInterval` in `.sdlc/local.json` the same way as `--wave-timeout`; same standalone fallback. Unit: seconds. | `BUILT_IN_DEFAULTS` in `scripts/lib/ship-fields.js` |
 
 ---
 
@@ -411,6 +413,51 @@ After all waves complete, `state/execute.js verify-completeness` checks that eve
 ```
 
 The pipeline **halts before the commit step** on exit 65 — it does not silently advance. This gate is also wired into `ship-sdlc`'s execute-step finalization.
+
+---
+
+## Wave Timeout and Liveness (#506)
+
+Each wave is bounded by a wall-clock deadline, resolved from the `--wave-timeout` / `--wave-interval` flags (see Flags above). The harness provides no per-Agent wall-clock deadline of its own (`maxTurns` is a turn budget, not a clock), so the wave-runner Agent enforces the deadline itself: it dispatches per-task workers in the background, polls their liveness with `Monitor`, and terminates any overrun worker with `TaskStop`. There is no separate watchdog subagent — the per-task layer already sits at the documented spawn-depth limit.
+
+### In-flight progress markers
+
+While a task is in flight, its worker records its current phase:
+
+```bash
+node state/execute.js wave-progress --wave <N> --run-id <run-id> --task <id> --phase <started|reading|editing|verifying|reporting>
+```
+
+- **Phase enum** is exactly `started | reading | editing | verifying | reporting` — any other value is rejected.
+- **Exit codes:** `0` on a successful write; `2` when `--wave`, `--run-id`, or `--task` is missing, or `--phase` is not one of the five values above.
+- **Read mode** (used by the wave-runner to observe a running wave from outside): `node state/execute.js wave-progress --wave <N> --run-id <run-id> --read` prints the marker JSON to stdout and exits `0`; an absent marker is not an error — it prints `{"tasks":{}}`.
+- **Location:** `<stateDir>/<runId>/progress-wave-<N>.json`, where `stateDir` is `resolveStateDir()`'s return value (already ends in `.sdlc/execution` — there is no extra `execution/` segment). The marker sits directly in the per-run directory, alongside that run's per-task fact sheets (`task-<id>.md`). See [`plugins/sdlc-utilities/skills/execute-plan-sdlc/state-format.md`](../../plugins/sdlc-utilities/skills/execute-plan-sdlc/state-format.md) for the full marker JSON shape.
+
+### TIMEOUT verdict
+
+When a task is still in flight at the deadline, the wave-runner terminates it and reports it in `WAVE_SUMMARY` with `status: "FAILED"` and `errorCode: "TIMEOUT"`. The wave itself is reported `status: "partial"` (not `failed` — other tasks in the same wave may have completed normally), and the wave-runner records `wave-done --status partial --timed-out`, which sets `wave.timedOut: true` on the wave row so a subsequent `--resume` does not re-wait on it.
+
+What this looks like from the outside:
+
+- Each terminated task is recorded by main context via `task-fail --error TIMEOUT` — the task is accounted, not missing, so the post-execution completeness gate (exit 65) stays meaningful.
+- One warning line is surfaced: `Wave N exceeded executeWaveTimeout (<n>s) — <k> task(s) terminated.`
+- **The pipeline does not halt.** Timeout is a verdict, not a crash — the same treatment `await-remote-review` and `verify-pipeline` give their own timeouts — and execution proceeds to Step 6 (RECOVER) with the terminated tasks.
+
+**`--commit-waves` interaction.** `--commit-waves` (see Per-Wave WIP Commits above) only commits a wave once it has passed G9 and G11 with `wave.status === 'completed'`. A timed-out wave is `status: "partial"`, not `completed` — **it is not committable.** Its work stays uncommitted until the tasks recovered in Step 6 finish and the wave reaches `completed`; only then does the deferred WIP commit for that wave fire. This is the correct behavior (committing a half-executed wave would be worse), but it means `--commit-waves` does not give you a checkpoint for a wave that timed out until recovery completes.
+
+### Resuming safely (`resume-reset`)
+
+Before computing the resume pointer, `--resume` runs:
+
+```bash
+node state/execute.js resume-reset [--branch <name>]
+```
+
+- Clears `tasks` (and `completedAt`) on any wave whose status is `in_progress` — those rows were written mid-wave by main context and are untrusted (see state-format.md).
+- Leaves `completed`, `failed`, and `partial` waves untouched. A `partial` (timed-out) wave's rows are a deliberate record, not untrusted data — its unfinished task IDs are carried into the next wave's dispatch set instead of re-running the full `executeWaveTimeout` deadline from scratch.
+- **Exit code:** always `0` — a no-op (no state file, or nothing to reset) is success, not an error.
+- **Output:** `{"resetWaves": [...], "clearedTaskIds": [...]}` on stdout.
+- **Idempotent:** running it twice against the same state returns `{"resetWaves":[],"clearedTaskIds":[]}` on the second call and leaves the file byte-identical.
 
 ---
 

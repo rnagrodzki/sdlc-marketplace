@@ -125,6 +125,19 @@
           "minItems": 1,
           "default": ["copilot"],
           "description": "Logins (case-insensitive) whose reviews satisfy await-remote-review. When the login is `copilot`, the reviewer must also be a Bot. (R56, R57)"
+        },
+        "executeWaveTimeout": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3600,
+          "default": 1800,
+          "description": "Maximum seconds a single execute wave may run before stalled tasks are terminated. Forwarded to execute-plan-sdlc as `--wave-timeout`. The maximum restates MAX_WAVE_TIMEOUT_SECONDS in plugins/sdlc-utilities/scripts/lib/ship-fields.js, which is the single enforcement point (Monitor.timeout_ms caps at 3600000 ms). (R57, R-WAVE-DEADLINE)"
+        },
+        "executeWaveInterval": {
+          "type": "integer",
+          "minimum": 10,
+          "default": 60,
+          "description": "Seconds between execute wave liveness poll attempts. Forwarded to execute-plan-sdlc as `--wave-interval`. (R57, R-WAVE-LIVENESS)"
         }
       },
       "additionalProperties": false

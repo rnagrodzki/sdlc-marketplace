@@ -108,12 +108,12 @@ individual task acceptance criteria".
 ```json
 {
   "wave": 1,
+  "status": "completed",
   "tasks": [
-    { "id": "t1", "status": "DONE", "filesChanged": ["src/components/ResourceIndicator.tsx"] },
-    { "id": "t2", "status": "DONE", "filesChanged": ["src/services/ResourceService.ts"] }
+    { "id": "t1", "status": "DONE", "filesTouched": ["src/components/ResourceIndicator.tsx"] },
+    { "id": "t2", "status": "DONE", "filesTouched": ["src/services/ResourceService.ts"] }
   ],
-  "allDone": true,
-  "errors": []
+  "escalationsUsed": 0
 }
 ```
 
@@ -122,12 +122,12 @@ individual task acceptance criteria".
 ```json
 {
   "wave": 2,
+  "status": "completed",
   "tasks": [
-    { "id": "t3", "status": "DONE", "filesChanged": ["src/cache/IndicatorCache.ts"] },
-    { "id": "t4", "status": "DONE", "filesChanged": ["src/cache/IndicatorCache.ts"] },
-    { "id": "t5", "status": "DONE", "filesChanged": ["src/api/resources.ts"] }
+    { "id": "t3", "status": "DONE", "filesTouched": ["src/cache/IndicatorCache.ts"] },
+    { "id": "t4", "status": "DONE", "filesTouched": ["src/cache/IndicatorCache.ts"] },
+    { "id": "t5", "status": "DONE", "filesTouched": ["src/api/resources.ts"] }
   ],
-  "allDone": true,
-  "errors": []
+  "escalationsUsed": 0
 }
 ```

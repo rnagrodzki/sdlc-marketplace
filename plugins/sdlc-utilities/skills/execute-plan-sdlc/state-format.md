@@ -110,13 +110,14 @@ Each element represents one execution wave in order. Wave `0` is the pre-wave (s
 ]
 ```
 
-| Field         | Type   | Present when                             | Description                                                          |
-|---------------|--------|------------------------------------------|----------------------------------------------------------------------|
-| `number`      | number | always                                   | Wave number. `0` for the pre-wave; `1`, `2`, ... for execution waves.|
-| `status`      | string | always                                   | Current wave status (see [Status Values](#status-values) below).     |
-| `startedAt`   | string | status is `in_progress` or later         | ISO 8601 UTC timestamp when the wave began.                          |
-| `completedAt` | string | status is `completed` or `failed`        | ISO 8601 UTC timestamp when the wave finished.                       |
-| `tasks`       | array  | always                                   | Per-task records for this wave (see below).                          |
+| Field         | Type    | Present when                             | Description                                                          |
+|---------------|---------|------------------------------------------|----------------------------------------------------------------------|
+| `number`      | number  | always                                   | Wave number. `0` for the pre-wave; `1`, `2`, ... for execution waves.|
+| `status`      | string  | always                                   | Current wave status (see [Status Values](#status-values) below).     |
+| `startedAt`   | string  | status is `in_progress` or later         | ISO 8601 UTC timestamp when the wave began. Set once on the first `wave-start` and never overwritten on resume — a wave re-entered via `--resume` keeps its original `startedAt`, so wall-clock deadline enforcement (`executeWaveTimeout`) measures from the true start, not the resume time. |
+| `completedAt` | string  | status is `completed`, `partial`, or `failed` | ISO 8601 UTC timestamp when the wave finished — successfully, partially (timed out), or with an error. |
+| `timedOut`    | boolean | present only on a wave whose deadline elapsed | `true` when `wave-done --status partial --timed-out` recorded that the wave's wall-clock deadline (`executeWaveTimeout`) elapsed before every in-wave task finished. Written only by that command — main context reads this field but never writes it. Absent on waves that never timed out. |
+| `tasks`       | array   | always                                   | Per-task records for this wave (see below).                          |
 
 ---
 
@@ -132,7 +133,8 @@ Each element represents one task within its wave.
     "complexity": "Standard",
     "risk": "Low",
     "status": "completed",
-    "filesChanged": ["db/schema.sql", "db/migrations/001_init.sql"]
+    "filesChanged": ["db/schema.sql", "db/migrations/001_init.sql"],
+    "completedAt": "2026-03-28T14:30:58Z"
   },
   {
     "id": 2,
@@ -140,7 +142,8 @@ Each element represents one task within its wave.
     "complexity": "Complex",
     "risk": "Medium",
     "status": "failed",
-    "filesChanged": []
+    "filesChanged": [],
+    "completedAt": "2026-03-28T14:31:40Z"
   }
 ]
 ```
@@ -153,6 +156,7 @@ Each element represents one task within its wave.
 | `risk`         | string   | Task risk classification: `"Low"`, `"Medium"`, or `"High"`.                         |
 | `status`       | string   | Task outcome: `"completed"`, `"failed"`, or `"skipped"`.                            |
 | `filesChanged` | string[] | Repository-relative paths of files this task modified, derived from `git diff` after task completion. Empty array if the task produced no file changes. |
+| `completedAt`  | string   | ISO 8601 UTC timestamp when `task-done`/`task-fail` recorded this task's outcome. Task rows never carry a `startedAt`: `task-done`/`task-fail` run after the task has already finished, so there is no truthful start time to record. Per-task liveness while a task is still in flight comes from the progress marker instead (see [Progress Markers](#progress-markers-in-flight-wave-liveness) below), not from a field on this row. |
 
 ---
 
@@ -193,7 +197,45 @@ Accumulates cross-wave state so that a resumed execution in a fresh Claude sessi
 | `in_progress` | Currently executing. If the process crashes, this wave or task will be retried.  |
 | `completed`   | Finished successfully.                                                           |
 | `failed`      | Terminated with an error; execution halted.                                      |
+| `partial`     | Wave only. The wave's `executeWaveTimeout` deadline elapsed before every task finished — some tasks may have completed, others were terminated with `errorCode: TIMEOUT`. Recorded via `wave-done --status partial --timed-out`, which also sets `timedOut: true` on the wave row. Not a crash: execution proceeds to recovery rather than halting. |
 | `skipped`     | Intentionally bypassed (e.g. task already completed in a prior attempt).         |
+
+---
+
+## Progress Markers (In-Flight Wave Liveness)
+
+While a wave is running, each dispatched worker records its current phase in a separate marker file — the only signal produced *during* execution. Every field described above (`startedAt`, `completedAt`, `status`, ...) is written after a task or wave finishes; task rows in particular never carry a `startedAt` (see `waves[].tasks[]` above), so this marker is the sole source of per-task liveness while work is still in flight.
+
+**Location:**
+
+```
+<stateDir>/<runId>/progress-wave-<N>.json
+```
+
+- `<stateDir>` — `resolveStateDir()`'s return value, which already ends in `.sdlc/execution`. There is no additional `execution/` path segment: the marker sits directly inside the per-run directory, alongside that run's per-task fact sheets (`task-<id>.md`).
+- `<runId>` — the run identifier passed to `wave-start --run-id` and threaded through the wave manifest.
+- `<N>` — the wave number.
+
+Example: `.sdlc/execution/run-20260328T143000Z/progress-wave-2.json`
+
+**Shape:**
+
+```json
+{
+  "tasks": {
+    "3": { "phase": "editing", "updatedAt": "2026-03-28T14:32:10Z" },
+    "4": { "phase": "verifying", "updatedAt": "2026-03-28T14:32:40Z" }
+  }
+}
+```
+
+| Field                  | Type   | Description                                                                                    |
+|------------------------|--------|--------------------------------------------------------------------------------------------------|
+| `tasks`                | object | Keyed by task ID (string). One entry per task that has written at least one progress update.    |
+| `tasks[id].phase`      | string | One of `started`, `reading`, `editing`, `verifying`, `reporting` — a free-text phase is rejected. |
+| `tasks[id].updatedAt`  | string | ISO 8601 UTC timestamp of the most recent write for that task.                                   |
+
+Written via `state/execute.js wave-progress --wave <N> --run-id <id> --task <id> --phase <phase>` (atomic tmp-write + rename); read back via the same subcommand's `--read` mode, which prints `{"tasks":{}}` when no marker exists yet rather than erroring. The per-run directory is not swept by the top-level state-file GC (which only scans `.json` files directly under `.sdlc/execution/`) — markers are reaped by `--gc` alongside the fact sheets in that same directory.
 
 ---
 
@@ -210,7 +252,7 @@ If execution fails or is interrupted, the state file is retained so the run can 
 Passing `--resume` to `execute-plan-sdlc` causes it to locate the most recent state file for the current branch (matched by branch name in the filename). The skill then:
 
 1. Skips any wave with status `completed`.
-2. Retries any wave with status `in_progress` from its beginning (individual task results within that wave are not trusted).
+2. Retries any wave with status `in_progress` from its beginning (individual task results within that wave are not trusted — `execute.js resume-reset` clears those rows at resume time, before the resume pointer is computed).
 3. Executes remaining waves with status `pending` normally.
 
 The `context` object is loaded into the agent prompt so the resuming session understands what was built in prior waves.
@@ -246,7 +288,8 @@ Mid-execution state: wave 0 completed, wave 1 in progress, wave 2 pending.
           "complexity": "Standard",
           "risk": "Low",
           "status": "completed",
-          "filesChanged": ["db/schema.sql", "db/migrations/001_init.sql"]
+          "filesChanged": ["db/schema.sql", "db/migrations/001_init.sql"],
+          "completedAt": "2026-03-28T14:30:40Z"
         },
         {
           "id": 2,
@@ -254,7 +297,8 @@ Mid-execution state: wave 0 completed, wave 1 in progress, wave 2 pending.
           "complexity": "Trivial",
           "risk": "Low",
           "status": "completed",
-          "filesChanged": [".env.example", "src/config.ts"]
+          "filesChanged": [".env.example", "src/config.ts"],
+          "completedAt": "2026-03-28T14:30:58Z"
         }
       ]
     },
@@ -269,7 +313,8 @@ Mid-execution state: wave 0 completed, wave 1 in progress, wave 2 pending.
           "complexity": "Complex",
           "risk": "Medium",
           "status": "completed",
-          "filesChanged": ["src/auth/oauth.ts", "src/auth/providers/github.ts"]
+          "filesChanged": ["src/auth/oauth.ts", "src/auth/providers/github.ts"],
+          "completedAt": "2026-03-28T14:31:50Z"
         },
         {
           "id": 4,

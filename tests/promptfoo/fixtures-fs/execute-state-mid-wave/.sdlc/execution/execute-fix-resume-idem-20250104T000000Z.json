@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "skill": "execute-plan-sdlc",
+  "startedAt": "2025-01-04T00:00:00Z",
+  "branch": "fix/resume-idem",
+  "planPath": "/tmp/resume-idem-plan.md",
+  "planHash": "resumeidem000000000000000000000000000000000000000000000000000d",
+  "preset": "B",
+  "totalTasks": 4,
+  "waves": [
+    {
+      "number": 1,
+      "status": "completed",
+      "startedAt": "2025-01-04T00:00:10Z",
+      "completedAt": "2025-01-04T00:05:00Z",
+      "tasks": [
+        {
+          "id": "T1",
+          "name": "Completed wave task one",
+          "complexity": "Trivial",
+          "risk": "Low",
+          "status": "completed",
+          "filesChanged": ["a.js"],
+          "completedAt": "2025-01-04T00:02:00Z"
+        },
+        {
+          "id": "T2",
+          "name": "Completed wave task two",
+          "complexity": "Trivial",
+          "risk": "Low",
+          "status": "completed",
+          "filesChanged": ["b.js"],
+          "completedAt": "2025-01-04T00:04:00Z"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "status": "in_progress",
+      "startedAt": "2025-01-04T00:05:10Z",
+      "tasks": []
+    }
+  ],
+  "context": {
+    "plannedTaskIds": ["T1", "T2", "T3", "T4"],
+    "planSummary": "Already-reset state: wave 2 rows were cleared by a prior resume-reset run.",
+    "completedTaskIds": ["T1", "T2"],
+    "filesAdded": ["a.js"],
+    "filesModified": ["b.js"],
+    "interfacesCreated": [],
+    "decisionsFromPriorWaves": []
+  }
+}

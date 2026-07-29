@@ -57,13 +57,17 @@
           },
           "status": {
             "type": "string",
-            "enum": ["pending", "in_progress", "completed", "failed"]
+            "enum": ["pending", "in_progress", "completed", "failed", "partial"]
           },
           "startedAt": {
             "type": "string"
           },
           "completedAt": {
             "type": "string"
+          },
+          "timedOut": {
+            "type": "boolean",
+            "description": "Set by `wave-done --timed-out` (R-WAVE-DEADLINE, #506). Read on resume to skip re-waiting."
           },
           "tasks": {
             "type": "array",
@@ -93,6 +97,10 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "completedAt": {
+                  "type": "string",
+                  "description": "ISO-8601. Written by task-done/task-fail (R-WAVE-LIVENESS, #506). Task rows deliberately carry no startedAt."
                 }
               },
               "required": ["id", "name", "complexity", "risk", "status", "filesChanged"]

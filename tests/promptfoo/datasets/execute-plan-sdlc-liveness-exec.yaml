@@ -1,0 +1,189 @@
+# Exec test cases for the wave-liveness and resume-reset surfaces of
+# plugins/sdlc-utilities/scripts/state/execute.js (R-WAVE-LIVENESS,
+# R-WAVE-RESUME-RESET, #506). Deterministic — no LLM involved.
+#
+# Prefixes "execute-plan-sdlc/liveness/" and "execute-plan-sdlc/resume-reset/"
+# keep these addressable via --filter-pattern.
+#
+# EVERY case sets SDLC_STATE_DIR_OVERRIDE to the per-case fixture copy. The
+# override short-circuits lib/state.js::resolveStateDir(), which would otherwise
+# resolve to this repository's own live .sdlc/execution from any cwd inside the
+# working tree — and `gc` DELETES what it finds there. script_cwd is likewise
+# pinned to the fixture copy so a dropped override can never fall back to the
+# real worktree, and so `gc`'s listBranches() sees no branches instead of this
+# repo's.
+#
+# Exit codes are not directly assertable: providers/script-runner.js returns only
+# {output} and merges stderr into it on a non-zero exit, so "exits 2" / "exits 65"
+# is asserted through the stderr text.
+#
+# SINGLE-INVOCATION LIMIT — the provider issues exactly one spawnSync per case and
+# transformVars hands every case a *fresh* mkdtemp copy of the fixture, so two
+# invocations cannot be chained. The idempotency cases below therefore follow the
+# convention already used by datasets/migrate-config-exec.yaml and
+# datasets/state-gc-migrate-exec.yaml: the fixture *is* the post-first-run state,
+# and the single invocation is the second run.
+
+# --- wave-progress markers (Tasks 16, 17) ----------------------------------
+
+- description: "execute-plan-sdlc/liveness/wave-progress: --read returns a marker holding one entry per task in the wave"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-progress --wave 1 --run-id 20250101T000000 --read"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        return Object.keys(r.tasks).length === 2
+          && r.tasks.T1.phase === 'editing'
+          && r.tasks.T2.phase === 'verifying';
+
+- description: "execute-plan-sdlc/liveness/wave-progress: an out-of-enum --phase fails and lists the valid phases"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-progress --wave 1 --run-id 20250101T000000 --task T1 --phase sprinting"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: contains
+      value: "Error: --phase must be one of started, reading, editing, verifying, reporting"
+
+- description: "execute-plan-sdlc/liveness/wave-progress: --read with no marker prints {\"tasks\":{}} and does not fail"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-progress --wave 7 --run-id 20250101T000000 --read"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: equals
+      value: '{"tasks":{}}'
+
+# --- wave / task liveness flags (Tasks 14, 15) -----------------------------
+
+- description: "execute-plan-sdlc/liveness/wave-done: --status bogus is rejected and lists the valid statuses"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-done --wave 1 --branch fix/live-flags --status bogus"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: contains
+      value: "Error: --status must be one of completed, partial"
+
+- description: "execute-plan-sdlc/liveness/read: a state file carrying partial/timedOut/completedAt re-loads and round-trips through JSON.parse"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "read --branch fix/live-flags"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const s = JSON.parse(output);
+        const w1 = s.waves.find(w => w.number === 1);
+        const w2 = s.waves.find(w => w.number === 2);
+        return w2.status === 'partial'
+          && w2.timedOut === true
+          && typeof w2.completedAt === 'string'
+          && typeof w1.tasks[0].completedAt === 'string'
+          && w1.tasks[0].startedAt === undefined;
+
+# --- per-run directory GC (Task 17) ----------------------------------------
+
+- description: "execute-plan-sdlc/liveness/gc: an orphaned <runId>/ directory is removed while the run directory backed by a state file survives"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "gc --ttl-days 1"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        return r.execute.deleted.length === 0
+          && r.directories.deleted.some(d => d.dir === '19990101T000000' && d.reason === 'stale+state-file-gone')
+          && r.directories.kept.some(d => d.dir === '20250101T000000' && d.reason === 'state-file-exists');
+
+- description: "execute-plan-sdlc/liveness/gc: second run against already-swept state deletes nothing (fixture is the post-first-run filesystem)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "gc --ttl-days 1"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave/gc-swept"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        return r.directories.deleted.length === 0
+          && r.directories.kept.some(d => d.dir === '20250101T000000' && d.reason === 'state-file-exists');
+
+# --- resume-reset (Tasks 20, 23) -------------------------------------------
+
+- description: "execute-plan-sdlc/resume-reset/: only the in_progress wave is emptied — completed and failed waves keep their rows"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "resume-reset --branch fix/resume-mixed"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        return r.resetWaves.length === 1
+          && r.resetWaves[0] === 4
+          && !r.resetWaves.includes(1)
+          && !r.resetWaves.includes(2)
+          && JSON.stringify(r.clearedTaskIds) === JSON.stringify(['T5', 'T6']);
+
+- description: "execute-plan-sdlc/resume-reset/: a partial + timedOut wave is terminal and is not reset"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "resume-reset --branch fix/resume-mixed"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        // Non-vacuous: wave 4 must be reset, proving the state file was found,
+        // while wave 3 (partial + timedOut) must be left alone.
+        return r.resetWaves.includes(4)
+          && !r.resetWaves.includes(3)
+          && !r.clearedTaskIds.includes('T4');
+
+- description: "execute-plan-sdlc/resume-reset/: verify-completeness reports the cleared task IDs as missing (exit 65 payload on stderr)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "verify-completeness --branch fix/resume-idem"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        return JSON.stringify(r.missingIds) === JSON.stringify(['T3', 'T4'])
+          && r.totalPlanned === 4
+          && r.totalAccounted === 2;
+
+- description: "execute-plan-sdlc/resume-reset/: second run is a no-op reporting empty resetWaves (fixture is the post-first-run state)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "resume-reset --branch fix/resume-idem"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: equals
+      value: '{"resetWaves":[],"clearedTaskIds":[]}'

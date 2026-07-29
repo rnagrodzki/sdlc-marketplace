@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "skill": "execute-plan-sdlc",
+  "startedAt": "2025-01-01T00:00:00Z",
+  "branch": "fix/ctx-alpha",
+  "planPath": "/tmp/ctx-alpha-plan.md",
+  "planHash": "ctxalpha0000000000000000000000000000000000000000000000000000000a",
+  "preset": "B",
+  "totalTasks": 2,
+  "waves": [
+    {
+      "number": 1,
+      "status": "completed",
+      "startedAt": "2025-01-01T00:00:10Z",
+      "completedAt": "2025-01-01T00:09:00Z",
+      "tasks": [
+        {
+          "id": "T1",
+          "name": "Seed the context producer",
+          "complexity": "Standard",
+          "risk": "Low",
+          "status": "completed",
+          "filesChanged": ["src/producer.js"],
+          "completedAt": "2025-01-01T00:04:00Z"
+        }
+      ]
+    }
+  ],
+  "context": {
+    "plannedTaskIds": ["T1"],
+    "planSummary": "Wire the wave-context producer end to end.",
+    "completedTaskIds": ["T1"],
+    "filesAdded": ["src/producer.js"],
+    "filesModified": [],
+    "interfacesCreated": [],
+    "decisionsFromPriorWaves": []
+  }
+}

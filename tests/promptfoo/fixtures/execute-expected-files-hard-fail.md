@@ -17,7 +17,7 @@
 ## WAVE_SUMMARY returned by the wave-runner Agent
 
 ```
-WAVE_SUMMARY: {"wave":2,"status":"completed","tasks":[{"id":"T3","name":"Add token rotation","complexity":"Standard","risk":"Medium","status":"DONE","filesChanged":["docs/notes.md"],"verifyToken":"rotateToken in docs/notes.md","attempts":[{"model":"sonnet","status":"DONE"}],"finalModel":"sonnet"}],"verification":{"ran":false},"escalationsUsed":0}
+WAVE_SUMMARY: {"wave":2,"status":"completed","tasks":[{"id":"T3","status":"DONE","filesTouched":["docs/notes.md"],"verifyToken":"rotateToken in docs/notes.md"}],"escalationsUsed":0}
 ```
 
 ## git diff --stat output for this wave

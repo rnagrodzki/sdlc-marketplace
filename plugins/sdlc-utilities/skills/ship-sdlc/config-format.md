@@ -49,7 +49,9 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
     "verifyPipelineMaxIterations": 3,
     "awaitRemoteReviewTimeout": 600,
     "awaitRemoteReviewInterval": 60,
-    "awaitRemoteReviewers": ["copilot"]
+    "awaitRemoteReviewers": ["copilot"],
+    "executeWaveTimeout": 1800,
+    "executeWaveInterval": 60
   }
 }
 ```
@@ -77,6 +79,8 @@ To migrate explicitly without waiting for the next ship run, run `/setup-sdlc --
 | `awaitRemoteReviewTimeout` | `integer` (≥30) | `600` | Maximum seconds `await-remote-review` polls for a reviewer response (R57). Only prompted in `setup-sdlc` when `await-remote-review` is in `ship.steps[]`. |
 | `awaitRemoteReviewInterval` | `integer` (≥10) | `60` | Seconds between `await-remote-review` poll attempts (R57). Only prompted in `setup-sdlc` when `await-remote-review` is in `ship.steps[]`. |
 | `awaitRemoteReviewers` | `string[]` (minItems 1) | `["copilot"]` | Reviewer logins (case-insensitive) whose review satisfies the `await-remote-review` gate. Login `copilot` also requires `user.type === "Bot"` (R56, R57). Only prompted in `setup-sdlc` when `await-remote-review` is in `ship.steps[]`. |
+| `executeWaveTimeout` | `integer` (60–3600) | `1800` | Maximum seconds a single execute wave may run before stalled tasks are terminated (R57, R-WAVE-DEADLINE). Forwarded to `execute-plan-sdlc` as `--wave-timeout`. The `3600` ceiling restates `MAX_WAVE_TIMEOUT_SECONDS` in `scripts/lib/ship-fields.js`, the single enforcement point (`Monitor.timeout_ms` caps at 3600000 ms). Only prompted in `setup-sdlc` when `execute` is in `ship.steps[]`. |
+| `executeWaveInterval` | `integer` (≥10) | `60` | Seconds between execute wave liveness poll attempts (R57, R-WAVE-LIVENESS). Forwarded to `execute-plan-sdlc` as `--wave-interval`. Only prompted in `setup-sdlc` when `execute` is in `ship.steps[]`. |
 
 ### reviewThreshold Levels
 

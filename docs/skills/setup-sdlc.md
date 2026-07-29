@@ -241,7 +241,7 @@ For each non-delegated section, these are the fields the verbose header reveals 
 
 #### `ship`
 
-The 13 `ship` fields are imported verbatim from `scripts/lib/ship-fields.js` (single source of truth for both `/ship-sdlc` and `/setup-sdlc`). Six of the 13 are R57 tunables (`verifyPipelineTimeout`, `verifyPipelineInterval`, `verifyPipelineMaxIterations`, `awaitRemoteReviewTimeout`, `awaitRemoteReviewInterval`, `awaitRemoteReviewers`) prompted only when the gating step (`verify-pipeline` or `await-remote-review`) is in the selected `ship.steps[]` — the prepare script applies these `when.stepInActiveSteps` gates per issue #292 / R15. Run `/setup-sdlc --only ship` to see each field's default and description in the verbose header before answering.
+The 15 `ship` fields are imported verbatim from `scripts/lib/ship-fields.js` (single source of truth for both `/ship-sdlc` and `/setup-sdlc`). Eight of the 15 are R57 tunables (`verifyPipelineTimeout`, `verifyPipelineInterval`, `verifyPipelineMaxIterations`, `awaitRemoteReviewTimeout`, `awaitRemoteReviewInterval`, `awaitRemoteReviewers`, `executeWaveTimeout`, `executeWaveInterval`) prompted only when the gating step (`verify-pipeline`, `await-remote-review`, or `execute`) is in the selected `ship.steps[]` — the prepare script applies these `when.stepInActiveSteps` gates per issue #292 / R15. The `executeWaveTimeout` ceiling is `3600` seconds, restating `MAX_WAVE_TIMEOUT_SECONDS` in `scripts/lib/ship-fields.js` — the single enforcement point (`Monitor.timeout_ms` caps at 3600000 ms). Run `/setup-sdlc --only ship` to see each field's default and description in the verbose header before answering.
 
 #### `workspace`
 

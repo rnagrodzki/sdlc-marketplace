@@ -1,0 +1,172 @@
+# Exec test cases for the wave-context producer surface of
+# plugins/sdlc-utilities/scripts/state/execute.js (R-WAVE-CONTEXT-PRODUCER, #506).
+# Deterministic — no LLM involved.
+#
+# Prefix "execute-plan-sdlc/context-producer/" keeps these addressable via
+# --filter-pattern and distinct from "execute-plan-sdlc/wave-runner-overflow/".
+#
+# EVERY case sets SDLC_STATE_DIR_OVERRIDE to the per-case fixture copy. The
+# override short-circuits lib/state.js::resolveStateDir(), which would otherwise
+# resolve to this repository's own live .sdlc/execution from any cwd inside the
+# working tree. script_cwd is likewise pinned to the fixture copy so that a
+# dropped override can never fall back to the real worktree, and so that
+# summarizePriorWaveContext()'s config lookup and gc's listBranches() see the
+# fixture rather than this repo.
+#
+# DEFERRED — "execute-plan-sdlc/wave-summary/" (Task 12) cases are intentionally
+# absent. lib/wave-summary.js has no shebang and no CLI entry point, so the
+# script-runner provider (which spawns `node <script> <args>`) cannot reach it.
+# The only existing bridge, tests/promptfoo/scripts/wave-overflow-test.js, routes
+# through hardcoded `case '<name>':` blocks with inline literal fixtures and is
+# outside this change's file scope. Adding those four cases requires either a
+# CLI entry point on the lib or a new case block in that harness script; both are
+# follow-up work.
+#
+# SINGLE-INVOCATION LIMIT — providers/script-runner.js issues exactly one
+# spawnSync per test case, and transformVars gives every case a *fresh* mkdtemp
+# copy of the fixture, so two invocations cannot be chained. Every mutating verb
+# here (task-done, wave-done, the `context` success path) writes state and prints
+# nothing, so its post-write state is unobservable from a single case. Those rows
+# are covered only on their observable (stderr-validation) edges; see the report
+# accompanying this file.
+
+- description: "execute-plan-sdlc/context-producer/context: --data 'null' is rejected as a non-object (R-WAVE-CONTEXT-PRODUCER)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "context --branch fix/ctx-alpha --data null"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: contains
+      value: "Error: --data must be a JSON object (R-WAVE-CONTEXT-PRODUCER)"
+
+- description: "execute-plan-sdlc/context-producer/context: --data '{}' is rejected as an empty merge"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "context --branch fix/ctx-alpha --data {}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: contains
+      value: "Error: --data is an empty object"
+
+- description: "execute-plan-sdlc/context-producer/context: --data with an unknown key names the offending key"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: 'context --branch fix/ctx-alpha --data {"bogus":[]}'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: contains
+      value: "Error: --data contains unknown context keys: bogus"
+
+- description: "execute-plan-sdlc/context-producer/context: known key with wrong type (filesAdded as string) is rejected"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: 'context --branch fix/ctx-alpha --data {"filesAdded":"a"}'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: contains
+      value: "Error: --data.filesAdded must be an array of strings"
+
+- description: "execute-plan-sdlc/context-producer/task-done: --files-added outside --files-changed is rejected and the stray path is named (KD-1)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: 'task-done --wave 1 --branch fix/ctx-alpha --task T3 --files-changed ["a.js","b.js"] --files-added ["c.js"]'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: contains
+      value: 'Error: --files-added entry "c.js" is not present in --files-changed'
+    - type: contains
+      value: "filesAdded must be a subset of filesChanged"
+
+- description: "execute-plan-sdlc/context-producer/task-done: non-JSON --verify-token is rejected before any state I/O"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: 'task-done --wave 1 --branch fix/ctx-alpha --task T3 --files-changed ["a.js"] --verify-token tests-green'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: contains
+      value: "Error: --verify-token is not valid JSON"
+
+- description: "execute-plan-sdlc/context-producer/wave-done: non-JSON --decisions is rejected before the decisionsFromPriorWaves append"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "wave-done --wave 1 --branch fix/ctx-alpha --decisions not-json"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: contains
+      value: "Error: --decisions is not valid JSON"
+
+- description: "execute-plan-sdlc/context-producer/summarizer: a fully-populated context returns non-empty values for all six fields"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "summarize-prior-wave-context --branch fix/ctx-alpha"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const s = JSON.parse(output);
+        const arrays = ['completedTaskIds', 'filesAdded', 'filesModified', 'interfacesCreated', 'decisionsFromPriorWaves'];
+        return typeof s.planSummary === 'string'
+          && s.planSummary.length > 0
+          && arrays.every(k => Array.isArray(s[k]) && s[k].length > 0);
+
+- description: "execute-plan-sdlc/context-producer/summarizer: 60 completedTaskIds are capped to the last 50 by the default maxTaskIds"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "summarize-prior-wave-context --branch fix/ctx-alpha"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const s = JSON.parse(output);
+        return s.completedTaskIds.length === 50
+          && s.completedTaskIds[0] === 'T11'
+          && s.completedTaskIds[49] === 'T60';
+
+- description: "execute-plan-sdlc/context-producer/summarizer: --max-task-ids 5 overrides the default cap and returns the last 5"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: "summarize-prior-wave-context --branch fix/ctx-alpha --max-task-ids 5"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const s = JSON.parse(output);
+        return s.completedTaskIds.length === 5
+          && s.completedTaskIds[0] === 'T56'
+          && s.completedTaskIds[4] === 'T60';
+
+- description: "execute-plan-sdlc/context-producer/wave-start: --tasks-json writes one fact sheet per task into <stateDir>/<runId>/ (R-FACT-SHEET-DISPATCH)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/state/execute.js"
+    script_args: 'wave-start --wave 2 --branch fix/ctx-alpha --run-id 20250101T000000 --tasks-json [{"id":"T7","name":"Alpha"},{"id":"T8","name":"Beta"}]'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/execute-state-mid-wave"
+    script_env: '{"SDLC_STATE_DIR_OVERRIDE": "{{project_root}}/.sdlc/execution"}'
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        return Array.isArray(r.factSheets)
+          && r.factSheets.length === 2
+          && r.factSheets[0].endsWith('/20250101T000000/task-7.md')
+          && r.factSheets[1].endsWith('/20250101T000000/task-8.md');

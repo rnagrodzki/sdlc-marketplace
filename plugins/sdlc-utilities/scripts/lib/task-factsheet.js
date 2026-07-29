@@ -19,9 +19,10 @@ const path = require('node:path');
 /**
  * Render a task as compact markdown.
  * @param {{ id: string, name: string, description: string, acceptanceCriteria: string[], files: string[], contract?: string }} task
+ * @param {{ filesAdded?: string[], filesModified?: string[], interfacesCreated?: string[], decisionsFromPriorWaves?: string[] }} [priorWaveSummary]
  * @returns {string}
  */
-function renderFactSheet(task) {
+function renderFactSheet(task, priorWaveSummary) {
   const lines = [];
 
   lines.push(`# Task ${task.id}: ${task.name}`);
@@ -59,6 +60,29 @@ function renderFactSheet(task) {
     lines.push('');
   }
 
+  // R-WAVE-CONTEXT-PRODUCER (#506): prior-wave surfaces reach the worker through
+  // the fact sheet, not through LLM-narrated prose. Omitted entirely when empty.
+  if (priorWaveSummary && typeof priorWaveSummary === 'object') {
+    const rows = [
+      ['Created', priorWaveSummary.filesAdded],
+      ['Modified', priorWaveSummary.filesModified],
+      ['Interfaces', priorWaveSummary.interfacesCreated],
+      ['Decisions', priorWaveSummary.decisionsFromPriorWaves],
+    ].filter(([, v]) => Array.isArray(v) && v.length > 0);
+    if (rows.length > 0) {
+      lines.push('## Upstream Surfaces');
+      lines.push('');
+      lines.push('Produced by earlier waves. Treat as authoritative — do NOT re-derive by');
+      lines.push('searching the filesystem.');
+      lines.push('');
+      for (const [label, values] of rows) {
+        lines.push(`**${label}:**`);
+        for (const v of values) lines.push(`- ${v}`);
+        lines.push('');
+      }
+    }
+  }
+
   return lines.join('\n');
 }
 
@@ -93,10 +117,10 @@ function taskFactSheetPath({ runId, taskId, stateDir }) {
  * If content differs, the file is atomically rewritten.
  *
  * @param {{ id: string, name: string, description: string, acceptanceCriteria: string[], files: string[], contract?: string }} task
- * @param {{ runId: string, stateDir: string }} opts
+ * @param {{ runId: string, stateDir: string, priorWaveSummary?: object }} opts
  * @returns {string} Absolute path of the written fact sheet
  */
-function writeTaskFactSheet(task, { runId, stateDir }) {
+function writeTaskFactSheet(task, { runId, stateDir, priorWaveSummary }) {
   if (!task || !task.id) throw new Error('writeTaskFactSheet: task.id is required');
   if (!runId) throw new Error('writeTaskFactSheet: runId is required');
   if (!stateDir) throw new Error('writeTaskFactSheet: stateDir is required');
@@ -109,7 +133,7 @@ function writeTaskFactSheet(task, { runId, stateDir }) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  const content = renderFactSheet(task);
+  const content = renderFactSheet(task, priorWaveSummary);
 
   // Idempotency: skip write if content matches
   if (fs.existsSync(filePath)) {

@@ -588,3 +588,165 @@
         requiring an explicit `--plan <path>` or positional plan-file-path argument on
         the command itself. The response is explicit that conversation context is not
         a valid substitute for an explicit plan argument on a standalone invocation.
+
+# ---------------------------------------------------------------------------
+# Wave context producer / background dispatch / wave deadline (#506)
+# R-WAVE-CONTEXT-PRODUCER, R-WAVE-BACKGROUND-DISPATCH, R-WAVE-DEADLINE
+# ---------------------------------------------------------------------------
+
+- description: "execute-plan-sdlc (R-WAVE-CONTEXT-PRODUCER, #506): worker prompt carries INTERFACES and DECISIONS lines"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      A wave contains a Standard task (sonnet) plus a batched trivial group. Show the
+      completion block that the per-task worker prompt asks a Standard worker to fill in,
+      AND the per-task verification-token block the batched-trivial worker prompt asks for.
+      List every line of each block verbatim.
+  assert:
+    - type: icontains
+      value: "INTERFACES"
+    - type: icontains
+      value: "DECISIONS"
+    - type: llm-rubric
+      value: >
+        Both worker prompt shapes carry an INTERFACES line AND a DECISIONS line
+        alongside COMPLETE, VERIFY, and STATUS. In the per-task completion checklist
+        the lines read `INTERFACES: <symbol_name> in <file_path>[, ...] | none` and
+        `DECISIONS: <one-line decision a later task must honour> | none`. In the
+        batched-trivial block the same two tokens appear per task, with a task-number
+        infix (`INTERFACES Task {N}:` / `DECISIONS Task {N}:`) — that infixed form is
+        correct and must be accepted. The response states that the literal `none` is a
+        valid value for either line. A response that shows only COMPLETE/VERIFY/STATUS,
+        or that carries the two lines in just one of the two prompt shapes, fails.
+
+- description: "execute-plan-sdlc (R-WAVE-CONTEXT-PRODUCER, #506): worker treats Upstream Surfaces as authoritative"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      A Wave 2 worker needs a symbol that Wave 1 was supposed to create. Show the
+      "## Context From Prior Waves" section of that worker's prompt and describe what
+      the worker is instructed to do — first to find what prior waves built, and then
+      if the surface it needs turns out not to be listed.
+  assert:
+    - type: icontains
+      value: "Upstream Surfaces"
+    - type: icontains
+      value: "NEEDS_CONTEXT"
+    - type: llm-rubric
+      value: >
+        The worker is told that the `## Upstream Surfaces` section of its own fact sheet
+        is authoritative and machine-generated, and that it must READ that section
+        INSTEAD OF searching the filesystem (grep/glob/exploration) for what prior waves
+        built. When a surface the worker needs is absent from that section, the worker
+        reports `NEEDS_CONTEXT` and does NOT go looking for it. The response must NOT
+        tell the worker to search the codebase, infer the surface, or invent it.
+
+- description: "execute-plan-sdlc (R-WAVE-BACKGROUND-DISPATCH, #506): dispatch flags differ by layer"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      There are two dispatch layers: main context dispatches the wave-runner Agent
+      (Step 5b), and the wave-runner dispatches per-task worker Agents inside the wave.
+      State the `run_in_background` value required at EACH layer and explain why the two
+      differ.
+  assert:
+    - type: icontains
+      value: "run_in_background: false"
+    - type: icontains
+      value: "run_in_background: true"
+    - type: llm-rubric
+      value: >
+        The response gives BOTH values, in the correct direction: the main-context →
+        wave-runner dispatch in Step 5b uses `run_in_background: false`, and the
+        wave-runner → per-task worker dispatches use `run_in_background: true`. The
+        reasons are stated: false is an await barrier — main context cannot consolidate
+        without the WAVE_SUMMARY, so it must never proceed on a partial or absent
+        return; true makes the wave deadline enforceable — a backgrounded child returns
+        a task ID immediately, which is what lets the wave-runner poll it with `Monitor`
+        and terminate it with `TaskStop`. A response that gives only one of the two
+        values, or that swaps which layer gets which, fails.
+
+- description: "execute-plan-sdlc (R-WAVE-DEADLINE, #506): runner polls with Monitor and terminates with TaskStop"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      The wave-runner for Wave 2 has dispatched its per-task workers and received their
+      task IDs. Walk through how it enforces the wave deadline it was handed in the
+      manifest — how it waits, how it learns which tasks are still running, and what it
+      does to the ones that overrun.
+  assert:
+    - type: icontains
+      value: "Monitor"
+    - type: icontains
+      value: "TaskStop"
+    - type: llm-rubric
+      value: >
+        The wave-runner enforces the deadline itself, inside its own context. It polls
+        with `Monitor` on a non-blocking loop using the manifest's poll interval and a
+        `timeout_ms` no greater than the remaining budget. On each poll it re-reads the
+        progress markers (`wave-progress ... --read`) to learn which tasks are still in
+        flight — a task whose marker phase is not yet `reporting` — rather than relying
+        on its own memory of the dispatch list. When the deadline expires it calls
+        `TaskStop` on ONLY those still-in-flight tasks; workers that already reported are
+        left alone. The response must NOT describe spawning a separate watchdog Agent,
+        and must NOT describe a blocking sleep or main context doing the polling. It
+        must not restate a numeric default for the timeout — the value arrives in the
+        manifest.
+
+- description: "execute-plan-sdlc (R-WAVE-DEADLINE, #506): timeout is a verdict and the pipeline proceeds"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      Wave 2's deadline expired with every one of its tasks still in flight, so the
+      wave-runner terminated all of them. What wave `status` and per-task `errorCode`
+      does the WAVE_SUMMARY carry, and what does main context do next — does the run
+      stop here?
+  assert:
+    - type: icontains
+      value: "TIMEOUT"
+    - type: icontains
+      value: "partial"
+    - type: icontains
+      value: "Step 6"
+    - type: llm-rubric
+      value: >
+        Each terminated task is reported with `status: "FAILED"` and
+        `errorCode: "TIMEOUT"`, and the wave `status` is `partial` — NOT `failed`, even
+        though every task in this wave was terminated. Timeout is a verdict, not a
+        crash: the wave-runner still returns its WAVE_SUMMARY rather than aborting or
+        omitting it. Main context then records each task via `task-fail --error TIMEOUT`
+        so it stays accounted for at the completeness gate, surfaces one warning line,
+        and PROCEEDS TO STEP 6 (RECOVER) with those tasks. The response must state that
+        the pipeline continues — a response that stops the run, aborts, or treats the
+        timeout as terminal fails. It must also not have main context duplicate the
+        `wave-done --status partial --timed-out` write; the wave-runner already recorded
+        that verdict.
+
+- description: "execute-plan-sdlc (R-WAVE-CONTEXT-PRODUCER, #506): SKILL.md inlines the whole template fence"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/execute-plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/execute-plan-ready.md"
+    user_request: >
+      A wave has one Standard task and two Trivial tasks. When main context builds the
+      wave-runner Agent's prompt in Step 5b, describe exactly how much of each prompt
+      template from classifying-and-waving-tasks.md gets inlined, and how that extent is
+      specified.
+  assert:
+    - type: icontains
+      value: "perTaskTemplate"
+    - type: llm-rubric
+      value: >
+        Main context inlines the ENTIRE fenced block under the `## Agent Prompt Template`
+        heading as `perTaskTemplate` — from its opening fence through its closing fence —
+        and, because this wave has 2+ Trivial tasks, likewise the entire fenced block
+        under `## Batched Trivial Tasks Prompt Template` as `batchedTrivialTemplate`. The
+        extent is described fence-to-fence by heading; the response must NOT specify it
+        as a line range or line numbers, and must NOT describe excerpting, summarizing,
+        or truncating the template. The response gives the reason: truncating the fence
+        drops the trailing `## Hard Constraints` and `## Before Reporting: Self-Review`
+        sections from the worker prompt.

@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "skill": "execute-plan-sdlc",
+  "startedAt": "2025-01-02T00:00:00Z",
+  "branch": "fix/live-flags",
+  "planPath": "/tmp/live-flags-plan.md",
+  "planHash": "liveflags000000000000000000000000000000000000000000000000000000b",
+  "preset": "B",
+  "totalTasks": 3,
+  "waves": [
+    {
+      "number": 1,
+      "status": "completed",
+      "startedAt": "2025-01-02T00:00:10Z",
+      "completedAt": "2025-01-02T00:05:00Z",
+      "tasks": [
+        {
+          "id": "T1",
+          "name": "Liveness marker plumbing",
+          "complexity": "Standard",
+          "risk": "Low",
+          "status": "completed",
+          "filesChanged": ["lib/wave-progress.js"],
+          "completedAt": "2025-01-02T00:04:30Z"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "status": "partial",
+      "startedAt": "2025-01-02T00:05:10Z",
+      "completedAt": "2025-01-02T00:35:00Z",
+      "timedOut": true,
+      "tasks": [
+        {
+          "id": "T2",
+          "name": "Deadline handling",
+          "complexity": "Complex",
+          "risk": "High",
+          "status": "failed",
+          "filesChanged": ["lib/deadline.js"],
+          "completedAt": "2025-01-02T00:34:00Z"
+        }
+      ]
+    }
+  ],
+  "context": {
+    "plannedTaskIds": ["T1", "T2", "T3"],
+    "planSummary": "Wave deadline + liveness flags.",
+    "completedTaskIds": ["T1"],
+    "filesAdded": ["lib/deadline.js"],
+    "filesModified": ["lib/wave-progress.js"],
+    "interfacesCreated": [],
+    "decisionsFromPriorWaves": []
+  }
+}

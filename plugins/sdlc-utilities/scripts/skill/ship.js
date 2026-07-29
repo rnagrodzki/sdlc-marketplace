@@ -364,6 +364,28 @@ function mergeFlags(cli, config) {
     sources.awaitRemoteReviewers = 'default';
   }
 
+  // executeWaveTimeout (integer 60-3600, default from BUILT_IN_DEFAULTS).
+  // Flat inside `ship`, not nested under `ship.execute` — same section as
+  // every other timeout knob. Forwarded to execute-plan-sdlc as
+  // `--wave-timeout` (R57, R-WAVE-DEADLINE).
+  if (cfg.executeWaveTimeout !== undefined) {
+    merged.executeWaveTimeout  = cfg.executeWaveTimeout;
+    sources.executeWaveTimeout = 'config';
+  } else {
+    merged.executeWaveTimeout  = BUILT_IN_DEFAULTS.executeWaveTimeout;
+    sources.executeWaveTimeout = 'default';
+  }
+
+  // executeWaveInterval (integer ≥10, default from BUILT_IN_DEFAULTS).
+  // Forwarded to execute-plan-sdlc as `--wave-interval` (R57, R-WAVE-LIVENESS).
+  if (cfg.executeWaveInterval !== undefined) {
+    merged.executeWaveInterval  = cfg.executeWaveInterval;
+    sources.executeWaveInterval = 'config';
+  } else {
+    merged.executeWaveInterval  = BUILT_IN_DEFAULTS.executeWaveInterval;
+    sources.executeWaveInterval = 'default';
+  }
+
   // execute.commitWaves (boolean, default false) — Fixes #392 / R35.
   // Forwarded to execute-plan-sdlc as `--commit-waves` when true. Resolved
   // here (scripts-over-llm-logic guardrail) so SKILL.md only cites
@@ -445,6 +467,13 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
         // final feature commit subsumes per-wave WIP commits cleanly
         // (Fixes #392 / R35).
         flags.executeCommitWaves ? '--commit-waves' : '',
+        // Forward the wave liveness/deadline tunables resolved from
+        // ship.executeWaveTimeout / ship.executeWaveInterval. Always
+        // forwarded (they always resolve to config-or-default) — this
+        // invocation is the ONLY path by which execute-plan-sdlc learns the
+        // configured values (R57, R-WAVE-DEADLINE, R-WAVE-LIVENESS).
+        `--wave-timeout ${flags.executeWaveTimeout}`,
+        `--wave-interval ${flags.executeWaveInterval}`,
         // R-PLANFILE: forward the resolved plan file explicitly so
         // execute-plan-sdlc never has to infer it from conversation context
         // (fragile under compaction) — resolution is CLI-only (R72).
@@ -1523,6 +1552,13 @@ function main() {
       awaitRemoteReviewTimeout: flags.awaitRemoteReviewTimeout,
       awaitRemoteReviewInterval: flags.awaitRemoteReviewInterval,
       awaitRemoteReviewers: flags.awaitRemoteReviewers,
+      // R57 / R-WAVE-DEADLINE / R-WAVE-LIVENESS: wave tunables resolved at
+      // config-merge time and forwarded to the execute step's invocation as
+      // --wave-timeout / --wave-interval (see computeSteps). Surfaced here so
+      // downstream consumers can introspect the resolution without parsing
+      // step args.
+      executeWaveTimeout: flags.executeWaveTimeout,
+      executeWaveInterval: flags.executeWaveInterval,
       // Fixes #392 / R35: execute.commitWaves resolved at config-merge time;
       // forwarded as --commit-waves to the execute step's invocation (see
       // computeSteps). Surfaced here so downstream consumers can introspect

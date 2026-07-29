@@ -7,18 +7,21 @@
  * Usage:
  *   node execute-state.js init        --branch <b> --quality <X> --total-tasks <n> [--planned-task-ids <json>] [--plan-path <p>] [--plan-hash <h>]
  *   node execute-state.js wave-start  --wave <n> [--tasks-json <json>] [--run-id <id>]
- *   node execute-state.js wave-done   --wave <n>
+ *   node execute-state.js wave-done   --wave <n> [--decisions <json>] [--status <completed|partial>] [--timed-out]
  *   node execute-state.js wave-fail   --wave <n>
  *   node execute-state.js wave-committed --branch <b> --wave <n> --sha <sha>
- *   node execute-state.js task-done   --wave <n> --task <id> --name <name> --complexity <c> --risk <r> --files-changed <json>
+ *   node execute-state.js task-done   --wave <n> --task <id> --name <name> --complexity <c> --risk <r> --files-changed <json> [--files-added <json>] [--verify-token <json>]
  *   node execute-state.js task-fail   --wave <n> --task <id> --name <name> --complexity <c> --risk <r> --error <text> [--skipped-dependency]
  *   node execute-state.js context     --data <json>
  *   node execute-state.js read        [--branch <b>]
  *   node execute-state.js cleanup     [--branch <b>]
  *   node execute-state.js gc          [--ttl-days <N>] [--dry-run]
- *   node execute-state.js summarize-prior-wave-context [--run-id <id>] [--max-files <n>] [--max-decisions <n>] [--max-interfaces <n>]
+ *   node execute-state.js summarize-prior-wave-context [--run-id <id>] [--max-files <n>] [--max-decisions <n>] [--max-interfaces <n>] [--max-task-ids <n>]
  *   node execute-state.js wave-split --wave <n> --dispatched <json-id-array> [--missing-ids <json-id-array>] [--split-depth <n>] [--max-split-depth <n>]
  *   node execute-state.js verify-completeness --run-id <id>
+ *   node execute-state.js wave-progress --wave <n> --run-id <id> --task <id> --phase <started|reading|editing|verifying|reporting>  (write)
+ *   node execute-state.js wave-progress --wave <n> --run-id <id> --read                                                             (read; prints JSON)
+ *   node execute-state.js resume-reset [--branch <b>]
  *
  * Exit codes:
  *   0 = success
@@ -41,6 +44,7 @@ const {
 const { writeTaskFactSheet, taskFactSheetPath } = require(path.join(LIB, 'task-factsheet'));
 const { splitWave, MaxSplitDepthExceededError } = require(path.join(LIB, 'wave-split'));
 const { resolveActiveWorktreeSafe } = require(path.join(LIB, 'worktree'));
+const { writeProgress, readProgress } = require(path.join(LIB, 'wave-progress'));
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -87,6 +91,16 @@ function parseArgs(argv) {
       result.risk = args[++i];
     } else if (a === '--files-changed' && args[i + 1]) {
       result.filesChanged = args[++i];
+    } else if (a === '--files-added' && args[i + 1]) {
+      result.filesAdded = args[++i];
+    } else if (a === '--verify-token' && args[i + 1]) {
+      result.verifyToken = args[++i];
+    } else if (a === '--decisions' && args[i + 1]) {
+      result.decisions = args[++i];
+    } else if (a === '--status' && args[i + 1]) {
+      result.status = args[++i];
+    } else if (a === '--timed-out') {
+      result.timedOut = true;
     } else if (a === '--error' && args[i + 1]) {
       result.error = args[++i];
     } else if (a === '--data' && args[i + 1]) {
@@ -112,6 +126,9 @@ function parseArgs(argv) {
     } else if (a === '--max-interfaces' && args[i + 1]) {
       const val = parseInt(args[++i], 10);
       if (!isNaN(val)) result.maxInterfaces = val;
+    } else if (a === '--max-task-ids' && args[i + 1]) {
+      const val = parseInt(args[++i], 10);
+      if (!isNaN(val)) result.maxTaskIds = val;
     } else if (a === '--dispatched' && args[i + 1]) {
       result.dispatched = args[++i];
     } else if (a === '--missing-ids' && args[i + 1]) {
@@ -126,6 +143,10 @@ function parseArgs(argv) {
       result.stateFile = args[++i];
     } else if (a === '--skipped-dependency') {
       result.skippedDependency = true;
+    } else if (a === '--phase' && args[i + 1]) {
+      result.phase = args[++i];
+    } else if (a === '--read') {
+      result.read = true;
     }
   }
 
@@ -267,7 +288,7 @@ function cmdWaveStart(opts) {
   const wave = data.waves.find(w => w.number === opts.wave);
   if (wave) {
     wave.status = 'in_progress';
-    wave.startedAt = new Date().toISOString();
+    if (!wave.startedAt) wave.startedAt = new Date().toISOString();
   } else {
     data.waves.push({
       number: opts.wave,
@@ -300,10 +321,13 @@ function cmdWaveStart(opts) {
       ? data.startedAt.replace(/[^0-9T]/g, '').replace('T', 'T')
       : `wave-${opts.wave}`);
     const writtenPaths = [];
+    // R-WAVE-CONTEXT-PRODUCER (#506): bounded prior-wave context is rendered into
+    // each fact sheet so the worker never has to crawl the filesystem for it.
+    const priorWaveSummary = summarizePriorWaveContext(data);
     for (const task of tasks) {
       if (!task || !task.id) continue; // skip malformed entries
       try {
-        const p = writeTaskFactSheet(task, { runId, stateDir });
+        const p = writeTaskFactSheet(task, { runId, stateDir, priorWaveSummary });
         writtenPaths.push(p);
       } catch (e) {
         process.stderr.write(`Warning: failed to write fact sheet for task ${task.id}: ${e.message}\n`);
@@ -323,6 +347,23 @@ function cmdWaveDone(opts) {
     process.exit(2);
   }
 
+  // R-WAVE-CONTEXT-PRODUCER (#506): decisions arrive on the wire from
+  // WAVE_SUMMARY.tasks[].decisions[]; parsed before any state I/O so a caller
+  // error is always exit 2.
+  let decisions = [];
+  if (opts.decisions) {
+    try {
+      decisions = JSON.parse(opts.decisions);
+    } catch (e) {
+      process.stderr.write(`Error: --decisions is not valid JSON: ${e.message}\n`);
+      process.exit(2);
+    }
+    if (!Array.isArray(decisions)) {
+      process.stderr.write('Error: --decisions must be a JSON array\n');
+      process.exit(2);
+    }
+  }
+
   const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('execute', slug);
@@ -335,8 +376,23 @@ function cmdWaveDone(opts) {
   if (!Array.isArray(data.waves)) data.waves = [];
 
   const wave = findOrCreateWave(data.waves, opts.wave);
-  wave.status = 'completed';
+  const VALID_WAVE_DONE_STATUS = ['completed', 'partial'];
+  const status = opts.status || 'completed';
+  if (!VALID_WAVE_DONE_STATUS.includes(status)) {
+    process.stderr.write(`Error: --status must be one of ${VALID_WAVE_DONE_STATUS.join(', ')}\n`);
+    process.exit(2);
+  }
+  wave.status = status;
+  if (opts.timedOut) wave.timedOut = true;   // R-WAVE-DEADLINE resume short-circuit (#506)
   wave.completedAt = new Date().toISOString();
+
+  // Append decisions to the prior-wave context. Idempotent by value: re-running
+  // wave-done with the same --decisions leaves the array length unchanged.
+  if (!data.context || typeof data.context !== 'object') data.context = {};
+  const ctx = data.context;
+  if (!Array.isArray(ctx.decisionsFromPriorWaves)) ctx.decisionsFromPriorWaves = [];
+  const pushUnique = (arr, v) => { if (!arr.includes(v)) arr.push(v); };
+  for (const d of decisions) pushUnique(ctx.decisionsFromPriorWaves, d);
 
   writeState(filePath, data);
   process.exit(0);
@@ -440,6 +496,47 @@ function cmdTaskDone(opts) {
     process.exit(2);
   }
 
+  // R-WAVE-CONTEXT-PRODUCER (#506): the added/modified split arrives on the wire
+  // from the worker's own COMPLETE line; it is never probed from the working tree.
+  let filesAdded = [];
+  if (opts.filesAdded) {
+    try {
+      filesAdded = JSON.parse(opts.filesAdded);
+    } catch (e) {
+      process.stderr.write(`Error: --files-added is not valid JSON: ${e.message}\n`);
+      process.exit(2);
+    }
+    if (!Array.isArray(filesAdded)) {
+      process.stderr.write('Error: --files-added must be a JSON array\n');
+      process.exit(2);
+    }
+  }
+
+  let verifyTokens = [];
+  if (opts.verifyToken) {
+    try {
+      verifyTokens = JSON.parse(opts.verifyToken);
+    } catch (e) {
+      process.stderr.write(`Error: --verify-token is not valid JSON: ${e.message}\n`);
+      process.exit(2);
+    }
+    if (typeof verifyTokens === 'string') verifyTokens = [verifyTokens];
+    if (!Array.isArray(verifyTokens)) {
+      process.stderr.write('Error: --verify-token must be a JSON array or string\n');
+      process.exit(2);
+    }
+  }
+
+  // KD-1 invariant: filesAdded ⊆ filesTouched. Enforced before any state I/O so a
+  // caller error is always exit 2 (never masked by a missing state file).
+  const changedSet = new Set(Array.isArray(filesChanged) ? filesChanged : []);
+  for (const f of filesAdded) {
+    if (!changedSet.has(f)) {
+      process.stderr.write(`Error: --files-added entry "${f}" is not present in --files-changed (filesAdded must be a subset of filesChanged)\n`);
+      process.exit(2);
+    }
+  }
+
   const branch = resolveBranchOrExit(opts.branch);
   const slug = slugifyBranch(branch);
   const found = readState('execute', slug);
@@ -461,6 +558,7 @@ function cmdTaskDone(opts) {
     risk: opts.risk || '',
     status: 'completed',
     filesChanged: Array.isArray(filesChanged) ? filesChanged : [],
+    completedAt: new Date().toISOString(),
   };
 
   const existingIdx = wave.tasks.findIndex(t => t.id === opts.task);
@@ -469,6 +567,23 @@ function cmdTaskDone(opts) {
   } else {
     wave.tasks.push(taskEntry);
   }
+
+  // R-WAVE-CONTEXT-PRODUCER (#506): the four prior-wave context fields had no
+  // producer — summarizePriorWaveContext read them and nothing ever wrote them.
+  // The added/modified split is carried on the wire by the worker's own
+  // `COMPLETE: files_created=` list; it is NOT probed from the working tree.
+  if (!data.context || typeof data.context !== 'object') data.context = {};
+  const ctx = data.context;
+  for (const key of ['filesAdded', 'filesModified', 'interfacesCreated', 'completedTaskIds']) {
+    if (!Array.isArray(ctx[key])) ctx[key] = [];
+  }
+  const added = new Set(Array.isArray(filesAdded) ? filesAdded : []);
+  const pushUnique = (arr, v) => { if (!arr.includes(v)) arr.push(v); };
+  for (const f of taskEntry.filesChanged) {
+    pushUnique(added.has(f) ? ctx.filesAdded : ctx.filesModified, f);
+  }
+  for (const t of verifyTokens) pushUnique(ctx.interfacesCreated, t);
+  pushUnique(ctx.completedTaskIds, String(opts.task));
 
   writeState(filePath, data);
   process.exit(0);
@@ -512,6 +627,7 @@ function cmdTaskFail(opts) {
     status: taskStatus,
     filesChanged: [],
     error: opts.error || '',
+    completedAt: new Date().toISOString(),
   };
 
   const existingIdx = wave.tasks.findIndex(t => t.id === opts.task);
@@ -548,6 +664,35 @@ function cmdContext(opts) {
   }
 
   const { data, filePath } = found;
+  const CONTEXT_KEYS = new Set([
+    'planSummary', 'completedTaskIds', 'filesAdded',
+    'filesModified', 'interfacesCreated', 'decisionsFromPriorWaves',
+  ]);
+  if (incoming === null || typeof incoming !== 'object' || Array.isArray(incoming)) {
+    process.stderr.write('Error: --data must be a JSON object (R-WAVE-CONTEXT-PRODUCER)\n');
+    process.exit(2);
+  }
+  const unknown = Object.keys(incoming).filter(k => !CONTEXT_KEYS.has(k));
+  if (unknown.length > 0) {
+    process.stderr.write(`Error: --data contains unknown context keys: ${unknown.join(', ')}\n`);
+    process.exit(2);
+  }
+  if (Object.keys(incoming).length === 0) {
+    process.stderr.write('Error: --data is an empty object — nothing to merge\n');
+    process.exit(2);
+  }
+  for (const key of Object.keys(incoming)) {
+    const value = incoming[key];
+    if (key === 'planSummary') {
+      if (typeof value !== 'string') {
+        process.stderr.write(`Error: --data.${key} must be a string\n`);
+        process.exit(2);
+      }
+    } else if (!Array.isArray(value) || !value.every(v => typeof v === 'string')) {
+      process.stderr.write(`Error: --data.${key} must be an array of strings\n`);
+      process.exit(2);
+    }
+  }
   if (!data.context || typeof data.context !== 'object') data.context = {};
   data.context = deepMerge(data.context, incoming);
 
@@ -579,6 +724,104 @@ function cmdCleanup(opts) {
 
   deleteState(found.filePath);
   process.exit(0);
+}
+
+/**
+ * Reap stale per-run directories under `resolveStateDir()` (e.g. `<runId>/`
+ * fact-sheet + wave-progress-marker directories written by `wave-start` /
+ * `wave-progress`). Mirrors `gcStateFiles`'s own ttl-fresh / owner-exists /
+ * stale+gone pruning rule (F-wave-liveness-abort-and-resume-durability):
+ *
+ *   - Directory mtime within TTL           → KEEP, reason "ttl-fresh".
+ *   - Directory name matches a live run     → KEEP, reason "state-file-exists".
+ *   - Directory is stale AND unmatched      → DELETE (rm -rf), reason "stale+state-file-gone".
+ *
+ * "Live run" is derived from every surviving `execute-*.json` state file's
+ * `startedAt` field, using the exact same slug derivation `wave-start` uses
+ * for its default `--run-id` (punctuation stripped). This does not recover
+ * an explicit custom `--run-id` (e.g. an issue-number-based id) that has no
+ * stored linkage back to a state file — those directories rely on the
+ * ttl-fresh path for protection instead, same as any other stale+unreferenced
+ * artifact. No exact algorithm is pinned by spec; this is the simplest rule
+ * that satisfies "never remove a live run's directory" without inventing a
+ * new persisted runId↔state-file mapping.
+ *
+ * When `dryRun` is true, classification runs identically but `fs.rmSync` is
+ * never called — the result uses `wouldDelete`/`wouldKeep` bucket names (same
+ * convention `cmdGc`'s own `--dry-run` branch already uses for `.json` files)
+ * so callers can tell a preview result from a real one at a glance.
+ *
+ * @param {{ stateDir: string, ttlDays: number, now?: number, dryRun?: boolean }} opts
+ * @returns {{ deleted: Array<{dir,mtime,reason}>, kept: Array<{dir,reason}> } | { wouldDelete: Array<{dir,reason}>, wouldKeep: Array<{dir,reason}> }}
+ */
+function reapRunDirectories({ stateDir, ttlDays, now, dryRun }) {
+  const result = dryRun ? { wouldDelete: [], wouldKeep: [] } : { deleted: [], kept: [] };
+  const deleteBucket = dryRun ? result.wouldDelete : result.deleted;
+  const keepBucket = dryRun ? result.wouldKeep : result.kept;
+  if (!fs.existsSync(stateDir)) return result;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(stateDir, { withFileTypes: true });
+  } catch (_) {
+    return result;
+  }
+
+  const liveRunIds = new Set();
+  for (const entry of entries) {
+    if (entry.isDirectory() || !entry.name.endsWith('.json')) continue;
+    const parsed = parseStateFilename(entry.name);
+    if (!parsed || parsed.prefix !== 'execute') continue;
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(stateDir, entry.name), 'utf8'));
+      if (data && typeof data.startedAt === 'string') {
+        liveRunIds.add(data.startedAt.replace(/[^0-9T]/g, ''));
+      }
+    } catch (_) {
+      // Unreadable/corrupt state file — cannot contribute a live runId.
+    }
+  }
+
+  const nowMs = typeof now === 'number' ? now : Date.now();
+  const ttlMs = ttlDays * 86400000;
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const dirName = entry.name;
+    const dirPath = path.join(stateDir, dirName);
+    let stat;
+    try {
+      stat = fs.statSync(dirPath);
+    } catch (_) {
+      continue; // disappeared between readdir and stat
+    }
+
+    const ageMs = nowMs - stat.mtimeMs;
+
+    if (ageMs < ttlMs) {
+      keepBucket.push({ dir: dirName, reason: 'ttl-fresh' });
+      continue;
+    }
+
+    if (liveRunIds.has(dirName)) {
+      keepBucket.push({ dir: dirName, reason: 'state-file-exists' });
+      continue;
+    }
+
+    if (dryRun) {
+      deleteBucket.push({ dir: dirName, reason: 'stale+state-file-gone' });
+      continue;
+    }
+
+    try {
+      fs.rmSync(dirPath, { recursive: true, force: true });
+      deleteBucket.push({ dir: dirName, mtime: stat.mtimeMs, reason: 'stale+state-file-gone' });
+    } catch (_) {
+      keepBucket.push({ dir: dirName, reason: 'rm-failed' });
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -618,13 +861,18 @@ function cmdGc(opts) {
       }
     }
 
-    process.stdout.write(JSON.stringify({ dryRun: true, ttlDays, ...out }, null, 2) + '\n');
+    const directories = reapRunDirectories({ stateDir, ttlDays, dryRun: true });
+    process.stdout.write(JSON.stringify({ dryRun: true, ttlDays, ...out, directories }, null, 2) + '\n');
     process.exit(0);
   }
 
   const execute = gcStateFiles({ prefix: 'execute', ttlDays, knownBranches });
   const plan    = gcStateFiles({ prefix: 'plan',    ttlDays, knownBranches });
-  process.stdout.write(JSON.stringify({ ttlDays, execute, plan }, null, 2) + '\n');
+  // Sweep run-id directories after the json sweep above so a run whose
+  // execute-state file was just deleted is correctly treated as unowned
+  // in this same pass (F-wave-liveness-abort-and-resume-durability).
+  const directories = reapRunDirectories({ stateDir: resolveStateDir(), ttlDays });
+  process.stdout.write(JSON.stringify({ ttlDays, execute, plan, directories }, null, 2) + '\n');
   process.exit(0);
 }
 
@@ -875,9 +1123,113 @@ function cmdSummarizePriorWaveContext(opts) {
   if (opts.maxFiles      != null) caps.maxFiles      = opts.maxFiles;
   if (opts.maxDecisions  != null) caps.maxDecisions  = opts.maxDecisions;
   if (opts.maxInterfaces != null) caps.maxInterfaces = opts.maxInterfaces;
+  if (opts.maxTaskIds    != null) caps.maxTaskIds    = opts.maxTaskIds;
 
   const summary = summarizePriorWaveContext(found.data, caps);
   process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
+  process.exit(0);
+}
+
+// Bounded phase enum mirrored from lib/wave-progress.js's own VALID_PHASES so
+// this CLI verb controls its own exit code / stderr wording on an invalid
+// --phase, independent of the library's thrown error message (R-WAVE-LIVENESS).
+const VALID_WAVE_PROGRESS_PHASES = ['started', 'reading', 'editing', 'verifying', 'reporting'];
+
+/**
+ * `wave-progress` — thin CLI surface over lib/wave-progress.js's writeProgress
+ * / readProgress. Workers cannot `require()` a lib directly, so this verb is
+ * the only way an Agent dispatch can record or observe in-flight wave phase
+ * (R-WAVE-LIVENESS, #506, Task 16/17).
+ *
+ * Write mode:  --wave <n> --run-id <id> --task <id> --phase <enum>
+ * Read mode:   --wave <n> --run-id <id> --read           (prints JSON, absence is not an error)
+ */
+function cmdWaveProgress(opts) {
+  if (opts.wave == null || isNaN(opts.wave)) {
+    process.stderr.write('Error: --wave is required\n');
+    process.exit(2);
+  }
+  if (!opts.runId) {
+    process.stderr.write('Error: --run-id is required\n');
+    process.exit(2);
+  }
+
+  const stateDir = resolveStateDir();
+
+  if (opts.read) {
+    const progress = readProgress({ runId: opts.runId, wave: opts.wave, stateDir });
+    process.stdout.write(JSON.stringify(progress) + '\n');
+    process.exit(0);
+  }
+
+  if (!opts.task) {
+    process.stderr.write('Error: --task is required (write mode)\n');
+    process.exit(2);
+  }
+  if (!VALID_WAVE_PROGRESS_PHASES.includes(opts.phase)) {
+    process.stderr.write(`Error: --phase must be one of ${VALID_WAVE_PROGRESS_PHASES.join(', ')}\n`);
+    process.exit(2);
+  }
+
+  writeProgress({ runId: opts.runId, wave: opts.wave, stateDir, taskId: opts.task, phase: opts.phase });
+  process.exit(0);
+}
+
+/**
+ * `resume-reset` — clear untrusted task rows before a resume computes its wave pointer.
+ *
+ * Main context writes a wave's task rows in a batch after the wave-runner returns, so a
+ * run interrupted mid-wave leaves a partial set of rows that `verify-completeness` would
+ * otherwise count as accounted — a false-complete at the exit-65 gate. For every wave with
+ * status `in_progress` this verb sets `tasks = []` and clears `completedAt`, preserving
+ * `startedAt` and `status`. Waves with any other status are untouched: `completed`,
+ * `failed` and `partial` are terminal (their rows are a deliberate record) and `pending`
+ * waves never ran.
+ *
+ * Prints {resetWaves, clearedTaskIds}. Exit 0 always — a no-op is success.
+ *
+ * Implements R-WAVE-RESUME-RESET (#506, Task 20).
+ */
+function cmdResumeReset(opts) {
+  const branch = resolveBranchOrExit(opts.branch);
+  const slug = slugifyBranch(branch);
+  const found = readState('execute', slug);
+
+  const resetWaves = [];
+  const clearedTaskIds = [];
+
+  // Unlike the sibling verbs, a missing state file is not an error here: there is simply
+  // nothing to reset, and the resume flow calls this unconditionally.
+  if (found) {
+    const { data, filePath } = found;
+    const waves = Array.isArray(data.waves) ? data.waves : [];
+
+    for (const wave of waves) {
+      // Positive equality only. `status !== 'completed'` would also sweep `failed` and
+      // `partial`, whose rows must survive.
+      if (!wave || wave.status !== 'in_progress') continue;
+
+      const tasks = Array.isArray(wave.tasks) ? wave.tasks : [];
+      // Idempotency (state-machine-idempotency): `status` is preserved by design, so the
+      // status check alone would re-report the same wave on every run. A wave only counts
+      // as reset when it still has something to clear.
+      if (tasks.length === 0 && wave.completedAt === undefined) continue;
+
+      // Collect the ids before emptying the row set.
+      for (const task of tasks) {
+        if (task && task.id) clearedTaskIds.push(task.id);
+      }
+      wave.tasks = [];
+      delete wave.completedAt;
+      resetWaves.push(wave.number);
+    }
+
+    // Skip the write entirely when nothing changed, so a second run leaves the file
+    // byte-identical.
+    if (resetWaves.length > 0) writeState(filePath, data);
+  }
+
+  process.stdout.write(JSON.stringify({ resetWaves, clearedTaskIds }) + '\n');
   process.exit(0);
 }
 
@@ -903,9 +1255,11 @@ try {
     case 'summarize-prior-wave-context': cmdSummarizePriorWaveContext(opts); break;
     case 'wave-split': cmdWaveSplit(opts); break;
     case 'verify-completeness': cmdVerifyCompleteness(opts); break;
+    case 'wave-progress': cmdWaveProgress(opts); break;
+    case 'resume-reset': cmdResumeReset(opts); break;
     default:
       process.stderr.write(`Error: unknown subcommand "${opts.subcommand}"\n`);
-      process.stderr.write('Usage: node execute-state.js <init|wave-start|wave-done|wave-fail|wave-committed|task-done|task-fail|context|read|cleanup|gc|summarize-prior-wave-context|wave-split|verify-completeness> [options]\n');
+      process.stderr.write('Usage: node execute-state.js <init|wave-start|wave-done|wave-fail|wave-committed|task-done|task-fail|context|read|cleanup|gc|summarize-prior-wave-context|wave-split|verify-completeness|wave-progress|resume-reset> [options]\n');
       process.exit(2);
   }
 } catch (e) {

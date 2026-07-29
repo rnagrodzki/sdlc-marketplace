@@ -757,13 +757,14 @@ function gcTempdirs({ prefix, ttlDays = 7, knownBranches = [], now, tmpdir } = {
  *
  * Defaults can be overridden via `.sdlc/config.json` under
  * `execute.priorWaveContextCaps`:
- *   { maxFiles: 20, maxDecisions: 10, maxInterfaces: 15 }
+ *   { maxFiles: 20, maxDecisions: 10, maxInterfaces: 15, maxTaskIds: 50 }
  *
  * @param {object} state                   - execute state object (from readState)
  * @param {object} [opts]
  * @param {number} [opts.maxFiles=20]       - max filesAdded + filesModified entries each
  * @param {number} [opts.maxDecisions=10]   - max decisionsFromPriorWaves entries
  * @param {number} [opts.maxInterfaces=15]  - max interfacesCreated entries
+ * @param {number} [opts.maxTaskIds=50]     - max completedTaskIds entries
  * @returns {{ planSummary: string, completedTaskIds: string[], filesAdded: string[], filesModified: string[], interfacesCreated: string[], decisionsFromPriorWaves: string[] }}
  */
 function summarizePriorWaveContext(state, opts = {}) {
@@ -782,6 +783,7 @@ function summarizePriorWaveContext(state, opts = {}) {
   const maxFiles      = opts.maxFiles      != null ? opts.maxFiles      : (configCaps.maxFiles      || 20);
   const maxDecisions  = opts.maxDecisions  != null ? opts.maxDecisions  : (configCaps.maxDecisions  || 10);
   const maxInterfaces = opts.maxInterfaces != null ? opts.maxInterfaces : (configCaps.maxInterfaces || 15);
+  const maxTaskIds    = opts.maxTaskIds    != null ? opts.maxTaskIds    : (configCaps.maxTaskIds    || 50);
 
   /**
    * Return the last N items from an array, or the full array if shorter.
@@ -795,7 +797,7 @@ function summarizePriorWaveContext(state, opts = {}) {
 
   return {
     planSummary:              ctx.planSummary              || '',
-    completedTaskIds:         Array.isArray(ctx.completedTaskIds) ? [...ctx.completedTaskIds] : [],
+    completedTaskIds:         tail(ctx.completedTaskIds,         maxTaskIds),
     filesAdded:               tail(ctx.filesAdded,               maxFiles),
     filesModified:            tail(ctx.filesModified,            maxFiles),
     interfacesCreated:        tail(ctx.interfacesCreated,        maxInterfaces),

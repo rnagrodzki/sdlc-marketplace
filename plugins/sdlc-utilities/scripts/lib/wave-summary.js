@@ -82,6 +82,25 @@ function validateTaskEntry(task) {
     violations.push('task.sha must be null or a string');
   }
 
+  // Optional context-carrying fields (R-WAVE-CONTEXT-PRODUCER, #506).
+  if (task.verifyToken !== undefined && task.verifyToken !== null && typeof task.verifyToken !== 'string') {
+    violations.push('task.verifyToken must be null or a string');
+  }
+  for (const f of ['interfaces', 'decisions', 'filesAdded']) {
+    if (task[f] === undefined || task[f] === null) continue;
+    if (!Array.isArray(task[f]) || task[f].some(v => typeof v !== 'string')) {
+      violations.push(`task.${f} must be an array of strings`);
+    }
+  }
+  // filesAdded ⊆ filesTouched (KD-1). A disjoint entry means the runner mis-parsed
+  // the worker's COMPLETE line, and would make `task-done --files-added` exit 2.
+  if (Array.isArray(task.filesAdded) && Array.isArray(task.filesTouched)) {
+    const stray = task.filesAdded.filter(f => !task.filesTouched.includes(f));
+    if (stray.length > 0) {
+      violations.push(`task.filesAdded entries missing from filesTouched: ${stray.join(', ')}`);
+    }
+  }
+
   // Disallow fields that were dropped from the bounded schema
   const droppedFields = ['name', 'complexity', 'risk', 'finalModel', 'attempts', 'filesChanged', 'error', 'verification'];
   for (const f of droppedFields) {

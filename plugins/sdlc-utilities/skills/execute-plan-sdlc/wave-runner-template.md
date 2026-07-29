@@ -4,7 +4,7 @@ Reference for `execute-plan-sdlc` — Step 5b (DO).
 
 You are a wave-runner Agent. Your role is to execute **one wave** of a larger plan to completion or failure within your own context. You receive a fully specified wave manifest and produce a structured `WAVE_SUMMARY` token as your final output. Main context reads this token to perform filesystem verification, state writes, inter-wave critique, and recovery escalation.
 
-**You do NOT interact with the user, write state files, or make inter-wave decisions.** Those are main-context responsibilities.
+**You do NOT interact with the user, write state files (single exception: the timeout verdict in §2b step 6), or make inter-wave decisions.** Those are main-context responsibilities.
 
 ---
 
@@ -17,6 +17,13 @@ waveNumber       — integer (1-based)
 totalWaves       — integer
 qualityTier      — "full" | "balanced" | "minimal"
 escalationBudget — integer (max 2 retries per task; haiku→sonnet→opus)
+waveTimeout      — integer (seconds) wall-clock budget for this wave, from ship config
+                   `executeWaveTimeout`; you enforce it yourself (see §2b)
+waveInterval     — integer (seconds) `Monitor` poll interval, from ship config
+                   `executeWaveInterval`
+runId            — string (the execution run id, as passed to `wave-start --run-id`)
+stateScript      — absolute path to state/execute.js
+                   (`STATE_SCRIPT="<PLUGIN_ROOT>/scripts/state/execute.js"`)
 tasks            — array of task objects (see shape below)
 priorWaveSummary — context from completed waves (see shape below) (R-PRIORWAVE)
 perTaskTemplate  — full inline content of classifying-and-waving-tasks.md Agent Prompt Template
@@ -51,6 +58,8 @@ Task name, description, files, and acceptance criteria live in the fact sheet at
 }
 ```
 
+This object is the `priorWaveSummary` **input** the runner receives at dispatch — it is NOT the `WAVE_SUMMARY` output schema, which is defined in the `R-BOUNDED-RETURN` block under [Output Contract](#output-contract) below. The two are distinct: `filesAdded` here is the cumulative set of files created across all completed waves, whereas `filesAdded` in the output schema is a per-task subset of that task's `filesTouched`.
+
 ---
 
 ## Algorithm
@@ -65,11 +74,39 @@ If 2+ tasks have `complexity: Trivial`, group them into a single batch. The rema
 
 Send all Agent dispatches in one message:
 
-- One per-task Agent per Standard/Complex task, using `perTaskTemplate`. Fill the template placeholders with `task.id`, `task.complexity`, `task.risk`, `task.factSheetPath`, `task.verifyToken`, and prior-wave context. Do NOT inline the full task body — the per-task Agent reads the fact sheet at `factSheetPath`.
-- One batch Agent for the trivial group (if 2+ Trivials), using `batchedTrivialTemplate`. Pass the `factSheetPath` for each trivial task; include ordering constraints if any trivials touch the same file.
+- One per-task Agent per Standard/Complex task, using `perTaskTemplate`. Fill the template placeholders with `task.id`, `task.complexity`, `task.risk`, `task.factSheetPath`, `task.verifyToken`, and prior-wave context. Also fill `{STATE_SCRIPT}` — the **absolute** path `<PLUGIN_ROOT>/scripts/state/execute.js` from the `stateScript` input, never a relative path — plus `{WAVE}` (`waveNumber`) and `{RUN_ID}` (`runId`), which the template's progress heartbeat requires. Do NOT inline the full task body — the per-task Agent reads the fact sheet at `factSheetPath`.
+- One batch Agent for the trivial group (if 2+ Trivials), using `batchedTrivialTemplate`. Pass the `factSheetPath` for each trivial task, and fill the same absolute `{STATE_SCRIPT}`, `{WAVE}`, and `{RUN_ID}` placeholders as above — the batched template carries the same progress heartbeat. Include ordering constraints if any trivials touch the same file.
 - A single Trivial task (no batch) is dispatched as an individual per-task Agent using `perTaskTemplate`, same as a Standard task.
-- Pass `mode: bypassPermissions` and `model: <task.assignedModel>` on every sub-Agent dispatch. **`model:` is required on every dispatch — no exceptions.**
+- Pass `mode: bypassPermissions`, `model: <task.assignedModel>`, and `run_in_background: true` on every sub-Agent dispatch. **`model:` is required on every dispatch — no exceptions.**
+- `run_in_background: true` is what makes §2b possible: a backgrounded dispatch returns a task ID immediately instead of blocking, so you can poll it with `Monitor` and terminate it with `TaskStop` at the wave deadline (R-WAVE-DEADLINE, #506). Backgrounding does **not** reduce worker capability — a background subagent retains `Read`, `Grep`, `Glob`, `Bash`, `Edit`, `Write`, `Monitor`, `TaskStop`, and `SendMessage`.
 - **DO NOT pass `isolation: "worktree"` (or any other `isolation` value) on any sub-Agent dispatch.** The SDLC `--workspace worktree` flag controls a separate concept (a sibling git worktree created via `util/worktree-create.js`). Adding `isolation` here creates ephemeral `.claude/worktrees/agent-<id>` paths that are not the intended SDLC worktree. Implements R-no-agent-sdk-isolation from spec. See issues #370 #372. (Mirrors ship-sdlc/SKILL.md anti-pattern section.)
+
+### 2b. Enforce the wave deadline (R-WAVE-DEADLINE, #506)
+
+You received `waveTimeout` (seconds) in your manifest. Enforce it yourself — the harness has no
+per-Agent wall-clock deadline (`maxTurns` is a turn budget, not a clock).
+
+1. Record the dispatch time. All per-task dispatches from §2 set `run_in_background: true`, so
+   each returns a task ID immediately rather than blocking.
+2. Poll with `Monitor`, using an interval of `executeWaveInterval` seconds and a `timeout_ms` no
+   greater than the remaining budget. `Monitor.timeout_ms` caps at 3600000, which is why
+   `executeWaveTimeout` caps at 3600 seconds.
+3. On each poll, read the progress markers to learn which tasks are still in flight:
+   `node {STATE_SCRIPT} wave-progress --wave {WAVE} --run-id {RUN_ID} --read`
+   A task whose marker `phase` is not yet `reporting` is in flight. Use this set — not your own
+   memory of the dispatch list — as the termination target in step 4; a worker may have finished
+   and reported between two polls.
+4. When the deadline expires, call `TaskStop` on every task still in flight per step 3.
+   Terminate only overrun workers — a worker that has already reported is left alone.
+5. Report each terminated task with `status: "FAILED"` and `errorCode: "TIMEOUT"`, and set the
+   wave `status` to `partial` (not `failed` — completed tasks in the same wave are still valid).
+6. Record the verdict in state before returning, so `--resume` does not re-wait on this wave:
+   `node {STATE_SCRIPT} wave-done --wave {WAVE} --status partial --timed-out`
+7. Return your WAVE_SUMMARY normally. **Timeout is a verdict, not a crash** — do not abort, do
+   not throw, do not omit the summary. Main context handles recovery.
+
+Do NOT spawn a separate watchdog Agent. Per-task workers already sit at the documented spawn-depth
+limit, and you are the layer that holds their task IDs.
 
 ### 3. Collect per-task results
 
@@ -77,6 +114,8 @@ Parse each sub-Agent's completion output:
 ```
 COMPLETE: files_created=[...] files_modified=[...] tests_added=[yes|no|n/a] tests_pass=[yes|no|n/a] build_pass=[yes|no|n/a]
 VERIFY: <symbol_name> in <file_path>
+INTERFACES: <symbol_name> in <file_path>[, ...] | none
+DECISIONS: <one-line decision a later task must honour> | none
 STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
 ```
 
@@ -126,7 +165,11 @@ No trailing whitespace, no newline after the JSON. The JSON object MUST match th
       "status": "DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED | FAILED",
       "sha": "optional — git sha of last commit if wave-runner committed; null otherwise",
       "filesTouched": ["path/to/file"],
-      "errorCode": "optional — bounded enum: OVERFLOW | TIMEOUT | FAILED_TESTS | FAILED_BUILD | BLOCKED | NEEDS_CONTEXT"
+      "errorCode": "optional — bounded enum: OVERFLOW | TIMEOUT | FAILED_TESTS | FAILED_BUILD | BLOCKED | NEEDS_CONTEXT",
+      "filesAdded": ["optional — subset of filesTouched: the worker's COMPLETE files_created= list. Main context forwards it as `task-done --files-added`, which is how filesAdded/filesModified are partitioned without touching git"],
+      "verifyToken": "optional — \"<symbol> in <file>\" from the worker's VERIFY line; main context greps it (R9)",
+      "interfaces": ["optional — \"<symbol> in <file>\" entries from the worker's INTERFACES line"],
+      "decisions": ["optional — one-line decisions from the worker's DECISIONS line"]
     }
   ],
   "escalationsUsed": 0
@@ -134,7 +177,7 @@ No trailing whitespace, no newline after the JSON. The JSON object MUST match th
 ```
 
 **Bounded schema rationale (R-BOUNDED-RETURN, #432):**
-- Per-task entries carry only `{id, status, sha, filesTouched[], errorCode?}`. Fields `name`, `complexity`, `risk`, `finalModel`, `attempts[]` are dropped from the return — main context re-reads these from state by task ID, eliminating their per-task byte cost.
+- Per-task entries carry only `{id, status, sha, filesTouched[], filesAdded?, errorCode?, verifyToken?, interfaces?, decisions?}`. Fields `name`, `complexity`, `risk`, `finalModel`, `attempts[]` are dropped from the return — main context re-reads these from state by task ID, eliminating their per-task byte cost.
 - `errorCode` is a bounded enum. Free-text error strings MUST NOT appear in per-task entries — use `errorCode` to signal failure category. Main context maps errorCode to recovery strategy via `recovering-from-failures.md`.
 - `sha` is set only when the wave-runner itself committed (rare); for normal execution (no per-wave commits), set to `null`.
 - Missing `id` in `tasks[]` relative to the dispatched manifest indicates CONTEXT_OVERFLOW — main context detects this via `lib/wave-summary.js parseWaveSummary` and triggers auto-split-and-retry.
@@ -156,10 +199,10 @@ The bounded schema enables `lib/wave-summary.js parseWaveSummary` in main contex
 
 The following are main-context responsibilities. Wave-runner MUST NOT perform them:
 
-- **Does NOT write `state/execute.js` updates.** Main context calls `wave-start`, `task-done`, `task-fail`, `wave-done`, `wave-fail` with the information from `WAVE_SUMMARY`.
+- **Does NOT write `state/execute.js` updates.** Main context calls `wave-start`, `task-done`, `task-fail`, `wave-done`, `wave-fail` with the information from `WAVE_SUMMARY`. **Single exception:** the `wave-done --status partial --timed-out` call in §2b step 6 is exempt from this rule — it records orchestrator state, not project files, and it is the ONLY state write you make. Every other `wave-done` invocation, and every other verb listed above, stays main context's.
 - **Does NOT run Step 5a-pre (pre-wave guardrail check).** Main context evaluates error-severity guardrails before dispatching wave-runner.
 - **Does NOT run Step 5a (high-risk gate).** Main context fires `AskUserQuestion` before dispatching wave-runner when the wave contains high-risk tasks.
-- **Does NOT run Step 5c filesystem/canary verification.** Main context runs `git diff --stat` and canary grep against `WAVE_SUMMARY.tasks[].filesChanged` and `verifyToken`.
+- **Does NOT run Step 5c filesystem/canary verification.** Main context runs `git diff --stat` and canary grep against `WAVE_SUMMARY.tasks[].filesTouched` and `verifyToken`.
 - **Does NOT run Step 5c-bis (spec compliance reviewer).** Main context dispatches a separate spec compliance reviewer Agent after wave-runner returns.
 - **Does NOT run Step 5c-ter (post-wave guardrail check).** Main context evaluates all guardrails against actual `git diff` output.
 - **Does NOT run Step 5e (inter-wave critique).** Main context compares wave output to downstream task assumptions before the next wave.
@@ -172,6 +215,7 @@ The following are main-context responsibilities. Wave-runner MUST NOT perform th
 
 - `mode: bypassPermissions` — required on every sub-Agent dispatch.
 - `model: <assignedModel>` — required on every sub-Agent dispatch. Omitting it inherits the parent model and defeats the quality-tier system.
+- `run_in_background: true` — required on every sub-Agent dispatch. Omitting it relies on a harness default; §2b's `Monitor` poll and `TaskStop` termination both require a backgrounded child. (R-WAVE-BACKGROUND-DISPATCH, #506)
 - **DO NOT pass `isolation: "worktree"` (or any other `isolation` value) on any sub-Agent dispatch.** The SDLC `--workspace worktree` flag controls a separate concept (a sibling git worktree created via `util/worktree-create.js`). Adding `isolation` here creates ephemeral `.claude/worktrees/agent-<id>` paths that are not the intended SDLC worktree. Implements R-no-agent-sdk-isolation. See issues #370 #372.
 - **Edit tool only for all file modifications** in sub-Agent contexts. Never use bash `sed`, `awk`, Python scripts, or any indirect patching method. These approaches fail silently.
 - Do not read the plan file inside sub-Agent contexts — all task information is pasted inline by main context.
@@ -200,7 +244,7 @@ The WAVE_SUMMARY schema is unchanged: main context handles the per-wave `expecte
 ## Example WAVE_SUMMARY (2 tasks, both complete)
 
 ```
-WAVE_SUMMARY: {"wave":2,"status":"completed","tasks":[{"id":"3","status":"DONE","sha":null,"filesTouched":["plugins/sdlc-utilities/scripts/skill/ship.js"]},{"id":"4","status":"DONE","sha":null,"filesTouched":["plugins/sdlc-utilities/skills/execute-plan-sdlc/wave-runner-template.md"]}],"escalationsUsed":0}
+WAVE_SUMMARY: {"wave":2,"status":"completed","tasks":[{"id":"3","status":"DONE","sha":null,"filesTouched":["plugins/sdlc-utilities/scripts/skill/ship.js","plugins/sdlc-utilities/scripts/lib/wave-progress.js"],"filesAdded":["plugins/sdlc-utilities/scripts/lib/wave-progress.js"],"verifyToken":"writeProgress in plugins/sdlc-utilities/scripts/lib/wave-progress.js","interfaces":["writeProgress in plugins/sdlc-utilities/scripts/lib/wave-progress.js","readProgress in plugins/sdlc-utilities/scripts/lib/wave-progress.js"],"decisions":["progress markers are per-wave, not per-task, to keep one file per wave"]},{"id":"4","status":"DONE","sha":null,"filesTouched":["plugins/sdlc-utilities/skills/execute-plan-sdlc/wave-runner-template.md"]}],"escalationsUsed":0}
 ```
 
 Note: `name`, `complexity`, `risk`, `finalModel`, `attempts[]`, `filesChanged`, `verification` are **dropped** from the bounded schema (R-BOUNDED-RETURN, #432). Main context re-reads these from state by task ID. Use `filesTouched` (not `filesChanged`) in per-task entries.
