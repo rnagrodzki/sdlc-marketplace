@@ -149,10 +149,57 @@ function buildGithubHosting(projectRoot) {
 }
 
 /**
+ * Sort find-cascade matches by embedded semver (sort -V semantics) and return the highest.
+ * @param {string[]} lines
+ * @returns {string}
+ */
+function highestVersionMatch(lines) {
+  const ver = p => { const m = p.match(/\/(\d+)\.(\d+)\.(\d+)\/skills/); return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0]; };
+  const sorted = lines.slice().sort((a, b) => { const [a1, a2, a3] = ver(a); const [b1, b2, b3] = ver(b); return a1 - b1 || a2 - b2 || a3 - b3; });
+  return sorted[sorted.length - 1];
+}
+
+/**
+ * Resolve a skill/plan-sdlc template path.
+ *   1. Workspace-relative (`__dirname`-derived): scripts/ and skills/ are always siblings
+ *      in the plugin layout, in both a dev/CI checkout and an installed plugin cache
+ *      (`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/{scripts,skills}`) — this
+ *      also guarantees the template matches the version of plan.js actually running.
+ *   2. find cascade over `~/.claude/plugins` — defensive fallback for non-standard installs
+ *      only. NOT tried first: on machines with a large plugin cache this can take tens of
+ *      seconds per call, and buildG17Dispatch/buildLanes/buildLensReviewers/
+ *      buildIntakeAuditDispatch call this up to 9 times per invocation.
+ * @param {string} templateName
+ * @returns {string|null}
+ */
+function resolveSkillTemplate(templateName) {
+  const workspacePath = path.join(__dirname, '..', '..', 'skills', 'plan-sdlc', templateName);
+  if (fs.existsSync(workspacePath)) {
+    return workspacePath;
+  }
+
+  const findResult = spawnSync(
+    'find',
+    [
+      `${process.env.HOME}/.claude/plugins`,
+      '-name', templateName,
+      '-path', '*/plan-sdlc/*',
+    ],
+    { encoding: 'utf8' },
+  );
+  if (!findResult.error && findResult.status === 0) {
+    const lines = (findResult.stdout || '').trim().split('\n').filter(Boolean);
+    if (lines.length > 0) {
+      return highestVersionMatch(lines);
+    }
+  }
+
+  return null;
+}
+
+/**
  * Build P15 g17Dispatch metadata (R33).
- * Resolves the G17 prompt template path via find cascade:
- *   1. ~/.claude/plugins (installed plugin path)
- *   2. workspace-relative (development / CI path)
+ * Resolves the G17 prompt template path via resolveSkillTemplate().
  * Returns null promptTemplatePath and adds an error when the file cannot be found.
  * @returns {{ subagentType: string, model: string, promptTemplatePath: string|null, error?: string }}
  */
@@ -161,77 +208,17 @@ function buildG17Dispatch() {
   const subagentType = 'general-purpose';
   const model = 'sonnet';
 
-  // 1. Try installed plugin path via find
-  const findResult = spawnSync(
-    'find',
-    [
-      `${process.env.HOME}/.claude/plugins`,
-      '-name', templateName,
-      '-path', '*/plan-sdlc/*',
-    ],
-    { encoding: 'utf8' },
-  );
-  if (!findResult.error && findResult.status === 0) {
-    const lines = (findResult.stdout || '').trim().split('\n').filter(Boolean);
-    if (lines.length > 0) {
-      // sort -V semantics: pick the last (highest version) entry
-      const ver = p => { const m = p.match(/\/(\d+)\.(\d+)\.(\d+)\/skills/); return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0]; };
-      const sorted = lines.slice().sort((a, b) => { const [a1, a2, a3] = ver(a); const [b1, b2, b3] = ver(b); return a1 - b1 || a2 - b2 || a3 - b3; });
-      return { subagentType, model, promptTemplatePath: sorted[sorted.length - 1] };
-    }
+  const promptTemplatePath = resolveSkillTemplate(templateName);
+  if (promptTemplatePath) {
+    return { subagentType, model, promptTemplatePath };
   }
 
-  // 2. Workspace-relative fallback (development / CI)
-  const workspacePath = path.join(
-    __dirname,
-    '..', '..', 'skills', 'plan-sdlc', templateName,
-  );
-  if (fs.existsSync(workspacePath)) {
-    return { subagentType, model, promptTemplatePath: workspacePath };
-  }
-
-  // 3. Not found — surface as error; G17 cannot dispatch without a prompt template
   return {
     subagentType,
     model,
     promptTemplatePath: null,
     error: `G17 prompt template not found: ${templateName}`,
   };
-}
-
-/**
- * Resolve a skill/plan-sdlc template path via the same find cascade as buildG17Dispatch.
- * Returns the resolved absolute path, or null when not found.
- * @param {string} templateName
- * @returns {string|null}
- */
-function resolveSkillTemplate(templateName) {
-  // 1. Try installed plugin path via find
-  const findResult = spawnSync(
-    'find',
-    [
-      `${process.env.HOME}/.claude/plugins`,
-      '-name', templateName,
-      '-path', '*/plan-sdlc/*',
-    ],
-    { encoding: 'utf8' },
-  );
-  if (!findResult.error && findResult.status === 0) {
-    const lines = (findResult.stdout || '').trim().split('\n').filter(Boolean);
-    if (lines.length > 0) {
-      const ver = p => { const m = p.match(/\/(\d+)\.(\d+)\.(\d+)\/skills/); return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0]; };
-      const sorted = lines.slice().sort((a, b) => { const [a1, a2, a3] = ver(a); const [b1, b2, b3] = ver(b); return a1 - b1 || a2 - b2 || a3 - b3; });
-      return sorted[sorted.length - 1];
-    }
-  }
-
-  // 2. Workspace-relative fallback (development / CI)
-  const workspacePath = path.join(__dirname, '..', '..', 'skills', 'plan-sdlc', templateName);
-  if (fs.existsSync(workspacePath)) {
-    return workspacePath;
-  }
-
-  return null;
 }
 
 /**
