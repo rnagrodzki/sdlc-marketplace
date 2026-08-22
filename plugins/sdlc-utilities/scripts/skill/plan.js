@@ -150,9 +150,12 @@ function buildGithubHosting(projectRoot) {
 
 /**
  * Build P15 g17Dispatch metadata (R33).
- * Resolves the G17 prompt template path via find cascade:
- *   1. ~/.claude/plugins (installed plugin path)
- *   2. workspace-relative (development / CI path)
+ * Resolves the G17 prompt template path:
+ *   1. workspace-relative (__dirname-sibling — dev/CI checkout and installed plugin cache both
+ *      keep scripts/ and skills/ as siblings, so this deterministically matches the running version)
+ *   2. ~/.claude/plugins find cascade (fallback only; Fixes #514 — was tried first, costing
+ *      ~10s per call on a non-trivial plugin cache and blowing past the promptfoo exec harness's
+ *      30s spawnSync timeout)
  * Returns null promptTemplatePath and adds an error when the file cannot be found.
  * @returns {{ subagentType: string, model: string, promptTemplatePath: string|null, error?: string }}
  */
@@ -161,7 +164,16 @@ function buildG17Dispatch() {
   const subagentType = 'general-purpose';
   const model = 'sonnet';
 
-  // 1. Try installed plugin path via find
+  // 1. Workspace-relative (development / CI / installed plugin cache — scripts/ and skills/ are siblings)
+  const workspacePath = path.join(
+    __dirname,
+    '..', '..', 'skills', 'plan-sdlc', templateName,
+  );
+  if (fs.existsSync(workspacePath)) {
+    return { subagentType, model, promptTemplatePath: workspacePath };
+  }
+
+  // 2. Fallback: find cascade over installed plugin cache
   const findResult = spawnSync(
     'find',
     [
@@ -181,15 +193,6 @@ function buildG17Dispatch() {
     }
   }
 
-  // 2. Workspace-relative fallback (development / CI)
-  const workspacePath = path.join(
-    __dirname,
-    '..', '..', 'skills', 'plan-sdlc', templateName,
-  );
-  if (fs.existsSync(workspacePath)) {
-    return { subagentType, model, promptTemplatePath: workspacePath };
-  }
-
   // 3. Not found — surface as error; G17 cannot dispatch without a prompt template
   return {
     subagentType,
@@ -200,13 +203,19 @@ function buildG17Dispatch() {
 }
 
 /**
- * Resolve a skill/plan-sdlc template path via the same find cascade as buildG17Dispatch.
- * Returns the resolved absolute path, or null when not found.
+ * Resolve a skill/plan-sdlc template path: workspace-relative first, find cascade as fallback.
+ * See buildG17Dispatch's doc comment for why the order is workspace-first (Fixes #514).
  * @param {string} templateName
  * @returns {string|null}
  */
 function resolveSkillTemplate(templateName) {
-  // 1. Try installed plugin path via find
+  // 1. Workspace-relative (development / CI / installed plugin cache — scripts/ and skills/ are siblings)
+  const workspacePath = path.join(__dirname, '..', '..', 'skills', 'plan-sdlc', templateName);
+  if (fs.existsSync(workspacePath)) {
+    return workspacePath;
+  }
+
+  // 2. Fallback: find cascade over installed plugin cache
   const findResult = spawnSync(
     'find',
     [
@@ -223,12 +232,6 @@ function resolveSkillTemplate(templateName) {
       const sorted = lines.slice().sort((a, b) => { const [a1, a2, a3] = ver(a); const [b1, b2, b3] = ver(b); return a1 - b1 || a2 - b2 || a3 - b3; });
       return sorted[sorted.length - 1];
     }
-  }
-
-  // 2. Workspace-relative fallback (development / CI)
-  const workspacePath = path.join(__dirname, '..', '..', 'skills', 'plan-sdlc', templateName);
-  if (fs.existsSync(workspacePath)) {
-    return workspacePath;
   }
 
   return null;
