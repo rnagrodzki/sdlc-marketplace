@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- plan-sdlc: `plan.js` template resolution (`resolveSkillTemplate()` / `buildG17Dispatch()`) now tries the `__dirname`-relative workspace path before falling back to the `~/.claude/plugins` find cascade, not after. The find-first order cost ~10s per call on a non-trivial plugin cache, and #515's new lane/lens template resolution raised the call count to 9 per invocation (~94s total) — blowing past the promptfoo exec harness's 30s timeout and stalling the pre-push hook suite (#514)
+
 ### Changed
 - harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
 - ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
