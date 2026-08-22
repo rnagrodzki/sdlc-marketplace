@@ -79,6 +79,12 @@ callers change.
 
 ---
 
+## OpenSpec Appendix
+
+Not applicable — no OpenSpec change.
+
+---
+
 ## Verification Scorecard
 
 *(Requirement traceability)*

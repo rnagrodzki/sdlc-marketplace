@@ -258,6 +258,11 @@ function summarizePrTemplate(_cfg, detected) {
   return detected?.content?.prTemplate?.exists ? 'installed' : '';
 }
 
+function summarizePlanTemplate(_cfg, detected) {
+  if (!detected) return '';
+  return detected?.content?.planTemplate?.exists ? 'installed' : '';
+}
+
 function summarizePlanGuardrails(_cfg, detected) {
   if (!detected) return '';
   const count = detected?.content?.planGuardrails?.count || 0;
@@ -452,6 +457,20 @@ const SETUP_SECTIONS = [
     confirmDetected: false,
     fields: [],
     summarize: summarizePrTemplate,
+  },
+  {
+    id: 'plan-template',
+    label: 'plan-template',
+    purpose: 'Project-owned plan template at .sdlc/plan-template.md, used by /plan-sdlc to build the plan skeleton (Required Sections, Discovery Questions, Verification Patterns) and by validate-plan-format.js PF10 to check required-section presence. Without it, /plan-sdlc falls back to the shipped default template.',
+    configFile: '<delegated>',
+    configPath: null,
+    consumedBy: ['plan-sdlc'],
+    filesModified: ['.sdlc/plan-template.md'],
+    optional: true,
+    delegatedTo: 'setup-plan-template',
+    confirmDetected: false,
+    fields: [],
+    summarize: summarizePlanTemplate,
   },
   {
     id: 'plan-guardrails',

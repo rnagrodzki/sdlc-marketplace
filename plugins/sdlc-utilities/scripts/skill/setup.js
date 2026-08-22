@@ -148,6 +148,7 @@ function detect(projectRoot) {
   // lib/pr-template.js::resolvePrTemplatePath until the deprecation window closes.
   const prTemplatePath = path.join(projectRoot, '.sdlc', 'pr-template.md');
   const jiraTemplatesDir = path.join(projectRoot, '.sdlc', 'jira-templates');
+  const planTemplatePath = path.join(projectRoot, '.sdlc', 'plan-template.md');
 
   // --- OpenSpec config detection ---
   const openspecConfigPath = path.join(projectRoot, 'openspec', 'config.yaml');
@@ -223,6 +224,10 @@ function detect(projectRoot) {
       prTemplate: {
         exists: fs.existsSync(prTemplatePath),
         path: path.join('.sdlc', 'pr-template.md'),
+      },
+      planTemplate: {
+        exists: fs.existsSync(planTemplatePath),
+        path: path.join('.sdlc', 'plan-template.md'),
       },
       jiraTemplates: {
         count: countFiles(jiraTemplatesDir, '.md'),
@@ -405,6 +410,9 @@ function detect(projectRoot) {
     }
     if (section.id === 'pr-template') {
       return result.content.prTemplate.exists ? 'set' : 'not-set';
+    }
+    if (section.id === 'plan-template') {
+      return result.content.planTemplate.exists ? 'set' : 'not-set';
     }
     if (section.id === 'openspec-block') {
       return result.openspecConfig.managedBlockVersion != null ? 'set' : 'not-set';

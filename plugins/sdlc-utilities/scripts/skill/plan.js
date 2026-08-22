@@ -482,7 +482,7 @@ function main() {
   }
 
   // 1a. Plan template detection
-  let planTemplate = { path: null };
+  const planTemplate = { path: null };
   const planTemplateProjectPath = path.join(projectRoot, '.sdlc', 'plan-template.md');
   if (fs.existsSync(planTemplateProjectPath)) {
     planTemplate.path = planTemplateProjectPath;

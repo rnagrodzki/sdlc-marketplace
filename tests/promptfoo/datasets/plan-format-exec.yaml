@@ -9,8 +9,10 @@
 #   project-plan-no-deviations                -- CORRECT: otherwise-valid plan missing Deviations -> PF6 fail
 #   project-plan-oversized-notes               -- CORRECT: Notes block over 5 lines -> PF5 cap fail
 #   project-plan-with-notes                   -- CORRECT: Deviations + short Notes -> all pass
-#   project-plan-with-scorecard               -- CORRECT: full-pipeline plan with every default-template section
-#                                                 except OpenSpec Appendix (non-openspec Source) -> PF10 pass (conditional skip)
+#   project-plan-with-scorecard               -- CORRECT: full-pipeline plan with every default-template section,
+#                                                 including an "## OpenSpec Appendix" heading marked
+#                                                 "Not applicable — no OpenSpec change" for its non-openspec Source
+#                                                 -> PF10 pass (heading always required per R59; only the body differs)
 #   project-plan-openspec-appendix            -- CORRECT: full-pipeline OpenSpec plan with every default-template
 #                                                 section including OpenSpec Appendix -> passes PF1-PF10
 #   project-plan-appendix-heading-injection   -- CORRECT: fenced (4-backtick) example containing a nested
@@ -246,7 +248,7 @@
     - type: icontains
       value: "OpenSpec Appendix"
 
-- description: "plan-format: PF10 passes on non-openspec Source without ## OpenSpec Appendix (conditional skip)"
+- description: "plan-format: PF10 passes on non-openspec Source with a 'Not applicable' OpenSpec Appendix heading (heading always required)"
   vars:
     script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-plan-format.js"
     script_args: "--project-root {{project_root}} --file {{project_root}}/plans/plan.md --final --template {{repo_root}}/plugins/sdlc-utilities/skills/plan-sdlc/plan-template-default.md --json"

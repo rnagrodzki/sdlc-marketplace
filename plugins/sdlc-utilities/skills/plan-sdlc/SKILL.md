@@ -114,23 +114,24 @@ Extract `guardrails` from the output → store as `activeGuardrails`. If the arr
 1. Read `planTemplate.path` from the plan.js output (P21).
 2. If `planTemplate.path` is non-null, that file is the project template — use it as the active template.
 3. If `planTemplate.path` is null, fall back to the shipped default: `<PLUGIN_ROOT>/skills/plan-sdlc/plan-template-default.md` (a sibling file of this SKILL.md).
-4. Read the active template file.
+4. Read the active template file. **If the file is unreadable** (deleted between prepare-script detection and this read, permissions error, etc.): when the active template was the project override, fall back to the shipped default (step 3) and print one line: `Project plan template unreadable — falling back to shipped default.`; when even the shipped default is unreadable, stop and invoke `error-report-sdlc` (Skill: plan-sdlc, Step: Step 0 template resolution, Operation: read active template, Error: the read failure).
 5. Parse `## Required Sections` — extract each bullet as a section entry with:
    - **name** — the bullet text (before any HTML comment)
    - **narrative** — `true` when the bullet carries `<!-- narrative: true -->`
    - **condition** — the condition string when the bullet carries `<!-- conditional: ... -->`, or null
-6. Extract `## Discovery Questions` — the bullet list of questions the Step 1 exploration phase answers.
-7. Extract `## Verification Patterns` — the bullet list of verification approaches for task `**Verify:**` fields.
+   **If the template has no `## Required Sections` heading** (malformed project override — the shipped default always has one): treat it the same as an unreadable file — fall back to the shipped default with the same one-line notice, or stop and invoke `error-report-sdlc` if the shipped default itself is malformed.
+6. Extract `## Discovery Questions` — the bullet list of questions the Step 1 exploration phase answers. Absent in a project override is not an error — Step 1 falls back to its built-in scope/integration/success questions (see Step 1).
+7. Extract `## Verification Patterns` — the bullet list of verification approaches for task `**Verify:**` fields. Absent in a project override is not an error — task authoring falls back to generic verification judgment.
 8. Store the resolved absolute template path as `activeTemplatePath` for use in Step 3 lane dispatch.
 
 **Build the plan skeleton from the template.** For each entry in the parsed `## Required Sections` list, in the order defined by `./plan-format-reference.md`'s `## Section Order`:
 
 - **Unconditional sections** — write the `## <name>` heading with a placeholder body. For `Deviations & assumptions`, use the table format (Item | asked | does | why) with a placeholder row. For other sections, use `[TBD]`.
-- **Conditional sections** — evaluate the condition against the prepare output's signals (e.g., `fromOpenspec.valid` / `openspecContext` for OpenSpec conditions), not against plan header placeholders which are still `[TBD]` at skeleton-build time. When the condition holds, write the heading with `[TBD]`. When it does not, write the heading with `Not applicable — <reason>` (e.g., `Not applicable — no OpenSpec change`).
+- **Conditional sections** — evaluate the condition against the prepare output's signals, not against plan header placeholders which are still `[TBD]` at skeleton-build time. For OpenSpec conditions specifically, use `fromOpenspecDirect` (set in the `--from-openspec` handling below) — the same flag that gates OpenSpec Appendix generation in Step 4, so the skeleton decision and the fill decision never diverge. A plan with `openspecContext` populated via the interactive `--spec` flow but without `--from-openspec` does NOT satisfy OpenSpec-conditional sections (it lacks the structured `openspecContext.requirements[]`/`tasks[]` data those sections render). When the condition holds, write the heading with `[TBD]`. When it does not, write the heading with `Not applicable — <reason>` (e.g., `Not applicable — no OpenSpec change`). **Unknown condition strings** — a project-override template MAY declare a `<!-- conditional: ... -->` string this SKILL.md doesn't recognize (only the OpenSpec condition is currently defined). Default to treating the condition as NOT satisfied — write the heading with `Not applicable — condition "<condition string>" not recognized`. This fails toward a visible, grep-able placeholder rather than either silently dropping the heading (which PF10 would then flag as a genuine failure) or guessing the condition true and leaving a `[TBD]` nobody fills in. Since PF10 checks heading presence unconditionally (R59), the heading itself is written either way — only the body differs.
 
-**Lightweight plan adjustment:** When Step 0 routing selects the lightweight branch (Step 5 skipped), sections whose content is produced exclusively by a skipped step (e.g., `Verification Scorecard` is produced by Step 5) get body `Not applicable — lightweight plan` instead of `[TBD]`. This prevents dead placeholders in the final plan.
+**Lightweight plan adjustment:** When Step 0 routing selects the lightweight branch (Step 5 skipped), sections whose content is produced exclusively by a skipped step (e.g., `Verification Scorecard` is produced by Step 5) get body `Not applicable — lightweight plan` instead of `[TBD]`. This prevents dead placeholders in the final plan. This is a best-effort readability improvement, not a correctness requirement: it names known step-owned sections by their default-template name, so a project override that renames or adds a step-5-owned section simply falls back to the generic `[TBD]` body for that section rather than breaking — the section still appears (per the "do not hardcode which sections appear" rule below), only the friendlier substitute body is skipped.
 
-Do NOT hardcode section names in the skeleton. The template is the single source of truth for which sections appear. Section body formats for known sections (e.g., the Deviations table) are defined in `./plan-format-reference.md`.
+Do NOT hardcode which sections appear in the skeleton, or their order. The template's `## Required Sections` list (and `./plan-format-reference.md`'s `## Section Order`) is the single source of truth for section presence and ordering — never an explicit roster coded into this SKILL.md. Section-specific BODY FORMATTING for a small, named set of sections (the Deviations table above, the lightweight-adjustment substitution above) is a distinct, narrower exception: it improves the placeholder body for sections this doc already knows by name, and degrades gracefully to the generic `[TBD]` body for any section it doesn't recognize — it never controls whether a section is written.
 
 **Contradictory-signal override (implements R16):** After reading the prepare output, IF `openspec.authoritative.path` is set AND the current session-start `<system-reminder>` contains a line matching `/openspec.*not initialized|not initialized.*openspec/i`, print exactly one line:
 `Ignoring contradictory 'not initialized' signal in session context — openspec/config.yaml exists (authoritative source: SDLC's own check via plan.js prepare output).`
@@ -598,9 +599,9 @@ After link verification passes, run the deterministic plan format validator. PF9
 - **Full-pipeline plan** (Step 0 routed through Step 5, the multi-lens review — i.e. ≥4 files): `FINAL_FLAG="--final"`. A scorecard is expected, so PF9 is enforced.
 - **Lightweight plan** (Step 5 skipped): `FINAL_FLAG=""`. No scorecard expected, so PF9 is not applied.
 
-Substitute the correct values into the block below before running it; `${FINAL_FLAG:+--final}` expands to `--final` only when `FINAL_FLAG` is non-empty, and to nothing otherwise (no word-splitting, no empty positional argument). `${TEMPLATE_FLAG}` passes the active template path so PF10 can check template-required sections.
+Substitute the correct values into the block below before running it; `${FINAL_FLAG:+--final}` expands to `--final` only when `FINAL_FLAG` is non-empty, and to nothing otherwise (no word-splitting, no empty positional argument). `TEMPLATE_PATH` passes the active template path so PF10 can check template-required sections — it is appended via a bash array, never inline-interpolated, so a path containing spaces is not word-split.
 
-**Set `TEMPLATE_FLAG`:** When `FINAL_FLAG` is `"--final"` (full-pipeline plan), set `TEMPLATE_FLAG="--template $activeTemplatePath"` (the absolute path resolved in Step 0's template resolution). When `FINAL_FLAG` is empty (lightweight plan), set `TEMPLATE_FLAG=""` — PF10 is skipped along with PF9.
+**Set `TEMPLATE_PATH`:** When `FINAL_FLAG` is `"--final"` (full-pipeline plan), set `TEMPLATE_PATH="$activeTemplatePath"` (the absolute path resolved in Step 0's template resolution). When `FINAL_FLAG` is empty (lightweight plan), leave `TEMPLATE_PATH` unset/empty — PF10 is skipped along with PF9.
 
 ```bash
 # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
@@ -608,8 +609,13 @@ Substitute the correct values into the block below before running it; `${FINAL_F
 #   "--final" for a full-pipeline plan (Step 5 ran → scorecard expected),
 #   ""        for a lightweight plan (Step 5 skipped → PF9 not applied).
 # It is NOT derived from scorecard presence (that would make PF9 circular).
-# TEMPLATE_FLAG passes the active plan template path for PF10.
-node "<PLUGIN_ROOT>/scripts/ci/validate-plan-format.js" ${FINAL_FLAG:+--final} ${TEMPLATE_FLAG} --markdown --file "$plan_path"
+# TEMPLATE_PATH passes the active plan template path for PF10. Built as an array
+# (not a pre-joined "--template $path" string) so a path containing spaces is
+# passed as a single argument instead of being word-split on the unquoted expansion.
+ARGS=(--markdown --file "$plan_path")
+[ -n "$FINAL_FLAG" ] && ARGS+=(--final)
+[ -n "$TEMPLATE_PATH" ] && ARGS+=(--template "$TEMPLATE_PATH")
+node "<PLUGIN_ROOT>/scripts/ci/validate-plan-format.js" "${ARGS[@]}"
 FORMAT_EXIT=$?
 ```
 

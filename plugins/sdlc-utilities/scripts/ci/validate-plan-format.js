@@ -181,22 +181,12 @@ function parseTemplate(templatePath) {
   return { sections };
 }
 
-/**
- * Evaluate a template conditional marker (e.g. "source matches
- * openspec/changes/") against the plan's header fields.
- * Unrecognized condition syntax defaults to true (require the section)
- * so a malformed condition fails safe toward stricter validation.
- */
-function evaluateTemplateCondition(condition, planHeader) {
-  const match = condition.match(/^(\S+)\s+matches\s+(.+)$/i);
-  if (!match) return true;
-
-  const field   = match[1].toLowerCase();
-  const pattern = match[2].trim();
-  const value   = (planHeader && planHeader[field]) || '';
-
-  return value.includes(pattern);
-}
+// Note: no per-condition evaluation lives here. PF10 checks every declared
+// section's heading unconditionally (see checkPF10 below) — R59 requires the
+// heading present on every plan regardless of the section's conditional
+// applicability; only the section's BODY differs by condition, and body
+// content is an LLM (plan-sdlc SKILL.md Step 0/4) concern, not a
+// deterministic-floor concern.
 
 // ---------------------------------------------------------------------------
 // Validation checks
@@ -435,12 +425,15 @@ function checkPF9(content) {
 
 /**
  * Dynamic, template-driven required-section presence check.
- * For each required section from the active template: if unconditional,
- * check the "## <name>" heading is present in the plan; if conditional,
- * evaluate the condition against the plan header fields first and skip
- * the section when the condition doesn't hold.
+ * For every required section from the active template — conditional or not
+ * — check that the "## <name>" heading is present in the plan (implements
+ * R59: the heading is present on every plan regardless of the section's
+ * conditional applicability; a not-applicable conditional section still
+ * carries its heading, with body text like "Not applicable — <reason>").
+ * Conditions are not evaluated here; they only affect the section's BODY,
+ * which is an LLM (plan-sdlc SKILL.md) concern at plan-authoring time.
  */
-function checkPF10(content, requiredSections, planHeader) {
+function checkPF10(content, requiredSections) {
   if (!requiredSections || requiredSections.length === 0) {
     return { id: 'PF10', status: 'pass', message: 'No template-required sections to check' };
   }
@@ -449,14 +442,15 @@ function checkPF10(content, requiredSections, planHeader) {
   const missing  = [];
 
   for (const section of requiredSections) {
-    if (section.condition && !evaluateTemplateCondition(section.condition, planHeader)) {
-      continue;
-    }
-
     const namePattern = section.name
       .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       .replace(/\s+/g, '\\s+');
-    const headingRe = new RegExp(`^##\\s+${namePattern}\\b`, 'im');
+    // (?=\s|$) instead of \b: \b fails to match when the section name ends
+    // in punctuation (e.g. a name ending in ')'), since \b requires a
+    // word-char/non-word-char transition and ')' is already a non-word char.
+    // $ is safe here (not just end-of-string) because the 'm' flag makes it
+    // match end-of-line.
+    const headingRe = new RegExp(`^##\\s+${namePattern}(?=\\s|$)`, 'im');
 
     if (!headingRe.test(stripped)) {
       missing.push(section.name);
@@ -533,9 +527,8 @@ try {
   ];
   if (requireScorecard) checks.push(checkPF9(content));
   if (requireScorecard && templatePath) {
-    const template   = parseTemplate(templatePath);
-    const planHeader = { source: extractField(content, 'Source') || '' };
-    checks.push(checkPF10(content, template.sections, planHeader));
+    const template = parseTemplate(templatePath);
+    checks.push(checkPF10(content, template.sections));
   }
 
   const passed = checks.every(c => c.status === 'pass');
