@@ -272,3 +272,12 @@
   `Bash`, `Monitor`, `TaskStop`, and `SendMessage`, so backgrounding does not reduce worker
   capability. Testable assertion: "Every Agent-dispatch instruction in SKILL.md and
   wave-runner-template.md names `run_in_background` with an explicit boolean."
+
+- R42 (Fixes #508 — per-task sibling test convention checking): Per-task and batched-trivial
+  agent prompt templates MUST include an instruction directing agents to glob for existing test
+  files in sibling packages/directories before writing new tests, and to mirror the observed
+  patterns (framework, helper usage, assertion style, file structure). The instruction MUST be
+  language-agnostic. A re-check during the verifying phase SHOULD be included for same-wave
+  sibling alignment (best-effort). Testable assertion: "The per-task template and
+  batched-trivial template each contain a section instructing agents to discover and mirror
+  sibling test conventions, and the Self-Review section includes a test-quality check."
