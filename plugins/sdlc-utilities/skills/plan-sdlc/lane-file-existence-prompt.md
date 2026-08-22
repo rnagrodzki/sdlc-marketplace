@@ -16,6 +16,8 @@ You receive:
 
 Read the plan file at `{PLAN_FILE_PATH}` before evaluating. Use Glob or Bash to check file existence.
 
+Skip `## OpenSpec Appendix` content when evaluating any gate.
+
 ---
 
 ## Gates to Evaluate

@@ -12,18 +12,20 @@
  *   --json                  JSON output to stdout (default)
  *   --markdown              Formatted markdown output to stdout
  *   --final                 Also enforce PF9 (Verification Scorecard)
+ *   --template <path>       Active plan template; enables PF10 (under --final only)
  *
  * Exit codes: 0 = all pass, 1 = issues found, 2 = script error
  *
  * Checks:
- *   PF1 — Header fields (Goal, Architecture, Source, Verification)
- *   PF2 — Task numbering (contiguous from 0 or 1)
- *   PF3 — Required metadata (Complexity, Risk, Depends on, Verify)
- *   PF4 — Dependency validity (valid refs, no cycles)
- *   PF5 — Task body (Acceptance criteria; optional Notes capped at 5 lines)
- *   PF6 — Deviations & assumptions section present
- *   PF7 — Contract presence (artifact-touching tasks have **Contract:** block)
- *   PF9 — Scorecard presence (under --final only)
+ *   PF1  — Header fields (Goal, Architecture, Source, Verification)
+ *   PF2  — Task numbering (contiguous from 0 or 1)
+ *   PF3  — Required metadata (Complexity, Risk, Depends on, Verify)
+ *   PF4  — Dependency validity (valid refs, no cycles)
+ *   PF5  — Task body (Acceptance criteria; optional Notes capped at 5 lines)
+ *   PF6  — Deviations & assumptions section present
+ *   PF7  — Contract presence (artifact-touching tasks have **Contract:** block)
+ *   PF9  — Scorecard presence (under --final only)
+ *   PF10 — Template-driven required section presence (under --final, when --template given)
  *
  * Uses only Node.js built-in modules. No npm install required.
  */
@@ -46,6 +48,7 @@ function parseArgs(argv) {
   let filePath     = null;
   let outputFormat = 'json';
   let requireScorecard = false;
+  let templatePath = null;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -59,10 +62,12 @@ function parseArgs(argv) {
       outputFormat = 'markdown';
     } else if (a === '--final') {
       requireScorecard = true;
+    } else if (a === '--template' && args[i + 1]) {
+      templatePath = path.resolve(args[++i]);
     }
   }
 
-  return { projectRoot, filePath, outputFormat, requireScorecard };
+  return { projectRoot, filePath, outputFormat, requireScorecard, templatePath };
 }
 
 // ---------------------------------------------------------------------------
@@ -80,27 +85,117 @@ function extractField(content, fieldName) {
 }
 
 /**
+ * Strip fenced code blocks (```, ````, or longer) from content so checks that
+ * scan for headings/patterns don't false-positive (or false-negative) on
+ * example text inside a fence. Handles fences of 3+ backticks via a
+ * backreference, so a 4-backtick fence can safely contain literal ``` text.
+ */
+function stripFences(content) {
+  return content.replace(/^(`{3,})[^\n]*\n[\s\S]*?^\1`*[ \t]*$/gm, '');
+}
+
+/**
  * Split plan content into task blocks.
  * Returns array of { number, title, body } objects.
  */
 function extractTasks(content) {
+  const stripped = stripFences(content);
   const tasks = [];
   const taskRe = /^### Task (\d+):\s*(.+)$/gm;
   let match;
 
   const matches = [];
-  while ((match = taskRe.exec(content)) !== null) {
+  while ((match = taskRe.exec(stripped)) !== null) {
     matches.push({ number: parseInt(match[1], 10), title: match[2].trim(), index: match.index });
   }
 
   for (let i = 0; i < matches.length; i++) {
     const start = matches[i].index;
-    const end   = i + 1 < matches.length ? matches[i + 1].index : content.length;
-    const body  = content.slice(start, end);
+    const end   = i + 1 < matches.length ? matches[i + 1].index : stripped.length;
+    const body  = stripped.slice(start, end);
     tasks.push({ number: matches[i].number, title: matches[i].title, body });
   }
 
   return tasks;
+}
+
+/**
+ * Parse a plan template file's "## Required Sections" list.
+ * Each list item is a section name, optionally annotated with an HTML
+ * comment marker:
+ *   - Context <!-- narrative: true -->
+ *   - OpenSpec Appendix <!-- conditional: source matches openspec/changes/ -->
+ * Returns { sections: [{ name, narrative, condition }] }.
+ */
+function parseTemplate(templatePath) {
+  const content = fs.readFileSync(templatePath, 'utf8');
+  const sections = [];
+
+  // Find the "## Required Sections" heading and the next "## " heading (or
+  // end of file) to bound the list. Done via explicit heading scanning
+  // rather than a single regex: a lazy [\s\S]*? terminated by (?=\n##|$)
+  // is unsafe here because the /m flag makes $ match before ANY newline,
+  // not just end-of-string, truncating the block at its first line break.
+  const headingRe = /^##\s+(.+)$/gm;
+  let headingMatch;
+  let blockStart = -1;
+  let blockEnd   = content.length;
+
+  while ((headingMatch = headingRe.exec(content)) !== null) {
+    if (blockStart === -1) {
+      if (headingMatch[1].trim() === 'Required Sections') {
+        blockStart = headingRe.lastIndex;
+      }
+      continue;
+    }
+    blockEnd = headingMatch.index;
+    break;
+  }
+
+  if (blockStart === -1) {
+    return { sections };
+  }
+
+  const block = content.slice(blockStart, blockEnd);
+  const lineRe = /^-\s+(.+)$/gm;
+  let match;
+  while ((match = lineRe.exec(block)) !== null) {
+    let line = match[1].trim();
+
+    const narrative = /<!--\s*narrative:\s*true\s*-->/.test(line);
+    line = line.replace(/<!--\s*narrative:\s*true\s*-->/, '').trim();
+
+    let condition = null;
+    const condMatch = line.match(/<!--\s*conditional:\s*(.+?)\s*-->/);
+    if (condMatch) {
+      condition = condMatch[1].trim();
+      line = line.replace(/<!--\s*conditional:[\s\S]*?-->/, '').trim();
+    }
+
+    const name = line.trim();
+    if (name) {
+      sections.push({ name, narrative, condition });
+    }
+  }
+
+  return { sections };
+}
+
+/**
+ * Evaluate a template conditional marker (e.g. "source matches
+ * openspec/changes/") against the plan's header fields.
+ * Unrecognized condition syntax defaults to true (require the section)
+ * so a malformed condition fails safe toward stricter validation.
+ */
+function evaluateTemplateCondition(condition, planHeader) {
+  const match = condition.match(/^(\S+)\s+matches\s+(.+)$/i);
+  if (!match) return true;
+
+  const field   = match[1].toLowerCase();
+  const pattern = match[2].trim();
+  const value   = (planHeader && planHeader[field]) || '';
+
+  return value.includes(pattern);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +408,7 @@ function checkPF5(tasks) {
 
 function checkPF6(content) {
   // Strip fenced code blocks before checking so headers inside code examples don't produce false passes.
-  const stripped = content.replace(/^```[\s\S]*?^```/gm, '');
+  const stripped = stripFences(content);
   const re = /^##\s+Deviations\s*&\s*assumptions/im;
   if (!re.test(stripped)) {
     return { id: 'PF6', status: 'fail', message: 'Missing required "## Deviations & assumptions" section' };
@@ -332,10 +427,46 @@ function checkPF7(tasks) {
 }
 
 function checkPF9(content) {
-  const stripped = content.replace(/^```[\s\S]*?^```/gm, '');
+  const stripped = stripFences(content);
   return /^##\s+Verification\s+Scorecard/im.test(stripped)
     ? { id: 'PF9', status: 'pass', message: 'Verification Scorecard section present' }
     : { id: 'PF9', status: 'fail', message: 'Missing required "## Verification Scorecard" section' };
+}
+
+/**
+ * Dynamic, template-driven required-section presence check.
+ * For each required section from the active template: if unconditional,
+ * check the "## <name>" heading is present in the plan; if conditional,
+ * evaluate the condition against the plan header fields first and skip
+ * the section when the condition doesn't hold.
+ */
+function checkPF10(content, requiredSections, planHeader) {
+  if (!requiredSections || requiredSections.length === 0) {
+    return { id: 'PF10', status: 'pass', message: 'No template-required sections to check' };
+  }
+
+  const stripped = stripFences(content);
+  const missing  = [];
+
+  for (const section of requiredSections) {
+    if (section.condition && !evaluateTemplateCondition(section.condition, planHeader)) {
+      continue;
+    }
+
+    const namePattern = section.name
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s+');
+    const headingRe = new RegExp(`^##\\s+${namePattern}\\b`, 'im');
+
+    if (!headingRe.test(stripped)) {
+      missing.push(section.name);
+    }
+  }
+
+  if (missing.length > 0) {
+    return { id: 'PF10', status: 'fail', message: `Missing required section(s): ${missing.join(', ')}` };
+  }
+  return { id: 'PF10', status: 'pass', message: 'All template-required sections present' };
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +502,7 @@ function formatMarkdown(report) {
 // ---------------------------------------------------------------------------
 
 try {
-  const { projectRoot, filePath, outputFormat, requireScorecard } = parseArgs(process.argv);
+  const { projectRoot, filePath, outputFormat, requireScorecard, templatePath } = parseArgs(process.argv);
 
   if (!filePath) {
     process.stderr.write('validate-plan-format.js error: --file <path> is required\n');
@@ -380,6 +511,11 @@ try {
 
   if (!fs.existsSync(filePath)) {
     process.stderr.write(`validate-plan-format.js error: file not found: ${filePath}\n`);
+    process.exit(2);
+  }
+
+  if (templatePath && !fs.existsSync(templatePath)) {
+    process.stderr.write(`validate-plan-format.js error: template file not found: ${templatePath}\n`);
     process.exit(2);
   }
 
@@ -396,6 +532,11 @@ try {
     checkPF7(tasks),
   ];
   if (requireScorecard) checks.push(checkPF9(content));
+  if (requireScorecard && templatePath) {
+    const template   = parseTemplate(templatePath);
+    const planHeader = { source: extractField(content, 'Source') || '' };
+    checks.push(checkPF10(content, template.sections, planHeader));
+  }
 
   const passed = checks.every(c => c.status === 'pass');
   const report = {

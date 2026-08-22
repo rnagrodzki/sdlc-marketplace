@@ -426,3 +426,32 @@
       value: '"tasksUpdated": 1'
     - type: icontains
       value: '"valid": true'
+
+# --- planTemplate detection (Task 7) ---
+
+- description: "plan-prepare: planTemplate field present with path null when .sdlc/plan-template.md does not exist"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/plan-prepare-github-remote"
+  assert:
+    - type: icontains
+      value: '"planTemplate"'
+    - type: icontains
+      value: '"path": null'
+
+- description: "plan-prepare: planTemplate field has correct path when .sdlc/plan-template.md exists"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/skill/plan.js"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/plan-prepare-with-template"
+  assert:
+    - type: icontains
+      value: '"planTemplate"'
+    - type: javascript
+      value: |
+        const data = JSON.parse(output);
+        if (!data.planTemplate) return 'planTemplate field missing';
+        if (!data.planTemplate.path) return 'planTemplate.path is null or missing';
+        if (!data.planTemplate.path.includes('.sdlc/plan-template.md')) return `path does not contain .sdlc/plan-template.md: ${data.planTemplate.path}`;
+        return true;

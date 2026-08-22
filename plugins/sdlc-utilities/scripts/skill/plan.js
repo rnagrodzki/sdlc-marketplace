@@ -481,6 +481,13 @@ function main() {
     };
   }
 
+  // 1a. Plan template detection
+  let planTemplate = { path: null };
+  const planTemplateProjectPath = path.join(projectRoot, '.sdlc', 'plan-template.md');
+  if (fs.existsSync(planTemplateProjectPath)) {
+    planTemplate.path = planTemplateProjectPath;
+  }
+
   // 2. --from-openspec validation
   let fromOpenspecResult = null;
   let openspecContext = { tasks: null, tasksUpdated: 0 };
@@ -623,6 +630,7 @@ function main() {
     openspecContext,
     guardrails,
     explorePack,
+    planTemplate,
     githubHosting,
     g17Dispatch: { subagentType: g17Dispatch.subagentType, model: g17Dispatch.model, promptTemplatePath: g17Dispatch.promptTemplatePath },
     intakeAuditDispatch,

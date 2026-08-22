@@ -128,6 +128,40 @@ When Claude Code's [plan mode](https://docs.anthropic.com/en/docs/claude-code/pl
 
 ---
 
+## Plan Sections
+
+Every plan contains the following sections:
+
+- **Context** — problem/trigger/success motivational section establishing why this plan exists and what defines successful delivery
+- **Research Findings** — captures exploration output, architecture/tech considerations, and key learnings from Steps 1–2 discovery
+- **Final Shape** — aggregated end-state after all tasks complete, enabling fast review of overall outcome
+- **OpenSpec Appendix** — verbatim snapshots of OpenSpec artifacts (conditional, present only when `--from-openspec` or `--spec` is active)
+- **Contract `example:` key** — optional field in per-task Contract blocks showing input/output examples demonstrating how the decided shape is used
+
+See also: [`docs/plan-format-reference.md`](../plan-format-reference.md) for detailed section specifications.
+
+---
+
+## Plan Template
+
+A `.sdlc/plan-template.md` file replaces the default plan template entirely, allowing your team to standardize plan structure and discovery process.
+
+**Setup:** Use `/setup-sdlc --plan-template` to scaffold your first template. The command generates a starting template with sections, questions, and verification patterns for your project.
+
+**Format:**
+
+A plan template contains three parts:
+
+1. **Required Sections** — list of markdown section headings (##) that every plan must contain (e.g., Context, Research Findings, Final Shape). The skill validates this list at Step 4 (PF10 check).
+2. **Discovery Questions** — open-ended prompts (2–3 sentences each) shown during requirements gathering when scope is unclear. Questions shape the plan header and focus decomposition.
+3. **Verification Patterns** — optional checklist templates and prose blocks for testing and verification, embedded as reference material during task acceptance-criteria writing.
+
+**Narrative lane exemptions:** Sections marked with an HTML comment `<!-- narrative: true -->` are exempted from render-don't-narrate gates (G19). Use sparingly for sections carrying only rationale (e.g., Architecture Decision Record) where narration is the intent.
+
+For template authoring and examples, see [`docs/plan-format-reference.md`](../plan-format-reference.md).
+
+---
+
 ## Examples
 
 ### From conversation context
@@ -510,6 +544,7 @@ Checks applied at this gate:
 - **PF6** — `## Deviations & assumptions` section present.
 - **PF7** — every artifact-touching task (≥1 `Create:`/`Modify:`/`Test:` Files entry) carries a `**Contract:**` block. This is the deterministic floor for the G18 settlement gate.
 - **PF9** — `## Verification Scorecard` section present. This is the deterministic floor for Gate B. PF9 is applied **only when `--final` is passed**, which the skill does only for full-pipeline plans (those that ran the Step 5 multi-lens review). Lightweight plans that skip Step 5 are not expected to carry a scorecard, so PF9 is omitted for them. The `--final` decision is driven by the Step 0 routing branch, never by scorecard presence (that would make the check circular).
+- **PF10** — template-driven section checks: every plan includes all Required Sections defined in `.sdlc/plan-template.md` (when present). Applied only when a plan template exists in the project. This is the deterministic floor for template-validation gates; concreteness and section-content quality remain the job of LLM gates G1–G21.
 
 These are *presence* checks only — concreteness and content quality remain the job of the LLM gates G18/G19/G20/G21 (the calibrated ceiling above this floor). On non-zero exit, Step 7 is **not** entered and the violation report is surfaced verbatim. No flag toggles this gate — it is hard. G19 (render-don't-narrate) and G21 (self-contained code refs) have no deterministic floor by design: both require semantic judgment that a regex proxy would mis-fire on (see PF8-reserved in the spec).
 
