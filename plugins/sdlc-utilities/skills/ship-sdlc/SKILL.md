@@ -466,11 +466,41 @@ if [ "$WORKSPACE" = "branch" ]; then
 
   # Step 3: Create the feature branch (HEAD shared with main worktree).
   git checkout -b "$EXECUTE_BRANCH"
+
+  # Step 4: Refresh prepare output (R-expected-branch-injection, issues #347/#348/#349).
+  # Step 1c's prepare snapshot ran BEFORE this branch existed, so gitState.currentBranch
+  # in that snapshot was still the pre-checkout branch (typically the default branch) —
+  # every `--expected-branch <branch>` baked into steps[commit]/[commit-fixes]/[version]/[pr]
+  # and into context.expectedBranch is stale on a true first run. Re-run prepare now that
+  # the branch exists so gitState.currentBranch (and its state-file-backed override) resolve
+  # correctly, then reassign $PREPARE_OUTPUT_FILE — every downstream consumer already reads
+  # steps[]/context via that variable name, so no other change is needed. Only steps[] and
+  # context are consumed from the refreshed output — Step 1d–1g banners are not re-printed.
+  REFRESHED_OUTPUT_FILE=$(node "<PLUGIN_ROOT>/scripts/skill/ship.js" --output-file --has-plan $ARGUMENTS)
+  REFRESH_EXIT=$?
+  if [ "$REFRESH_EXIT" -eq 2 ] || [ -z "$REFRESHED_OUTPUT_FILE" ]; then
+    echo "ship-prepare refresh failed after branch checkout (exit $REFRESH_EXIT) — cannot verify --expected-branch args are correct. Stopping."
+    exit 1
+  fi
+  # Same rule as Step 1c: a non-empty errors[] means the refresh is degraded — render each
+  # entry verbatim (plan-file error rendering rule) and STOP. A refresh failure here is
+  # anomalous (prepare just succeeded seconds earlier) — do not fall back to the stale file
+  # or hand-splice --expected-branch values; that reintroduces the ad hoc invocation
+  # construction the dispatch protocol's "use step.invocation verbatim" rule forbids.
+  REFRESH_ERRORS=$(node -e "const d=JSON.parse(require('fs').readFileSync('$REFRESHED_OUTPUT_FILE','utf8'));process.stdout.write(JSON.stringify(d.errors||[]))")
+  if [ "$REFRESH_ERRORS" != "[]" ]; then
+    echo "ship-prepare refresh after branch checkout returned errors — stopping:"
+    node -e "JSON.parse(process.argv[1]).forEach(e=>console.log(typeof e==='string'?e:e.message))" "$REFRESH_ERRORS"
+    exit 1
+  fi
+  rm -f "$PREPARE_OUTPUT_FILE"
+  PREPARE_OUTPUT_FILE="$REFRESHED_OUTPUT_FILE"
+  trap 'rm -f "$PREPARE_OUTPUT_FILE"' EXIT INT TERM
 fi
 # When WORKSPACE = continue: EXECUTE_BRANCH stays unset, no migration, no checkout — run in place.
 ```
 
-After `git checkout -b` the cwd is the main worktree on the new feature branch, so all subsequent Bash invocations and Agent-tool dispatches run in the current cwd trivially. There is **no `--branch` forward to execute** — by the time execute is dispatched, cwd is on the feature branch, so execute-plan-sdlc's own derive yields `continue` (run in place) and no value crosses the boundary. `EXECUTE_BRANCH` is still used by the post-version ancestry gate (see "Execute step" / version section); under `continue` it is unset and that gate is a no-op.
+After `git checkout -b` the cwd is the main worktree on the new feature branch, so all subsequent Bash invocations and Agent-tool dispatches run in the current cwd trivially. There is **no `--branch` forward to execute** — by the time execute is dispatched, cwd is on the feature branch, so execute-plan-sdlc's own derive yields `continue` (run in place) and no value crosses the boundary. `EXECUTE_BRANCH` is still used by the post-version ancestry gate (see "Execute step" / version section); under `continue` it is unset and that gate is a no-op. `context.expectedBranch` (consumed by that same gate) comes from the refreshed `$PREPARE_OUTPUT_FILE`, so it already reflects `EXECUTE_BRANCH`.
 
 The `migrate` subcommand renames `ship-<oldSlug>-<ts>.json` → `ship-<newSlug>-<ts>.json` and updates `data.branch`. On `migrated: false` (e.g. no state file yet, slug already correct), warn and continue — do not abort; the orphaned file (if any) will be cleaned by the terminal `cleanup` step or by `--gc`.
 
