@@ -1012,12 +1012,13 @@ function runValidation(flags, flagSources, steps, context) {
  * @returns {{ stateFile: string|null, found: boolean }}
  */
 function detectResumeState(_projectRoot, currentBranch) {
-  const { stateFile, found, fresh, nextPendingStep, fullPath } = detectResumeStateLib({
+  const { stateFile, found, fresh, nextPendingStep, fullPath, worktreeMismatch } = detectResumeStateLib({
     prefix: 'ship',
     branch: currentBranch,
   });
   // Forward fresh / nextPendingStep / fullPath for R-implicit-resume (#359).
-  return { stateFile, found, fresh, nextPendingStep, fullPath };
+  // Forward worktreeMismatch so implicit resume can be gated on it (#506/#509 follow-up).
+  return { stateFile, found, fresh, nextPendingStep, fullPath, worktreeMismatch };
 }
 
 // ---------------------------------------------------------------------------
@@ -1477,13 +1478,16 @@ function main() {
   // rather than whichever session originally created the pipeline. Gated on
   // errors.length === 0 so a run that is about to hard-error (e.g. R72
   // missingPlanFile) never mutates the state file it is refusing to run.
-  if (resume && resume.found && resume.fresh && !cli.resume) {
+  if (resume && resume.found && resume.fresh && !cli.resume && !resume.worktreeMismatch) {
     implicitResume = true;
     flags.resume = true;
     flagSources.resume = 'implicit';
     if (errors.length === 0) claimSession('ship', slugifyBranch(gitState.currentBranch));
   } else if (cli.resume && resume && resume.found && errors.length === 0) {
     claimSession('ship', slugifyBranch(gitState.currentBranch));
+  }
+  if (resume && resume.found && resume.worktreeMismatch && !cli.resume) {
+    warnings.push('Ship state file exists but was created in a different worktree. Use --resume to resume explicitly.');
   }
   flags.implicitResume = implicitResume;
 

@@ -31,13 +31,18 @@
  * pending auto-gated — no-opposite-logical-vectors). The `stop_hook_active === true`
  * early-exit avoids contributing to the Claude Code 8-consecutive-continuation cap
  * (and prevents the now-mode-independent in_progress block from looping against that
- * cap in non-auto mode). The hook never mutates the ship state file, so its block
- * decision is a pure function of pipeline state — but an unchanged advancing step
- * would otherwise block forever, so a consecutive-block counter (STOP_BLOCK_CAP,
- * keyed by step name) is kept in its own sidecar file, never in the ship state
- * file itself, so the hook stays non-mutating with respect to pipeline state.
- * After STOP_BLOCK_CAP consecutive blocks on the same unchanged step, the hook
- * degrades to silent exit 0 (with a stderr note) rather than blocking forever.
+ * cap in non-auto mode). The hook otherwise never mutates the ship state file, so its
+ * block decision is normally a pure function of pipeline state — but an unchanged
+ * advancing step would otherwise block forever, so a consecutive-block counter
+ * (STOP_BLOCK_CAP, keyed by step name) is kept in its own sidecar file, never in the
+ * ship state file itself, so the hook stays non-mutating with respect to pipeline
+ * state for every decision short of cap exhaustion. After STOP_BLOCK_CAP consecutive
+ * blocks on the same unchanged step, the hook degrades to silent exit 0 (with a
+ * stderr note) rather than blocking forever — and, as the sole exception to the
+ * non-mutating rule, re-reads state, locates the step by name, marks it `failed`
+ * with `failedReason: 'block-cap-exhausted'`, and writes back (fail-open: a write
+ * error emits a stderr diagnostic but never crashes the hook). The sidecar is
+ * deleted after exhaustion so a retry of the same step gets a fresh block budget.
  * The counter resets whenever the current step name differs from the one recorded
  * in the sidecar, so ordinary multi-step progress is unaffected.
  *
@@ -73,9 +78,9 @@ function main() {
   //     `payload.session_id` is read further down by the R73 gate (e).
   if (payload.stop_hook_active === true) process.exit(0);
 
-  let slugifyBranch, findStateFile, readState, pipelineAdvancing, hookEnforcementAllowed, resolveStateDir, exec;
+  let slugifyBranch, findStateFile, readState, writeState, pipelineAdvancing, hookEnforcementAllowed, resolveStateDir, exec;
   try {
-    ({ slugifyBranch, findStateFile, readState, pipelineAdvancing, hookEnforcementAllowed, resolveStateDir } = require('../scripts/lib/state'));
+    ({ slugifyBranch, findStateFile, readState, writeState, pipelineAdvancing, hookEnforcementAllowed, resolveStateDir } = require('../scripts/lib/state'));
     ({ exec } = require('../scripts/lib/git'));
   } catch {
     process.exit(0);
@@ -156,6 +161,29 @@ function main() {
     }
 
     if (counter.count >= STOP_BLOCK_CAP) {
+      // Re-read state to avoid clobbering concurrent writes (#review F2).
+      // Locate the step by name (not index) so a concurrent step-advance
+      // doesn't mark the wrong step failed.
+      try {
+        const fresh = readState('ship', branchSlug);
+        if (fresh && fresh.data && Array.isArray(fresh.data.steps)) {
+          const target = fresh.data.steps.find(s => (s.name || s.id || 'unknown') === stepName);
+          if (target && target.status !== 'completed') {
+            target.status = 'failed';
+            target.failedReason = 'block-cap-exhausted';
+            writeState(fresh.filePath, fresh.data);
+          }
+        }
+      } catch (e) {
+        // Fail open — state write error must not crash the hook, but emit
+        // a diagnostic so the failure is visible in logs (#review F3).
+        process.stderr.write(
+          `stop-pipeline-continue: cap-exhaustion state write failed: ${e.message}\n`
+        );
+      }
+      // Delete sidecar so a retry of the same step gets a fresh block
+      // budget instead of re-triggering exhaustion immediately (#review F1).
+      try { fs.unlinkSync(sidecarPath); } catch { /* absent is fine */ }
       process.stderr.write(
         `stop-pipeline-continue: consecutive-block cap (${STOP_BLOCK_CAP}) reached for step ` +
         `"${stepName}" — no longer blocking\n`
