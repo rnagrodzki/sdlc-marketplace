@@ -21,6 +21,8 @@ You receive:
 
 Read the plan file at `{PLAN_FILE_PATH}` before evaluating.
 
+Skip `## OpenSpec Appendix` content when evaluating any gate.
+
 ---
 
 ## Focus Areas (risk lens only)

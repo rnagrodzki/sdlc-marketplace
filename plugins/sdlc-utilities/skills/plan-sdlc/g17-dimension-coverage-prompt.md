@@ -35,6 +35,8 @@ Task tool (general-purpose):
     - Learnings log path: {LEARNINGS_LOG_PATH} (`.sdlc/learnings/log.md`)
     - PR commit window: {PR_COMMIT_WINDOW} (e.g., "last 14 days" — best-effort)
 
+    Skip `## OpenSpec Appendix` content when evaluating any gate.
+
     ## Process (execute in this order)
 
     ### Step A — Read the plan file

@@ -66,7 +66,7 @@ Write an implementation plan from requirements, a spec, or a user description. P
 
 **Session recovery (full pipeline only):** When the designated plan file already has content, restart and overwrite — do NOT prompt (implements R23 single-touchpoint default for Step 0). Clear the file in-place and begin fresh. If the user wants to preserve the prior draft, they can `cp` the file before invoking the skill.
 
-**Initialize plan file:** Write the skeleton header immediately:
+**Initialize plan file:** Write the document header immediately (before plan.js — header fields are fixed metadata, not template sections):
 
 ```markdown
 # [Feature Name] Implementation Plan
@@ -77,17 +77,7 @@ Write an implementation plan from requirements, a spec, or a user description. P
 **Verification:** [TBD]
 
 ---
-
-## Deviations & assumptions
-
-| Item | asked | does | why |
-|---|---|---|---|
-| [TBD] | [what was asked] | [what the plan does] | [rationale] |
-
----
 ```
-
-The `## Deviations & assumptions` section (implements R47) is a required top-of-plan section. Leave the placeholder row until Step 1/2 populates it (or note "none" when the plan matches the request exactly). Presence is enforced deterministically by the `validate-plan-format.js` PF6 check — not by an LLM gate.
 
 **Context detection and guardrail loading (skill/plan.js):**
 
@@ -118,6 +108,30 @@ Context detection (from skill/plan.js):
 ```
 
 Extract `guardrails` from the output → store as `activeGuardrails`. If the array is non-empty, print: "Loaded N plan guardrails." If empty: "No plan guardrails configured."
+
+**Template resolution (implements R61):** After parsing the plan.js output, resolve the active plan template:
+
+1. Read `planTemplate.path` from the plan.js output (P21).
+2. If `planTemplate.path` is non-null, that file is the project template — use it as the active template.
+3. If `planTemplate.path` is null, fall back to the shipped default: `<PLUGIN_ROOT>/skills/plan-sdlc/plan-template-default.md` (a sibling file of this SKILL.md).
+4. Read the active template file. **If the file is unreadable** (deleted between prepare-script detection and this read, permissions error, etc.): when the active template was the project override, fall back to the shipped default (step 3) and print one line: `Project plan template unreadable — falling back to shipped default.`; when even the shipped default is unreadable, stop and invoke `error-report-sdlc` (Skill: plan-sdlc, Step: Step 0 template resolution, Operation: read active template, Error: the read failure).
+5. Parse `## Required Sections` — extract each bullet as a section entry with:
+   - **name** — the bullet text (before any HTML comment)
+   - **narrative** — `true` when the bullet carries `<!-- narrative: true -->`
+   - **condition** — the condition string when the bullet carries `<!-- conditional: ... -->`, or null
+   **If the template has no `## Required Sections` heading** (malformed project override — the shipped default always has one): treat it the same as an unreadable file — fall back to the shipped default with the same one-line notice, or stop and invoke `error-report-sdlc` if the shipped default itself is malformed.
+6. Extract `## Discovery Questions` — the bullet list of questions the Step 1 exploration phase answers. Absent in a project override is not an error — Step 1 falls back to its built-in scope/integration/success questions (see Step 1).
+7. Extract `## Verification Patterns` — the bullet list of verification approaches for task `**Verify:**` fields. Absent in a project override is not an error — task authoring falls back to generic verification judgment.
+8. Store the resolved absolute template path as `activeTemplatePath` for use in Step 3 lane dispatch.
+
+**Build the plan skeleton from the template.** For each entry in the parsed `## Required Sections` list, in the order defined by `./plan-format-reference.md`'s `## Section Order`:
+
+- **Unconditional sections** — write the `## <name>` heading with a placeholder body. For `Deviations & assumptions`, use the table format (Item | asked | does | why) with a placeholder row. For other sections, use `[TBD]`.
+- **Conditional sections** — evaluate the condition against the prepare output's signals, not against plan header placeholders which are still `[TBD]` at skeleton-build time. For OpenSpec conditions specifically, use `fromOpenspecDirect` (set in the `--from-openspec` handling below) — the same flag that gates OpenSpec Appendix generation in Step 4, so the skeleton decision and the fill decision never diverge. A plan with `openspecContext` populated via the interactive `--spec` flow but without `--from-openspec` does NOT satisfy OpenSpec-conditional sections (it lacks the structured `openspecContext.requirements[]`/`tasks[]` data those sections render). When the condition holds, write the heading with `[TBD]`. When it does not, write the heading with `Not applicable — <reason>` (e.g., `Not applicable — no OpenSpec change`). **Unknown condition strings** — a project-override template MAY declare a `<!-- conditional: ... -->` string this SKILL.md doesn't recognize (only the OpenSpec condition is currently defined). Default to treating the condition as NOT satisfied — write the heading with `Not applicable — condition "<condition string>" not recognized`. This fails toward a visible, grep-able placeholder rather than either silently dropping the heading (which PF10 would then flag as a genuine failure) or guessing the condition true and leaving a `[TBD]` nobody fills in. Since PF10 checks heading presence unconditionally (R59), the heading itself is written either way — only the body differs.
+
+**Lightweight plan adjustment:** When Step 0 routing selects the lightweight branch (Step 5 skipped), sections whose content is produced exclusively by a skipped step (e.g., `Verification Scorecard` is produced by Step 5) get body `Not applicable — lightweight plan` instead of `[TBD]`. This prevents dead placeholders in the final plan. This is a best-effort readability improvement, not a correctness requirement: it names known step-owned sections by their default-template name, so a project override that renames or adds a step-5-owned section simply falls back to the generic `[TBD]` body for that section rather than breaking — the section still appears (per the "do not hardcode which sections appear" rule below), only the friendlier substitute body is skipped.
+
+Do NOT hardcode which sections appear in the skeleton, or their order. The template's `## Required Sections` list (and `./plan-format-reference.md`'s `## Section Order`) is the single source of truth for section presence and ordering — never an explicit roster coded into this SKILL.md. Section-specific BODY FORMATTING for a small, named set of sections (the Deviations table above, the lightweight-adjustment substitution above) is a distinct, narrower exception: it improves the placeholder body for sections this doc already knows by name, and degrades gracefully to the generic `[TBD]` body for any section it doesn't recognize — it never controls whether a section is written.
 
 **Contradictory-signal override (implements R16):** After reading the prepare output, IF `openspec.authoritative.path` is set AND the current session-start `<system-reminder>` contains a line matching `/openspec.*not initialized|not initialized.*openspec/i`, print exactly one line:
 `Ignoring contradictory 'not initialized' signal in session context — openspec/config.yaml exists (authoritative source: SDLC's own check via plan.js prepare output).`
@@ -210,7 +224,7 @@ fi
   - Use inline exploration below. Plan still produced. (implements R28)
   - Issue all Glob/Grep/Read calls for inline exploration in a SINGLE message (parallel dispatch). (implements R37, Fixes #418)
 
-**Structured discovery:** When requirements are vague (a single sentence or ambiguous goal), use AskUserQuestion with 2–3 targeted questions at once:
+**Structured discovery:** When requirements are vague (a single sentence or ambiguous goal), use AskUserQuestion with targeted questions. When the active template provides `## Discovery Questions`, use those questions verbatim. When the template has no `## Discovery Questions` section (project override omitted it), fall back to:
 1. **Scope** — what's in, what's explicitly out?
 2. **Integration** — what existing code does this touch?
 3. **Success** — how will we know it works?
@@ -236,7 +250,9 @@ Identify constraints: language, framework, existing conventions, testing approac
 
 **Write to plan file:** After exploration, update the plan file:
 - Fill in Goal, Architecture, Verification header fields
-- Append a `## Requirements` section with numbered checklist (one bullet per requirement)
+- Write the `## Context` section — answers to the Discovery Questions in plain language (R62)
+- Write the `## Research Findings` section — captures exploration output: file patterns, existing modules, naming conventions, testing patterns, and build/lint/test commands discovered during codebase exploration. This section persists in the final plan (template-required, narrative).
+- Append a `## Requirements` section with numbered checklist (one bullet per requirement) — this is temporary scaffolding, removed in Step 2 post-write cleanup
 
 **Re-anchor:** Before leaving Step 1, re-read the plan file's Requirements section. This counters attention drift after many exploration calls.
 
@@ -337,6 +353,7 @@ Files + Contract + Acceptance criteria — do not restate it here.]
 - mirror: [existing artifact + line anchors to copy structure from]
 - decisions: [per-task decided choices bound to this deliverable]
 - sync: [sibling artifacts that must stay byte-consistent]
+- example: [optional — concrete input/output pair when shape's prose leaves a genuinely ambiguous boundary; omit when a render-trigger surface applies, since the render IS the example]
 ```
 
 **Contract block (required — implements R45):** Every artifact-touching task MUST include a `**Contract:**` block per `./plan-format-reference.md`, carrying the type-appropriate decided shape (code: signatures/types/flags/error-cases/import-paths; docs: template+sections+audience+cross-links; openspec/spec: requirement IDs ADD/MODIFY/REMOVE + delta text + numbering). The plan type is derived from the task's `Files:` paths; a mixed-artifact task uses its dominant artifact's column. A task whose Contract is absent or merely restates "update X to do Y" is flagged by G18 in Step 3.
@@ -345,19 +362,38 @@ Files + Contract + Acceptance criteria — do not restate it here.]
 
 **Render don't narrate (surface-conditional — implements R46):** When a task touches a concrete-artifact surface (payload, struct/schema field change, status enum, flow, config/flag delta, error mode, data-writing end-state), RENDER the artifact (fenced block / table / before→after diff) — do not describe it in prose. Use the catalog + conventions in ./plan-format-reference.md. Cap: one elided (…) example per distinct contract shape (a distinct contract shape is one unique combination of method + path for REST, or flag + type for CLI — two endpoints with the same method but different paths are distinct shapes). Trivial docs/rename tasks render nothing. (Mermaid fenced blocks allowed for flow/call-order/state surfaces; no MDX.) A task whose concrete-artifact surface is described in prose rather than rendered is flagged by G19 in Step 3.
 
-**G19 — Render-don't-narrate (error-severity):** For each render-trigger surface (REST/RPC endpoint, CLI flag, schema field, status enum, state/flow/enum, config delta, error taxonomy) a task touches, flags that surface if its shape is narrated in prose instead of rendered as a fenced block, table, or before→after diff — a render for one surface does NOT excuse prose for another surface in the same task. Owned by the content-coverage lane. Blocks plan approval until every touched surface is rendered. Not-applicable for trivial tasks and pure docs/rename tasks. LLM-only (semantic — render-trigger detection); hardened by prose. No deterministic floor (KD2).
+**G19 — Render-don't-narrate (error-severity):** For each render-trigger surface (REST/RPC endpoint, CLI flag, schema field, status enum, state/flow/enum, config delta, error taxonomy) a task touches, flags that surface if its shape is narrated in prose instead of rendered as a fenced block, table, or before→after diff — a render for one surface does NOT excuse prose for another surface in the same task. Owned by the content-coverage lane. Blocks plan approval until every touched surface is rendered. Not-applicable for trivial tasks and pure docs/rename tasks. **Template-driven exemption (R61):** content under a section name marked `<!-- narrative: true -->` in the active template is exempt — the exempt set comes entirely from the template's markers, not from hardcoded section names. LLM-only (semantic — render-trigger detection); hardened by prose. No deterministic floor (KD2).
 
-**G20 — Notes rationale-only (error-severity):** Flags a `Notes:` block that restates the task's Contract/acceptance instead of carrying only rationale. Owned by the content-coverage lane (lanes[1]). Blocks plan approval until the `Notes:` block is rationale-only.
+**G20 — Notes rationale-only (error-severity):** Flags a `Notes:` block that restates the task's Contract/acceptance instead of carrying only rationale. Owned by the content-coverage lane (lanes[1]). Blocks plan approval until the `Notes:` block is rationale-only. **Template-driven exemption (R61):** content under a section name marked `<!-- narrative: true -->` in the active template is exempt.
 
 **G21 — Self-contained code refs (error-severity):** Flags a bare `file:line` change reference not anchored with surrounding lines (or the full function body) plus an inline diff. A `file:line` used as a pointer / `Contract.mirror` precedent anchor is exempt. Owned by the content-coverage lane (lanes[1]). Blocks plan approval until the reference is self-contained. LLM-only (semantic — change-site vs precedent ref); no deterministic floor (KD6).
 
-**Verification strategy — match to task type:**
+**Verification strategy — match to task type.** When the active template provides `## Verification Patterns`, draw `**Verify:**` values from those patterns. When the template has no Verification Patterns (project override omitted it), use these defaults:
 - Feature/logic → TDD (write failing test, implement, pass)
 - Config/infrastructure → build verification
 - Documentation → manual review
 - Integration → integration test or E2E
 
-**Write to plan file:** Append Key Decisions section (if applicable) and all task blocks. Populate the top-of-plan `## Deviations & assumptions` table (implements R47): one row per place the plan diverges from or assumes beyond the literal request (columns Item | asked | does | why). When the plan matches the request exactly, replace the placeholder row with a single "none" row. **De-dup rationale convention (implements R52):** Each decision gets one rationale entry — do not duplicate rationale across multiple decisions for the same topic.
+**Write to plan file — template-required sections and tasks:** Write ALL sections declared in the active template's `## Required Sections` list, in the order defined by `./plan-format-reference.md`'s `## Section Order`. Do NOT hardcode section names — the template is the single source of truth. For each template-required section:
+
+- `## Context` — already written in Step 1 (answers to Discovery Questions); update if Step 2 research expanded the picture
+- `## Research Findings` — already written in Step 1 (exploration output); update if needed
+- `## Deviations & assumptions` — populate the table (Item | asked | does | why): one row per place the plan diverges from or assumes beyond the literal request. When the plan matches the request exactly, replace the placeholder row with a single "none" row (implements R47; presence enforced by PF6/PF10 via the active template). **De-dup rationale convention (implements R52):** Each decision gets one rationale entry.
+- `## Key Decisions` — note every decision where you chose between valid approaches. Focus on choices where a reasonable implementer might differ without the rationale. Skip obvious decisions.
+- `## Contract Examples` — one worked `**Contract:**` block per column type (code / docs / openspec) actually used by the plan's tasks, per R60. Reuse the three worked examples from `./plan-format-reference.md` verbatim.
+- `## Final Shape` — describe the end-state once all tasks are complete (what the deliverable looks like when done, not how it gets there)
+- `## OpenSpec Appendix` — see "OpenSpec Appendix generation" in Step 4/5 below. During Step 2, leave the skeleton placeholder (either `[TBD]` or `Not applicable — no OpenSpec change` per the condition evaluated in Step 0).
+- Task blocks — all `### Task N:` blocks with per-task metadata
+- Any project-custom sections from the template that are not in the list above — write them with the body format appropriate to their name, or `[TBD]` if the format is unknown
+
+**R62 plain-language style (applies to all narrative sections):** Sections marked `<!-- narrative: true -->` in the template (e.g. Context, Research Findings, Key Decisions, Final Shape) MUST follow these writing rules:
+- Short sentences — one idea per sentence
+- Every technical term explained inline on first use (e.g., "webhook — an HTTP callback the payment provider calls on our server")
+- Goal structured as a multi-line bullet list, not a dense text blob
+- Key Decisions readable by non-experts: state the choice, the alternative, and why one wins — prefer plain wording over jargon
+- Visual breathing room — blank lines between ideas
+
+R62 is a writing-quality convention judged by the Step 5 lens reviewers (R36) alongside their other checks — no new gate is introduced, and it is not enforced deterministically.
 
 **Post-write cleanup:** Remove the `## Requirements` working section from the plan file. Requirements are traceable through task acceptance criteria; the section was temporary scaffolding.
 
@@ -376,7 +412,7 @@ For each `lanes[i]` entry (i = 0..4):
 - prompt body: Read `lanes[i].promptTemplatePath` and fill template variables:
   - All lanes: `{PLAN_FILE_PATH}` (absolute path to plan file), `{PROJECT_ROOT}` (cwd)
   - Lanes 0–3 non-G17: `{REQUIREMENTS_SUMMARY}` (the numbered requirements list from Step 1 CONSUME — same content as `{REQUIREMENTS_CHECKLIST}` in Step 5; retained in memory from Step 1), `{ACTIVE_GUARDRAILS}` (from `guardrails[]` P7), `{OPENSPEC_TASKS}` (from `openspecContext.tasks` P13, null when not OpenSpec-sourced), `{BRIEF_FINDING_IDS}` (from `explorePack.manifestPath` context, null when no brief)
-  - Lane 1 (content-coverage) additionally: `{FORMAT_REFERENCE_PATH}` — absolute path to plan-format-reference.md (sibling of lane-content-coverage-prompt.md in the same skill directory; resolve as `dirname(lanes[1].promptTemplatePath)/plan-format-reference.md`)
+  - Lane 1 (content-coverage) additionally: `{FORMAT_REFERENCE_PATH}` — absolute path to plan-format-reference.md (sibling of lane-content-coverage-prompt.md in the same skill directory; resolve as `dirname(lanes[1].promptTemplatePath)/plan-format-reference.md`), `{PLAN_TEMPLATE_PATH}` — `activeTemplatePath` resolved in Step 0 (the absolute path to the active plan template — project override or shipped default)
   - Lane 4 (G17/dimension-coverage): `{DIMENSIONS_DIR}` (`.sdlc/review-dimensions/`), `{COPILOT_DIR}` (`.github/instructions/`), `{GITHUB_HOSTING_DETECTED}` (`githubHosting.detected` from P14), `{LEARNINGS_LOG_PATH}` (`.sdlc/learnings/log.md`), `{PR_COMMIT_WINDOW}` (best-effort "last 14 days" if unknown)
 
 **Null `promptTemplatePath` handling:** When `lanes[i].promptTemplatePath` is null (prepare script reported it could not find the template), skip that lane's dispatch and immediately add a synthetic blocking issue:
@@ -448,6 +484,15 @@ When `g17Findings.findings` is non-empty, append the `g17Findings.rendering` mar
 - Otherwise, splice immediately after the last `### Task N:` block.
 
 When `g17Findings.findings` is empty (or `g17Findings` is the empty-fallback from a dispatch failure), do nothing. Absent proposals are not a failure — G17 is advisory (R31).
+
+**OpenSpec Appendix generation (implements R59):** When `fromOpenspecDirect` is true (full-pipeline OpenSpec path), populate the `## OpenSpec Appendix` section with:
+
+1. **Requirement inventory table** — one row per entry from `openspecContext.requirements[]` with columns: reqId, capability, type, covering task(s).
+2. **Delta-spec fragments** — reproduce each delta-spec file's content so a reviewer does not need to open OpenSpec files separately.
+
+**Nested-fence safety (N+1 backticks):** Delta-spec fragments are themselves markdown containing fenced code blocks. Before fencing a fragment, count the longest consecutive backtick run (N) appearing anywhere inside the fragment's content. Wrap the fragment in a fence of max(N+1, 4) backticks — CommonMark closes a fence only on a run at least as long as the opening run, so the longer outer fence passes shorter inner runs through untouched. Each fragment is fenced independently (different fragments may need different outer fence lengths).
+
+When `fromOpenspecDirect` is false, the skeleton placeholder from Step 0 already reads `Not applicable — no OpenSpec change` — leave it as-is.
 
 Step 4 is autonomous (implements R22 single-touchpoint handoff). After fixes are applied (Guardrail Compliance section written when `activeGuardrails` is non-empty, and Suggested Review Dimensions spliced when `g17Findings.findings` is non-empty per R34), proceed directly to Step 5. The user does NOT see the plan at Step 4; the single user touchpoint for the finalized plan is Step 7 (Handoff). The Step 4 error-severity guardrail-block harden offer above remains a genuine decision gate and is preserved (R19).
 
@@ -554,7 +599,9 @@ After link verification passes, run the deterministic plan format validator. PF9
 - **Full-pipeline plan** (Step 0 routed through Step 5, the multi-lens review — i.e. ≥4 files): `FINAL_FLAG="--final"`. A scorecard is expected, so PF9 is enforced.
 - **Lightweight plan** (Step 5 skipped): `FINAL_FLAG=""`. No scorecard expected, so PF9 is not applied.
 
-Substitute the correct value into the block below before running it; `${FINAL_FLAG:+--final}` expands to `--final` only when `FINAL_FLAG` is non-empty, and to nothing otherwise (no word-splitting, no empty positional argument).
+Substitute the correct values into the block below before running it; `${FINAL_FLAG:+--final}` expands to `--final` only when `FINAL_FLAG` is non-empty, and to nothing otherwise (no word-splitting, no empty positional argument). `TEMPLATE_PATH` passes the active template path so PF10 can check template-required sections — it is appended via a bash array, never inline-interpolated, so a path containing spaces is not word-split.
+
+**Set `TEMPLATE_PATH`:** When `FINAL_FLAG` is `"--final"` (full-pipeline plan), set `TEMPLATE_PATH="$activeTemplatePath"` (the absolute path resolved in Step 0's template resolution). When `FINAL_FLAG` is empty (lightweight plan), leave `TEMPLATE_PATH` unset/empty — PF10 is skipped along with PF9.
 
 ```bash
 # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
@@ -562,7 +609,13 @@ Substitute the correct value into the block below before running it; `${FINAL_FL
 #   "--final" for a full-pipeline plan (Step 5 ran → scorecard expected),
 #   ""        for a lightweight plan (Step 5 skipped → PF9 not applied).
 # It is NOT derived from scorecard presence (that would make PF9 circular).
-node "<PLUGIN_ROOT>/scripts/ci/validate-plan-format.js" ${FINAL_FLAG:+--final} --markdown --file "$plan_path"
+# TEMPLATE_PATH passes the active plan template path for PF10. Built as an array
+# (not a pre-joined "--template $path" string) so a path containing spaces is
+# passed as a single argument instead of being word-split on the unquoted expansion.
+ARGS=(--markdown --file "$plan_path")
+[ -n "$FINAL_FLAG" ] && ARGS+=(--final)
+[ -n "$TEMPLATE_PATH" ] && ARGS+=(--template "$TEMPLATE_PATH")
+node "<PLUGIN_ROOT>/scripts/ci/validate-plan-format.js" "${ARGS[@]}"
 FORMAT_EXIT=$?
 ```
 
@@ -642,7 +695,7 @@ Do NOT report the plan as "validated" on format-floor PASS alone. Format floor =
 
 **Plan-execution format mismatch.** The plan MUST include Complexity, Risk, Depends on, and Verify fields per task — execute-plan-sdlc consumes these for wave building. Missing metadata forces inference, which is slower and less accurate.
 
-**Plan file is the single source of truth.** All working state lives in the plan file. Do not create temporary files, scratchpads, or side documents. If exploration findings are needed later, they belong in the plan file's Requirements section until cleanup.
+**Plan file is the single source of truth.** All working state lives in the plan file. Do not create temporary files, scratchpads, or side documents. Exploration findings belong in the `## Research Findings` section (template-required, persists in the final plan). The `## Requirements` section is temporary scaffolding removed in Step 2 post-write cleanup.
 
 ## Learning Capture
 
@@ -676,6 +729,7 @@ On selection, invoke the chosen skill using the Skill tool. On "done", end witho
 
 ## See Also
 
+- `./plan-template-default.md` — shipped default plan template (section list, discovery questions, verification patterns)
 - `./plan-reviewer-prompt.md` — plan review subagent template
 - `./plan-format-reference.md` — plan document format specification
 - [`/execute-plan-sdlc`](../execute-plan-sdlc/SKILL.md) — skill that executes the plans this skill produces

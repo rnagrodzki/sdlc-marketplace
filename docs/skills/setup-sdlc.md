@@ -38,9 +38,10 @@ Pre-check every row in the menu and skip the per-field `keep` prompt — all con
 | `--skip <section>` | Skip a config section during setup (version, ship, jira, review, commit, pr) | — |
 | `--force` | Skip the per-field `keep` prompt for every field — all values are reconfirmed rather than accepted with one keystroke. Does not change which rows are pre-checked (all rows are pre-checked by default). | — |
 | `--unset-only` | Pre-check only sections in `not-set` state. Legacy fast-path before #235 — the default flow now pre-checks all rows. | — |
-| `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block`, `workspace` | — |
+| `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block`, `workspace` | — |
 | `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | — |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | — |
+| `--plan-template` | Jump directly to plan template sub-flow (skip config builder). Scaffolds the project-owned `.sdlc/plan-template.md` override consumed by `/plan-sdlc` and by `validate-plan-format.js` PF10. | — |
 | `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | — |
 | `--execution-guardrails` | Jump directly to execution guardrails sub-flow (skip config builder) | — |
 | `--openspec-enrich` | Jump directly to openspec config enrichment sub-flow | — |
@@ -207,6 +208,7 @@ Every section the menu can configure. The label, purpose, files modified, and co
 | `pr-labels` | PR label assignment policy under `pr.labels`. Mode `off` (default) adds no automatic labels — `--label` overrides still work. Mode `rules` evaluates user-defined deterministic rules (branch prefix, commit type, path glob, JIRA type, diff size). Mode `llm` opts into the legacy fuzzy match. Configured via `--only pr-labels`. | `.sdlc/config.json` | `/pr-sdlc` |
 | `review-dimensions` | Review dimensions installed under `.sdlc/review-dimensions/*.yaml`. Each dimension is a focused check set used by `/review-sdlc`. | `.sdlc/review-dimensions/*.yaml` | `/review-sdlc` |
 | `pr-template` | PR description template at `.sdlc/pr-template.md`, used by `/pr-sdlc` when drafting PRs. | `.sdlc/pr-template.md` | `/pr-sdlc` |
+| `plan-template` | Project-owned plan template at `.sdlc/plan-template.md`, used by `/plan-sdlc` to build the plan skeleton (Required Sections, Discovery Questions, Verification Patterns) and by `validate-plan-format.js` PF10 to check required-section presence. Without it, `/plan-sdlc` falls back to the shipped default template. | `.sdlc/plan-template.md` | `/plan-sdlc` |
 | `plan-guardrails` | Custom rules at `.sdlc/config.json#plan.guardrails` evaluated by `/plan-sdlc` during critique phases. | `.sdlc/config.json` | `/plan-sdlc` |
 | `execution-guardrails` | Runtime guardrails at `.sdlc/config.json#execute.guardrails` evaluated by `/execute-plan-sdlc` and `/ship-sdlc` before/after each wave. | `.sdlc/config.json` | `/execute-plan-sdlc`, `/ship-sdlc` |
 | `openspec-block` | Managed block in `openspec/config.yaml` providing sdlc-utilities workflow guidance to OpenSpec-aware skills. Idempotent across plugin versions. | `openspec/config.yaml` | `/plan-sdlc`, `/execute-plan-sdlc`, `/ship-sdlc` |

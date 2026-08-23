@@ -48,6 +48,8 @@ Task tool (general-purpose):
 
     Read the plan file. For each check, verify by reading the plan — do not assume.
 
+    Skip `## OpenSpec Appendix` content when evaluating any gate.
+
     | Category | What to Look For |
     |---|---|
     | Requirements coverage | Every requirement in the checklist has at least one task; no orphan tasks without a requirement |

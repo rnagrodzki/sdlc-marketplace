@@ -1,8 +1,8 @@
 ---
 name: setup-sdlc
-description: "Use this skill when setting up the SDLC plugin for a project, initializing configuration, or when any skill reports missing config. Renders a selective-section menu so users choose which sections to configure; each selected section prints a verbose header (purpose, files-modified, consuming skills, per-option description) before any prompt. Supports direct sub-flow entry via --only, --dimensions, --pr-template, --guardrails, --execution-guardrails, --openspec-enrich. Arguments: [--migrate] [--skip <section>] [--force] [--only <ids>] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--openspec-enrich] [--remove-openspec] [--add] [--no-copilot]"
+description: "Use this skill when setting up the SDLC plugin for a project, initializing configuration, or when any skill reports missing config. Renders a selective-section menu so users choose which sections to configure; each selected section prints a verbose header (purpose, files-modified, consuming skills, per-option description) before any prompt. Supports direct sub-flow entry via --only, --dimensions, --pr-template, --guardrails, --execution-guardrails, --openspec-enrich, --plan-template. Arguments: [--migrate] [--skip <section>] [--force] [--only <ids>] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--openspec-enrich] [--remove-openspec] [--plan-template] [--add] [--no-copilot]"
 user-invocable: true
-argument-hint: "[--migrate] [--skip <section>] [--force] [--only <ids>] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--openspec-enrich] [--remove-openspec] [--add] [--no-copilot]"
+argument-hint: "[--migrate] [--skip <section>] [--force] [--only <ids>] [--dimensions] [--pr-template] [--guardrails] [--execution-guardrails] [--openspec-enrich] [--remove-openspec] [--plan-template] [--add] [--no-copilot]"
 model: sonnet
 ---
 
@@ -23,13 +23,14 @@ delegates content creation to specialized skills.
 | `--migrate` | Force migration of legacy config files even if no legacy files are auto-detected | off |
 | `--skip <section>` | Skip a config section during setup. Valid values: `version`, `ship`, `jira`, `review`, `commit`, `pr` | none |
 | `--force` | Pre-check every menu row (reconfigure everything) instead of selecting only `not-set` rows | off |
-| `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid ids match `prepare.sections[].id`: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block` | none |
+| `--only <ids>` | Comma-separated section ids to configure non-interactively (skips the menu). Valid ids match `prepare.sections[].id`: `version`, `ship`, `jira`, `review`, `commit`, `pr`, `pr-labels`, `review-dimensions`, `pr-template`, `plan-guardrails`, `execution-guardrails`, `openspec-block`, `plan-template` | none |
 | `--dimensions` | Jump directly to review dimensions sub-flow (alias for `--only review-dimensions`) | off |
 | `--pr-template` | Jump directly to PR template sub-flow (skip config builder) | off |
 | `--guardrails` | Jump directly to plan guardrails sub-flow (skip config builder) | off |
 | `--execution-guardrails` | Jump directly to execution guardrails sub-flow (skip config builder) | off |
 | `--openspec-enrich` | Jump directly to openspec config enrichment sub-flow | off |
 | `--remove-openspec` | Remove the managed block from openspec/config.yaml (with --openspec-enrich) | off |
+| `--plan-template` | Jump directly to plan template sub-flow (alias for `--only plan-template`) | off |
 | `--add` | Expansion mode (with --dimensions or --guardrails) | off |
 | `--no-copilot` | Skip GitHub Copilot instructions (with --dimensions) | off |
 
@@ -83,6 +84,7 @@ The legacy direct-entry flags map onto `--only` (which now drives Step 3 directl
 | `--guardrails` | `--only plan-guardrails` |
 | `--execution-guardrails` | `--only execution-guardrails` |
 | `--openspec-enrich` | `--only openspec-block` |
+| `--plan-template` | `--only plan-template` |
 
 If any of those flags is passed (and `--only` is not), translate it into `--only <id>`. If `--only <ids>` is passed (directly or via translation), skip Step 1's menu and proceed to Step 2 → Step 3 with `selectedIds = <ids>`. Pass through `--add`, `--no-copilot`, and `--remove-openspec` to the relevant sub-flow when invoked.
 
@@ -104,7 +106,7 @@ The JSON contains these top-level keys:
 
 <!-- Implements R-menu-1, R-menu-4. Fixes #337. Step 1 is plain chat output; AskUserQuestion is intentionally NOT used here. -->
 
-**Direct-entry flag bypass (preserved):** When `--only`, `--force`, `--dimensions`, `--pr-template`, `--guardrails`, `--execution-guardrails`, or `--openspec-enrich` was passed, `selectedIds` are resolved before Step 1 by the flag-alias routing table in Step 0. Skip the entire menu (no numbered list, no chat prompt) and jump to Step 2/3 with the resolved id set.
+**Direct-entry flag bypass (preserved):** When `--only`, `--force`, `--dimensions`, `--pr-template`, `--guardrails`, `--execution-guardrails`, `--openspec-enrich`, or `--plan-template` was passed, `selectedIds` are resolved before Step 1 by the flag-alias routing table in Step 0. Skip the entire menu (no numbered list, no chat prompt) and jump to Step 2/3 with the resolved id set.
 
 **Phase 1 — Render the status block.** Print the status block as before, using `section.label` and `section.summary` verbatim:
 
@@ -142,6 +144,7 @@ Example rendering:
 1. [set] Version — Configures how version-sdlc bumps the project version.
 2. [not-set] Ship — Configures the ship-sdlc pipeline defaults.
 3. [legacy] Review (locked — required) — Configures review dimensions for review-sdlc.
+4. [not-set] Plan template — customize what sections every plan must include.
 ```
 
 **Phase 3 — Ask via plain chat (NOT `AskUserQuestion`).** Print the following prompt as a literal chat message, then end the model turn so the user's next message is the answer:
@@ -272,6 +275,7 @@ For each id selected in Step 1 (call this list `selectedIds`), in `prepare.secti
    | `'setup-guardrails'` | Read and follow `@setup-guardrails.md` (it runs its own scan internally). Pass through `--add` if present. |
    | `'setup-execution-guardrails'` | Read and follow `@setup-execution-guardrails.md`. Pass through `--add` if present. |
    | `'setup-openspec'` | Read and follow `@setup-openspec.md`. Pass through `--remove-openspec` as `--remove` if present. |
+   | `'setup-plan-template'` | Read and follow `@setup-plan-template.md` (it checks for an existing template itself; no scan input from parent required). |
 
 After the loop, write any pending project-config and local-config slices via the "Writing config files" sub-section at the end of Step 3.
 
