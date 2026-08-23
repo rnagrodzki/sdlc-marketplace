@@ -39,11 +39,12 @@
  * state for every decision short of cap exhaustion. After STOP_BLOCK_CAP consecutive
  * blocks on the same unchanged step, the hook degrades to silent exit 0 (with a
  * stderr note) rather than blocking forever — and, as the sole exception to the
- * non-mutating rule, marks the stalled step `failed` with
- * `failedReason: 'block-cap-exhausted'` and writes the state file (fail-open: a
- * write error is caught and never crashes the hook). The counter resets whenever
- * the current step name differs from the one recorded in the sidecar, so ordinary
- * multi-step progress is unaffected.
+ * non-mutating rule, re-reads state, locates the step by name, marks it `failed`
+ * with `failedReason: 'block-cap-exhausted'`, and writes back (fail-open: a write
+ * error emits a stderr diagnostic but never crashes the hook). The sidecar is
+ * deleted after exhaustion so a retry of the same step gets a fresh block budget.
+ * The counter resets whenever the current step name differs from the one recorded
+ * in the sidecar, so ordinary multi-step progress is unaffected.
  *
  * Lazy-loads ../scripts/lib/state.js and ../scripts/lib/git.js. Requires only
  * Node.js built-ins plus those two lib files — no new npm dependencies.
@@ -160,13 +161,29 @@ function main() {
     }
 
     if (counter.count >= STOP_BLOCK_CAP) {
+      // Re-read state to avoid clobbering concurrent writes (#review F2).
+      // Locate the step by name (not index) so a concurrent step-advance
+      // doesn't mark the wrong step failed.
       try {
-        step.status = 'failed';
-        step.failedReason = 'block-cap-exhausted';
-        writeState(result.filePath, data);
-      } catch {
-        // Fail open -- state write error must not crash the hook
+        const fresh = readState('ship', branchSlug);
+        if (fresh && fresh.data && Array.isArray(fresh.data.steps)) {
+          const target = fresh.data.steps.find(s => (s.name || s.id || 'unknown') === stepName);
+          if (target && target.status !== 'completed') {
+            target.status = 'failed';
+            target.failedReason = 'block-cap-exhausted';
+            writeState(fresh.filePath, fresh.data);
+          }
+        }
+      } catch (e) {
+        // Fail open — state write error must not crash the hook, but emit
+        // a diagnostic so the failure is visible in logs (#review F3).
+        process.stderr.write(
+          `stop-pipeline-continue: cap-exhaustion state write failed: ${e.message}\n`
+        );
       }
+      // Delete sidecar so a retry of the same step gets a fresh block
+      // budget instead of re-triggering exhaustion immediately (#review F1).
+      try { fs.unlinkSync(sidecarPath); } catch { /* absent is fine */ }
       process.stderr.write(
         `stop-pipeline-continue: consecutive-block cap (${STOP_BLOCK_CAP}) reached for step ` +
         `"${stepName}" — no longer blocking\n`

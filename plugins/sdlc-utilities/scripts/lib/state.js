@@ -918,10 +918,11 @@ function claimSession(prefix, branchSlug) {
  * Deliberately excludes:
  *   - Freshness/TTL — `mtime` only advances on step transitions, so a
  *     long-running `execute` step must not be silenced by staleness.
- *   - Worktree identity — `data.worktree` is diagnostic-only (see
- *     state-format.md) and would legitimately mismatch for a step running
- *     in a linked task worktree; `resolveStateDir()` already routes through
- *     the main worktree, so merely locating the file proves same-repo.
+ *   - Worktree identity — `data.worktree` is a resume gate (issue #503,
+ *     `detectResumeState`) but is excluded from hook enforcement because a
+ *     step running in a linked task worktree would legitimately mismatch;
+ *     `resolveStateDir()` already routes through the main worktree, so
+ *     merely locating the file proves same-repo.
  *
  * Mirrors the shape of `pipelineAdvancing(data)` above: pure, no I/O, no
  * mtime/stat, no git invocation — cannot throw, cannot be slow, safe to call

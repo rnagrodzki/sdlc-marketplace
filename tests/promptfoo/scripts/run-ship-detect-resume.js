@@ -78,7 +78,12 @@ if (!repoRoot) {
 const stateFile = path.join(projectRoot, stateRel);
 
 function activeWorktree() {
-  return execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: projectRoot, encoding: 'utf8' }).trim();
+  try {
+    return execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: projectRoot, encoding: 'utf8' }).trim();
+  } catch (e) {
+    emit({ error: `activeWorktree failed: ${e.message}` });
+    process.exit(0);
+  }
 }
 
 const baseState = {
@@ -144,10 +149,16 @@ try {
 } catch (_) {
   // Leave manifest null — surfaced as nulls below for assertion visibility.
 }
+// Clean up ship.js's temp manifest file to avoid leaking into the fixture dir.
+if (stdoutPath) {
+  try { fs.unlinkSync(stdoutPath); } catch { /* absent is fine */ }
+}
 
 emit({
   scenario,
   exitCode: res.status,
+  error: res.error ? String(res.error) : null,
+  signal: res.signal || null,
   stderr: (res.stderr || '').trim(),
   worktreeMismatch: manifest && manifest.resume ? manifest.resume.worktreeMismatch : null,
   implicitResume: manifest && manifest.flags ? manifest.flags.implicitResume : null,
