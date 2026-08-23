@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.25] - 2026-08-23
+
 ### Fixed
-- plan-sdlc: `plan.js` template resolution (`resolveSkillTemplate()` / `buildG17Dispatch()`) now tries the `__dirname`-relative workspace path before falling back to the `~/.claude/plugins` find cascade, not after. The find-first order cost ~10s per call on a non-trivial plugin cache, and #515's new lane/lens template resolution raised the call count to 9 per invocation (~94s total) — blowing past the promptfoo exec harness's 30s timeout and stalling the pre-push hook suite (#514)
+- ship-sdlc: worktree-gated resume and cap-exhaustion recovery — promote worktree mismatch from diagnostic to resume gate, re-read state before writes to prevent concurrent conflicts, locate steps by name instead of index for safe concurrent handling, delete sidecar on cap exhaustion so retry gets fresh budget (#503)
+- plan-sdlc: `plan.js` template resolution now tries the workspace-relative path before the `~/.claude/plugins` find cascade, eliminating ~10s-per-call overhead that stalled the pre-push hook suite (#514)
 
 ### Changed
-- harvest-learnings: `harvest-learnings.js` now reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy `.claude/learnings/log.md` triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for one-shot migration (#356)
-- ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags `ship.verifyPipeline` / `ship.awaitReview` removed; CLI flags `--verify-pipeline` / `--await-review` removed (passing them now produces a clear migration-pointer error). Schema bumped v3 → v4 with auto-migration on first read.
+- harvest-learnings: reads from `.sdlc/learnings/log.md` (canonical path per #231 spec); legacy path triggers a one-version stderr deprecation fallback; `migrate-learnings-log.js` available for migration (#356)
+- ship-sdlc: post-PR CI verification and remote-review awaiting are now opt-in via `ship.steps[]` entries (`verify-pipeline`, `await-remote-review`). Boolean flags and CLI flags removed; schema bumped v3 → v4 with auto-migration on first read.
 
 ## [0.21.24] - 2026-08-22
 
