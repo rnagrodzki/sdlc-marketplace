@@ -692,3 +692,119 @@
         const inner = JSON.parse(r.stdout);
         if (!/in_progress/.test((inner.hookSpecificOutput || {}).additionalContext || '')) return `FAIL: worktree mismatch silenced the gate, stderr=${r.stderr}`;
         return true;
+
+# ---------------------------------------------------------------------------
+# worktree-mismatch (this plan, follow-up to #503/#506/#509): `data.worktree`
+# is diagnostic-only for the three stdin-driven hooks above (case 18 stays
+# valid — no worktree term there), but ship.js's OWN resume detection
+# (lib/state.js::detectResumeState) DOES gate on it: a fresh state file whose
+# recorded worktree no longer matches the active one must not silently
+# implicit-resume. Driven through
+# tests/promptfoo/scripts/run-ship-detect-resume.js, which stamps a fresh
+# state file with a scenario-controlled `worktree` field and either calls
+# detectResumeState() directly or spawns the real ship.js prepare pipeline.
+# Fixture: project-ship-state-resume (real git repo, branch main).
+# ---------------------------------------------------------------------------
+
+# 19. Matching worktree — detectResumeState reports worktreeMismatch: false.
+- description: "worktree-mismatch: detectResumeState with matching worktree returns worktreeMismatch:false"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ship-detect-resume.js"
+    script_args: "--project-root {{project_root}} --state-rel .sdlc/execution/ship-main-20260101T000000Z.json --branch main --scenario match"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-state-resume"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.found !== true) return `FAIL: found=${inner.found}`;
+        if (inner.worktreeMismatch !== false) return `FAIL: worktreeMismatch=${inner.worktreeMismatch}`;
+        return true;
+
+# 20. Mismatching worktree — detectResumeState reports worktreeMismatch: true.
+- description: "worktree-mismatch: detectResumeState with mismatching worktree returns worktreeMismatch:true"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ship-detect-resume.js"
+    script_args: "--project-root {{project_root}} --state-rel .sdlc/execution/ship-main-20260101T000000Z.json --branch main --scenario mismatch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-state-resume"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.found !== true) return `FAIL: found=${inner.found}`;
+        if (inner.worktreeMismatch !== true) return `FAIL: worktreeMismatch=${inner.worktreeMismatch}`;
+        return true;
+
+# 21. Absent worktree field (pre-#501 state file) — fails open, worktreeMismatch: false.
+- description: "worktree-mismatch: detectResumeState with absent worktree field returns worktreeMismatch:false (back-compat)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ship-detect-resume.js"
+    script_args: "--project-root {{project_root}} --state-rel .sdlc/execution/ship-main-20260101T000000Z.json --branch main --scenario absent"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-state-resume"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.found !== true) return `FAIL: found=${inner.found}`;
+        if (inner.worktreeMismatch !== false) return `FAIL: worktreeMismatch=${inner.worktreeMismatch}`;
+        return true;
+
+# 22. End-to-end — ship.js's own implicit-resume gate skips resume on a
+#     worktree mismatch: flags.implicitResume stays false and a warning
+#     naming the mismatch is pushed, even though the state file is fresh and
+#     --resume was not passed (which would otherwise implicit-resume per
+#     R-implicit-resume, #359).
+- description: "worktree-mismatch: ship.js implicit resume skipped on worktree mismatch"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/run-ship-detect-resume.js"
+    script_args: "--project-root {{project_root}} --state-rel .sdlc/execution/ship-main-20260101T000000Z.json --branch main --scenario ship-resume-mismatch"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-ship-state-resume"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const inner = JSON.parse(r.stdout);
+        if (inner.exitCode !== 0) return `FAIL: ship.js exited ${inner.exitCode}, stderr=${inner.stderr}`;
+        if (inner.worktreeMismatch !== true) return `FAIL: precondition not met, worktreeMismatch=${inner.worktreeMismatch}`;
+        if (inner.implicitResume !== false) return `FAIL: implicitResume=${inner.implicitResume}, expected skipped (false)`;
+        const warnings = inner.warnings || [];
+        if (!warnings.some(w => /different worktree/i.test(w))) return `FAIL: warnings missing worktree-mismatch message: ${JSON.stringify(warnings)}`;
+        return true;
+
+# ---------------------------------------------------------------------------
+# cap-exhaustion (Task 6, #505 follow-up): the consecutive-block cap's state
+# MUTATION side-effect, not just its stdout/stderr behavior (already covered
+# by case 7 above). After STOP_BLOCK_CAP consecutive blocks the hook writes
+# the stalled step back to the state file as `failed` with
+# `failedReason: 'block-cap-exhausted'` — the sole exception to the hook's
+# otherwise non-mutating contract.
+# ---------------------------------------------------------------------------
+
+# 23. Same 4-run sequence as case 7, but reads the persisted step back off the
+#     state file afterward instead of only asserting on stdout/stderr.
+- description: "cap-exhaustion: consecutive-block cap transitions step to failed with failedReason block-cap-exhausted"
+  vars:
+    script_path: "-e"
+    script_args: '((cp,fs,hook,statePath)=>(Array(4).fill(0).forEach(_=>cp.spawnSync("node",[hook],{input:JSON.stringify({stop_hook_active:false,session_id:"sess-fixture"}),cwd:process.cwd(),encoding:"utf8"})),console.log(JSON.stringify(JSON.parse(fs.readFileSync(statePath,"utf8")).steps.find(s=>s.name==="execute")))))(require("child_process"),require("fs"),"{{repo_root}}/plugins/sdlc-utilities/hooks/stop-pipeline-continue.js",process.cwd()+"/.sdlc/execution/ship-feat-ship-20260608T120000Z.json")'
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/ship-pipeline-inprogress"
+  assert:
+    - type: javascript
+      value: |
+        const r = JSON.parse(output);
+        if (r.exitCode !== 0) return `FAIL: exit ${r.exitCode} stderr=${r.stderr}`;
+        const step = JSON.parse(r.stdout);
+        if (!step) return 'FAIL: execute step not found in state file';
+        if (step.status !== 'failed') return `FAIL: status ${step.status}`;
+        if (step.failedReason !== 'block-cap-exhausted') return `FAIL: failedReason ${step.failedReason}`;
+        return true;

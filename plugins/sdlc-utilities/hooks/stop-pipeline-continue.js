@@ -31,15 +31,19 @@
  * pending auto-gated — no-opposite-logical-vectors). The `stop_hook_active === true`
  * early-exit avoids contributing to the Claude Code 8-consecutive-continuation cap
  * (and prevents the now-mode-independent in_progress block from looping against that
- * cap in non-auto mode). The hook never mutates the ship state file, so its block
- * decision is a pure function of pipeline state — but an unchanged advancing step
- * would otherwise block forever, so a consecutive-block counter (STOP_BLOCK_CAP,
- * keyed by step name) is kept in its own sidecar file, never in the ship state
- * file itself, so the hook stays non-mutating with respect to pipeline state.
- * After STOP_BLOCK_CAP consecutive blocks on the same unchanged step, the hook
- * degrades to silent exit 0 (with a stderr note) rather than blocking forever.
- * The counter resets whenever the current step name differs from the one recorded
- * in the sidecar, so ordinary multi-step progress is unaffected.
+ * cap in non-auto mode). The hook otherwise never mutates the ship state file, so its
+ * block decision is normally a pure function of pipeline state — but an unchanged
+ * advancing step would otherwise block forever, so a consecutive-block counter
+ * (STOP_BLOCK_CAP, keyed by step name) is kept in its own sidecar file, never in the
+ * ship state file itself, so the hook stays non-mutating with respect to pipeline
+ * state for every decision short of cap exhaustion. After STOP_BLOCK_CAP consecutive
+ * blocks on the same unchanged step, the hook degrades to silent exit 0 (with a
+ * stderr note) rather than blocking forever — and, as the sole exception to the
+ * non-mutating rule, marks the stalled step `failed` with
+ * `failedReason: 'block-cap-exhausted'` and writes the state file (fail-open: a
+ * write error is caught and never crashes the hook). The counter resets whenever
+ * the current step name differs from the one recorded in the sidecar, so ordinary
+ * multi-step progress is unaffected.
  *
  * Lazy-loads ../scripts/lib/state.js and ../scripts/lib/git.js. Requires only
  * Node.js built-ins plus those two lib files — no new npm dependencies.
@@ -73,9 +77,9 @@ function main() {
   //     `payload.session_id` is read further down by the R73 gate (e).
   if (payload.stop_hook_active === true) process.exit(0);
 
-  let slugifyBranch, findStateFile, readState, pipelineAdvancing, hookEnforcementAllowed, resolveStateDir, exec;
+  let slugifyBranch, findStateFile, readState, writeState, pipelineAdvancing, hookEnforcementAllowed, resolveStateDir, exec;
   try {
-    ({ slugifyBranch, findStateFile, readState, pipelineAdvancing, hookEnforcementAllowed, resolveStateDir } = require('../scripts/lib/state'));
+    ({ slugifyBranch, findStateFile, readState, writeState, pipelineAdvancing, hookEnforcementAllowed, resolveStateDir } = require('../scripts/lib/state'));
     ({ exec } = require('../scripts/lib/git'));
   } catch {
     process.exit(0);
@@ -156,6 +160,13 @@ function main() {
     }
 
     if (counter.count >= STOP_BLOCK_CAP) {
+      try {
+        step.status = 'failed';
+        step.failedReason = 'block-cap-exhausted';
+        writeState(result.filePath, data);
+      } catch {
+        // Fail open -- state write error must not crash the hook
+      }
       process.stderr.write(
         `stop-pipeline-continue: consecutive-block cap (${STOP_BLOCK_CAP}) reached for step ` +
         `"${stepName}" — no longer blocking\n`

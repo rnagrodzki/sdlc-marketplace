@@ -16,10 +16,21 @@ mkdir -p .sdlc/execution
 # R73 (#505) NEGATIVE-TERM guard — this is the reported stall. The state's
 # `worktree` field records the MAIN checkout (written unexpanded below), while
 # the hook is invoked with a payload `cwd` pointing at a linked task worktree.
-# The gate carries NO worktree term by design: `worktree` is diagnostic-only and
-# legitimately mismatches for a step dispatched with isolation: "worktree", and
-# resolveStateDir() already routes through the main worktree so merely locating
-# the file proves same-repo. The hooks must still enforce.
+# The three stdin-driven hooks (pipeline-continue.js, stop-pipeline-continue.js,
+# block-askuserquestion-auto.js) carry NO worktree term by design: `worktree`
+# legitimately mismatches a payload cwd for a step dispatched with
+# isolation: "worktree", and resolveStateDir() already routes through the main
+# worktree so merely locating the file proves same-repo. The hooks must still
+# enforce (see the cases below).
+#
+# `worktree` is NOT diagnostic-only everywhere, though (this plan, follow-up to
+# #503/#506/#509): ship.js's OWN resume detection (lib/state.js::
+# detectResumeState) DOES gate implicit resume on this same field — see
+# state-format.md's `worktree` row and the `worktree-mismatch:`-prefixed cases
+# in ship-hooks-exec.yaml. That is a separate code path (ship.js comparing its
+# own active worktree against the field at prepare time) from the hook-payload
+# `cwd` comparison this fixture exercises below, which stays deliberately
+# worktree-unaware.
 # NOTE: unquoted heredoc — $PWD expands to this fixture's temp-copied checkout.
 cat > .sdlc/execution/ship-feat-ship-20260608T120000Z.json <<EOF
 {

@@ -13,7 +13,7 @@ const path   = require('path');
 const crypto = require('crypto');
 const { exec }                   = require('./git');
 const { readSection, resolveSdlcRoot } = require('./config');
-const { resolveMainWorktree }    = require('./worktree');
+const { resolveMainWorktree, resolveActiveWorktreeSafe } = require('./worktree');
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -168,14 +168,20 @@ function findStateFile(prefix, branchSlug) {
  *     terminal statuses per state-format.md). `null` when all steps are
  *     resolved, or when the state file is unreadable / has no `steps[]`.
  *
+ * Issue #503 — R-resume-worktree: `worktreeMismatch` — `true` when the
+ * selected state file's `data.worktree` (realpath'd) differs from the
+ * current active worktree (also realpath'd via `resolveActiveWorktreeSafe`).
+ * Fails open (`false`) when `data.worktree` is absent/null (pre-#501 state
+ * files) or when either `realpathSync` call throws.
+ *
  * @param {object} opts
  * @param {string}  opts.prefix      "ship" | "execute" | "plan"
  * @param {string} [opts.branch]     If provided, restricts to this branch's slug.
  * @returns {{stateFile: string|null, fullPath: string|null, found: boolean,
- *           fresh: boolean, nextPendingStep: string|null}}
+ *           fresh: boolean, nextPendingStep: string|null, worktreeMismatch: boolean}}
  */
 function detectResumeState({ prefix, branch } = {}) {
-  const empty = { stateFile: null, fullPath: null, found: false, fresh: false, nextPendingStep: null };
+  const empty = { stateFile: null, fullPath: null, found: false, fresh: false, nextPendingStep: null, worktreeMismatch: false };
   if (!prefix) return empty;
 
   const stateDir = resolveStateDir();
@@ -218,6 +224,7 @@ function detectResumeState({ prefix, branch } = {}) {
   // selected state file. Defensive — corrupt/unreadable file yields null
   // (caller treats null as "no resumable step name surfaced").
   let nextPendingStep = null;
+  let worktreeMismatch = false;
   try {
     const raw = fs.readFileSync(winner.fullPath, 'utf8');
     const data = JSON.parse(raw);
@@ -227,8 +234,21 @@ function detectResumeState({ prefix, branch } = {}) {
         nextPendingStep = pending.name;
       }
     }
+    // Issue #503 — R-resume-worktree: compare stored worktree against the
+    // active one. Fails open on absent field (back-compat) or resolution
+    // error (never block resume). Mirrors sameWorktree() in
+    // hooks/session-start.js:108-116.
+    if (data && data.worktree) {
+      try {
+        const stored = fs.realpathSync(data.worktree);
+        const current = fs.realpathSync(resolveActiveWorktreeSafe());
+        worktreeMismatch = stored !== current;
+      } catch {
+        // Fail open — resolution error should never block resume.
+      }
+    }
   } catch (_) {
-    // Leave nextPendingStep as null.
+    // Leave nextPendingStep as null, worktreeMismatch as false.
   }
 
   return {
@@ -237,6 +257,7 @@ function detectResumeState({ prefix, branch } = {}) {
     found: true,
     fresh,
     nextPendingStep,
+    worktreeMismatch,
   };
 }
 
