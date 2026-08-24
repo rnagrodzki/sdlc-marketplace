@@ -186,6 +186,25 @@ function detectActiveChanges(projectRoot) {
         }
       }
     }
+
+    if (!branchMatch && branch && activeChanges.length > 0) {
+      const { detectBaseBranchSafe, getChangedFiles } = require('./git');
+      const base = detectBaseBranchSafe(projectRoot);
+      if (branch !== base) {
+        const changedFiles = getChangedFiles(base, projectRoot, 'committed');
+        const hits = new Set();
+        for (const f of changedFiles) {
+          for (const change of activeChanges) {
+            if (f.startsWith(`openspec/changes/${change.name}/`)) {
+              hits.add(change.name);
+            }
+          }
+        }
+        if (hits.size === 1) {
+          branchMatch = hits.values().next().value;
+        }
+      }
+    }
   } catch {
     // Graceful degradation — skip branch matching if git is unavailable
   }
@@ -610,6 +629,58 @@ function markTaskDone(changeName, taskRef, opts = {}, env = {}) {
   return { changed: true, reason: null, line: resolvedIdx + 1 };
 }
 
+/**
+ * Sync every incomplete task in a change's tasks.md to done, via markTaskDone.
+ *
+ * Pure-IO, never throws.
+ *
+ * @param {string} projectRoot
+ * @param {string} changeName
+ * @returns {{ synced: number, alreadyDone: number, failed: Array<{ ref: string, reason: string }> }}
+ */
+function syncIncompleteTasks(projectRoot, changeName) {
+  // Path-traversal guard: mirrors markTaskDone's guard on changeName (see above).
+  if (
+    !changeName ||
+    typeof changeName !== 'string' ||
+    changeName.includes('/') ||
+    changeName.includes('\\') ||
+    changeName.includes('..') ||
+    changeName.includes('\0')
+  ) {
+    return { synced: 0, alreadyDone: 0, failed: [{ ref: '', reason: 'io-error' }] };
+  }
+
+  const root = typeof projectRoot === 'string' && projectRoot ? projectRoot : process.cwd();
+  const tasksPath = path.join(root, 'openspec', 'changes', changeName, 'tasks.md');
+
+  let content;
+  try {
+    content = fs.readFileSync(tasksPath, 'utf8');
+  } catch (_) {
+    return { synced: 0, alreadyDone: 0, failed: [{ ref: '', reason: 'io-error' }] };
+  }
+
+  const pending = parseTasks(content).filter((t) => t.done === false);
+
+  let synced = 0;
+  let alreadyDone = 0;
+  const failed = [];
+
+  for (const t of pending) {
+    const result = markTaskDone(changeName, t.ref, { line: t.line, title: t.title }, { projectRoot: root });
+    if (result.changed) {
+      synced += 1;
+    } else if (result.reason === 'already-done') {
+      alreadyDone += 1;
+    } else {
+      failed.push({ ref: t.ref, reason: result.reason || 'unknown' });
+    }
+  }
+
+  return { synced, alreadyDone, failed };
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
@@ -623,5 +694,6 @@ module.exports = {
   getRequirementInventory,
   parseTasks,
   markTaskDone,
+  syncIncompleteTasks,
   STAGE_LABELS,
 };

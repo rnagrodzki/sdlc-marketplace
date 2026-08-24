@@ -651,6 +651,8 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
           dispatchMode: null,
         };
       }
+      const hasTaskCounts = typeof oc.tasksDone === 'number' && typeof oc.tasksTotal === 'number';
+      const taskSuffix = hasTaskCounts ? ` (${oc.tasksDone}/${oc.tasksTotal} tasks done)` : '';
       return {
         name: 'archive-openspec',
         skill: null,
@@ -658,7 +660,7 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
         status: 'conditional',
         skipSource: 'none',
         args: `--change ${changeName}${flags.auto ? ' --auto' : ''}`,
-        reason: `openspec change "${changeName}" ready for archive`,
+        reason: `openspec change "${changeName}" ready for archive${taskSuffix}`,
         pause: !flags.auto,
         isolation: null,
         dispatchMode: null,
@@ -1374,6 +1376,9 @@ function main() {
   const openspecIsArchived  = openspecChangeName
     ? isArchived(contentRoot, openspecChangeName)
     : false;
+  const openspecMatchedChange = openspecChangeName
+    ? (openspecResult.activeChanges || []).find(c => c.name === openspecChangeName)
+    : null;
 
   // R-expected-branch-injection (issues #347, #348, #349): resolve the feature branch
   // that commit/version/pr sub-skills should operate on.
@@ -1454,6 +1459,9 @@ function main() {
   const openspecContext = {
     branchMatch: openspecBranchMatch,
     isAlreadyArchived: openspecIsArchived,
+    tasksDone: openspecMatchedChange ? openspecMatchedChange.tasksDone : null,
+    tasksTotal: openspecMatchedChange ? openspecMatchedChange.tasksTotal : null,
+    stage: openspecMatchedChange ? openspecMatchedChange.stage : null,
   };
   const steps = computeSteps(flags, flagSources, { openspecContext, expectedBranch, planFile });
 
