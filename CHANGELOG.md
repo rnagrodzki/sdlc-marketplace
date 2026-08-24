@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.26] - 2026-08-24
+
+### Fixed
+- ship-sdlc: git-diff fallback for branch-to-change matching when branch name doesn't match the openspec change slug, and pre-archive task synchronization with interactive prompts for incomplete tasks (#492)
+- received-review-sdlc: reinstate post-validation archive approval prompt for the all-tasks-done path, fix shell-injection pattern in commit step, add exit-code checks on inline node invocations, and move isArchived idempotence check ahead of I/O (#492)
+
 ## [0.21.25] - 2026-08-23
 
 ### Fixed
