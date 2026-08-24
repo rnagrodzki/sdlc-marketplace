@@ -1,0 +1,4 @@
+- [x] Top-level done task
+- [ ] Top-level pending task
+  - [x] Indented done subtask
+  - [ ] Indented pending subtask

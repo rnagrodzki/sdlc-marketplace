@@ -631,76 +631,96 @@ When `step.status !== 'will_run'` (skipped — not in steps[] or no matched chan
 
 If the `archive-openspec` step has `status: "conditional"` in the pipeline plan, execute it inline (no Agent dispatch — this is a deterministic shell/script operation):
 
-1. Extract the change name from `step.args` (`--change <name>`), same extraction pattern as `verify-openspec` above:
+1. **Extract the change name** from `step.args` (`--change <name>`), same extraction pattern as `verify-openspec` above:
    ```bash
    CHANGE_NAME="${step.args#--change }"
    CHANGE_NAME="${CHANGE_NAME%% *}"
    ```
-2. Locate the openspec library:
+2. **Locate the openspec library:**
    ```bash
    # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line. Do not run `find`.
    OPENSPEC_LIB="<PLUGIN_ROOT>/scripts/lib/openspec.js"
    ```
-3. **Fresh task-completeness read (R-archive-sync-2).** Do NOT reuse `openspecContext.tasksDone`/`tasksTotal` from the prepare output — those are a prepare-time snapshot and can be stale by the time this step runs (e.g. `execute` marks tasks done after prepare ran). Re-derive the counts now via `parseTasks`. Pass values through environment variables — never interpolate them into the script string:
+3. **Idempotence check — before any I/O, prompting, or mutation.** If `isArchived(projectRoot, "$CHANGE_NAME")` already returns `true`, stop here and record the result with reason "already archived"; do NOT proceed to the task-completeness read below.
+   ```bash
+   IS_ARCHIVED=$(OPENSPEC_LIB="$OPENSPEC_LIB" CHANGE_NAME="$CHANGE_NAME" node -e '
+     const lib = require(process.env.OPENSPEC_LIB);
+     process.stdout.write(String(lib.isArchived(process.cwd(), process.env.CHANGE_NAME)));
+   ')
+   [ $? -eq 0 ] || { echo "archive-openspec: isArchived check failed" >&2; exit 1; }
+   ```
+4. **Fresh task-completeness read (R-archive-sync-2).** Do NOT reuse `openspecContext.tasksDone`/`tasksTotal` from the prepare output — those are a prepare-time snapshot and can be stale by the time this step runs (e.g. `execute` marks tasks done after prepare ran). Call the guarded `getTaskCounts(projectRoot, changeName)` helper in `lib/openspec.js` — it validates `changeName` against path traversal and distinguishes a missing `tasks.md` (`error: null`, zero counts) from a real read/parse failure (`error: <code>`). Pass values through environment variables — never interpolate them into the script string:
    ```bash
    TASKS_JSON=$(OPENSPEC_LIB="$OPENSPEC_LIB" CHANGE_NAME="$CHANGE_NAME" node -e '
-     const fs = require("fs");
-     const path = require("path");
      const lib = require(process.env.OPENSPEC_LIB);
-     const tasksPath = path.join(process.cwd(), "openspec", "changes", process.env.CHANGE_NAME, "tasks.md");
-     let tasks = [];
-     try { tasks = lib.parseTasks(fs.readFileSync(tasksPath, "utf8")); } catch (_) { tasks = []; }
-     const tasksDone = tasks.filter((t) => t.done).length;
-     process.stdout.write(JSON.stringify({ tasksDone, tasksTotal: tasks.length }));
+     const r = lib.getTaskCounts(process.cwd(), process.env.CHANGE_NAME);
+     process.stdout.write(JSON.stringify(r));
    ')
+   [ $? -eq 0 ] && [ -n "$TASKS_JSON" ] || { echo "archive-openspec: task-completeness read failed" >&2; exit 1; }
    ```
-   Parse `$TASKS_JSON` → `tasksDone`, `tasksTotal`.
+   Parse `$TASKS_JSON` → `tasksDone`, `tasksTotal`, `error`. If `error` is non-null (invalid change name, or a real I/O/parse failure on an existing `tasks.md`), halt the pipeline with that error and preserve state for `--resume` — do NOT treat it as "all done." Only a `null` error (including the ENOENT case, where both counts are `0`) feeds the branch below.
 
-4. **Branch on completeness:**
-   - **All done** (`tasksDone === tasksTotal`, including the no-`tasks.md`/zero-task case) — proceed directly to step 6 (validate). No prompt, no sync.
-   - **Incomplete AND `flags.auto === true`** (R-archive-sync-4) — do NOT call `AskUserQuestion` (per R71). Log a warning naming the incomplete count, e.g. `archive-openspec: 2 task(s) incomplete — proceeding without sync (--auto)`. Proceed to step 6 with `tasks.md` unmodified.
+5. **Branch on completeness:**
+   - **All done** (`tasksDone === tasksTotal`, including the no-`tasks.md`/zero-task case) — proceed directly to the **validate** step below. No sync prompt here; a separate post-validation approval prompt still applies for this path — see the **archive** step.
+   - **Incomplete AND `flags.auto === true`** (R-archive-sync-4) — do NOT call `AskUserQuestion` (per R71). Log a warning naming the incomplete count, e.g. `archive-openspec: 2 task(s) incomplete — proceeding without sync (--auto)`. Proceed to the **validate** step with `tasks.md` unmodified.
    - **Incomplete AND `flags.auto === false`** (R-archive-sync-3) — use `AskUserQuestion`:
      > OpenSpec change "`<name>`" has `<tasksTotal - tasksDone>` incomplete task(s) (`<tasksDone>`/`<tasksTotal>` done).
      >
      > Options: **sync-and-archive** (Recommended) | **archive-anyway** | **abort**
-     - **sync-and-archive** → run step 5 (sync), then proceed to step 6.
-     - **archive-anyway** → proceed to step 6 without modifying `tasks.md`.
+     - **sync-and-archive** → run the **sync** step below, then proceed to the **validate** step.
+     - **archive-anyway** → proceed to the **validate** step without modifying `tasks.md`.
      - **abort** → halt the pipeline (exit 1). Do NOT call `complete-step` or `fail` for this step — leave it `in_progress` in the ship state file so `--resume` re-enters `archive-openspec` (R-archive-sync-3; same "state preserved for --resume" semantics as the R45 abort).
+     This prompt is the consent gate for the incomplete-task path — the **archive** step's post-validation approval prompt does not fire again for whichever option was chosen here.
 
-5. **Sync (`sync-and-archive` only).** Mark every incomplete task done via `syncIncompleteTasks`, same env-var pattern:
+6. **Sync (`sync-and-archive` only).** Mark every incomplete task done via `syncIncompleteTasks`, same env-var pattern:
    ```bash
    SYNC_JSON=$(OPENSPEC_LIB="$OPENSPEC_LIB" CHANGE_NAME="$CHANGE_NAME" node -e '
      const lib = require(process.env.OPENSPEC_LIB);
      const r = lib.syncIncompleteTasks(process.cwd(), process.env.CHANGE_NAME);
      process.stdout.write(JSON.stringify(r));
    ')
+   [ $? -eq 0 ] && [ -n "$SYNC_JSON" ] || { echo "archive-openspec: sync failed" >&2; exit 1; }
    ```
-   Parse `$SYNC_JSON` → `{ synced, alreadyDone, failed }`. Log `archive-openspec: synced <synced> task(s) (<alreadyDone> already done)`, plus a warning line naming any `failed` refs. A non-empty `failed` is non-fatal — proceed to step 6 regardless (a task ref `syncIncompleteTasks` cannot resolve is a `tasks.md` data issue, not a reason to block the archive).
+   Parse `$SYNC_JSON` → `{ synced, alreadyDone, failed }`. Log `archive-openspec: synced <synced> task(s) (<alreadyDone> already done)`, plus a warning line naming any `failed` refs. A non-empty `failed` is non-fatal — proceed to the **validate** step regardless (a task ref `syncIncompleteTasks` cannot resolve is a `tasks.md` data issue, not a reason to block the archive).
 
-6. Call `lib/openspec.js::validateChangeStrict(projectRoot, name)` via Bash, same env-var pattern:
+7. **Validate.** Call `lib/openspec.js::validateChangeStrict(projectRoot, name)` via Bash, same env-var pattern:
    ```bash
    VALIDATE_JSON=$(OPENSPEC_LIB="$OPENSPEC_LIB" CHANGE_NAME="$CHANGE_NAME" node -e '
      const lib = require(process.env.OPENSPEC_LIB);
      const r = lib.validateChangeStrict(process.cwd(), process.env.CHANGE_NAME);
      process.stdout.write(JSON.stringify(r));
    ')
+   [ $? -eq 0 ] && [ -n "$VALIDATE_JSON" ] || { echo "archive-openspec: validate failed to run" >&2; exit 1; }
    ```
-7. **If `ok === false`:** halt the pipeline. Print the validation errors (`stderr`) and save state for `--resume`.
-8. **If `ok === true`:** run the archive:
+   - **If `ok === false`:** halt the pipeline. Print the validation errors (`stderr`) and save state for `--resume`.
+   - **If `ok === true`:** proceed to the **archive** step.
+
+8. **Archive.**
+   - **All-done path (from the branch above) AND `flags.auto === false`:** this is the point R25 requires a consent gate — the sync prompt did not fire for this path, so the user has not yet approved the archive. Use `AskUserQuestion`:
+     > OpenSpec change "`<name>`" passed validation with all `<tasksTotal>` task(s) already complete. Archive now?
+     >
+     > Options: **archive** (Recommended) | **abort**
+     - **archive** → run the archive below.
+     - **abort** → halt the pipeline (exit 1). Leave the step `in_progress` so `--resume` re-enters `archive-openspec`, matching the R-archive-sync-3 abort semantics.
+   - **All-done path AND `flags.auto === true`:** no prompt (R71) — proceed directly.
+   - **Incomplete path** (`sync-and-archive`, `archive-anyway`, or the `--auto` warn-only case): the earlier prompt (or `--auto` warning) already served as approval — proceed directly, no second prompt.
+
+   Run the archive:
    ```bash
    ARCHIVE_JSON=$(OPENSPEC_LIB="$OPENSPEC_LIB" CHANGE_NAME="$CHANGE_NAME" node -e '
      const lib = require(process.env.OPENSPEC_LIB);
      const r = lib.runArchive(process.cwd(), process.env.CHANGE_NAME);
      process.stdout.write(JSON.stringify(r));
    ')
+   [ $? -eq 0 ] && [ -n "$ARCHIVE_JSON" ] || { echo "archive-openspec: archive failed to run" >&2; exit 1; }
    ```
-9. If archive succeeds, commit:
+
+9. **Commit and record.** If archive succeeds, commit — reference `$CHANGE_NAME` in double quotes; do NOT interpolate the change name into a bare `<name>` placeholder (same env-var discipline as the steps above):
    ```bash
    git add openspec/
-   git commit -m "chore(openspec): archive <name>"
+   git commit -m "chore(openspec): archive $CHANGE_NAME"
    ```
-   Record the result via `complete-step --result` using the sync-aware summary matching the path taken (documented in `state-format.md`): `"archived <name>"` (all tasks were already done), `"archived <name> (synced N tasks)"` (`sync-and-archive`), or `"archived <name>, N task(s) left incomplete"` (`archive-anyway`, interactive or `--auto` warn-only).
-10. If `isArchived(projectRoot, name)` already returns true (idempotence), skip with reason "already archived".
+   Record the result via `complete-step --result` using the sync-aware summary matching the path taken (documented in `state-format.md`): `"archived $CHANGE_NAME"` (all tasks were already done), `"archived $CHANGE_NAME (synced N tasks)"` (`sync-and-archive`), or `"archived $CHANGE_NAME, N task(s) left incomplete"` (`archive-anyway`, interactive or `--auto` warn-only).
 
 If the step has `status: "skipped"`, print the skip reason from `step.reason`.
 
