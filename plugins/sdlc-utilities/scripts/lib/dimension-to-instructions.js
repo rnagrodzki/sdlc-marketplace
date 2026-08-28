@@ -27,8 +27,15 @@
  * mechanical transform and a length CHECK only. On overflow it warns to
  * stderr — it does NOT summarize or truncate.
  *
+ * Common Review Instructions (R-common-prompt, issue #519): when the caller
+ * passes commonContent (CLI: --common-file <path>), its text is injected into
+ * the mirror under a "## Common Review Instructions" heading, placed after
+ * the description/severity block and before the Checklist section. This is
+ * KD3 (per-mirror injection) — each Copilot mirror is self-contained, since
+ * Copilot instructions files are read independently (no shared preamble).
+ *
  * Usage:
- *   node dimension-to-instructions.js --file <path-to-dimension.md>   # read file
+ *   node dimension-to-instructions.js --file <path-to-dimension.md> [--common-file <path>]
  *   cat dimension.md | node dimension-to-instructions.js              # read stdin
  *   The generated mirror is written to STDOUT. The LLM (harden Step 5b /
  *   setup Step 8) is responsible for the actual Write — subprocess FS writes
@@ -82,11 +89,17 @@ function extractSection(body, heading) {
  * mirror string. Pure function — no I/O.
  *
  * @param {string} dimensionContent  raw `.sdlc/review-dimensions/<name>.md`
+ * @param {string} [commonContent]   optional raw content of `_common.md`
+ *                                   (R-common-prompt). When non-blank, it is
+ *                                   injected under a "## Common Review
+ *                                   Instructions" heading, after the
+ *                                   description/severity block and before
+ *                                   the Checklist section (KD3).
  * @returns {string}                 the `.instructions.md` mirror content
  * @throws {Error}                   when frontmatter is missing or required
  *                                   fields (`name`, `triggers`) are absent
  */
-function dimensionToInstructions(dimensionContent) {
+function dimensionToInstructions(dimensionContent, commonContent) {
   const rawFm = extractFrontmatter(dimensionContent);
   if (rawFm == null) {
     throw new Error('dimensionToInstructions: missing YAML frontmatter block (--- delimiters)');
@@ -125,6 +138,16 @@ function dimensionToInstructions(dimensionContent) {
     out.push('');
   }
   out.push(`Default severity: ${severity}`);
+
+  // Common Review Instructions (R-common-prompt) — injected per-mirror so
+  // each Copilot instructions file is self-contained (KD3). Placed after
+  // description/severity, before the Checklist section.
+  if (typeof commonContent === 'string' && commonContent.trim()) {
+    out.push('');
+    out.push('## Common Review Instructions');
+    out.push('');
+    out.push(commonContent.trim());
+  }
 
   // Checklist — strip "- [ ] " checkbox prefix to a plain "- " list item.
   const checklist = extractSection(body, 'Checklist');
@@ -197,9 +220,25 @@ function main(argv) {
     }
   }
 
+  const commonFileIdx = argv.indexOf('--common-file');
+  let commonContent;
+  if (commonFileIdx !== -1) {
+    const commonFilePath = argv[commonFileIdx + 1];
+    if (!commonFilePath) {
+      process.stderr.write('Error: --common-file requires a path argument\n');
+      process.exit(2);
+    }
+    try {
+      commonContent = require('node:fs').readFileSync(commonFilePath, 'utf8');
+    } catch (e) {
+      process.stderr.write(`Error: cannot read common file "${commonFilePath}": ${e.message}\n`);
+      process.exit(2);
+    }
+  }
+
   let mirror;
   try {
-    mirror = dimensionToInstructions(input);
+    mirror = dimensionToInstructions(input, commonContent);
   } catch (e) {
     process.stderr.write(`Error: ${e.message}\n`);
     process.exit(2);

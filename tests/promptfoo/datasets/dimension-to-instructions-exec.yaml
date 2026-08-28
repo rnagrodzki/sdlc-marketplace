@@ -11,6 +11,8 @@
 #   full-dimension.md        — triggers(2) + description + severity:high + skip-when(2) + Checklist + Severity Guide
 #   no-severity-dimension.md — triggers(1) + description, NO severity (→ default medium), NO skip-when, NO Severity Guide
 #   overflow-dimension.md    — large dimension whose mirror exceeds 4000 chars (overflow warning)
+#   common-content.md        — plain markdown (no frontmatter, per R-common-prompt) fed via
+#                              --common-file to exercise the Common Review Instructions injection
 
 # 1. Full dimension → correct applyTo (triggers joined by comma).
 - description: "dimension-to-instructions (#456): joins triggers into applyTo with comma"
@@ -124,3 +126,53 @@
   assert:
     - type: contains
       value: "missing YAML frontmatter"
+
+# 8. --common-file injects a "## Common Review Instructions" section, placed
+#    after description/severity and before the Checklist section (KD3 —
+#    per-mirror injection so each Copilot instructions file is self-contained).
+- description: "dimension-to-instructions (#519): --common-file injects Common Review Instructions before Checklist"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+    script_args: "--file {{project_root}}/full-dimension.md --common-file {{project_root}}/common-content.md"
+    project_root: "file://fixtures-fs/dimension-to-instructions"
+  assert:
+    - type: contains
+      value: "## Common Review Instructions"
+    - type: contains
+      value: "Apply house style across every dimension: prefer explicit error handling over silent catches, and flag any TODO comments left in production code."
+    # Placement: immediately after the severity line...
+    - type: contains
+      value: "Default severity: high\n\n## Common Review Instructions"
+    # ...and before the Checklist heading.
+    - type: contains
+      value: "flag any TODO comments left in production code.\n\n## Checklist"
+
+# 9. No --common-file flag → no Common Review Instructions section (default,
+#    backward-compatible behavior unchanged).
+- description: "dimension-to-instructions (#519): without --common-file, no Common Review Instructions section is emitted"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+    script_args: "--file {{project_root}}/full-dimension.md"
+    project_root: "file://fixtures-fs/dimension-to-instructions"
+  assert:
+    - type: not-contains
+      value: "## Common Review Instructions"
+
+# 10. --common-file combined with a dimension that already exceeds the 4000-char
+#     Copilot limit → overflow warning still fires (exit 0, not condensed), and the
+#     Common Review Instructions section is still injected into the oversized mirror.
+- description: "dimension-to-instructions (#519): --common-file with over-limit dimension still emits overflow warning"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/lib/dimension-to-instructions.js"
+    script_args: "--file {{project_root}}/overflow-dimension.md --common-file {{project_root}}/common-content.md"
+    project_root: "file://fixtures-fs/dimension-to-instructions"
+    script_capture_stderr: true
+  assert:
+    - type: contains
+      value: "exceeding the 4000-char Copilot limit"
+    - type: contains
+      value: "## Common Review Instructions"
+    - type: contains
+      value: "Apply house style across every dimension"
+    - type: not-contains
+      value: "truncated"

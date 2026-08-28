@@ -161,7 +161,7 @@ Present the markdown output table. If any file has errors, show the error detail
 
 **Skip this step if:** Step 7 reported any errors, or `copilotEnabled` is false (determined during Step 1 GitHub hosting detection in parent).
 
-**Check existing state:** Glob `.github/instructions/*.instructions.md`. If files exist with the same names as selected dimensions, confirm overwrite. In `--add` mode: only generate for newly added dimensions.
+**Check existing state:** Glob `.github/instructions/*.instructions.md`. If files exist with the same names as selected dimensions, confirm overwrite. In `--add` mode: when `_common.md` exists and contains new or changed content, regenerate ALL existing mirrors (not just newly added ones) to incorporate the common instructions; otherwise, only generate for newly added dimensions.
 
 **PLAN — map dimensions to files:** Show the proposed `.github/instructions/<name>.instructions.md` list with `applyTo` and estimated char count. Use AskUserQuestion: "Generate these Copilot instruction files?" Options: **yes** / **no** / **select** (numbers).
 
@@ -177,45 +177,46 @@ Present the markdown output table. If any file has errors, show the error detail
 
 **DO — write files:**
 
-1. `mkdir -p .github/instructions`
-2. Write `.github/instructions/<name>.instructions.md` using this template:
-
-   ```markdown
-   ---
-   applyTo: "{triggers array joined by comma}"
-   ---
-   # {name} — Review Instructions
-
-   {description}
-
-   Default severity: {severity}
-
-   ## Checklist
-
-   {body checklist items — convert "- [ ] " prefix to "- " (plain list, no checkboxes)}
-
-   ## Severity Guide
-
-   {severity guide table from body, if present}
-   {if skip-when patterns exist:}
-
-   ## Note
-
-   In Claude Code reviews, files matching these patterns are excluded: {skip-when patterns}.
-   Copilot path-specific instructions do not support exclusion patterns — use judgment
-   when findings apply to these files.
+1. **Read common prompt once (if present):**
+   ```bash
+   # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
+   COMMON_CONTENT=$(node -e "
+     const { readCommonPrompt } = require('<PLUGIN_ROOT>/scripts/lib/dimensions.js');
+     const content = readCommonPrompt('.');
+     process.stdout.write(content || '');
+   ")
+   # When _common.md is absent or empty, COMMON_CONTENT is empty; pass it anyway.
    ```
+
+2. `mkdir -p .github/instructions`
+3. For each selected dimension, generate its mirror deterministically using the dimension-to-instructions.js script:
+
+   ```bash
+   # Substitute <PLUGIN_ROOT> and <name> (from the dimension filename)
+   DIMENSION_FILE=".sdlc/review-dimensions/<name>.md"
+   COMMON_FLAG=""
+   [ -n "$COMMON_CONTENT" ] && COMMON_FLAG="--common-file /dev/stdin"
+   MIRROR=$(echo "$COMMON_CONTENT" | node "<PLUGIN_ROOT>/scripts/lib/dimension-to-instructions.js" --file "$DIMENSION_FILE" $COMMON_FLAG)
+   GEN_EXIT=$?
+   ```
+   
+   If `GEN_EXIT` is non-zero (unparseable dimension), display the error and skip this dimension.
+
+4. Write `.github/instructions/<name>.instructions.md` with the generated `$MIRROR` content.
+
+5. Confirm each file with its path and character count. Print a final summary listing all generated files with sizes.
+
+   **Field mapping reference (for understanding the transformation):**
 
    | Dimension field | Copilot field | Transformation |
    |---|---|---|
    | `triggers` (array) | `applyTo` (string) | Join with `,` |
    | `description` | Opening paragraph | Used as-is |
    | `severity` | Header note | "Default severity: {value}" |
+   | `_common.md` | Common Review Instructions section | Injected after severity, before Checklist (if present) |
    | Body checklist | Checklist section | Strip `- [ ]` → `- ` |
    | `skip-when` | Note section | Advisory text |
    | `max-files`, `requires-full-diff`, `model` | — | Omit |
-
-3. Confirm each file with its path and character count. Print a final summary listing all generated files with sizes.
 
 ---
 

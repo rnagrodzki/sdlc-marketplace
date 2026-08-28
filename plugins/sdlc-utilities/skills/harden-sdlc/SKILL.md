@@ -263,7 +263,12 @@ When it holds, derive `<name>` from the dimension filename (`.sdlc/review-dimens
    # Substitute <PLUGIN_ROOT> from the `sdlc plugin root:` context line.
    # #474: read the just-written dimension at its ABSOLUTE content-rooted path,
    # not a cwd-relative one (the dimension lives in the active worktree).
-   MIRROR=$(node "<PLUGIN_ROOT>/scripts/lib/dimension-to-instructions.js" --file "<proposal.targetFile>")
+   COMMON_FILE_PATH="$CONTENT_ROOT/.sdlc/review-dimensions/_common.md"
+   COMMON_FILE_FLAG=""
+   if [ -f "$COMMON_FILE_PATH" ]; then
+     COMMON_FILE_FLAG="--common-file \"$COMMON_FILE_PATH\""
+   fi
+   MIRROR=$(node "<PLUGIN_ROOT>/scripts/lib/dimension-to-instructions.js" --file "<proposal.targetFile>" $COMMON_FILE_FLAG)
    GEN_EXIT=$?
    ```
    A non-zero `GEN_EXIT` (unparseable dimension) is a hard failure — halt per R-iteration-write rule 4 (see step 4) and surface the partial state (dimension written, mirror not).
