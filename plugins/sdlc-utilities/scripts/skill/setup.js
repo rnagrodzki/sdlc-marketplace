@@ -27,9 +27,9 @@ const { OPENSPEC_ENRICH_VERSION } = require(path.join(__dirname, '..', 'util', '
 // Helpers
 // ---------------------------------------------------------------------------
 
-function countFiles(dirPath, ext) {
+function countFiles(dirPath, ext, exclude) {
   if (!fs.existsSync(dirPath)) return 0;
-  return fs.readdirSync(dirPath).filter(f => f.endsWith(ext)).length;
+  return fs.readdirSync(dirPath).filter(f => f.endsWith(ext) && f !== exclude).length;
 }
 
 function execSafe(cmd) {
@@ -218,7 +218,7 @@ function detect(projectRoot) {
     },
     content: {
       reviewDimensions: {
-        count: countFiles(reviewDimensionsDir, '.md'),
+        count: countFiles(reviewDimensionsDir, '.md', '_common.md'),
         path: path.join('.sdlc', 'review-dimensions') + path.sep,
       },
       prTemplate: {
