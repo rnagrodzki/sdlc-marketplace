@@ -14,6 +14,7 @@
 
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
 const LIB = path.join(__dirname, '..', '..', '..', 'plugins', 'sdlc-utilities', 'scripts', 'lib');
 const { readCommonPrompt } = require(path.join(LIB, 'dimensions'));
 
@@ -53,9 +54,9 @@ const FIXTURES = path.join(__dirname, '..', 'fixtures-fs');
 }
 
 // Test 4: readCommonPrompt trims whitespace
-{
+(function () {
   // Create a temporary fixture with _common.md containing whitespace
-  const tempFixtureDir = path.join(FIXTURES, 'temp-test-common-prompt');
+  const tempFixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dimensions-common-'));
   const reviewDimensionsDir = path.join(tempFixtureDir, '.sdlc', 'review-dimensions');
 
   try {
@@ -71,7 +72,8 @@ const FIXTURES = path.join(__dirname, '..', 'fixtures-fs');
       console.error(`FAIL: Test 4 - Whitespace not trimmed properly`);
       console.error(`Expected: ${JSON.stringify(expected)}`);
       console.error(`Got: ${JSON.stringify(result)}`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     console.log('PASS: Test 4 - readCommonPrompt trims whitespace');
   } finally {
@@ -80,11 +82,11 @@ const FIXTURES = path.join(__dirname, '..', 'fixtures-fs');
       fs.rmSync(tempFixtureDir, { recursive: true, force: true });
     } catch {}
   }
-}
+})();
 
 // Test 5: readCommonPrompt returns null for empty file (after trimming)
-{
-  const tempFixtureDir = path.join(FIXTURES, 'temp-test-empty-common');
+(function () {
+  const tempFixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dimensions-common-'));
   const reviewDimensionsDir = path.join(tempFixtureDir, '.sdlc', 'review-dimensions');
 
   try {
@@ -97,7 +99,8 @@ const FIXTURES = path.join(__dirname, '..', 'fixtures-fs');
     const result = readCommonPrompt(tempFixtureDir);
     if (result !== null) {
       console.error(`FAIL: Test 5 - Expected null for empty file, got ${JSON.stringify(result)}`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     console.log('PASS: Test 5 - readCommonPrompt returns null for empty file');
   } finally {
@@ -106,6 +109,6 @@ const FIXTURES = path.join(__dirname, '..', 'fixtures-fs');
       fs.rmSync(tempFixtureDir, { recursive: true, force: true });
     } catch {}
   }
-}
+})();
 
-console.log('\nAll readCommonPrompt tests passed!');
+if (!process.exitCode) console.log('\nAll readCommonPrompt tests passed!');

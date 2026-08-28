@@ -282,6 +282,8 @@ function writeDimensionDiffs(activeDimensions, fileDiffs, projectRoot) {
  * Each slice carries the heavy per-dimension fields that the thin manifest index omits:
  * { body, matched_files, file_context, warnings }. Mutates dim.slice_file on each dimension.
  * Sibling to writeDimensionDiffs — kept single-responsibility (slices only, no diff logic).
+ * @param {string|null} [commonPrompt]  when present, prepended to every slice's body under a
+ *   "## Common Review Instructions" heading (R-common-prompt, #519).
  */
 function writeDimensionSlices(activeDimensions, tmpDir, commonPrompt) {
   for (const dim of activeDimensions) {
