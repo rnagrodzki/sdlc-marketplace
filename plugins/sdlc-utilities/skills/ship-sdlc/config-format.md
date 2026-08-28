@@ -125,7 +125,7 @@ A flag passed directly on the command line always wins. If no flag is given, the
 
 Running `ship-sdlc --init-config` launches an interactive sequence that writes the `ship` section to `.sdlc/local.json`. The steps are:
 
-1. **Steps to run** — Select the pipeline steps to run by default (multi-select). Choices: `execute`, `commit`, `review`, `version`, `archive-openspec`, `pr`, plus opt-in entries `verify-openspec` (OpenSpec-gated: validates implementation completeness before archiving), `verify-pipeline` (post-PR CI check), `await-remote-review` (wait for automated reviewer verdict), and `learnings-commit` (persist session learnings). Default: the six core steps.
+1. **Steps to run** — Select the pipeline steps to run by default (multi-select). Choices: `execute`, `commit`, `review`, `version`, `archive-openspec` (checks task completion before archiving; in interactive mode, offers to sync pending tasks), `pr`, plus opt-in entries `verify-openspec` (OpenSpec-gated: validates implementation completeness before archiving), `verify-pipeline` (post-PR CI check), `await-remote-review` (wait for automated reviewer verdict), and `learnings-commit` (persist session learnings). Default: the six core steps.
 
 2. **Default bump type** — Choose the default version increment: `patch`, `minor`, or `major`.
 

@@ -651,6 +651,12 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
           dispatchMode: null,
         };
       }
+      // Only show the "N/M tasks done" suffix when the change actually has a
+      // tasks.md with at least one task line — tasksTotal is 0 (not null) both
+      // when there's no tasks.md and when tasks.md has zero task lines, and in
+      // either case "(0/0 tasks done)" misleadingly reads as "fully complete".
+      const hasTaskCounts = typeof oc.tasksDone === 'number' && typeof oc.tasksTotal === 'number' && oc.tasksTotal > 0;
+      const taskSuffix = hasTaskCounts ? ` (${oc.tasksDone}/${oc.tasksTotal} tasks done)` : '';
       return {
         name: 'archive-openspec',
         skill: null,
@@ -658,7 +664,7 @@ function computeSteps(flags, flagSources, { openspecContext, expectedBranch, pla
         status: 'conditional',
         skipSource: 'none',
         args: `--change ${changeName}${flags.auto ? ' --auto' : ''}`,
-        reason: `openspec change "${changeName}" ready for archive`,
+        reason: `openspec change "${changeName}" ready for archive${taskSuffix}`,
         pause: !flags.auto,
         isolation: null,
         dispatchMode: null,
@@ -1374,6 +1380,9 @@ function main() {
   const openspecIsArchived  = openspecChangeName
     ? isArchived(contentRoot, openspecChangeName)
     : false;
+  const openspecMatchedChange = openspecChangeName
+    ? (openspecResult.activeChanges || []).find(c => c.name === openspecChangeName)
+    : null;
 
   // R-expected-branch-injection (issues #347, #348, #349): resolve the feature branch
   // that commit/version/pr sub-skills should operate on.
@@ -1451,9 +1460,12 @@ function main() {
   };
 
   // Compute steps (pass openspec context for archive-openspec step)
+  // Note: no `stage` field — nothing in computeSteps reads it (dead plumbing).
   const openspecContext = {
     branchMatch: openspecBranchMatch,
     isAlreadyArchived: openspecIsArchived,
+    tasksDone: openspecMatchedChange ? openspecMatchedChange.tasksDone : null,
+    tasksTotal: openspecMatchedChange ? openspecMatchedChange.tasksTotal : null,
   };
   const steps = computeSteps(flags, flagSources, { openspecContext, expectedBranch, planFile });
 

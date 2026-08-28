@@ -95,7 +95,7 @@ export const skillsMeta: SkillMeta[] = [
       { id: 'execute-steps', label: 'Execute pipeline steps', type: 'dispatch', description: 'Runs the pipeline; every sub-skill (including execute-plan-sdlc) is dispatched as an Agent for context isolation, returning a structured result that drives the pipeline state machine' },
       { id: 'review-gate', label: 'Review verdict gate', type: 'llm', description: 'Evaluates review findings; triggers fix loop for critical/high' },
       { id: 'verify-openspec', label: 'Verify OpenSpec (opt-in)', type: 'dispatch', description: 'Runs openspec validate --strict inline to validate implementation completeness against the spec; runs only when configured in steps[] and a matched change exists' },
-      { id: 'archive-openspec', label: 'Archive OpenSpec change (conditional)', type: 'script', description: 'Runs openspec archive inline when change is tasks-complete; skipped if no OpenSpec or not ready' },
+      { id: 'archive-openspec', label: 'Archive OpenSpec change (conditional)', type: 'script', description: 'Fresh task-completeness check; prompts to sync or archive-anyway when incomplete; runs openspec archive inline' },
       { id: 'report', label: 'Pipeline summary', type: 'verify', description: 'Prints results, decisions log, deferred findings, cleanup' },
     ],
     connections: [

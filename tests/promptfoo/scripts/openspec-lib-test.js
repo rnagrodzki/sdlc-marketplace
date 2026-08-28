@@ -17,6 +17,10 @@
  *   markTaskDone     — calls markTaskDone(change, ref, { line?, title? }) under --project-root
  *                      flags: --ref <id>, --line <N>, --title <s>
  *   markTaskDoneTwice — runs markTaskDone twice in a row to assert idempotency (`already-done` on 2nd call)
+ *   detectActiveChanges    — calls detectActiveChanges(projectRoot)
+ *   syncIncompleteTasks    — calls syncIncompleteTasks(projectRoot, --change) (pass --temp-copy for a disposable fixture copy)
+ *   syncIncompleteTasksTwice — runs syncIncompleteTasks twice in a row to assert idempotency on 2nd call
+ *   getTaskCounts          — calls getTaskCounts(projectRoot, --change)
  */
 'use strict';
 
@@ -94,6 +98,8 @@ switch (op) {
       hasParseTasks:              typeof lib.parseTasks === 'function',
       hasMarkTaskDone:            typeof lib.markTaskDone === 'function',
       hasGetRequirementInventory: typeof lib.getRequirementInventory === 'function',
+      hasSyncIncompleteTasks:     typeof lib.syncIncompleteTasks === 'function',
+      hasGetTaskCounts:           typeof lib.getTaskCounts === 'function',
     }, null, 2));
     break;
   }
@@ -181,6 +187,49 @@ switch (op) {
     }
     const result = lib.getRequirementInventory(projectRoot, changeName);
     console.log(JSON.stringify(result, null, 2));
+    break;
+  }
+
+  case 'detectActiveChanges': {
+    if (!projectRoot) {
+      console.error('--project-root required for detectActiveChanges');
+      process.exit(1);
+    }
+    const result = lib.detectActiveChanges(projectRoot);
+    console.log(JSON.stringify(result));
+    break;
+  }
+
+  case 'syncIncompleteTasks': {
+    if (!projectRoot || !changeName) {
+      console.error('--project-root and --change required for syncIncompleteTasks');
+      process.exit(1);
+    }
+    const root = maybeTempCopyProjectRoot(projectRoot);
+    const result = lib.syncIncompleteTasks(root, changeName);
+    console.log(JSON.stringify(result));
+    break;
+  }
+
+  case 'syncIncompleteTasksTwice': {
+    if (!projectRoot || !changeName) {
+      console.error('--project-root and --change required for syncIncompleteTasksTwice');
+      process.exit(1);
+    }
+    const root = maybeTempCopyProjectRoot(projectRoot);
+    const first = lib.syncIncompleteTasks(root, changeName);
+    const second = lib.syncIncompleteTasks(root, changeName);
+    console.log(JSON.stringify({ first, second }));
+    break;
+  }
+
+  case 'getTaskCounts': {
+    if (!projectRoot || !changeName) {
+      console.error('--project-root and --change required for getTaskCounts');
+      process.exit(1);
+    }
+    const result = lib.getTaskCounts(projectRoot, changeName);
+    console.log(JSON.stringify(result));
     break;
   }
 

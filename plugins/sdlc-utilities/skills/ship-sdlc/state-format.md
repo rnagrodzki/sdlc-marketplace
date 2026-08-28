@@ -129,6 +129,13 @@ The pipeline runs these canonical steps in order (conditional and optional steps
 `verify-openspec` only runs when it is included in `steps[]` AND a matched OpenSpec change exists (`flags.openspecChange` or `openspecContext.branchMatch`).
 `archive-openspec` only runs when an OpenSpec change is detected for the current branch.
 
+`archive-openspec`'s `result` field (status `completed`) reflects the task-completeness outcome from the fresh `parseTasks` read taken immediately before validating and archiving (R-archive-sync-2) — NOT the prepare-time `tasksDone`/`tasksTotal` snapshot exposed on `openspecContext`. Three shapes:
+- `"archived <name>"` — all tasks were already done; no prompt, no sync.
+- `"archived <name> (synced N tasks)"` — the user chose `sync-and-archive` at the interactive prompt and `syncIncompleteTasks` marked `N` tasks done (R-archive-sync-3, R-archive-sync-5).
+- `"archived <name>, N task(s) left incomplete"` — tasks were left incomplete on purpose: either the user chose `archive-anyway` at the interactive prompt, or the pipeline was running `--auto` and warned-and-proceeded without prompting (R-archive-sync-4).
+
+If the user instead chooses `abort` at the interactive prompt, the pipeline halts before archiving — the step is left `status: "in_progress"` (no `result` written) so `--resume` re-enters it.
+
 ### Status Values
 
 | Status        | Meaning                                                                 |

@@ -5,7 +5,8 @@
  *
  * Exports:
  *   detectActiveChanges, validateChange, validateChangeStrict, isArchived,
- *   runArchive, parseTasks, markTaskDone, STAGE_LABELS
+ *   runArchive, getRequirementInventory, parseTasks, markTaskDone,
+ *   syncIncompleteTasks, getTaskCounts, STAGE_LABELS
  */
 
 'use strict';
@@ -55,23 +56,38 @@ function countMdFiles(dir) {
 }
 
 /**
+ * Validate a changeName is safe to interpolate into a filesystem path under
+ * openspec/changes/<changeName>/. Rejects empty/non-string values and any
+ * path-traversal component. Shared by markTaskDone, syncIncompleteTasks, and
+ * getTaskCounts so the allow/deny rule lives in exactly one place instead of
+ * being copy-pasted per function.
+ * @param {*} changeName
+ * @returns {boolean}
+ */
+function isValidChangeName(changeName) {
+  return (
+    typeof changeName === 'string' &&
+    changeName.length > 0 &&
+    !changeName.includes('/') &&
+    !changeName.includes('\\') &&
+    !changeName.includes('..') &&
+    !changeName.includes('\0')
+  );
+}
+
+/**
  * Parse task completion from tasks.md content.
- * Counts lines matching `^- [x]` (done) and `^- [ ]` (pending).
+ * Delegates to parseTasks() so completion counts (tasksDone/tasksTotal) and
+ * task mutation (syncIncompleteTasks/markTaskDone) agree on what counts as a
+ * task line — both now use parseTasks's indent-tolerant `^([ \t]*)- \[([ xX])\]`
+ * match instead of a separate column-0-only regex.
  * @param {string} content
  * @returns {{ tasksDone: number, tasksTotal: number }}
  */
 function parseTaskCompletion(content) {
-  const lines = content.split('\n');
-  let done = 0;
-  let pending = 0;
-  for (const line of lines) {
-    if (/^- \[x\]/i.test(line)) {
-      done++;
-    } else if (/^- \[ \]/.test(line)) {
-      pending++;
-    }
-  }
-  return { tasksDone: done, tasksTotal: done + pending };
+  const tasks = parseTasks(content);
+  const done = tasks.filter((t) => t.done).length;
+  return { tasksDone: done, tasksTotal: tasks.length };
 }
 
 /**
@@ -183,6 +199,25 @@ function detectActiveChanges(projectRoot) {
         if (branchSlug === nameSlug || slugRe.test(branchSlug)) {
           branchMatch = change.name;
           break;
+        }
+      }
+    }
+
+    if (!branchMatch && branch && activeChanges.length > 0) {
+      const { detectBaseBranchSafe, getChangedFiles } = require('./git');
+      const base = detectBaseBranchSafe(projectRoot);
+      if (branch !== base) {
+        const changedFiles = getChangedFiles(base, projectRoot, 'committed');
+        const hits = new Set();
+        for (const f of changedFiles) {
+          for (const change of activeChanges) {
+            if (f.startsWith(`openspec/changes/${change.name}/`)) {
+              hits.add(change.name);
+            }
+          }
+        }
+        if (hits.size === 1) {
+          branchMatch = hits.values().next().value;
         }
       }
     }
@@ -516,16 +551,8 @@ function parseTasks(content) {
  */
 function markTaskDone(changeName, taskRef, opts = {}, env = {}) {
   // Path-traversal guard: changeName is caller-supplied (LLM/CLI) and is interpolated
-  // into a filesystem path. Reject empty, separator, or parent-ref components so the
-  // resulting path cannot escape openspec/changes/<changeName>/.
-  if (
-    !changeName ||
-    typeof changeName !== 'string' ||
-    changeName.includes('/') ||
-    changeName.includes('\\') ||
-    changeName.includes('..') ||
-    changeName.includes('\0')
-  ) {
+  // into a filesystem path. See isValidChangeName() for the shared rule.
+  if (!isValidChangeName(changeName)) {
     return { changed: false, reason: 'io-error', line: null };
   }
   const projectRoot = env && env.projectRoot ? env.projectRoot : process.cwd();
@@ -610,6 +637,94 @@ function markTaskDone(changeName, taskRef, opts = {}, env = {}) {
   return { changed: true, reason: null, line: resolvedIdx + 1 };
 }
 
+/**
+ * Sync every incomplete task in a change's tasks.md to done, via markTaskDone.
+ *
+ * Pure-IO, never throws.
+ *
+ * @param {string} projectRoot
+ * @param {string} changeName
+ * @returns {{ synced: number, alreadyDone: number, failed: Array<{ ref: string, reason: string }> }}
+ */
+function syncIncompleteTasks(projectRoot, changeName) {
+  // Path-traversal guard: shares isValidChangeName() with markTaskDone (see above).
+  if (!isValidChangeName(changeName)) {
+    return { synced: 0, alreadyDone: 0, failed: [{ ref: '', reason: 'io-error' }] };
+  }
+
+  const root = typeof projectRoot === 'string' && projectRoot ? projectRoot : process.cwd();
+  const tasksPath = path.join(root, 'openspec', 'changes', changeName, 'tasks.md');
+
+  let content;
+  try {
+    content = fs.readFileSync(tasksPath, 'utf8');
+  } catch (_) {
+    return { synced: 0, alreadyDone: 0, failed: [{ ref: '', reason: 'io-error' }] };
+  }
+
+  const pending = parseTasks(content).filter((t) => t.done === false);
+
+  let synced = 0;
+  let alreadyDone = 0;
+  const failed = [];
+
+  for (const t of pending) {
+    const result = markTaskDone(changeName, t.ref, { line: t.line, title: t.title }, { projectRoot: root });
+    if (result.changed) {
+      synced += 1;
+    } else if (result.reason === 'already-done') {
+      alreadyDone += 1;
+    } else {
+      failed.push({ ref: t.ref, reason: result.reason || 'unknown' });
+    }
+  }
+
+  return { synced, alreadyDone, failed };
+}
+
+/**
+ * Compute fresh task-completion counts for a change's tasks.md directly (no
+ * proposal.md/specs/ checks — unlike validateChange/analyzeChange, this is
+ * usable before a change is known to be well-formed). Used by ship-sdlc's
+ * archive-openspec step to re-read live counts immediately before deciding
+ * whether the change is ready to archive.
+ *
+ * Validates changeName via isValidChangeName (path-traversal guard — the
+ * caller-supplied change name must not escape openspec/changes/<name>/) and
+ * distinguishes a missing tasks.md (ENOENT — the ordinary "no tasks written
+ * yet" case, returns zero counts with `error: null`) from any other
+ * filesystem error (permission denied, tasksPath resolving to a directory,
+ * etc. — returns zero counts with a non-null `error` so the caller can halt
+ * instead of silently treating a real problem as "all tasks done"). Note
+ * parseTasks()/parseTaskCompletion() are pure regex scans over the string
+ * content and cannot themselves throw, so the only realistic non-ENOENT
+ * failure path is at the fs.readFileSync layer.
+ *
+ * @param {string} projectRoot
+ * @param {string} changeName
+ * @returns {{ tasksDone: number, tasksTotal: number, error: string|null }}
+ */
+function getTaskCounts(projectRoot, changeName) {
+  if (!isValidChangeName(changeName)) {
+    return { tasksDone: 0, tasksTotal: 0, error: 'invalid-change-name' };
+  }
+  const root = typeof projectRoot === 'string' && projectRoot ? projectRoot : process.cwd();
+  const tasksPath = path.join(root, 'openspec', 'changes', changeName, 'tasks.md');
+
+  let content;
+  try {
+    content = fs.readFileSync(tasksPath, 'utf8');
+  } catch (e) {
+    if (e && e.code === 'ENOENT') {
+      return { tasksDone: 0, tasksTotal: 0, error: null };
+    }
+    return { tasksDone: 0, tasksTotal: 0, error: (e && e.code) || 'read-error' };
+  }
+
+  const { tasksDone, tasksTotal } = parseTaskCompletion(content);
+  return { tasksDone, tasksTotal, error: null };
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
@@ -623,5 +738,7 @@ module.exports = {
   getRequirementInventory,
   parseTasks,
   markTaskDone,
+  syncIncompleteTasks,
+  getTaskCounts,
   STAGE_LABELS,
 };

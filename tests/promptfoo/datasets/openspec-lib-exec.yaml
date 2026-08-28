@@ -113,3 +113,113 @@
       value: '"ok": false'
     - type: icontains
       value: '"requirements": null'
+
+# --- detectActiveChanges diff-fallback + syncIncompleteTasks tests (Task 5) ---
+# Fixture: git repo whose current branch (feat/issue-42-rework) does NOT match
+# the active change's slug (my-change), forcing detectActiveChanges past the
+# branch-slug regex and into the committed-diff fallback. tasks.md ships with
+# 1 done + 2 pending tasks for syncIncompleteTasks coverage.
+
+- description: "openspec-lib: detectActiveChanges resolves branchMatch via diff fallback when branch name does not match change slug"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op detectActiveChanges --project-root {{project_root}}"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-detect-diff"
+  assert:
+    - type: icontains
+      value: '"present":true'
+    - type: icontains
+      value: '"branchMatch":"my-change"'
+
+- description: "openspec-lib: syncIncompleteTasks marks all pending tasks done"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op syncIncompleteTasks --project-root {{project_root}} --change my-change"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-detect-diff"
+  assert:
+    - type: icontains
+      value: '"synced":2'
+    - type: icontains
+      value: '"alreadyDone":0'
+    - type: icontains
+      value: '"failed":[]'
+
+- description: "openspec-lib: syncIncompleteTasks is idempotent — a second call finds nothing left to sync"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op syncIncompleteTasksTwice --project-root {{project_root}} --change my-change"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-detect-diff"
+  assert:
+    - type: icontains
+      value: '"first":{"synced":2,"alreadyDone":0,"failed":[]}'
+    - type: icontains
+      value: '"second":{"synced":0,"alreadyDone":0,"failed":[]}'
+
+- description: "openspec-lib: syncIncompleteTasks is exported"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op exports"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: icontains
+      value: '"hasSyncIncompleteTasks": true'
+
+# --- getTaskCounts tests (review fix — consolidates the path-traversal guard
+# and the ENOENT-vs-real-error distinction that used to live ad hoc inline in
+# ship-sdlc/SKILL.md's archive-openspec step 3) ---
+
+- description: "openspec-lib: getTaskCounts is exported"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op exports"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: icontains
+      value: '"hasGetTaskCounts": true'
+
+- description: "openspec-lib: getTaskCounts returns zero counts with no error when tasks.md does not exist (ENOENT)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op getTaskCounts --project-root {{project_root}} --change feat-x"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/openspec-marktaskdone/missing"
+  assert:
+    - type: icontains
+      value: '"tasksDone":0'
+    - type: icontains
+      value: '"tasksTotal":0'
+    - type: icontains
+      value: '"error":null'
+
+- description: "openspec-lib: getTaskCounts counts indented sub-tasks (agrees with parseTasks/syncIncompleteTasks, not just column-0 lines)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op getTaskCounts --project-root {{project_root}} --change feat-x"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/openspec-marktaskdone/indented"
+  assert:
+    - type: icontains
+      value: '"tasksDone":2'
+    - type: icontains
+      value: '"tasksTotal":4'
+    - type: icontains
+      value: '"error":null'
+
+- description: "openspec-lib: getTaskCounts rejects a path-traversal changeName"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/openspec-lib-test.js"
+    script_args: "--op getTaskCounts --project-root {{project_root}} --change ../../etc"
+    script_cwd: "{{project_root}}"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: icontains
+      value: '"tasksDone":0'
+    - type: icontains
+      value: '"tasksTotal":0'
+    - type: icontains
+      value: '"error":"invalid-change-name"'
