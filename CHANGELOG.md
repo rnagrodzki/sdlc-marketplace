@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.27] - 2026-08-28
+
+### Added
+- review-sdlc: common review dimension prompt — shared instructions applied consistently across all review dimensions instead of being defined per-dimension (#519)
+- harden-sdlc: pass the common review dimension prompt through to review mirrors, keeping hardening reviews aligned with review-sdlc's dimension criteria (#519)
+
 ## [0.21.26] - 2026-08-24
 
 ### Fixed

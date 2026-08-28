@@ -30,7 +30,7 @@ const path = require('node:path');
 const os   = require('node:os');
 const LIB = path.join(__dirname, '..', 'lib');
 
-const { validateAll, extractFrontmatter, extractBody, parseSimpleYaml, resolveDimensionsDir } = require(path.join(LIB, 'dimensions'));
+const { validateAll, extractFrontmatter, extractBody, parseSimpleYaml, resolveDimensionsDir, readCommonPrompt } = require(path.join(LIB, 'dimensions'));
 const {
   exec,
   checkGitState,
@@ -282,12 +282,17 @@ function writeDimensionDiffs(activeDimensions, fileDiffs, projectRoot) {
  * Each slice carries the heavy per-dimension fields that the thin manifest index omits:
  * { body, matched_files, file_context, warnings }. Mutates dim.slice_file on each dimension.
  * Sibling to writeDimensionDiffs — kept single-responsibility (slices only, no diff logic).
+ * @param {string|null} [commonPrompt]  when present, prepended to every slice's body under a
+ *   "## Common Review Instructions" heading (R-common-prompt, #519).
  */
-function writeDimensionSlices(activeDimensions, tmpDir) {
+function writeDimensionSlices(activeDimensions, tmpDir, commonPrompt) {
   for (const dim of activeDimensions) {
     const sliceFile = path.join(tmpDir, `${dim.name}.slice.json`);
+    const body = commonPrompt
+      ? `## Common Review Instructions\n\n${commonPrompt}\n\n${dim.body}`
+      : dim.body;
     fs.writeFileSync(sliceFile, JSON.stringify({
-      body:          dim.body,
+      body,
       matched_files: dim.matched_files,
       file_context:  dim.file_context,
       warnings:      dim.warnings,
@@ -592,6 +597,8 @@ function main() {
     process.exit(1);
   }
 
+  const commonPrompt = readCommonPrompt(projectRoot);
+
   // Commit context only available for branch-based scopes
   if (!isLocalScope) {
     const commitFileMap = getCommitFileMap(base, activeRoot);
@@ -609,7 +616,7 @@ function main() {
   const tmpDir     = writeDimensionDiffs(activeDims, fileDiffs, projectRoot);
   // Per-dimension slice files (R-manifest-index-slices, #447): written after diffs so
   // file_context is populated and diff-content warnings are appended into dim.warnings.
-  writeDimensionSlices(activeDims, tmpDir);
+  writeDimensionSlices(activeDims, tmpDir, commonPrompt);
 
   // Plan critique and refinement
   const critique = critiquePlan(dims, changedFiles);

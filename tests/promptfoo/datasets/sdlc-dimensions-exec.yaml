@@ -3,8 +3,9 @@
 # They validate that dimension validation produces correct output.
 #
 # Fixture appropriateness:
-#   project-with-dimensions  -- CORRECT: 2 valid dimension files should pass
-#   project-no-dimensions    -- CORRECT (edge): no .claude/review-dimensions/ → empty dimensions array
+#   project-with-dimensions      -- CORRECT: valid dimension files (+ _common.md) should pass
+#   project-no-dimensions        -- CORRECT (edge): no .claude/review-dimensions/ → empty dimensions array
+#   project-with-sdlc-dimensions -- CORRECT: single dimension, no _common.md (regression guard fixture)
 
 - description: "sdlc-dimensions: valid dimensions pass all checks"
   vars:
@@ -155,3 +156,58 @@
       value: '"total_errors":\s*0'
     - type: icontains
       value: "HAS_WARNINGS"
+
+- description: "sdlc-dimensions: _common.md is excluded from validation results"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-dimensions.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/project-with-dimensions"
+  assert:
+    # With _common.md in the fixture but excluded, total should still be 3
+    - type: regex
+      value: '"total":\s*3'
+    # _common.md file must NOT appear in results
+    - type: regex
+      value: '(?!_common\.md)'
+    # Three dimensions should be present
+    - type: icontains
+      value: "security-review"
+    - type: icontains
+      value: "code-quality-review"
+    - type: icontains
+      value: "model-override-review"
+
+- description: "sdlc-dimensions: _common.md absent has no effect on validation (regression guard)"
+  vars:
+    script_path: "repo://plugins/sdlc-utilities/scripts/ci/validate-dimensions.js"
+    script_args: "--project-root {{project_root}} --json"
+    project_root: "file://fixtures-fs/project-with-sdlc-dimensions"
+  assert:
+    # No _common.md in this fixture; behavior is unchanged from pre-feature baseline.
+    - type: icontains
+      value: '"overall": "PASS"'
+    - type: regex
+      value: '"total_errors":\s*0'
+    - type: regex
+      value: '"total":\s*1'
+    - type: icontains
+      value: "security-review"
+
+- description: "sdlc-dimensions: readCommonPrompt utility function works correctly"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/dimensions-common-prompt-test.js"
+    script_args: ""
+  assert:
+    # All tests must pass
+    - type: icontains
+      value: "All readCommonPrompt tests passed"
+    - type: icontains
+      value: "PASS: Test 1"
+    - type: icontains
+      value: "PASS: Test 2"
+    - type: icontains
+      value: "PASS: Test 3"
+    - type: icontains
+      value: "PASS: Test 4"
+    - type: icontains
+      value: "PASS: Test 5"

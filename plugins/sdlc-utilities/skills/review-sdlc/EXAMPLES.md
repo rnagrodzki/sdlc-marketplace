@@ -393,6 +393,30 @@ Review migration files for correctness, safety, and reversibility.
 
 ---
 
+## _common.md
+
+Place in `.sdlc/review-dimensions/` with no frontmatter to share common instructions across all review dimensions:
+
+```markdown
+# Common Review Instructions
+
+Before claiming an issue does not exist, verify its absence:
+
+- Search the entire changeset, not just modified lines
+- Check both implementation and test files
+- Review the project's dependency list if the issue relates to external packages
+- Scan recent git history if the pattern seems too obvious to be missing
+- When in doubt, flag it rather than skip it — false positives are cheaper than false negatives
+
+## Severity Baseline
+
+When a finding does not clearly fit the dimension's severity guide, default to `medium`.
+```
+
+When present, this content is prepended to every dimension's review instructions under a `## Common Review Instructions` heading.
+
+---
+
 ## dependency-management-review.md
 
 ```markdown

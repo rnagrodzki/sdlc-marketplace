@@ -194,6 +194,34 @@ For canonical `triggers:` blocks and complete dimension examples, see [`EXAMPLES
 
 ---
 
+## Common Prompt
+
+Place a `_common.md` file in `.sdlc/review-dimensions/` to share instructions across all review dimensions. The file is plain markdown (no YAML frontmatter).
+
+Its content is automatically prepended to every dimension's review instructions under a `## Common Review Instructions` heading. When the file is absent, behavior is unchanged.
+
+### How it works
+
+The common prompt text is injected into each dimension's instructions after the severity section but before the dimension-specific checklist. This allows you to define shared guidance (verification principles, naming conventions, severity overrides) that applies to every reviewer subagent without duplicating text across all dimension files.
+
+### Copilot mirrors
+
+For Copilot, common text is baked into every per-dimension `.instructions.md` mirror at generation time. This means each mirror file contains the full common prompt plus dimension-specific instructions as a single self-contained document.
+
+### After creating or editing
+
+After creating or editing `_common.md`, run `/setup-sdlc --dimensions` to regenerate all Copilot mirrors, then commit both `_common.md` and the updated mirror files:
+
+```bash
+/setup-sdlc --dimensions
+git add .sdlc/review-dimensions/
+git commit -m "docs: update common review instructions"
+```
+
+Omit this step if you are using the skill in Claude Code only (no Copilot) — the common prompt takes effect immediately at review time.
+
+---
+
 ## Consolidated Comment Format
 
 The command posts a single PR comment:

@@ -64,6 +64,12 @@ const KNOWN_FIELDS = new Set([
 const VALID_SEVERITIES = new Set(['critical', 'high', 'medium', 'low', 'info']);
 
 /**
+ * Filename of the shared common-prompt file (R-common-prompt, issue #519).
+ * Excluded from dimension validation (D1-D9); has no YAML frontmatter.
+ */
+const COMMON_PROMPT_FILE = '_common.md';
+
+/**
  * Canonical severity vocabulary for plan/execute guardrails (R17).
  * See lib/dimensions.js::GUARDRAIL_SEVERITIES for the source of truth.
  */
@@ -236,6 +242,24 @@ function resolveDimensionsDir(projectRoot) {
   return newPath; // doesn't exist; readdirSync will fail and return zero files
 }
 
+/**
+ * Reads and returns the common prompt text from _common.md in the dimensions directory.
+ * Returns null if the file doesn't exist or cannot be read.
+ * Returns null if the file content is empty after trimming.
+ *
+ * @param {string} projectRoot - the project root directory
+ * @returns {string|null} - the trimmed content of _common.md, or null
+ */
+function readCommonPrompt(projectRoot) {
+  const dir = resolveDimensionsDir(projectRoot);
+  try {
+    const content = fs.readFileSync(path.join(dir, COMMON_PROMPT_FILE), 'utf8').trim();
+    return content || null;
+  } catch {
+    return null;
+  }
+}
+
 function validateAll(projectRoot) {
   const dimensionsDir = resolveDimensionsDir(projectRoot);
 
@@ -243,7 +267,7 @@ function validateAll(projectRoot) {
   try {
     const entries = fs.readdirSync(dimensionsDir);
     files = entries
-      .filter(f => f.endsWith('.md'))
+      .filter(f => f.endsWith('.md') && f !== COMMON_PROMPT_FILE)
       .map(f => path.join(dimensionsDir, f));
   } catch (err) {
     // Directory doesn't exist — not an error for this script, just zero results
@@ -311,4 +335,5 @@ module.exports = {
   validateDimensionFile,
   validateAll,
   resolveDimensionsDir,
+  readCommonPrompt,
 };
