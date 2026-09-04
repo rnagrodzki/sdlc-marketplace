@@ -1,6 +1,7 @@
-# Script execution tests for plugins/sdlc-utilities/scripts/lib/git.js — issue #239.
-# Validates the new fetchBaseRef helper (best-effort, non-fatal) and the
-# buildBranchContribDiffCmd helper (three-dot semantics for branch-contribution scopes).
+# Script execution tests for plugins/sdlc-utilities/scripts/lib/git.js — issues #239, #522.
+# Validates the fetchBaseRef helper (best-effort, non-fatal), the buildBranchContribDiffCmd
+# helper (three-dot semantics for branch-contribution scopes), and exec()'s 50MB maxBuffer
+# limit / buffer-overflow handling (issue #522: prevent silent truncation on large output).
 # These run real Node.js scripts against fixture directories (no LLM).
 # Uses tests/promptfoo/scripts/git-lib-test.js so script_path resolves to a real file.
 
@@ -99,6 +100,46 @@
   assert:
     - type: contains
       value: '"feature.js"'
+
+- description: "git-lib: exec() succeeds for a trivial command within the maxBuffer limit"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op execMaxBuffer"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: '"ok": true'
+
+- description: "git-lib: exec() applies the configured 50MB maxBuffer, not Node's 1MB execSync default (issue #522)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op execDefaultMaxBufferApplied"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: '"ok": true'
+
+- description: "git-lib: exec() throws on buffer overflow with the actual configured byte limit in the message (issue #522)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op execMaxBufferOverflow"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: '"threw": true'
+    - type: contains
+      value: 'maxBuffer'
+    - type: contains
+      value: '(10 bytes)'
+
+- description: "git-lib: exec() returns null on normal command failure (non-buffer-overflow)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op execNormalFailure"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: '"returnedNull": true'
 
 - description: "git-lib: getAllSemverTags includes pre-release tags; getTagList excludes them"
   vars:
