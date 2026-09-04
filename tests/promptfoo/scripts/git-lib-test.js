@@ -20,6 +20,12 @@
  *   getChangedFilesScope — invokes getChangedFiles(base, projectRoot, scope) against a fixture repo
  *                         and prints {scope, base, files}. Used to assert default 'all' scope routes
  *                         through buildBranchContribDiffCmd (three-dot) — issue #364.
+ *   execMaxBuffer               — basic sanity check that exec() succeeds for a trivial command.
+ *   execDefaultMaxBufferApplied — proves the default 50MB maxBuffer (not Node's 1MB execSync
+ *                         default) is actually applied — issue #522.
+ *   execMaxBufferOverflow       — proves exec() throws on overflow and reports the actual
+ *                         effective byte limit for the call — issue #522.
+ *   execNormalFailure          — proves non-overflow failures still return null (throwOnError=false).
  */
 'use strict';
 
@@ -113,15 +119,27 @@ switch (op) {
   }
 
   case 'execMaxBuffer': {
-    // Verify exec() succeeds with output under the buffer limit and MAX_BUFFER is applied.
+    // Verify exec() succeeds for a trivial command (basic sanity check — does not by
+    // itself prove the 50MB limit is applied; see execDefaultMaxBufferApplied for that).
     const out = lib.exec('echo hello');
     console.log(JSON.stringify({ ok: out === 'hello', output: out }, null, 2));
     break;
   }
 
+  case 'execDefaultMaxBufferApplied': {
+    // Verify the configured 50MB maxBuffer (not Node's 1MB execSync default) is actually
+    // applied when no opts.maxBuffer override is given. 2MB of output would fail under
+    // Node's 1MB default but succeeds under git.js's 50MB default.
+    const size = 2 * 1024 * 1024;
+    const out = lib.exec(`node -e "process.stdout.write('x'.repeat(${size}))"`);
+    console.log(JSON.stringify({ ok: out !== null && out.length === size, length: out === null ? null : out.length }, null, 2));
+    break;
+  }
+
   case 'execMaxBufferOverflow': {
-    // Verify exec() throws on buffer overflow when maxBuffer is exceeded.
-    // Uses a tiny maxBuffer override (10 bytes) to trigger overflow without needing 50MB output.
+    // Verify exec() throws on buffer overflow when maxBuffer is exceeded, and that the
+    // thrown message reports the actual effective limit for this call (opts.maxBuffer
+    // override), not a hardcoded constant unrelated to what was really configured.
     try {
       lib.exec('echo hello world this is a long string that exceeds ten bytes', { maxBuffer: 10 });
       console.log(JSON.stringify({ threw: false }, null, 2));

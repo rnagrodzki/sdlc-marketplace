@@ -29,9 +29,15 @@ const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
  * @param {object} [opts]  Passed to execSync (cwd, shell, etc.)
  * @param {boolean} [opts.throwOnError]  If true, rethrows on failure instead of returning null.
  * @returns {string|null}
+ * @throws {Error} Always throws when stdout exceeds maxBuffer (default 50 MB), regardless of
+ *   throwOnError. This is deliberate: silently returning null on overflow would mask a
+ *   truncated/incomplete result (issue #522) instead of surfacing it. Every other failure
+ *   mode still honors throwOnError as documented above.
  */
 function exec(cmd, opts = {}) {
   const { throwOnError, ...execOpts } = opts;
+  // The limit actually enforced for this call — opts.maxBuffer overrides the default.
+  const effectiveMaxBuffer = execOpts.maxBuffer ?? MAX_BUFFER;
   try {
     return execSync(cmd, { encoding: 'utf8', maxBuffer: MAX_BUFFER, ...execOpts }).trim();
   } catch (err) {
@@ -39,7 +45,8 @@ function exec(cmd, opts = {}) {
       || err.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
       || (err.message && err.message.includes('maxBuffer'));
     if (isBufferOverflow) {
-      throw new Error(`exec: stdout exceeded maxBuffer (${MAX_BUFFER} bytes). Command: ${cmd}`);
+      const cmdPreview = cmd.length > 300 ? `${cmd.slice(0, 300)}…` : cmd;
+      throw new Error(`exec: stdout exceeded maxBuffer (${effectiveMaxBuffer} bytes). Command: ${cmdPreview}`);
     }
     if (throwOnError) throw err;
     return null;
@@ -55,11 +62,21 @@ function exec(cmd, opts = {}) {
  * @param {number} [opts.baseDelayMs=1000] Delay before the second attempt; doubles on each retry.
  * @param {boolean} [opts.throwOnError]    If true and all retries exhausted, throws with attempt count.
  * @returns {string|null}  Trimmed stdout, or null when all attempts fail and throwOnError is false.
+ * @throws {Error} Immediately (no retries) if exec() throws — e.g. buffer overflow. Retrying
+ *   the same command would hit the same limit again, so the underlying error propagates as-is
+ *   instead of being retried or wrapped in a generic "failed after N attempts" message.
  */
 function retryExec(cmd, opts = {}) {
   const { retries = 3, baseDelayMs = 1000, throwOnError, ...execOpts } = opts;
   for (let attempt = 1; attempt <= retries; attempt++) {
-    const result = exec(cmd, execOpts);
+    let result;
+    try {
+      result = exec(cmd, execOpts);
+    } catch (err) {
+      // exec() only throws for non-retryable failures (e.g. buffer overflow) — retrying
+      // won't change the outcome, so propagate immediately rather than swallowing it.
+      throw err;
+    }
     if (result !== null) return result;
     // All attempts exhausted — break before sleeping.
     if (attempt === retries) break;
