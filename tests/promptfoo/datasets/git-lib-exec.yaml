@@ -100,6 +100,35 @@
     - type: contains
       value: '"feature.js"'
 
+- description: "git-lib: exec() succeeds for normal-sized output (maxBuffer applied)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op execMaxBuffer"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: '"ok": true'
+
+- description: "git-lib: exec() throws on buffer overflow with descriptive error (issue #522)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op execMaxBufferOverflow"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: '"threw": true'
+    - type: contains
+      value: 'maxBuffer'
+
+- description: "git-lib: exec() returns null on normal command failure (non-buffer-overflow)"
+  vars:
+    script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"
+    script_args: "--op execNormalFailure"
+    project_root: "file://fixtures-fs/project-openspec-baseline"
+  assert:
+    - type: contains
+      value: '"returnedNull": true'
+
 - description: "git-lib: getAllSemverTags includes pre-release tags; getTagList excludes them"
   vars:
     script_path: "repo://tests/promptfoo/scripts/git-lib-test.js"

@@ -112,6 +112,32 @@ switch (op) {
     break;
   }
 
+  case 'execMaxBuffer': {
+    // Verify exec() succeeds with output under the buffer limit and MAX_BUFFER is applied.
+    const out = lib.exec('echo hello');
+    console.log(JSON.stringify({ ok: out === 'hello', output: out }, null, 2));
+    break;
+  }
+
+  case 'execMaxBufferOverflow': {
+    // Verify exec() throws on buffer overflow when maxBuffer is exceeded.
+    // Uses a tiny maxBuffer override (10 bytes) to trigger overflow without needing 50MB output.
+    try {
+      lib.exec('echo hello world this is a long string that exceeds ten bytes', { maxBuffer: 10 });
+      console.log(JSON.stringify({ threw: false }, null, 2));
+    } catch (e) {
+      console.log(JSON.stringify({ threw: true, message: e.message }, null, 2));
+    }
+    break;
+  }
+
+  case 'execNormalFailure': {
+    // Verify exec() returns null on normal command failure (non-buffer-overflow) with throwOnError=false.
+    const result = lib.exec('exit 1', { shell: true });
+    console.log(JSON.stringify({ returnedNull: result === null }, null, 2));
+    break;
+  }
+
   case 'tagListVariants': {
     // Create a temp git repo, add tags, and assert getAllSemverTags vs getTagList behaviour.
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'git-lib-tag-test-'));

@@ -21,6 +21,8 @@ const { execSync, spawnSync } = require('node:child_process');
 // Core exec helper
 // ---------------------------------------------------------------------------
 
+const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
+
 /**
  * Run a shell command and return trimmed stdout, or null on failure.
  * @param {string} cmd
@@ -31,8 +33,14 @@ const { execSync, spawnSync } = require('node:child_process');
 function exec(cmd, opts = {}) {
   const { throwOnError, ...execOpts } = opts;
   try {
-    return execSync(cmd, { encoding: 'utf8', ...execOpts }).trim();
+    return execSync(cmd, { encoding: 'utf8', maxBuffer: MAX_BUFFER, ...execOpts }).trim();
   } catch (err) {
+    const isBufferOverflow = err.code === 'ENOBUFS'
+      || err.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
+      || (err.message && err.message.includes('maxBuffer'));
+    if (isBufferOverflow) {
+      throw new Error(`exec: stdout exceeded maxBuffer (${MAX_BUFFER} bytes). Command: ${cmd}`);
+    }
     if (throwOnError) throw err;
     return null;
   }
