@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.28] - 2026-09-04
+
+### Fixed
+- git-lib: raised the exec buffer limit from Node's 1MB default to 50MB and surface a clear error when a command still exceeds it, instead of silently truncating large diffs and logs (#522)
+
 ## [0.21.27] - 2026-08-28
 
 ### Added
