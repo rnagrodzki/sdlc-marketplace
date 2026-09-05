@@ -466,11 +466,36 @@ if [ "$WORKSPACE" = "branch" ]; then
 
   # Step 3: Create the feature branch (HEAD shared with main worktree).
   git checkout -b "$EXECUTE_BRANCH"
+
+  # Step 4 (R-expected-branch-branch-derive, fixes #526): the prepare step computed
+  # --expected-branch from the PRE-CHECKOUT branch (it ran before EXECUTE_BRANCH existed —
+  # ship.js cannot predict a plan-title-derived branch name ahead of time). Patch the
+  # already-written prepare-output file in place so every later re-read (commit,
+  # commit-fixes, version, pr all re-read step.args/step.invocation from this same file,
+  # same pattern as the context.planFile read below) sees the real feature branch instead
+  # of the stale one. This is a one-time file patch, not a per-dispatch substitution, and
+  # not a live `git branch --show-current` re-query (that would make the guard tautological
+  # and defeat the branch-drift protection from #347/#348/#349).
+  node -e "
+    const fs = require('fs');
+    const f = process.env.F, branch = process.env.B;
+    const d = JSON.parse(fs.readFileSync(f, 'utf8'));
+    const pattern = /--expected-branch \S+/g;
+    for (const step of d.steps || []) {
+      if (typeof step.args === 'string') step.args = step.args.replace(pattern, '--expected-branch ' + branch);
+      if (typeof step.invocation === 'string') step.invocation = step.invocation.replace(pattern, '--expected-branch ' + branch);
+    }
+    if (d.context) d.context.expectedBranch = branch;
+    fs.writeFileSync(f, JSON.stringify(d, null, 2));
+  " F="$PREPARE_OUTPUT_FILE" B="$EXECUTE_BRANCH"
 fi
-# When WORKSPACE = continue: EXECUTE_BRANCH stays unset, no migration, no checkout — run in place.
+# When WORKSPACE = continue: EXECUTE_BRANCH stays unset, no migration, no checkout, no
+# --expected-branch patch — prepare's pre-checkout value is already correct (no branch change).
 ```
 
 After `git checkout -b` the cwd is the main worktree on the new feature branch, so all subsequent Bash invocations and Agent-tool dispatches run in the current cwd trivially. There is **no `--branch` forward to execute** — by the time execute is dispatched, cwd is on the feature branch, so execute-plan-sdlc's own derive yields `continue` (run in place) and no value crosses the boundary. `EXECUTE_BRANCH` is still used by the post-version ancestry gate (see "Execute step" / version section); under `continue` it is unset and that gate is a no-op.
+
+**Display vs. dispatch (R-expected-branch-branch-derive):** Step 2's pipeline table is printed before this patch runs and may show the stale pre-checkout `--expected-branch` value for `commit`/`commit-fixes`/`version`/`pr` — that is expected and display-only. Step 5 dispatch for those steps MUST use the patched file (re-read `step.args`/`step.invocation` fresh rather than reusing what was printed in Step 2), so the actual dispatched value is always the real feature branch.
 
 The `migrate` subcommand renames `ship-<oldSlug>-<ts>.json` → `ship-<newSlug>-<ts>.json` and updates `data.branch`. On `migrated: false` (e.g. no state file yet, slug already correct), warn and continue — do not abort; the orphaned file (if any) will be cleaned by the terminal `cleanup` step or by `--gc`.
 

@@ -797,6 +797,35 @@
         crosses the boundary. Reference R60 (fixes #378, #379). The response must
         NOT claim a `--branch "$EXECUTE_BRANCH"` flag is forwarded.
 
+- description: "ship-sdlc (#526): stale --expected-branch from prepare is patched to EXECUTE_BRANCH after checkout"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"
+    project_context: "file://fixtures/ship-pipeline-ready.md"
+    user_request: >
+      The workspace derives to `branch` from `main`. ship-prepare.js computed
+      `--expected-branch main` into the commit/commit-fixes/version/pr step args
+      BEFORE the feature branch was decided or checked out. After ship-sdlc runs
+      `git checkout -b <feature-branch>`, what value does `--expected-branch`
+      actually carry when commit-sdlc, version-sdlc, and pr-sdlc are dispatched —
+      the pre-checkout branch (`main`) or the feature branch? Does ship-sdlc
+      re-query the live current branch at each dispatch site to get this value?
+  assert:
+    - type: llm-rubric
+      value: >
+        The response must state that ship-sdlc patches the prepare-output file
+        in place immediately after `git checkout -b "$EXECUTE_BRANCH"` (same
+        shell invocation), rewriting every `--expected-branch <value>` in
+        steps[].args/.invocation to the real feature branch and updating
+        context.expectedBranch to match — so commit-sdlc/commit-fixes/version-sdlc/
+        pr-sdlc all receive the real feature branch, not `main`. It must state
+        this is a one-time file patch that later steps re-read, NOT a live
+        `git branch --show-current` re-query performed separately at each of the
+        four dispatch sites (a live re-query would make the branch-mismatch guard
+        tautological and defeat the #347/#348/#349 protection). It may note the
+        Step 2 pipeline table can still display the stale pre-checkout value
+        since it's printed before the patch runs, but the actual dispatch uses
+        the patched value. Reference R-expected-branch-branch-derive (fixes #526).
+
 - description: "ship-sdlc (#379): pre-execute state migration runs before branch creation in branch mode"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/ship-sdlc/SKILL.md"

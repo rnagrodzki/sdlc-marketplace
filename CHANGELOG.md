@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.29] - 2026-09-05
+
+### Added
+- plan-sdlc: gate option 2 now generates OpenSpec artifacts autonomously instead of requiring manual completion
+- plan-sdlc: Step 5/6 gates re-dispatch automatically when material changes occur (task count, deviations, or file set change), covering the full set of review-defined trigger conditions; `--auto` suppresses re-dispatch prompts (#523)
+
 ## [0.21.28] - 2026-09-04
 
 ### Fixed

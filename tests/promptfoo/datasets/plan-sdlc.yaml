@@ -21,6 +21,9 @@
 #   plan-per-event-contracts           -- CORRECT: code plan, T1 emits 3 distinct events each with its own payload record; exercises per-distinct-shape render cap (catalog #2/#3, R49, Fixes #472)
 #   plan-bare-ref                      -- CORRECT: code plan, T1 has a bare file:line CHANGE ref (forbidden) + a Contract.mirror line-anchor (allowed carve-out); exercises Code reference anchoring convention (R51, Fixes #472)
 #   plan-g19-prose-flood               -- CORRECT: code plan, T1 narrates its HTTP payload surface (#1) entirely in prose while rendering an unrelated config-delta surface (#7) as a table; exercises the NEW per-surface G19 rule — the incidental render must NOT excuse the prose-narrated surface (R46, Fixes #488)
+#   plan-sdlc-c1-inline-openspec       -- CORRECT: gate-check Option 2 inline OpenSpec artifact generation; exercises R63 openspec-target annotations, Gate A/openspec-task suppression (Fixes #523)
+#   plan-sdlc-c2-material-change       -- CORRECT: Step 6 task-count delta sets materialChangeDetected; exercises R64 merged Step 3 lane + Step 5 lens re-dispatch (Fixes #523)
+#   plan-sdlc-c3-ambiguity             -- CORRECT: conflicting codebase caching patterns with no dominant convention; exercises Step 1 Structured discovery trigger (c), interactive and --auto paths (R65, Fixes #523)
 
 # --- Fan-out parallelization cases (P1/P2/P3 — Fixes #418) ---
 
@@ -1327,3 +1330,103 @@
         does NOT flag Task 2: the `Contract.mirror` line-anchor `src/pricing/tax.ts:1-30`
         is a precedent pointer to existing structure being copied, which is the documented
         exempt case. The response does NOT claim all file:line references are forbidden.
+
+# --- Gate-check Option 2 inline generation, material-change re-dispatch, Step 1 ambiguity (C1/C2/C3) ---
+
+- description: "plan-sdlc: gate-check Option 2 authors OpenSpec appendix with openspec-target annotations, skips Gate A and openspec-task blocks (R63, C1)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-sdlc-c1-inline-openspec.md"
+    user_request: >
+      Run /plan-sdlc. openspec/config.yaml exists but no --spec flag was passed. The request is a
+      functional change. At the Step 0 gate check the user selected Option 2 ("Generate OpenSpec
+      artifacts as plan appendix"). Walk through how Option 2 is handled in Step 0, then show how
+      Step 4 populates the ## OpenSpec Appendix section for this plan.
+  assert:
+    - type: icontains
+      value: "openspecInlineGenerate"
+    - type: icontains
+      value: "openspec-target"
+    - type: not-icontains
+      value: "- change:"
+    - type: llm-rubric
+      value: >
+        The response describes Option 2 setting `openspecInlineGenerate = true` in Step 0 with no
+        further prompting at that gate (R22 single-touchpoint) and `openspecContext` staying empty
+        for the rest of the run. It describes Step 4 authoring fresh OpenSpec artifacts under an
+        "OpenSpec Artifacts (Draft)" label, with each of the three fragments (Proposal Summary,
+        Delta Specs, Tasks List) wrapped in its own `<!-- openspec-target: <path> -->` annotation
+        (proposal.md, a specs/*.md path, and tasks.md). The response explicitly states that Gate A
+        (Intake Audit) is NOT dispatched for this plan because `openspecContext` is absent, and
+        that no plan task carries an `openspec-task:` annotation block since `fromOpenspecDirect`
+        is false. The response does not describe this as a full OpenSpec-sourced pipeline run.
+
+- description: "plan-sdlc: Step 6 task-count change sets materialChangeDetected, triggering merged Step 3 lane + Step 5 lens re-dispatch on the next iteration (R64, C2)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-sdlc-c2-material-change.md"
+    user_request: >
+      Run /plan-sdlc. Step 5 iteration 1 returned Issues Found. Step 6 IMPROVE just added a new
+      Task 5 to resolve the findings (taskCountBefore=4, taskCountAfter=5 — see context). Evaluate
+      the Step 6 material change detector, then describe exactly how the NEXT Step 5 iteration
+      dispatches its agents.
+  assert:
+    - type: icontains
+      value: "materialChangeDetected"
+    - type: icontains
+      value: "single message"
+    - type: llm-rubric
+      value: >
+        The response identifies that the task-count-delta trigger fires (4 -> 5) so
+        `materialChangeDetected` is set to true. It then describes the next Step 5 iteration as
+        dispatching ALL FIVE Step 3 `lanes[]` entries AND ALL THREE `lensReviewers[]` entries
+        together in a SINGLE message as parallel Agent tool calls (not two separate dispatches,
+        not sequential). It states the await barrier requires all 8 results (5 lanes + 3 lenses)
+        before consolidating. It states this merged dispatch counts as exactly ONE iteration of
+        the review loop (the counter increments by 1, not 2), and that `materialChangeDetected`
+        is cleared back to false once the merged issue set is assembled.
+
+- description: "plan-sdlc: conflicting codebase caching patterns trigger AskUserQuestion at Step 1 structured discovery, trigger c (interactive, C3)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-sdlc-c3-ambiguity.md"
+    user_request: >
+      Run /plan-sdlc (no --auto flag). Step 1 decomposition for the catalog caching task found two
+      existing, equally viable caching patterns in the codebase — see context for both patterns and
+      their call sites. Walk through the Step 1 "Structured discovery" trigger (c) and show what
+      happens next.
+  assert:
+    - type: icontains
+      value: "AskUserQuestion"
+    - type: llm-rubric
+      value: >
+        The response identifies this as the Step 1 "Structured discovery" trigger (c) ambiguity — the
+        codebase sends conflicting signals (two existing, equally viable caching patterns with no
+        dominant convention for this kind of lookup) — and fires AskUserQuestion presenting the
+        trade-offs of the in-memory LRU pattern vs. the Redis-backed pattern before proceeding to
+        task decomposition. The response does not silently pick one pattern without asking, and
+        does not proceed to decomposition before the user responds.
+
+- description: "plan-sdlc: --auto suppresses the Step 1 structured discovery AskUserQuestion; decision recorded in Key Decisions with a Deviations asked=no row (C3)"
+  vars:
+    skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
+    project_context: "file://fixtures/plan-sdlc-c3-ambiguity.md"
+    user_request: >
+      Run /plan-sdlc --auto. Step 1 decomposition for the catalog caching task found the same two
+      existing, equally viable caching patterns described in the context. Walk through the Step 1
+      "Structured discovery" trigger (c) under --auto and show what happens next.
+  assert:
+    - type: icontains
+      value: "Key Decisions"
+    - type: llm-rubric
+      value: >
+        The response explains that `--auto` suppresses the Step 1 "Structured discovery"
+        AskUserQuestion entirely — no question is presented to the user. Instead, per R65,
+        plan-sdlc autonomously picks the most conservative approach (the in-memory LRU cache —
+        no new infrastructure, no network hop), using the existing codebase pattern as a
+        tiebreaker between equally-conservative choices (the LRU cache is also the dominant
+        pattern, used by 3 of the 4 existing call sites). The response records the choice with
+        rationale in `## Key Decisions`. The response also states that a `## Deviations &
+        assumptions` row is added with `asked=no`, per the asked-column semantics for
+        autonomous/`--auto`-suppressed decisions. The response does not describe any
+        AskUserQuestion call being made.

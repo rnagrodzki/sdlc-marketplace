@@ -79,6 +79,8 @@ For 4+ file scopes, plan-sdlc dispatches a parallel dynamic-dimension orchestrat
 
 **Step 5 — Reviewer.** plan-reviewer-prompt gains a `{BRIEF_FILE}` input plus two gate rows: *exploration provenance* (uncited Standard/Complex tasks blocking) and *best-practice traceability* (silent omission of a web finding blocking). The reviewer also uses the multi-lens fan-out (R36): review dimensions are dispatched in parallel across the same five-lane structure, with each lane receiving `{REQUIREMENTS_SUMMARY}` (the numbered requirements list captured from the Step 1 CONSUME pass) so independent lenses can check requirement coverage without repeating work. Every lane dispatch in this fan-out is issued with `run_in_background: false` and Step 5 completes only after **all five lanes have returned** (await barrier, R-c1, fixes #487/#495) — the consolidation logic increments per completed fan-out dispatch, not per lens, so results from a lane that returns fewer lenses than expected are never silently treated as a full join.
 
+**Gate re-validation on material change (R64).** After Step 6 (IMPROVE) applies reviewer fixes, the skill snapshots seven values before and after, per task where noted: task count; each task's `Files:` path set (added or removed paths, not just additions); each task's `Contract:` block; each task's `Depends on:` value; the `## Key Decisions` entry set; each task's OpenSpec task-mapping ref (R29/R30); and the `## Deviations & assumptions` row set. A fix is **material** — `materialChangeDetected` is set — when any of: a task is added or removed; a task is re-scoped (its Files, Contract, or Depends on changed); a Key Decision is reversed or introduced; the OpenSpec task mapping changed; or a Deviations row is added or changed (R64's conservative superset — a deviations-table edit usually co-occurs with a scope or approach change worth re-validating). On the next pass through Step 5, a material change re-dispatches all five Step 3 gate lanes (G1–G21) together with the Step 5 lens reviewers in a single merged message, rather than trusting the earlier gate results to still hold — this path also preserves the error-severity guardrail-block gate (R19). This merged dispatch counts as **one** iteration of the existing review loop (increments the counter by 1, not 2), so the 3-iteration cap still applies normally. Wording-only, formatting-only, or metadata-only fixes that leave all seven snapshotted values unchanged are not material and do not trigger this re-dispatch.
+
 **Cleanup.** Tempdir wiped by the EXIT/INT/TERM trap installed in Step 1. Orphans from crashed runs swept by `ship-sdlc --gc`, which now globs `sdlc-explore-*` alongside the existing four state-file buckets and removes by mtime + branch-liveness.
 
 **Three modes for dimensions:**
@@ -135,7 +137,7 @@ Every plan contains the following sections:
 - **Context** — problem/trigger/success motivational section establishing why this plan exists and what defines successful delivery
 - **Research Findings** — captures exploration output, architecture/tech considerations, and key learnings from Steps 1–2 discovery
 - **Final Shape** — aggregated end-state after all tasks complete, enabling fast review of overall outcome
-- **OpenSpec Appendix** — requirement inventory and verbatim delta-spec fragments from OpenSpec artifacts. The `## OpenSpec Appendix` heading appears on every plan (PF10 checks it unconditionally); its body is populated only when `--from-openspec <name>` supplied the structured requirement/task data (`fromOpenspecDirect`) — `--spec` alone (interactive OpenSpec loading without `--from-openspec`) leaves the body reading `Not applicable — no OpenSpec change`, and non-OpenSpec plans read the same
+- **OpenSpec Appendix** — the `## OpenSpec Appendix` heading appears on every plan (PF10 checks it unconditionally); its body follows a three-way conditional: (a) when `--from-openspec <name>` supplied the structured requirement/task data (`fromOpenspecDirect`), the body holds a requirement inventory table plus verbatim delta-spec fragments reproduced from the on-disk OpenSpec change; (b) when the OpenSpec gate check's option 2 was selected (`openspecInlineGenerate`), the body instead holds authored artifacts — a Proposal Summary, Delta Specs, and Tasks List drafted from exploration and decomposition data at Step 4, each fragment wrapped in a `<!-- openspec-target: <path> -->` annotation (e.g. `<!-- openspec-target: proposal.md -->`, `<!-- openspec-target: specs/<feature-name>.md -->`, `<!-- openspec-target: tasks.md -->`) marking the on-disk path it corresponds to once handed off to `openspec create`; (c) when neither applies — `--spec` alone (interactive OpenSpec loading without `--from-openspec`) or no OpenSpec at all — the body reads `Not applicable — no OpenSpec change`
 - **Contract `example:` key** — optional field in per-task Contract blocks showing input/output examples demonstrating how the decided shape is used
 
 See also: [`docs/plan-format-reference.md`](../plan-format-reference.md) for detailed section specifications.
@@ -220,10 +222,12 @@ Response:
 This looks like a functional change. This project uses OpenSpec for spec-driven development.
 
 Options:
-  1. Start OpenSpec flow — run /opsx:propose to spec this out first
-  2. Continue planning directly — skip spec workflow
+  1. Start OpenSpec flow — use the openspec CLI to author a change first (for non-trivial features requiring full spec workflow)
+  2. Generate OpenSpec artifacts as plan appendix — plan generates proposal, spec deltas, and tasks as inline appendix content (recommended default)
   3. Use existing spec — if you already have an OpenSpec change for this
 ```
+
+Option 2 is now the recommended default — selecting it sets `openspecInlineGenerate = true` and proceeds with standard planning without further prompts (single-touchpoint); artifact authoring is deferred to Step 4, where exploration and decomposition data are available (see the OpenSpec Appendix entry under "Plan Sections" below). Option 1 is no longer the recommended path — it is demoted to non-trivial features that warrant the full OpenSpec CLI workflow before planning begins.
 
 ### From a requirements file
 
@@ -254,6 +258,10 @@ Before I decompose this, I need to clarify three things:
 2. Integration — is there an existing search index, or does this need a new one?
 3. Success — what does a passing test look like?
 ```
+
+**Expanded ambiguity detection.** Structured discovery now also fires when requirements are otherwise clear but a non-trivial aspect has multiple materially different approaches — concretely: (a) exploration surfaces two or more viable architecture patterns for the same aspect, (b) an ambiguous scope boundary exists where including vs. excluding a component would materially change the plan, or (c) the codebase sends conflicting signals — two existing patterns either of which could reasonably be followed. Any of these triggers the same targeted-question flow, even when the original request was not a single vague sentence.
+
+**`--auto` suppression.** When `--auto` is set, the clarifying `AskUserQuestion` above is suppressed. The skill instead picks the most conservative approach autonomously: for approach-pattern ambiguities (triggers a/c), matching existing codebase patterns is used only as a tiebreaker between equally-conservative choices; for scope-boundary or vague-requirement ambiguities (trigger b, or an underspecified goal), the skill defaults to the narrowest scope that still satisfies the stated requirement. Either way, it records the choice with rationale in `## Key Decisions`, and adds a `## Deviations & assumptions` row with `asked=no`.
 
 ### Completing the wave preview after approval
 
@@ -390,7 +398,7 @@ When the project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec/), this 
 - **Behavior change:** Skips structured discovery questions when OpenSpec artifacts provide sufficient scope. Maps every ADDED/MODIFIED delta spec requirement to at least one task.
 - **Plan header:** Sets `**Source:**` to `openspec/changes/<name>/` instead of "conversation context"
 - **Direct bridge (`--from-openspec <name>`):** Validates the named change, loads all artifacts, and uses `tasks.md` as the primary decomposition skeleton. Bypasses the gate check entirely. This is the recommended path when `session-start.js` reports a change at stage `ready-for-plan`.
-- **Functional change routing:** When OpenSpec is detected but neither `--spec` nor `--from-openspec` is passed, the skill classifies the user's request. For functional changes (new features, behavior modifications, API changes), it checks for a matching active OpenSpec change — if found, it auto-loads the spec context. If no match exists, it proposes three options: start the OpenSpec flow with `/opsx:propose`, continue planning directly without specs, or re-invoke with `/plan-sdlc --from-openspec <name>`. Non-functional changes (refactoring, config, docs) receive a passive hint only.
+- **Functional change routing:** When OpenSpec is detected but neither `--spec` nor `--from-openspec` is passed, the skill classifies the user's request. For functional changes (new features, behavior modifications, API changes), it checks for a matching active OpenSpec change — if found, it auto-loads the spec context. If no match exists, it proposes three options: (1) start the OpenSpec flow — use the openspec CLI to author a change first, now scoped to non-trivial features requiring the full spec workflow; (2) generate OpenSpec artifacts as a plan appendix — the recommended default, authoring proposal/spec-deltas/tasks content inline at Step 4 with no further prompts; or (3) re-invoke with `/plan-sdlc --from-openspec <name>` when a change already exists. Non-functional changes (refactoring, config, docs) receive a passive hint only.
 
 ### OpenSpec task annotation and checkbox tracking
 
