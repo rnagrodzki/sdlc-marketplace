@@ -231,7 +231,7 @@ fi
 
 Wait for answers before continuing.
 
-**`--auto` suppression:** When `--auto` is set, suppress the AskUserQuestion above. Instead, pick the approach that matches existing codebase patterns, record the choice in `## Key Decisions` with rationale, and add a `## Deviations & assumptions` row with `asked=no`.
+**`--auto` suppression (R65):** When `--auto` is set, suppress the AskUserQuestion above. Pick the most conservative approach autonomously: for approach-pattern ambiguities (triggers a/c), prefer whichever viable option most closely matches existing codebase patterns as a tiebreaker between equally-conservative choices; for scope-boundary or vague-requirement ambiguities (trigger b, or an underspecified goal), default to the narrowest scope that still satisfies the stated requirement. Record the choice in `## Key Decisions` with rationale, and add a `## Deviations & assumptions` row with `asked=no`.
 
 **Codebase exploration (skip for lightweight):** Use read-only tools (Glob, Grep, Read, LSP):
 - Relevant file structure and patterns in affected areas
@@ -289,11 +289,11 @@ When `openspecContext.requirements` is present (non-null) in the prepare output:
 
 Wait for answer.
 
-**Approach check:** If decomposition reveals multiple viable approaches for a component (e.g., sync vs. async, library vs. hand-rolled), use AskUserQuestion presenting the trade-offs of each option.
+**Approach check:** If decomposition reveals multiple viable approaches for a component (e.g., sync vs. async, library vs. hand-rolled), use AskUserQuestion presenting the trade-offs of each option. **Dedup against Step 1:** if this ambiguity was already resolved by a Structured discovery question (or its `--auto` fallback) in Step 1, skip — do not re-ask. Only surface approach questions that are newly revealed by the decomposition breakdown.
 
 Wait for answer.
 
-**`--auto` suppression:** When `--auto` is set, suppress the AskUserQuestion above. Instead, pick the approach that matches existing codebase patterns, record the choice in `## Key Decisions` with rationale, and add a `## Deviations & assumptions` row with `asked=no`.
+**`--auto` suppression (R65):** When `--auto` is set, suppress the AskUserQuestion above. Pick the most conservative approach autonomously, using the option that most closely matches existing codebase patterns as a tiebreaker between equally-conservative choices. Record the choice in `## Key Decisions` with rationale, and add a `## Deviations & assumptions` row with `asked=no`.
 
 **File structure mapping** — before writing tasks, map out:
 - Files to create (path + one-line responsibility)
@@ -528,6 +528,7 @@ When `materialChangeDetected` is true (set by the Step 6 IMPROVE pass — see be
 - **Await barrier:** do not consolidate or advance until exactly N = (5 lanes + M lenses) results are collected. Never consolidate on partial or zero returns.
 - **Merge:** lane results are processed by the Step 3 merge algorithm verbatim (coverageCheck {G1..G21}, null-template handling, lane-failure handling). Lens results are processed by the Step 5 merge below. The unified blocking-issue set is the union of both — lane issues deduped by `(gateId, taskRef, message-normalized-prefix)`, lens issues deduped by `(taskRef, message-normalized-prefix)`, cross-source union deduped by `(taskRef, message-normalized-prefix)` (keep first occurrence).
 - **G17 on re-dispatch (advisory only):** lanes[4]/G17 findings from the re-dispatch merge as advisory only. Step 4 has already run, so there is no `## Suggested Review Dimensions` consumer — do not re-splice G17 findings into the plan file. Persist updated `g17Findings` in memory for scorecard reference only.
+- **Guardrail-block gate preservation (R19):** lanes[3] (guardrail-compliance) findings from the re-dispatch are scanned the same way Step 4 scans them. If any error-severity guardrail violation is present in the re-dispatch merge, do NOT route it silently into Step 6's blocking-issue set — surface the same guardrail-block harden offer described in Step 4 (offer **harden** alongside the user-revision options; dispatch `Skill(harden-sdlc)` with `--failure-text "Plan blocked by error-severity guardrail <id>: <description> — <rationale>"`, `--skill plan-sdlc`, `--step "Step 5 — merged re-dispatch"`, `--operation "error-severity guardrail block"` only if the user selects harden, suppressed when `--auto` is set) before proceeding with Step 6 fixes. This preserves R19 across the merged re-dispatch path.
 - **`guardrailsEvaluated` / `critiqueRan`:** NOT re-written (once-per-run checkpoints — see Step 3).
 - **Clear flag:** set `materialChangeDetected = false` after the merged issue set is assembled.
 
@@ -603,22 +604,30 @@ Fix each blocking issue identified by the reviewer. Rewrite the plan file with f
 
 **Material change detection (implements R64):**
 
-Before rewriting the plan file, snapshot three values from the current plan content:
+Before rewriting the plan file, snapshot these values from the current plan content:
 1. `taskCountBefore` — number of `### Task N:` headings
 2. `deviationsRowsBefore` — set of row keys (first cell) in the `## Deviations & assumptions` table
-3. `filesSetBefore` — union of all paths listed in every task's `**Files:**` block
+3. `filesSetBefore` — map of `{ taskRef: <set of paths in that task's **Files:** block> }` for every task
+4. `contractsBefore` — map of `{ taskRef: <verbatim Contract: block text> }` for every task carrying a `**Contract:**` block
+5. `dependsOnBefore` — map of `{ taskRef: <verbatim Depends on: value> }` for every task
+6. `keyDecisionsBefore` — set of row/entry keys in the `## Key Decisions` section
+7. `openspecTaskMappingBefore` — map of `{ taskRef: <openspec-task.ref, or null if absent> }` for every task (R29/R30)
 
-After the plan file is rewritten with Step 6 fixes applied, compute the same three values from the updated plan content and compare:
+After the plan file is rewritten with Step 6 fixes applied, compute the same values from the updated plan content and compare:
 
-| Trigger | Condition | Material? |
-|---|---|---|
-| Task count delta | `taskCountAfter !== taskCountBefore` (task added or removed) | Yes |
-| Deviations table modified | Any new or changed row key in the Deviations table compared to `deviationsRowsBefore` | Yes |
-| New files in any task | `filesSetAfter` contains paths not present in `filesSetBefore` | Yes |
+| Trigger | Condition | Material? | R64 source |
+|---|---|---|---|
+| Task count delta | `taskCountAfter !== taskCountBefore` (task added or removed) | Yes | task added/removed |
+| Task re-scoped — Files | Any task's `filesSetAfter[taskRef]` differs from `filesSetBefore[taskRef]` (paths added or removed) | Yes | task re-scoped (Files) |
+| Task re-scoped — Contract | Any task's `contractsAfter[taskRef]` differs from `contractsBefore[taskRef]` | Yes | task re-scoped (Contract) |
+| Task re-scoped — Depends on | Any task's `dependsOnAfter[taskRef]` differs from `dependsOnBefore[taskRef]` | Yes | task re-scoped (Depends on) |
+| Key Decision changed | `keyDecisionsAfter` differs from `keyDecisionsBefore` (an entry reversed, or a new entry introduced) | Yes | Key Decision reversed/introduced |
+| OpenSpec task mapping changed | Any task's `openspecTaskMappingAfter[taskRef]` differs from `openspecTaskMappingBefore[taskRef]` | Yes | OpenSpec task mapping (R29/R30) changed |
+| Deviations table modified | Any new or changed row key in the Deviations table compared to `deviationsRowsBefore` | Yes (R64's conservative superset — a deviations-table edit usually co-occurs with a scope/approach change worth re-validating) | R64 conservative superset clause |
 
 If **any** trigger fires, set `materialChangeDetected = true`. Otherwise leave it `false` (or unset).
 
-Wording-only, formatting-only, and metadata-only fixes that leave task count, deviations rows, and per-task file lists unchanged are NOT material and do not trigger re-validation (R64).
+Wording-only, formatting-only, and metadata-only fixes that leave all seven snapshotted values unchanged are NOT material and do not trigger re-validation (R64).
 
 Re-dispatch the reviewer (back to Step 5 loop). When `materialChangeDetected` is true, the Step 5 merged dispatch path activates — see "Material change detection and merged re-dispatch" in Step 5.
 

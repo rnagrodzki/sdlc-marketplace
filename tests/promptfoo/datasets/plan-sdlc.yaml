@@ -21,6 +21,9 @@
 #   plan-per-event-contracts           -- CORRECT: code plan, T1 emits 3 distinct events each with its own payload record; exercises per-distinct-shape render cap (catalog #2/#3, R49, Fixes #472)
 #   plan-bare-ref                      -- CORRECT: code plan, T1 has a bare file:line CHANGE ref (forbidden) + a Contract.mirror line-anchor (allowed carve-out); exercises Code reference anchoring convention (R51, Fixes #472)
 #   plan-g19-prose-flood               -- CORRECT: code plan, T1 narrates its HTTP payload surface (#1) entirely in prose while rendering an unrelated config-delta surface (#7) as a table; exercises the NEW per-surface G19 rule — the incidental render must NOT excuse the prose-narrated surface (R46, Fixes #488)
+#   plan-sdlc-c1-inline-openspec       -- CORRECT: gate-check Option 2 inline OpenSpec artifact generation; exercises R63 openspec-target annotations, Gate A/openspec-task suppression (Fixes #523)
+#   plan-sdlc-c2-material-change       -- CORRECT: Step 6 task-count delta sets materialChangeDetected; exercises R64 merged Step 3 lane + Step 5 lens re-dispatch (Fixes #523)
+#   plan-sdlc-c3-ambiguity             -- CORRECT: conflicting codebase caching patterns with no dominant convention; exercises Step 1 Structured discovery trigger (c), interactive and --auto paths (R65, Fixes #523)
 
 # --- Fan-out parallelization cases (P1/P2/P3 — Fixes #418) ---
 
@@ -1345,7 +1348,7 @@
     - type: icontains
       value: "openspec-target"
     - type: not-icontains
-      value: "openspec-task:"
+      value: "- change:"
     - type: llm-rubric
       value: >
         The response describes Option 2 setting `openspecInlineGenerate = true` in Step 0 with no
@@ -1383,45 +1386,47 @@
         the review loop (the counter increments by 1, not 2), and that `materialChangeDetected`
         is cleared back to false once the merged issue set is assembled.
 
-- description: "plan-sdlc: conflicting codebase caching patterns trigger AskUserQuestion at Step 1 approach check (interactive, C3)"
+- description: "plan-sdlc: conflicting codebase caching patterns trigger AskUserQuestion at Step 1 structured discovery, trigger c (interactive, C3)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
     project_context: "file://fixtures/plan-sdlc-c3-ambiguity.md"
     user_request: >
       Run /plan-sdlc (no --auto flag). Step 1 decomposition for the catalog caching task found two
       existing, equally viable caching patterns in the codebase — see context for both patterns and
-      their call sites. Walk through the Step 1 "Approach check" and show what happens next.
+      their call sites. Walk through the Step 1 "Structured discovery" trigger (c) and show what
+      happens next.
   assert:
     - type: icontains
       value: "AskUserQuestion"
     - type: llm-rubric
       value: >
-        The response identifies this as the Step 1 "Approach check" ambiguity trigger — the
+        The response identifies this as the Step 1 "Structured discovery" trigger (c) ambiguity — the
         codebase sends conflicting signals (two existing, equally viable caching patterns with no
         dominant convention for this kind of lookup) — and fires AskUserQuestion presenting the
         trade-offs of the in-memory LRU pattern vs. the Redis-backed pattern before proceeding to
         task decomposition. The response does not silently pick one pattern without asking, and
         does not proceed to decomposition before the user responds.
 
-- description: "plan-sdlc: --auto suppresses the Step 1 approach-check AskUserQuestion; decision recorded in Key Decisions with a Deviations asked=no row (C3)"
+- description: "plan-sdlc: --auto suppresses the Step 1 structured discovery AskUserQuestion; decision recorded in Key Decisions with a Deviations asked=no row (C3)"
   vars:
     skill_path: "plugins/sdlc-utilities/skills/plan-sdlc/SKILL.md"
     project_context: "file://fixtures/plan-sdlc-c3-ambiguity.md"
     user_request: >
       Run /plan-sdlc --auto. Step 1 decomposition for the catalog caching task found the same two
       existing, equally viable caching patterns described in the context. Walk through the Step 1
-      "Approach check" under --auto and show what happens next.
+      "Structured discovery" trigger (c) under --auto and show what happens next.
   assert:
-    - type: not-icontains
-      value: "AskUserQuestion"
     - type: icontains
       value: "Key Decisions"
     - type: llm-rubric
       value: >
-        The response explains that `--auto` suppresses the Step 1 "Approach check" AskUserQuestion
-        entirely — no question is presented to the user. Instead, plan-sdlc autonomously picks the
-        approach matching the dominant existing codebase pattern (the in-memory LRU cache, used by
-        3 of the 4 existing call sites) and records the choice with rationale in `## Key
-        Decisions`. The response also states that a `## Deviations & assumptions` row is added
-        with `asked=no`, per the asked-column semantics for autonomous/`--auto`-suppressed
-        decisions. The response does not describe any AskUserQuestion call being made.
+        The response explains that `--auto` suppresses the Step 1 "Structured discovery"
+        AskUserQuestion entirely — no question is presented to the user. Instead, per R65,
+        plan-sdlc autonomously picks the most conservative approach (the in-memory LRU cache —
+        no new infrastructure, no network hop), using the existing codebase pattern as a
+        tiebreaker between equally-conservative choices (the LRU cache is also the dominant
+        pattern, used by 3 of the 4 existing call sites). The response records the choice with
+        rationale in `## Key Decisions`. The response also states that a `## Deviations &
+        assumptions` row is added with `asked=no`, per the asked-column semantics for
+        autonomous/`--auto`-suppressed decisions. The response does not describe any
+        AskUserQuestion call being made.

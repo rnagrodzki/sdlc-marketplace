@@ -1,6 +1,6 @@
-# Plan Ambiguity: Conflicting Codebase Caching Patterns (Step 1 Approach Check)
+# Plan Ambiguity: Conflicting Codebase Caching Patterns (Structured Discovery, Trigger C)
 
-This fixture exercises the Step 1 "Approach check" / structured-discovery ambiguity trigger: the
+This fixture exercises the Step 1 "Structured discovery" (trigger c) ambiguity trigger: the
 codebase sends conflicting signals — two existing patterns, either of which could reasonably be
 followed for the same new component — with no dominant convention. It is used both for the
 interactive path (AskUserQuestion fires) and the `--auto` path (AskUserQuestion is suppressed and
@@ -33,21 +33,26 @@ inventory counts) has no cross-instance consistency requirement — either appro
 
 The codebase sends conflicting signals: three existing call sites use the in-memory LRU pattern
 (Pattern A), one uses the Redis-backed pattern (Pattern B). Neither is disqualified by the
-requirements. Per the Step 1 "Approach check", this is a case where reasonable implementers could
-differ, and the plan must not silently guess.
+requirements. Per the Step 1 "Structured discovery" trigger (c), this is a case where reasonable
+implementers could differ, and the plan must not silently guess.
 
 ## Interactive path (no `--auto`)
 
-The Step 1 "Approach check" fires AskUserQuestion, presenting the trade-offs of Pattern A
-(in-memory LRU — simpler, no new infra, but not shared across instances) vs. Pattern B
+The Step 1 "Structured discovery" trigger fires AskUserQuestion, presenting the trade-offs of
+Pattern A (in-memory LRU — simpler, no new infra, but not shared across instances) vs. Pattern B
 (Redis-backed — shared/consistent across instances, but adds a network hop and an existing Redis
 dependency) before decomposition proceeds.
 
 ## `--auto` path
 
-`--auto` is set. The Step 1 "Approach check" AskUserQuestion is suppressed. Instead, plan-sdlc
-picks the approach matching the DOMINANT existing codebase pattern — Pattern A, the in-memory LRU
-cache used by 3 of the 4 existing call sites (`pricing.ts`, `discount.ts`, `shipping.ts`) — and:
-- Records the choice and rationale in `## Key Decisions`.
+`--auto` is set. The Step 1 "Structured discovery" AskUserQuestion is suppressed. Per R65,
+plan-sdlc picks the most conservative approach autonomously, using the existing codebase pattern
+as a tiebreaker between equally-conservative choices. Pattern A (in-memory LRU) is the more
+conservative option for this call site — no new infrastructure, no network hop, no new runtime
+dependency — and it is also the dominant pattern (3 of the 4 existing call sites: `pricing.ts`,
+`discount.ts`, `shipping.ts`), so the pattern-matching tiebreaker agrees with the conservative
+choice. plan-sdlc:
+- Records the choice and rationale (conservatism first, dominant-pattern as tiebreaker) in
+  `## Key Decisions`.
 - Adds a `## Deviations & assumptions` row with `asked=no` (autonomous/`--auto`-suppressed, per
   the `asked` column semantics).
