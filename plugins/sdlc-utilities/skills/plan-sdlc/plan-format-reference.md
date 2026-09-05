@@ -95,13 +95,17 @@ and `## Research Findings` (before `## Key Decisions`) — see `## Section Order
 the plan diverges from, or assumes beyond, the literal request — so reviewers can audit intent
 without reconstructing it.
 
+**`asked` column semantics:** `asked=yes` when AskUserQuestion was actually used to resolve the
+item; `asked=no` when the decision was made autonomously (no ambiguity worth surfacing) or when
+AskUserQuestion was suppressed by `--auto` (R65).
+
 ```markdown
 ## Deviations & assumptions
 
 | Item | asked | does | why |
 |---|---|---|---|
-| Notification delivery | "send notifications" | dispatches via a background queue | decouples request latency from delivery; mirrors existing worker pattern |
-| Retry policy | (not specified) | adds 3-attempt exponential backoff | transient broker failures must not drop messages |
+| Notification delivery | no | dispatches via a background queue | decouples request latency from delivery; mirrors existing worker pattern |
+| Retry policy | yes | adds 3-attempt exponential backoff | user chose exponential backoff over fixed-interval retry when asked via AskUserQuestion |
 ```
 
 When a plan introduces no divergences or assumptions, render the header with a single row stating "none".
@@ -483,6 +487,9 @@ need to open OpenSpec files separately.
   `Not applicable — no OpenSpec change`.
 - **OpenSpec change active** (source matches `openspec/changes/`): body lists each requirement from
   the inventory with the task(s) that cover it, and reproduces the relevant delta-spec fragments.
+- **OpenSpec inline generation** (`openspecInlineGenerate` true): body contains authored artifact
+  drafts with per-file `<!-- openspec-target: <path> -->` annotations consumable by `openspec
+  create`/`validate`.
 
 **Nested-fence safety (N+1 backticks):** delta-spec fragments reproduced here are themselves
 markdown containing fenced code blocks (scenario snippets, requirement bodies). A plain 3-backtick
@@ -508,6 +515,34 @@ runs through untouched.
 ### Requirement: Signed webhook payloads
 The system SHALL sign every outbound webhook payload with HMAC-SHA256.
 ```
+````
+
+**Inline generation example** (`openspecInlineGenerate` true — no on-disk OpenSpec change exists yet;
+the appendix authors the drafts that `openspec create`/`openspec validate` will consume). Each
+authored fragment is wrapped in a `<!-- openspec-target: <path> -->` annotation naming the file the
+fragment becomes once handed off:
+
+````markdown
+## OpenSpec Appendix
+
+**OpenSpec Artifacts (Draft)**
+
+### Proposal Summary
+<!-- openspec-target: proposal.md -->
+Adds HMAC-SHA256 signing to outbound webhook payloads so receivers can verify authenticity.
+
+### Delta Specs
+<!-- openspec-target: specs/billing/spec.md -->
+```markdown
+## ADDED Requirements
+### Requirement: Signed webhook payloads
+The system SHALL sign every outbound webhook payload with HMAC-SHA256.
+```
+
+### Tasks List
+<!-- openspec-target: tasks.md -->
+- [ ] Add HMAC signing to the webhook dispatcher
+- [ ] Reject unsigned inbound callbacks with 401
 ````
 
 ---
